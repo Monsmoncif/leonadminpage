@@ -1,0 +1,42 @@
+{
+  "name": "wheelzie",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:all": "concurrently -n \"BACKEND,FRONTEND\" -c \"magenta,cyan\" \"npm run backend:dev\" \"npm run dev\"",
+    "build": "next build",
+    "start": "next start",
+    "backend:dev": "npm --prefix backend run start:dev",
+    "backend:build": "npm --prefix backend run build",
+    "backend:start": "npm --prefix backend run start:prod"
+  },
+  "dependencies": {
+    "@types/pdfkit": "^0.17.6",
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.10.0",
+    "dotenv": "^17.4.2",
+    "html2pdf.js": "^0.14.0",
+    "lucide-react": "^1.23.0",
+    "mongoose": "^9.7.3",
+    "next": "16.2.10",
+    "next-auth": "^4.24.14",
+    "nodemailer": "^7.0.13",
+    "pdfkit": "^0.20.2",
+    "puppeteer-core": "^25.11.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "^3.9.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^10.0.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
