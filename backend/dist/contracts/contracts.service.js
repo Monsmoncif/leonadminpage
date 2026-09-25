@@ -769,7 +769,7 @@ let ContractsService = class ContractsService {
           </div>
         `;
                 await transporter.sendMail({
-                    from: `"Wheelzie System" <${process.env.SMTP_USER}>`,
+                    from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
                     to: adminEmail,
                     subject: `${isDelivered ? '✅' : '🔄'} ${isDelivered ? 'Vehicle Delivered' : 'Vehicle Returned & Settled'} — #${contractNum} | ${vehicleName}`,
                     html: emailHtml,
@@ -801,9 +801,9 @@ let ContractsService = class ContractsService {
             try {
                 const transporter = this.getMailTransporter();
                 await transporter.sendMail({
-                    from: `"Wheelzie Rentals" <${process.env.SMTP_USER}>`,
+                    from: `"Leon Rent Car" <${process.env.SMTP_USER}>`,
                     to: clientEmail,
-                    subject: `Rental Contract #${contractNum} — ${vehicleName} | Wheelzie`,
+                    subject: `Rental Contract #${contractNum} — ${vehicleName} | Leon Rent Car`,
                     html: `<p>Hello ${contract.clientId.name}, your rental contract details are confirmed.</p>`,
                 });
                 return { success: true };
@@ -820,13 +820,13 @@ let ContractsService = class ContractsService {
             throw new common_1.BadRequestException('Email is required');
         const transporter = this.getMailTransporter();
         await transporter.sendMail({
-            from: `"Wheelzie Rentals" <${process.env.SMTP_USER}>`,
+            from: `"Leon Rent Car" <${process.env.SMTP_USER}>`,
             to: email,
-            subject: `Your Vehicle Rental Contract - Wheelzie`,
+            subject: `Your Vehicle Rental Contract - Leon Rent Car`,
             html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
           <h2 style="color: #2F3645;">Hello ${clientName},</h2>
-          <p>Thank you for choosing Wheelzie for your rental needs!</p>
+          <p>Thank you for choosing Leon Rent Car for your rental needs!</p>
           <div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 8px; text-align: center;">
             <a href="${pdfUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; font-weight: bold; border-radius: 6px;">
               View & Download Your Contract

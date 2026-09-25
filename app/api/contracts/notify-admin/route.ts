@@ -100,13 +100,13 @@ export async function POST(req: Request) {
                 `}
               </table>
               
-              <p style="font-size: 13px; color: #64748b; margin-top: 24px;">— Wheelzie System Notification</p>
+              <p style="font-size: 13px; color: #64748b; margin-top: 24px;">— Leon Rent Car Notification</p>
             </div>
           </div>
         `;
 
         await transporter.sendMail({
-          from: `"Wheelzie System" <${process.env.SMTP_USER}>`,
+          from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
           to: adminEmail,
           subject: `${isDelivered ? '✅' : '🔄'} ${isDelivered ? 'Vehicle Delivered' : 'Vehicle Returned & Settled'} — #${contractNum} | ${vehicleName}`,
           html: emailHtml,
@@ -123,16 +123,16 @@ export async function POST(req: Request) {
       const admins = await User.find({ role: "admin", phone: { $exists: true, $ne: "" } }).select("phone name").lean();
       
       const moneyLine = isDelivered
-        ? `💵 Security Deposit Collected: $${contract.depositAmount || 0}`
-        : `💰 Rest of Money Collected: $${contract.returnAmountCollected !== undefined ? contract.returnAmountCollected : 0} (${contract.returnPaymentMethod || "Cash"}) [Confirmed to Admin]`;
+        ? `💵 *Security Deposit Collected:* $${contract.depositAmount || 0}`
+        : `💰 *Rest of Money Collected:* $${contract.returnAmountCollected !== undefined ? contract.returnAmountCollected : 0} (${contract.returnPaymentMethod || "Cash"})`;
 
       const whatsappMsg = `${isDelivered ? '✅' : '🔄'} *${eventTitle}*\n\n` +
-        `📄 Contract: #${contractNum}\n` +
-        `🚙 Vehicle: ${vehicleName} (${vehiclePlate})\n` +
-        `👤 Client: ${clientName}\n` +
-        `👨‍✈️ Driver: ${driverName}\n` +
-        `${moneyLine}\n` +
-        `\n— Wheelzie System`;
+        `📄 *Contract:* #${contractNum}\n` +
+        `🚙 *Vehicle:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+        `👤 *Client:* ${clientName}\n` +
+        `👨‍✈️ *Driver:* ${driverName}\n` +
+        `${moneyLine}\n\n` +
+        `— *Leon Rent Car*`;
 
       for (const admin of admins) {
         if (admin.phone) {

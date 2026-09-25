@@ -11,6 +11,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   const [contract, setContract] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -40,9 +41,21 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
       const timer = setTimeout(() => {
         if (!isNoPrint) window.print();
       }, 400);
+
+      // Background prefetch the PDF into server memory cache so clicking Download is instant
+      if (!isNoPrint) {
+        const prefetchTimer = setTimeout(() => {
+          fetch(`/api/contracts/${id}/pdf`).catch(() => {});
+        }, 800);
+        return () => {
+          clearTimeout(timer);
+          clearTimeout(prefetchTimer);
+        };
+      }
+
       return () => clearTimeout(timer);
     }
-  }, [contract]);
+  }, [contract, id]);
 
   if (loading) {
     return (
@@ -83,6 +96,29 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   const serialNo = contract.contractNumber
     ? String(contract.contractNumber)
     : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2000");
+
+  const handleDownloadPdf = async () => {
+    if (isDownloading) return;
+    try {
+      setIsDownloading(true);
+      const res = await fetch(`/api/contracts/${id}/pdf`);
+      if (!res.ok) throw new Error("Failed to load PDF");
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `Contract-${serialNo}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      console.error("PDF download failed:", err);
+      window.open(`/api/contracts/${id}/pdf`, "_blank");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div id="contract-print-content" className="bg-white min-h-screen font-sans text-[10px] leading-normal text-gray-900 selection:bg-brand/10 print:bg-white print:p-0 p-4 max-w-[210mm] mx-auto">
@@ -139,14 +175,24 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
       {/* Top Banner (Print Button for non-print view) */}
       <div className="no-print mb-4 p-3 bg-brand/5 border border-brand/20 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <a
-            href={`/api/contracts/${id}/pdf`}
-            download={`Contract-${serialNo}.pdf`}
-            className="px-4 py-2.5 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={isDownloading}
+            className="px-4 py-2.5 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-75"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-            Download PDF
-          </a>
+            {isDownloading ? (
+              <>
+                <Loader2 size={15} className="animate-spin text-brand" />
+                <span>Preparing PDF...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <span>Download PDF</span>
+              </>
+            )}
+          </button>
           <button 
             onClick={() => {
               document.title = serialNo;

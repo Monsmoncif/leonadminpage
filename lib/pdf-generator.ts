@@ -51,6 +51,49 @@ function getBrowserExecutablePath(): string | null {
   return null;
 }
 
+let globalBrowser: any = null;
+let browserLaunchingPromise: Promise<any> | null = null;
+
+async function getOrCreateBrowser(execPath: string): Promise<any> {
+  if (globalBrowser && globalBrowser.isConnected()) {
+    return globalBrowser;
+  }
+
+  if (browserLaunchingPromise) {
+    return browserLaunchingPromise;
+  }
+
+  browserLaunchingPromise = (async () => {
+    try {
+      const browser = await puppeteer.launch({
+        executablePath: execPath,
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--no-first-run",
+          "--no-default-browser-check",
+          "--disable-extensions",
+          "--disable-sync",
+        ],
+      });
+
+      browser.on("disconnected", () => {
+        globalBrowser = null;
+      });
+
+      globalBrowser = browser;
+      return browser;
+    } finally {
+      browserLaunchingPromise = null;
+    }
+  })();
+
+  return browserLaunchingPromise;
+}
+
 /**
  * Generates the EXACT contract PDF matching the Admin Print page (/bookings/[id]/print)
  * 100% identical to the contract that admin prints out.
@@ -61,27 +104,18 @@ export async function generateContractPdfFromPrintUrl(
 ): Promise<Buffer> {
   const execPath = getBrowserExecutablePath();
   if (execPath) {
-    let browser: any = null;
+    let page: any = null;
     try {
-      browser = await puppeteer.launch({
-        executablePath: execPath,
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-        ],
-      });
+      const browser = await getOrCreateBrowser(execPath);
+      page = await browser.newPage();
 
-      const page = await browser.newPage();
       const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
       const printUrl = `${baseUrl}/bookings/${contractId}/print?noprint=1`;
 
       await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 10000 });
       await page.waitForSelector("#contract-print-content", { timeout: 8000 });
       // Brief pause to allow fonts, signatures, and dynamic layout to settle
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const pdfUint8Array = await page.pdf({
         format: "A4",
@@ -89,16 +123,16 @@ export async function generateContractPdfFromPrintUrl(
         margin: { top: "6mm", bottom: "6mm", left: "5mm", right: "5mm" },
       });
 
-      await browser.close();
-      browser = null;
+      await page.close();
+      page = null;
 
       const pdfBuffer = Buffer.from(pdfUint8Array);
       console.log(`[PdfGenerator] Rendered exact admin print contract (${pdfBuffer.length} bytes) for #${contractId}`);
       return pdfBuffer;
     } catch (browserErr) {
       console.error("[PdfGenerator] Failed to render via headless browser, falling back to pdfkit:", browserErr);
-      if (browser) {
-        try { await browser.close(); } catch {}
+      if (page) {
+        try { await page.close(); } catch {}
       }
     }
   }

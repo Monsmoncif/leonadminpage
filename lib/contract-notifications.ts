@@ -4,7 +4,7 @@ import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
 import { User } from "@/models/User";
 import { Driver } from "@/models/Driver";
-import { sendWhatsApp } from "@/lib/whatsapp";
+import { sendWhatsApp, formatPhoneNumberForWhatsApp } from "@/lib/whatsapp";
 import nodemailer from "nodemailer";
 import { generateContractPdf, generateContractPdfFromPrintUrl } from "@/lib/pdf-generator";
 
@@ -200,9 +200,28 @@ export async function sendClientContractNotification(
         let whatsappMsg = "";
 
         if (type === "final") {
-          whatsappMsg = `Hello ${clientName},\nPlease find your rental contract attached. 📄\n\nThank you for choosing Leon Car Rental.\nEnjoy the drive & stay safe!`;
+          whatsappMsg = `🌟 *LEON RENT CAR* | تأكيد إرجاع السيارة\n` +
+            `*Vehicle Return Confirmation*\n\n` +
+            `Hello *${clientName}*,\n` +
+            `Thank you for choosing Leon Rent Car! Your vehicle return has been successfully processed.\n\n` +
+            `📄 *Contract / رقم العقد:* #${contractNum}\n` +
+            `🚗 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+            `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n\n` +
+            `📎 *Your final rental contract & invoice is attached below (PDF).*\n\n` +
+            `We hope you enjoyed your journey and look forward to welcoming you again!\n` +
+            `— *Leon Rent Car*`;
         } else {
-          whatsappMsg = `Hello ${clientName},\nPlease find your rental contract attached. 📄\n\nThank you for choosing Leon Car Rental.\nEnjoy the drive & stay safe!`;
+          whatsappMsg = `🌟 *LEON RENT CAR* | عقد إيجار سيارة\n` +
+            `*Vehicle Rental Agreement*\n\n` +
+            `Hello *${clientName}*,\n` +
+            `Thank you for choosing Leon Rent Car!\n\n` +
+            `📄 *Contract / رقم العقد:* #${contractNum}\n` +
+            `🚗 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+            `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
+            (contract.pickupLocation ? `📍 *Pickup Location / موقع الاستلام:* ${contract.pickupLocation}\n` : '') +
+            `\n📎 *Your official rental contract is attached below (PDF).*\n\n` +
+            `🛣️ Have a safe journey and enjoy the drive!\n` +
+            `— *Leon Rent Car*`;
         }
 
         const waRes = await sendWhatsApp({
@@ -363,18 +382,21 @@ export async function sendDriverTaskNotification(
     // 2. SEND WHATSAPP TO DRIVER
     if (driver.phone) {
       try {
-        const whatsappMsg = `*${taskArabicTitle}*\n` +
-          `━━━━━━━━━━━━━━━━━━\n` +
-          `📄 رقم العقد / Contract: #${contractNum}\n` +
-          `🚙 السيارة / Vehicle: ${vehicleName} (${vehiclePlate})\n` +
-          `👤 العميل / Client: ${clientName}\n` +
-          `📞 هاتف العميل / Phone: ${clientPhone || "N/A"}\n` +
-          `📍 ${isDelivery ? 'موقع التسليم / Delivery Location' : 'موقع الاستلام / Pickup Location'}: ${location}\n` +
-          `⏰ التوقيت المحدد / Time: ${time}\n` +
-          `📅 فترة الإيجار / Period: ${startDate} → ${endDate}\n` +
-          (contract.notes ? `\n📋 ملاحظات / Notes: ${contract.notes}\n` : '') +
-          `\n📲 رابط المهمة للسائق / Open Task:\n${actionUrl}\n\n` +
-          `— Leon Rent Car Dispatch`;
+        const cleanClientPhone = clientPhone ? formatPhoneNumberForWhatsApp(clientPhone) : "";
+        const clientChatLink = cleanClientPhone ? `https://wa.me/${cleanClientPhone}` : null;
+
+        const whatsappMsg = `*${taskArabicTitle}*\n\n` +
+          `📄 *رقم العقد / Contract:* #${contractNum}\n` +
+          `🚙 *السيارة / Vehicle:* ${vehicleName} (${vehiclePlate})\n` +
+          `👤 *العميل / Client:* ${clientName}\n` +
+          `📞 *هاتف العميل / Phone:* ${clientPhone || "N/A"}\n` +
+          (clientChatLink ? `💬 *واتساب العميل / Chat:* ${clientChatLink}\n` : '') +
+          `📍 *${isDelivery ? 'موقع التسليم / Delivery' : 'موقع الاستلام / Pickup'}:* ${location}\n` +
+          `⏰ *التوقيت المحدد / Time:* ${time}\n` +
+          `📅 *فترة الإيجار / Period:* ${startDate} → ${endDate}\n` +
+          (contract.notes ? `\n📋 *ملاحظات / Notes:* ${contract.notes}\n` : '') +
+          `\n📲 *رابط المهمة للسائق / Open Task:*\n${actionUrl}\n\n` +
+          `— *Leon Rent Car Dispatch*`;
 
         const waRes = await sendWhatsApp({
           to: driver.phone,

@@ -20,13 +20,13 @@ export async function POST(req: Request) {
     });
 
     const mailOptions = {
-      from: `"Wheelzie Rentals" <${process.env.SMTP_USER}>`,
+      from: `"Leon Rent Car" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: `Your Vehicle Rental Contract - Wheelzie`,
+      subject: `Your Vehicle Rental Contract - Leon Rent Car`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
           <h2 style="color: #2F3645;">Hello ${clientName},</h2>
-          <p>Thank you for choosing Wheelzie for your rental needs!</p>
+          <p>Thank you for choosing Leon Rent Car for your rental needs!</p>
           <p>Your vehicle rental contract has been successfully generated and signed.</p>
           
           <div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 8px; text-align: center;">
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
           </div>
           
           <p>If you have any questions, feel free to reply to this email or contact us.</p>
-          <p>Drive safe!<br/><strong>The Wheelzie Team</strong></p>
+          <p>Drive safe!<br/><strong>The Leon Rent Car Team</strong></p>
         </div>
       `,
     };

@@ -27,55 +27,30 @@ import {
   Camera,
   RotateCcw,
   Coins,
-  Fuel
+  Fuel,
+  Plus,
+  Trash2
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useToast } from "@/components/providers/ToastProvider";
 import Link from "next/link";
-import StatCard from "@/components/ui/StatCard";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
 
-// Helper for initials (matches clients & drivers page)
-const getInitials = (name: string) => {
-  if (!name) return "??";
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join("")
-    .substring(0, 2)
-    .toUpperCase();
-};
-
-// Pastel avatar colors matching clients page
-const getAvatarColor = (name: string) => {
-  if (!name) return "bg-blue-100 text-blue-700";
-  const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-emerald-100 text-emerald-700",
-    "bg-amber-100 text-amber-700",
-    "bg-purple-100 text-purple-700",
-    "bg-rose-100 text-rose-700",
-    "bg-cyan-100 text-cyan-700",
-  ];
-  const charCode = name.charCodeAt(0) || 0;
-  return colors[charCode % colors.length];
-};
-
-// Step definitions matching /bookings/new pattern
+// Step definitions matching driver/return and bookings/new pattern
 const SHOP_STEPS = [
-  { id: 1, title: "Contract & Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Mileage & Fuel", icon: Gauge },
-  { id: 3, title: "Inspection & Condition", icon: Camera },
+  { id: 1, title: "Vehicle & Mileage", icon: ExecutiveCarIcon },
+  { id: 2, title: "Inspection Photos", icon: Camera },
+  { id: 3, title: "Damage Check", icon: AlertTriangle },
   { id: 4, title: "Settlement & Check-in", icon: CheckCircle2 },
 ];
 
 const DISPATCH_STEPS = [
-  { id: 1, title: "Contract & Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Driver & Pickup", icon: UserCheck },
+  { id: 1, title: "Vehicle & Pickup", icon: ExecutiveCarIcon },
+  { id: 2, title: "Assign Driver", icon: UserCheck },
   { id: 3, title: "Review & Dispatch", icon: Send },
 ];
 
@@ -83,6 +58,7 @@ function ReturnPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const toast = useToast();
+  const { data: session } = useSession();
 
   const [contracts, setContracts] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
@@ -103,6 +79,8 @@ function ReturnPageContent() {
   const [hasDamages, setHasDamages] = useState<boolean>(false);
   const [damageDescription, setDamageDescription] = useState<string>("");
   const [damageCost, setDamageCost] = useState<string>("0");
+  const [damagePhotos, setDamagePhotos] = useState<string[]>([]);
+  const [isUploadingDamagePhoto, setIsUploadingDamagePhoto] = useState(false);
   const [salikCharge, setSalikCharge] = useState<string>("0");
   const [parkingCharge, setParkingCharge] = useState<string>("0");
   const [finesCharge, setFinesCharge] = useState<string>("0");
@@ -110,6 +88,7 @@ function ReturnPageContent() {
   const [returnFuelLevel, setReturnFuelLevel] = useState<number>(100);
   const [returnPaymentMethod, setReturnPaymentMethod] = useState<string>("Cash");
   const [returnPhotos, setReturnPhotos] = useState<Record<string, string>>({});
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   // Dispatch Driver form states
   const [returnDriverId, setReturnDriverId] = useState("");
@@ -118,6 +97,14 @@ function ReturnPageContent() {
   const [instructions, setInstructions] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const getCurrentFormattedTime = () => {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date());
+  };
 
   // Scroll to top smoothly on step change
   const scrollToTop = () => {
@@ -141,7 +128,7 @@ function ReturnPageContent() {
     ])
       .then(([contractsData, driversData]) => {
         const list = contractsData.contracts || [];
-        const activeList = list.filter((c: any) => c.status === "Active");
+        const activeList = list.filter((c: any) => c.status === "Active" || c.deliveryStatus === "Delivered");
         setContracts(activeList.length > 0 ? activeList : list);
 
         const driversList = Array.isArray(driversData) ? driversData : (driversData.drivers || []);
@@ -178,12 +165,12 @@ function ReturnPageContent() {
 
       const initialLoc = (selectedContract.dropoffLocation && selectedContract.dropoffLocation !== "Main Office") 
         ? selectedContract.dropoffLocation 
-        : (selectedContract.pickupLocation || "");
+        : (selectedContract.pickupLocation || "Main Office");
       setPickupLocation(initialLoc);
       
       setReturnDriverId(selectedContract.returnDriverId || "");
 
-      const nowTimeStr = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }).format(new Date());
+      const nowTimeStr = getCurrentFormattedTime();
       if (selectedContract.checkinTime && selectedContract.checkinTime !== "Pending Handover") {
         setScheduledTime(selectedContract.checkinTime);
         setShopReturnTime(selectedContract.checkinTime);
@@ -205,6 +192,7 @@ function ReturnPageContent() {
       setHasDamages(false);
       setDamageDescription("");
       setDamageCost("0");
+      setDamagePhotos([]);
       setSalikCharge(String(selectedContract.salikFees || selectedContract.salikCharge || 0));
       setParkingCharge(String(selectedContract.parkingFees || selectedContract.parkingCharge || 0));
       setFinesCharge(String(selectedContract.finesFees || selectedContract.finesCharge || 0));
@@ -221,6 +209,7 @@ function ReturnPageContent() {
         });
       }
       setReturnPhotos(initialPhotos);
+      setIsConfirmed(false);
     }
   }, [selectedContract]);
 
@@ -230,10 +219,19 @@ function ReturnPageContent() {
   };
 
   // Calculations
-  const vehicleName = selectedContract?.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || "Vehicle";
-  const plateNumber = selectedContract?.vehiclePlate || "";
-  const customerName = selectedContract?.customer || "Customer";
-  const handoverLocation = selectedContract?.pickupLocation || "";
+  const contractNum = selectedContract?.contractNumber || selectedContract?.id || selectedContract?._id?.substring(0, 8)?.toUpperCase() || "N/A";
+  const vehicleName = selectedContract?.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || (selectedContract?.unitId ? `${selectedContract.unitId.make} ${selectedContract.unitId.model}` : "Vehicle");
+  const plateMatch = (selectedContract?.vehicle || "").match(/\(([^)]+)\)/);
+  const plateNumber = selectedContract?.vehiclePlate || selectedContract?.unitId?.plate || (plateMatch ? plateMatch[1] : "");
+  const vehicleMake = selectedContract?.unitId?.make || "Vehicle";
+  const vehicleYear = selectedContract?.vehicleYear || selectedContract?.unitId?.year || "";
+  const vehicleColor = selectedContract?.vehicleColor || selectedContract?.unitId?.color || "";
+  const vehicleFuel = selectedContract?.vehicleFuel || selectedContract?.unitId?.fuelType || "Petrol";
+  const vehicleImage = selectedContract?.vehicleImage || selectedContract?.unitId?.images?.[0] || "";
+
+  const customerName = selectedContract?.customer || selectedContract?.clientId?.name || "Customer";
+  const customerPhone = selectedContract?.customerPhone || selectedContract?.clientId?.phone || "";
+  const handoverLocation = selectedContract?.pickupLocation || "Main Office";
 
   const depositAmount = Number(selectedContract?.depositAmount) || (selectedContract?.deposit ? Number(String(selectedContract.deposit).replace(/[^0-9.]/g, '')) : 0);
 
@@ -259,23 +257,69 @@ function ReturnPageContent() {
   const STEPS = returnMode === "shop" ? SHOP_STEPS : DISPATCH_STEPS;
   const totalSteps = STEPS.length;
 
+  // Damage photo uploader
+  const handleDamagePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingDamagePhoto(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        });
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64 }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            setDamagePhotos((prev) => [...prev, data.url]);
+          }
+        }
+      }
+      toast.success("Damage photos uploaded.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload damage photo.");
+    } finally {
+      setIsUploadingDamagePhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveDamagePhoto = (index: number) => {
+    setDamagePhotos((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   const handleNext = () => {
-    // Step 1: Contract Selection validation
+    // Step 1: Contract & Mileage validation
     if (currentStep === 1) {
       if (!selectedContract) {
         toast.error("Please select an active contract to return.");
         return;
       }
-      setIsChangingContract(false);
-    }
-
-    // Step 2: Mileage & Fuel (Shop mode)
-    if (returnMode === "shop" && currentStep === 2) {
-      const odo = Number(returnOdometer);
-      if (!returnOdometer.trim() || isNaN(odo) || odo < 0) {
-        toast.error("Please enter a valid return odometer reading.");
-        return;
+      if (returnMode === "shop") {
+        const odo = Number(returnOdometer);
+        if (!returnOdometer.trim() || isNaN(odo) || odo < initialMileage) {
+          toast.error(`Return odometer cannot be less than initial pickup mileage (${initialMileage.toLocaleString()} km).`);
+          return;
+        }
+      } else {
+        if (!pickupLocation.trim()) {
+          toast.error("Please specify a collection pickup location.");
+          return;
+        }
       }
+      setIsChangingContract(false);
     }
 
     // Step 2: Driver & Pickup (Dispatch mode)
@@ -284,13 +328,9 @@ function ReturnPageContent() {
         toast.error("Please choose a return driver.");
         return;
       }
-      if (!pickupLocation.trim()) {
-        toast.error("Please specify a collection pickup location.");
-        return;
-      }
     }
 
-    // Step 3: Condition & Photos (Shop mode)
+    // Step 3: Damage Check (Shop mode)
     if (returnMode === "shop" && currentStep === 3) {
       if (hasDamages && !damageDescription.trim()) {
         toast.error("Please enter a description for the reported damage.");
@@ -317,14 +357,24 @@ function ReturnPageContent() {
     if (!selectedContract) return;
 
     const odoNum = Number(returnOdometer);
-    if (isNaN(odoNum) || odoNum < 0) {
-      toast.error("Please enter a valid return odometer reading");
+    if (isNaN(odoNum) || odoNum < initialMileage) {
+      toast.error(`Return odometer cannot be less than initial pickup mileage (${initialMileage.toLocaleString()} km).`);
+      return;
+    }
+
+    if (hasDamages && !damageDescription.trim()) {
+      toast.error("Please describe the reported damages.");
+      setCurrentStep(3);
+      return;
+    }
+
+    if (!isConfirmed) {
+      toast.error("Please confirm return completion checkbox.");
       return;
     }
 
     try {
       setIsSubmitting(true);
-
       const orderedReturnPhotos = VEHICLE_ANGLES.map(angle => returnPhotos[angle] || "");
 
       const payload = {
@@ -348,12 +398,16 @@ function ReturnPageContent() {
           cost: damageChargeNum,
           date: new Date()
         }] : [],
+        newDamages: hasDamages && damageDescription.trim() ? damageDescription.trim() : "None",
+        damagePhotos: hasDamages ? damagePhotos : [],
         paymentMethod: returnPaymentMethod,
         paymentStatus: "Paid",
         returnAmountCollected: totalReturnCharges,
         returnPaymentMethod: returnPaymentMethod,
         returnPhotos: orderedReturnPhotos,
-        notes: instructions.trim() ? `${selectedContract.notes || ""}\n[Return Inspection Remarks: ${instructions.trim()}]`.trim() : selectedContract.notes
+        notes: instructions.trim() ? `${selectedContract.notes || ""}\n[Return Remarks: ${instructions.trim()}]`.trim() : selectedContract.notes,
+        returnedAt: new Date().toISOString(),
+        returnedBy: (session?.user as any)?.name || "Admin",
       };
 
       const res = await fetch(`/api/contracts/${selectedContract._id}`, {
@@ -367,7 +421,7 @@ function ReturnPageContent() {
         throw new Error(errorData.error || "Failed to complete return process");
       }
 
-      toast.success("Vehicle returned and contract completed successfully!");
+      toast.success("Vehicle returned and contract completed successfully! ✓");
       setTimeout(() => {
         router.push("/bookings");
       }, 800);
@@ -440,36 +494,37 @@ function ReturnPageContent() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
-        <Loader2 size={36} className="animate-spin text-brand" />
-        <p className="text-sm font-semibold text-text-secondary">Loading vehicle return console...</p>
+      <div className="max-w-5xl mx-auto space-y-6 pb-20 animate-pulse">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <div className="h-8 w-64 bg-gray-200 rounded-lg"></div>
+            <div className="h-4 w-96 bg-gray-200 rounded-lg mt-3"></div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8 flex items-center justify-between">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gray-200"></div>
+              <div className="h-3 w-20 bg-gray-200 rounded"></div>
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 h-96"></div>
       </div>
     );
   }
 
-  // ===================== STEP RENDERERS =====================
-
-  // STEP 1: Contract & Vehicle Selection
-  const renderContractStep = () => {
+  // ===================== STEP 1: VEHICLE & MILEAGE =====================
+  const renderVehicleStep = () => {
     return (
       <div className="space-y-6 animate-fade-in-up">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-text-primary">Step 1: Select Active Contract &amp; Vehicle</h2>
+            <h2 className="text-lg font-bold text-text-primary">Step 1: Vehicle &amp; Return Details</h2>
             <p className="text-xs text-text-muted mt-0.5">
-              Confirm the active booking being returned to calculate initial mileage, duration, and settlement.
+              Verify vehicle identity, record current return odometer reading, and select return fuel level
             </p>
           </div>
-          {selectedContract && !isChangingContract && (
-            <button
-              type="button"
-              onClick={() => setIsChangingContract(true)}
-              className="text-xs font-bold text-brand hover:text-brand-dark px-3 py-1.5 rounded-lg bg-brand/10 hover:bg-brand/15 transition-all self-start sm:self-auto cursor-pointer flex items-center gap-1.5"
-            >
-              <RotateCcw size={13} />
-              <span>Change Contract</span>
-            </button>
-          )}
         </div>
 
         {/* Contract Selection Browser (shown if no contract or user clicked change) */}
@@ -560,362 +615,627 @@ function ReturnPageContent() {
             </div>
           </div>
         ) : (
-          /* Selected Contract Executive Overview Card */
-          <div className="space-y-4">
-            {/* Top Metric Strip */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <StatCard
-                icon={DollarSign}
-                label="Return Charges Due"
-                value={`$${totalReturnCharges.toFixed(2)}`}
-                accentColor={totalReturnCharges > 0 ? "#E53935" : "#22C55E"}
-                subtitle={totalReturnCharges > 0 ? "Extra mileage & damages due" : "Clean return — no fees due"}
-                sparkData={[0, 0, extraKmCharge, damageChargeNum, totalReturnCharges]}
-              />
-              <StatCard
-                icon={Gauge}
-                label="Checkout Mileage"
-                value={`${initialMileage.toLocaleString()} km`}
-                accentColor="#3B82F6"
-                subtitle="Starting baseline odometer"
-                sparkData={[initialMileage - 200, initialMileage - 100, initialMileage]}
-              />
-              <StatCard
-                icon={Calendar}
-                label="Rental Duration"
-                value={`${totalDays} Days`}
-                accentColor="#22C55E"
-                subtitle={`${selectedContract?.startDate || "—"} to ${selectedContract?.endDate || "—"}`}
-                sparkData={[1, 3, 5, 7, totalDays]}
-              />
-            </div>
-
-            {/* Detailed Vehicle & Customer Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* 1. Vehicle Details Card */}
-              <div className="p-4 rounded-2xl bg-white border border-border shadow-xs space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                    <ExecutiveCarIcon size={24} />
+          /* 2-Column Layout (100% Identical to driver/return and bookings/new) */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left: Vehicle Profile Card */}
+            <div className="bg-card rounded-2xl border border-brand bg-brand-light/10 ring-2 ring-brand/30 p-5 space-y-4 shadow-sm flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-text-muted font-bold mb-0.5">
+                      {vehicleMake} • {vehicleYear || new Date().getFullYear()}
+                    </p>
+                    <h3 className="text-base font-bold text-text-primary leading-tight">{vehicleName}</h3>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Vehicle</span>
-                    <h3 className="text-base font-bold text-text-primary truncate">{vehicleName}</h3>
-                    <span className="inline-block mt-0.5 text-xs font-bold text-text-secondary px-2 py-0.5 bg-gray-100 rounded border border-border">
-                      {plateNumber || "NO-PLATE"}
+                  <span className="bg-brand text-white p-1 rounded-full shrink-0">
+                    <CheckCircle2 size={16} />
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-center min-h-[140px] my-2 relative bg-gray-50/70 rounded-xl border border-gray-100">
+                  {vehicleImage ? (
+                    <img
+                      src={vehicleImage}
+                      alt={vehicleName}
+                      className="max-w-full max-h-32 object-contain drop-shadow-sm"
+                    />
+                  ) : (
+                    <ExecutiveCarIcon size={52} className="text-gray-300" />
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
+                  {plateNumber && (
+                    <span className="font-mono text-brand font-bold bg-brand/10 px-2.5 py-1 rounded-md border border-brand/20">
+                      {plateNumber}
                     </span>
+                  )}
+                  <div className="text-right">
+                    <span className="text-xs text-text-muted">Color: </span>
+                    <span className="font-semibold text-text-primary">{vehicleColor || "Standard"}</span>
+                    <span className="mx-1.5 text-gray-300">•</span>
+                    <span className="text-xs text-text-muted">Fuel: </span>
+                    <span className="font-semibold text-text-primary">{vehicleFuel}</span>
                   </div>
                 </div>
-                <div className="text-xs text-text-secondary space-y-1.5 pt-2 border-t border-border/60">
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Contract Type:</span>
-                    <strong className="font-semibold text-text-primary">{selectedContract.contractType || "Shop"}</strong>
+
+                <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                  <div className="bg-white p-3 rounded-xl border border-border/80">
+                    <span className="text-text-muted text-[11px] block">Checkout Mileage</span>
+                    <span className="font-bold text-text-primary text-sm">
+                      {initialMileage.toLocaleString()} km
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Checkout Mileage:</span>
-                    <strong className="font-semibold text-text-primary">{initialMileage.toLocaleString()} km</strong>
+                  <div className="bg-white p-3 rounded-xl border border-border/80">
+                    <span className="text-text-muted text-[11px] block">Daily KM Limit</span>
+                    <span className="font-bold text-text-primary text-sm">
+                      {dailyKmLimit > 0 ? `${dailyKmLimit} km / day` : "Unlimited"}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* 2. Customer Profile Card */}
-              <div className="p-4 rounded-2xl bg-white border border-border shadow-xs space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 shadow-xs ${getAvatarColor(customerName)}`}>
-                    {getInitials(customerName)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Customer</span>
-                    <h3 className="text-base font-bold text-text-primary truncate capitalize">{customerName}</h3>
-                    <div className="flex items-center gap-1.5 text-xs text-text-secondary font-medium mt-0.5">
-                      <Phone size={12} className="text-text-muted shrink-0" />
-                      <span className="truncate">{selectedContract.customerPhone || "No phone recorded"}</span>
+              {/* Customer / Contract Info Pill */}
+              <div className="bg-white p-3.5 rounded-xl border border-border/80 space-y-1.5 text-xs mt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-text-muted text-[11px]">Primary Customer</span>
+                  <span className="font-mono text-[10px] text-brand bg-brand/10 px-2 py-0.5 rounded font-bold">
+                    Contract #{contractNum}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <strong className="text-text-primary font-bold">{customerName}</strong>
+                  <span className="text-text-muted">{customerPhone || "No phone recorded"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Return Schedule & Fuel (Shop mode) or Pickup Logistics (Dispatch mode) */}
+            {returnMode === "shop" ? (
+              <div className="space-y-5">
+                {/* Return Schedule & Mileage Card */}
+                <div className="bg-white rounded-2xl border border-border p-5 space-y-4 shadow-2xs">
+                  <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                    <Clock size={16} className="text-brand" />
+                    <span>Return Schedule &amp; Mileage</span>
+                  </h3>
+
+                  <div className="space-y-3">
+                    {/* Check-in Return Time */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-text-secondary">
+                          Check-in Return Time (وقت الاسترجاع) <span className="text-red-500">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShopReturnTime(getCurrentFormattedTime())}
+                          className="text-xs text-brand hover:text-brand-dark font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <span>Set time now</span>
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Clock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                          <input
+                            type="text"
+                            value={shopReturnTime}
+                            onChange={(e) => setShopReturnTime(e.target.value)}
+                            placeholder="e.g. 10:00 AM"
+                            className="w-full p-2.5 pl-10 rounded-xl border border-border bg-white text-sm font-medium text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShopReturnTime(getCurrentFormattedTime())}
+                          className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-secondary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 shadow-2xs flex items-center gap-1.5"
+                        >
+                          <Clock size={14} className="text-brand" />
+                          <span>Now</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Return Odometer */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-text-secondary">
+                          Return Odometer (km) <span className="text-red-500">*</span>
+                        </label>
+                        <span className="text-[11px] font-semibold text-text-muted bg-gray-100 px-2 py-0.5 rounded">
+                          Handover: {initialMileage.toLocaleString()} km
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <Gauge size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                        <input
+                          type="number"
+                          value={returnOdometer}
+                          onChange={(e) => setReturnOdometer(e.target.value)}
+                          placeholder={`e.g. ${initialMileage + 120}`}
+                          min={initialMileage}
+                          className="w-full p-2.5 pl-10 rounded-xl border border-border bg-white text-sm font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                          required
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs pt-1.5">
+                        <span className="text-text-muted">Distance driven since handover:</span>
+                        <span className="font-bold text-brand text-xs">+{kmDriven.toLocaleString()} km</span>
+                      </div>
+                      {returnOdometer.trim() !== "" && Number(returnOdometer) < initialMileage && (
+                        <p className="text-[11px] text-amber-600 flex items-center gap-1 font-medium pt-1">
+                          <AlertTriangle size={12} className="shrink-0" />
+                          <span>Entered reading ({Number(returnOdometer).toLocaleString()} km) is lower than checkout baseline ({initialMileage.toLocaleString()} km).</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Return Location */}
+                    <div>
+                      <label className="text-xs font-semibold text-text-secondary block mb-1">
+                        Return Pickup / Store Location
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                          <input
+                            type="text"
+                            readOnly
+                            value={handoverLocation || "Main Office / Showroom"}
+                            className="w-full p-2.5 pl-10 rounded-xl border border-border bg-gray-50 text-xs font-medium text-text-primary outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openGoogleMaps(handoverLocation || "Main Office")}
+                          className="px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-emerald-200 flex items-center gap-1.5"
+                        >
+                          <Navigation size={12} className="rotate-45" />
+                          <span>Maps</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Return Notes */}
+                    <div>
+                      <label className="text-xs font-semibold text-text-secondary block mb-1">
+                        Return Remarks / Notes (ملاحظات الاسترجاع)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={instructions}
+                        onChange={(e) => setInstructions(e.target.value)}
+                        placeholder="Any return observations or hand-over remarks..."
+                        className="w-full p-2.5 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none resize-none"
+                      />
                     </div>
                   </div>
                 </div>
-                <div className="text-xs text-text-secondary space-y-1.5 pt-2 border-t border-border/60">
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Customer Type:</span>
-                    <strong className="font-semibold text-text-primary">{selectedContract.customerType || "B2C"}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Pre-collected Deposit:</span>
-                    <strong className="font-semibold text-emerald-700">${depositAmount.toFixed(2)}</strong>
-                  </div>
-                </div>
-              </div>
 
-              {/* 3. Rental Period & Location Card */}
-              <div className="p-4 rounded-2xl bg-white border border-border shadow-xs space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
-                    <Calendar size={22} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Period</span>
-                    <h3 className="text-base font-bold text-text-primary">{totalDays} Rental Days</h3>
-                    <span className="text-xs text-text-secondary truncate block mt-0.5">
-                      {selectedContract.startDate} → {selectedContract.endDate}
-                    </span>
-                  </div>
+                {/* Return Fuel Level Selector Card */}
+                <div className="bg-white rounded-2xl border border-border p-5 shadow-2xs">
+                  <FuelLevelSelector
+                    value={returnFuelLevel}
+                    onChange={(val) => setReturnFuelLevel(val)}
+                    label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
+                    sublabel={`Handover baseline was ${selectedContract?.checkoutFuelLevel !== undefined ? selectedContract.checkoutFuelLevel : 100}%. Select current tank percentage.`}
+                  />
                 </div>
-                <div className="text-xs text-text-secondary space-y-1.5 pt-2 border-t border-border/60">
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Daily Km Allowance:</span>
-                    <strong className="font-semibold text-text-primary">{dailyKmLimit > 0 ? `${dailyKmLimit} km/day` : "Unlimited"}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Pickup Location:</span>
-                    <strong className="font-semibold text-text-primary truncate max-w-[150px]">{handoverLocation || "Main Office"}</strong>
+              </div>
+            ) : (
+              /* Dispatch Mode: Pickup Logistics Card */
+              <div className="space-y-5">
+                <div className="bg-white rounded-2xl border border-border p-5 space-y-4 shadow-2xs">
+                  <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                    <MapPin size={16} className="text-brand" />
+                    <span>Pickup Location &amp; Schedule</span>
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-text-secondary">
+                          Collection Pickup Location <span className="text-red-500">*</span>
+                        </label>
+                        {pickupLocation.trim() && (
+                          <button
+                            type="button"
+                            onClick={() => openGoogleMaps(pickupLocation.trim())}
+                            className="text-xs font-bold text-brand hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <Navigation size={11} className="rotate-45" />
+                            <span>Google Maps</span>
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={pickupLocation}
+                        onChange={(e) => setPickupLocation(e.target.value)}
+                        placeholder="e.g. Airport Terminal 1, Hotel Lobby, Client Residence..."
+                        className="w-full p-2.5 rounded-xl border border-border bg-white text-sm font-medium focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none shadow-sm"
+                        required
+                      />
+                      {handoverLocation && (
+                        <button
+                          type="button"
+                          onClick={() => setPickupLocation(handoverLocation)}
+                          className="text-xs text-text-secondary hover:text-text-primary font-semibold flex items-center gap-1 cursor-pointer mt-1"
+                        >
+                          <MapPin size={12} className="text-brand" />
+                          <span>Use Handover Address ({handoverLocation})</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-text-secondary flex items-center gap-1.5">
+                          <Clock size={14} className="text-brand" />
+                          <span>Scheduled Pickup Time</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={scheduledTime}
+                          onChange={(e) => setScheduledTime(e.target.value)}
+                          placeholder="10:00 AM"
+                          className="w-full p-2.5 rounded-xl border border-border bg-white text-sm font-semibold focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none shadow-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-text-secondary flex items-center gap-1.5">
+                          <User size={14} className="text-brand" />
+                          <span>Customer Phone Contact</span>
+                        </label>
+                        <input
+                          type="text"
+                          disabled
+                          value={`${customerName} (${customerPhone || "No Phone"})`}
+                          className="w-full p-2.5 rounded-xl border border-border bg-surface text-sm font-semibold text-text-muted cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Dispatch Notes */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-text-secondary block">
+                        Collection Instructions for Driver
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={instructions}
+                        onChange={(e) => setInstructions(e.target.value)}
+                        placeholder="e.g. Meet client in front of lobby, collect second key set..."
+                        className="w-full p-2.5 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none resize-none shadow-sm"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
     );
   };
 
-  // STEP 2 (Shop): Mileage & Fuel Level Check-in
-  const renderMileageAndFuelStep = () => {
-    return (
-      <div className="space-y-6 animate-fade-in-up">
+  // ===================== STEP 2 (Shop): INSPECTION PHOTOS =====================
+  const renderPhotosStep = () => (
+    <div className="space-y-6 animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 2: Mileage &amp; Fuel Level Inspection</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step 2: Return Vehicle Inspection Photos</h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Record the final odometer reading from the dashboard and inspect the remaining fuel level percentage.
+            Capture or upload 8 standard angles to document vehicle condition upon client return
           </p>
         </div>
-
-        {/* 1. Odometer & Return Time Card */}
-        <div className="p-5 rounded-2xl bg-surface border border-border/80 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-border/60">
-            <div className="flex items-center gap-2">
-              <Gauge size={18} className="text-brand" />
-              <h3 className="text-sm font-bold text-text-primary">Odometer Reading &amp; Check-in Time</h3>
-            </div>
-            <span className="text-xs text-text-muted">
-              Checkout Baseline: <strong className="font-bold text-text-primary">{initialMileage.toLocaleString()} km</strong>
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Odometer Input */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-text-primary block">
-                  Final Return Odometer (km) <span className="text-brand">*</span>
-                </label>
-                <span className="text-xs font-medium text-text-muted">
-                  Baseline: <strong className="text-text-secondary">{initialMileage.toLocaleString()} km</strong>
-                </span>
-              </div>
-              <input
-                type="number"
-                required
-                min="0"
-                value={returnOdometer}
-                onChange={(e) => setReturnOdometer(e.target.value)}
-                placeholder={`e.g. ${initialMileage || 0}`}
-                className="w-full text-base font-bold border border-border rounded-xl px-4 py-2.5 bg-white text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none shadow-sm"
-              />
-              {returnOdometer.trim() !== "" && Number(returnOdometer) < initialMileage && (
-                <p className="text-[11px] text-amber-600 flex items-center gap-1 font-medium pt-0.5">
-                  <AlertTriangle size={12} className="shrink-0" />
-                  <span>Entered reading ({Number(returnOdometer).toLocaleString()} km) is lower than checkout baseline ({initialMileage.toLocaleString()} km).</span>
-                </p>
-              )}
-            </div>
-
-            {/* Check-in Time */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-text-primary">
-                  Check-in Time <span className="text-brand">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const now = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }).format(new Date());
-                    setShopReturnTime(now);
-                  }}
-                  className="text-xs font-bold text-brand hover:underline cursor-pointer"
-                >
-                  Set Current Time
-                </button>
-              </div>
-              <input
-                type="text"
-                required
-                value={shopReturnTime}
-                onChange={(e) => setShopReturnTime(e.target.value)}
-                placeholder="10:00 AM"
-                className="w-full text-sm font-bold border border-border rounded-xl px-4 py-2.5 bg-white text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none shadow-sm"
-              />
-            </div>
-          </div>
-
-          {/* Live Mileage Metrics Strip */}
-          <div className="grid grid-cols-3 gap-3 pt-2 text-center text-xs">
-            <div className="p-3.5 bg-white rounded-xl border border-border text-center shadow-2xs">
-              <span className="text-[11px] text-text-muted block uppercase tracking-wider font-semibold">Distance Driven</span>
-              <strong className="font-bold text-text-primary text-base mt-0.5 block">{kmDriven} km</strong>
-            </div>
-            <div className="p-3.5 bg-white rounded-xl border border-border text-center shadow-2xs">
-              <span className="text-[11px] text-text-muted block uppercase tracking-wider font-semibold">Included Allowance</span>
-              <strong className="font-bold text-text-primary text-base mt-0.5 block">
-                {dailyKmLimit > 0 ? `${totalIncludedKm} km` : "Unlimited"}
-              </strong>
-            </div>
-            <div className={`p-3.5 rounded-xl border text-center shadow-2xs ${extraKm > 0 ? 'bg-red-50 border-red-200 text-brand' : 'bg-white border-border text-text-primary'}`}>
-              <span className="text-[11px] block uppercase tracking-wider font-semibold opacity-80">Extra Mileage</span>
-              <strong className="font-bold text-base mt-0.5 block">
-                {extraKm > 0 ? `+${extraKm} km ($${extraKmCharge.toFixed(2)})` : "0 km"}
-              </strong>
-            </div>
-          </div>
-        </div>
-
-        {/* 2. Fuel Level Selector */}
-        <FuelLevelSelector
-          value={returnFuelLevel}
-          onChange={(val) => setReturnFuelLevel(val)}
-          label="Return Fuel Level Percentage"
-          sublabel="Indicate current tank fuel level. Baseline checkout fuel was recorded upon car handover."
-        />
       </div>
-    );
-  };
 
-  // STEP 3 (Shop): Inspection Photos & Condition
-  const renderInspectionStep = () => {
-    return (
-      <div className="space-y-6 animate-fade-in-up">
-        <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 3: Vehicle Inspection Photos &amp; Damage Status</h2>
-          <p className="text-xs text-text-muted mt-0.5">
-            Document exterior condition across 8 standard angles and record any new damages discovered during handover.
-          </p>
+      <VehicleInspectionPhotoCapture
+        photos={returnPhotos}
+        onChange={setReturnPhotos}
+        title="Vehicle Return Inspection (فحص استرجاع السيارة بالمحل)"
+        subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
+        badgeLabel="Return Condition"
+      />
+    </div>
+  );
+
+  // ===================== STEP 3 (Shop): DAMAGE CHECK =====================
+  const renderDamageStep = () => (
+    <div className="space-y-6 animate-fade-in-up">
+      <div>
+        <h2 className="text-lg font-bold text-text-primary">Step 3: Damage Inspection (فحص الأضرار)</h2>
+        <p className="text-xs text-text-muted mt-0.5">
+          Inspect body panels, glass, and interior. Record any new damages discovered during return.
+        </p>
+      </div>
+
+      <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
+        <label className="text-sm font-bold text-text-primary flex items-center gap-2">
+          <AlertTriangle size={18} className={hasDamages ? "text-red-500" : "text-brand"} />
+          <span>Were Any New Damages Found Upon Return? (هل توجد أي أضرار جديدة؟)</span>
+        </label>
+
+        {/* Binary Choice Buttons */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              setHasDamages(false);
+              setDamageDescription("");
+              setDamageCost("0");
+              setDamagePhotos([]);
+            }}
+            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3.5 text-left ${
+              !hasDamages
+                ? "border-emerald-500 bg-emerald-50/70 shadow-sm"
+                : "border-border bg-white hover:bg-gray-50 text-text-muted"
+            }`}
+          >
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              !hasDamages ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-400"
+            }`}>
+              <CheckCircle size={20} />
+            </div>
+            <div>
+              <strong className={`block text-sm font-bold ${!hasDamages ? "text-emerald-950" : "text-text-primary"}`}>
+                No New Damages (سليمة تماماً)
+              </strong>
+              <span className="text-xs text-text-muted">Vehicle returned in clean condition without new scratches or dents</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setHasDamages(true)}
+            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3.5 text-left ${
+              hasDamages
+                ? "border-red-500 bg-red-50/70 shadow-sm"
+                : "border-border bg-white hover:bg-gray-50 text-text-muted"
+            }`}
+          >
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              hasDamages ? "bg-red-600 text-white" : "bg-gray-100 text-gray-400"
+            }`}>
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <strong className={`block text-sm font-bold ${hasDamages ? "text-red-950" : "text-text-primary"}`}>
+                New Damages Found (توجد أضرار)
+              </strong>
+              <span className="text-xs text-text-muted">New scratches, dents, cracked glass, or interior stains noticed</span>
+            </div>
+          </button>
         </div>
 
-        {/* Condition / Damages Toggle Card */}
-        <div className="p-5 rounded-2xl bg-surface border border-border/80 space-y-3.5">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={18} className="text-brand" />
-            <h3 className="text-sm font-bold text-text-primary">Vehicle Condition &amp; Damage Status</h3>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setHasDamages(false)}
-              className={`p-3.5 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                !hasDamages
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-sm"
-                  : "bg-white text-text-secondary border-border hover:bg-gray-50"
-              }`}
-            >
-              <CheckCircle2 size={16} className={!hasDamages ? "text-emerald-600" : ""} />
-              <span>Clean / No New Damages</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setHasDamages(true)}
-              className={`p-3.5 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                hasDamages
-                  ? "bg-red-50 text-brand border-red-300 shadow-sm"
-                  : "bg-white text-text-secondary border-border hover:bg-gray-50"
-              }`}
-            >
-              <AlertTriangle size={16} className={hasDamages ? "text-brand" : ""} />
-              <span>Damages Reported</span>
-            </button>
-          </div>
-
-          {hasDamages && (
-            <div className="p-4 bg-red-50/60 border border-red-200 rounded-xl space-y-3 text-sm animate-fade-in">
-              <div>
-                <label className="font-semibold text-text-primary block mb-1 text-xs">
-                  Damage Description &amp; Location <span className="text-brand">*</span>
+        {/* Detailed Damage Form If Damages Marked */}
+        {hasDamages && (
+          <div className="p-5 bg-red-50/70 rounded-2xl border border-red-200 space-y-4 animate-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-red-950 mb-1.5">
+                  Damage Description (وصف الأضرار بالتفصيل) <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={3}
                   value={damageDescription}
                   onChange={(e) => setDamageDescription(e.target.value)}
-                  placeholder="e.g. Scratched rear bumper, cracked left headlight..."
-                  className="w-full p-2.5 rounded-xl border border-red-200 bg-white text-sm text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  placeholder="Describe each damaged part clearly (e.g. Dent on front right fender, deep scratch on rear bumper...)"
+                  className="w-full p-3 rounded-xl border border-red-200 bg-white text-xs text-text-primary focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none resize-none font-medium"
+                  required
                 />
               </div>
+
               <div>
-                <label className="font-semibold text-text-primary block mb-1 text-xs">
-                  Repair / Compensation Charge ($)
+                <label className="block text-xs font-bold text-red-950 mb-1.5">
+                  Estimated Repair Cost ($)
                 </label>
-                <div className="relative max-w-xs">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-brand">$</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-sm text-red-600">$</span>
                   <input
                     type="number"
                     min="0"
+                    step="any"
                     value={damageCost}
                     onChange={(e) => setDamageCost(e.target.value)}
-                    className="w-full pl-7 pr-3 py-2 rounded-xl border border-red-200 bg-white text-sm font-bold text-brand focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                    placeholder="0.00"
+                    className="w-full p-3 pl-8 rounded-xl border border-red-200 bg-white text-base font-bold text-red-600 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none"
                   />
                 </div>
+                <span className="text-[10px] text-red-700 mt-1 block">Amount charged directly to customer</span>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* 8-Angle Vehicle Photo Inspection Capture */}
-        <VehicleInspectionPhotoCapture
-          photos={returnPhotos}
-          onChange={setReturnPhotos}
-          title="Return Inspection Photos (صور فحص الاسترجاع بالمحل)"
-          subtitle="Capture or upload 8 standard angles to document vehicle condition and mileage upon shop return."
-          badgeLabel="Shop Return"
-        />
+            {/* Damage Photos Capture */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-red-950 flex items-center gap-1.5">
+                  <Camera size={14} className="text-red-600" />
+                  <span>Damage Photos (صور توثيق الأضرار)</span>
+                  {damagePhotos.length > 0 && (
+                    <span className="bg-red-200 text-red-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {damagePhotos.length}
+                    </span>
+                  )}
+                </label>
+                <span className="text-[11px] text-red-700">Take clear close-up photos of damaged areas</span>
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {damagePhotos.map((url, idx) => (
+                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-red-200 shadow-xs bg-gray-100">
+                    <img src={url} alt={`Damage ${idx + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveDamagePhoto(idx)}
+                      className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 cursor-pointer"
+                      title="Delete Photo"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                    <span className="absolute bottom-1 left-1.5 text-[9px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
+                      #{idx + 1}
+                    </span>
+                  </div>
+                ))}
+
+                <label className={`aspect-square rounded-xl border-2 border-dashed border-red-300 hover:border-red-500 bg-white hover:bg-red-50/50 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group text-center p-2 ${isUploadingDamagePhoto ? "opacity-50 pointer-events-none" : ""}`}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleDamagePhotoUpload}
+                    disabled={isUploadingDamagePhoto}
+                  />
+                  {isUploadingDamagePhoto ? (
+                    <Loader2 size={20} className="animate-spin text-red-600" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Plus size={16} />
+                    </div>
+                  )}
+                  <span className="text-[11px] font-bold text-red-700">
+                    {isUploadingDamagePhoto ? "Uploading..." : "+ Add Photo"}
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    );
-  };
+    </div>
+  );
 
-  // STEP 4 (Shop): Settlement & Final Check-in
+  // ===================== STEP 4 (Shop): SETTLEMENT & CHECK-IN =====================
   const renderSettlementStep = () => {
     return (
       <div className="space-y-6 animate-fade-in-up">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 4: Final Settlement &amp; Close Contract</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step 4: Settlement &amp; Complete Return</h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Review the final return breakdown, settle any outstanding mileage or damage charges, and mark the contract Completed.
+            Review vehicle inspection summary, calculate additional fees, and settle the contract.
           </p>
         </div>
 
-        {/* Additional Return Charges (SALIK, PARKING, FINES, FUEL) */}
-        <div className="p-5 rounded-2xl bg-surface border border-border/80 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-border/60">
+        {/* Executive Summary Profile Grid (Matching driver/return) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
+            <span className="text-text-muted text-xs block mb-1">Customer</span>
+            <strong className="text-text-primary text-sm font-bold block truncate">
+              {customerName}
+            </strong>
+            <span className="text-xs text-text-muted block truncate">{customerPhone || "No phone"}</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
+            <span className="text-text-muted text-xs block mb-1">Vehicle</span>
+            <strong className="text-text-primary text-sm font-bold block truncate">{vehicleName}</strong>
+            <span className="text-xs text-text-muted font-mono">{plateNumber || "NO-PLATE"}</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
+            <span className="text-text-muted text-xs block mb-1">Return Location</span>
+            <strong className="text-text-primary text-xs font-bold block truncate" title={handoverLocation}>
+              {handoverLocation || "Main Office / Showroom"}
+            </strong>
+            <span className="text-xs text-text-muted">{shopReturnTime}</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
+            <span className="text-text-muted text-xs block mb-1">Return Mileage</span>
+            <strong className="text-brand text-sm font-bold block">
+              {Number(returnOdometer).toLocaleString()} km
+            </strong>
+            <span className="text-xs text-emerald-600 font-semibold">+{kmDriven.toLocaleString()} km driven</span>
+          </div>
+        </div>
+
+        {/* Condition & Inspection Photos Summary Strip */}
+        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+              <Camera size={14} className="text-brand" />
+              Return Inspection Photos ({Object.values(returnPhotos).filter(Boolean).length}/8 captured)
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentStep(2)}
+              className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
+            >
+              Edit Photos
+            </button>
+          </div>
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+            {VEHICLE_ANGLES.map((angle, idx) => {
+              const url = returnPhotos[angle];
+              return (
+                <div
+                  key={angle}
+                  className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
+                >
+                  {url ? (
+                    <img src={url} alt={angle} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[9px] text-text-muted font-medium leading-tight">
+                      #{idx + 1}
+                      <br />
+                      {angle.split(" ")[0]}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Additional Return Charges Card */}
+        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
             <div className="flex items-center gap-2">
-              <Coins size={18} className="text-brand" />
-              <div>
-                <h3 className="text-sm font-bold text-text-primary">Additional Return Charges &amp; Penalties</h3>
-                <p className="text-[11px] text-text-muted">Enter any incurred tolls, parking tickets, traffic violations, or fuel replenishment fees</p>
-              </div>
+              <Coins size={16} className="text-brand" />
+              <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider">
+                Additional Return Charges &amp; Penalties (رسوم ومخالفات الإرجاع)
+              </h3>
             </div>
-            {(salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum) > 0 && (
-              <span className="text-xs font-bold text-brand bg-brand/10 px-2.5 py-1 rounded-full">
-                +${(salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum).toFixed(2)} Added
+            {totalReturnCharges > 0 && (
+              <span className="text-xs font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-full">
+                +${totalReturnCharges.toFixed(2)} Total Due
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 1. SALIK (Tolls) */}
-            <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-border/80 shadow-2xs">
-              <label className="text-xs font-bold text-text-primary flex items-center justify-between">
-                <span>SALIK / Tolls (سالك)</span>
-                <span className="text-[10px] text-text-muted">AED / $</span>
+          {extraKm > 0 && (
+            <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
+              <div>
+                <span className="font-bold block">Extra Mileage Fee ({extraKm.toLocaleString()} km exceeded limit)</span>
+                <span className="text-red-700 text-[11px]">${pricePerExtraKm.toFixed(2)} per extra km • {totalIncludedKm.toLocaleString()} km included</span>
+              </div>
+              <strong className="font-bold text-sm text-red-600">+${extraKmCharge.toFixed(2)}</strong>
+            </div>
+          )}
+
+          {hasDamages && (
+            <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
+              <div>
+                <span className="font-bold block">Reported Vehicle Damage ({damagePhotos.length} photos)</span>
+                <span className="text-red-700 text-[11px] truncate max-w-sm block">{damageDescription || "Damage reported"}</span>
+              </div>
+              <strong className="font-bold text-sm text-red-600">+${damageChargeNum.toFixed(2)}</strong>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* SALIK */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-text-primary block">
+                SALIK (سالك)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
                 <input
                   type="number"
                   min="0"
@@ -923,20 +1243,19 @@ function ReturnPageContent() {
                   value={salikCharge}
                   onChange={(e) => setSalikCharge(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 rounded-lg border border-border bg-surface text-sm font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  className="w-full pl-6 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                 />
               </div>
-              <span className="text-[10px] text-text-muted block">Highway &amp; gate toll charges</span>
+              <span className="text-[9px] text-text-muted block">Toll gates</span>
             </div>
 
-            {/* 2. PARKING */}
-            <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-border/80 shadow-2xs">
-              <label className="text-xs font-bold text-text-primary flex items-center justify-between">
-                <span>PARKING (مواقف)</span>
-                <span className="text-[10px] text-text-muted">AED / $</span>
+            {/* PARKING */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-text-primary block">
+                PARKING (مواقف)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
                 <input
                   type="number"
                   min="0"
@@ -944,20 +1263,19 @@ function ReturnPageContent() {
                   value={parkingCharge}
                   onChange={(e) => setParkingCharge(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 rounded-lg border border-border bg-surface text-sm font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  className="w-full pl-6 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                 />
               </div>
-              <span className="text-[10px] text-text-muted block">Municipal / airport parking fees</span>
+              <span className="text-[9px] text-text-muted block">Parking tickets</span>
             </div>
 
-            {/* 3. FINES */}
-            <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-border/80 shadow-2xs">
-              <label className="text-xs font-bold text-text-primary flex items-center justify-between">
-                <span>FINES (مخالفات)</span>
-                <span className="text-[10px] text-text-muted">AED / $</span>
+            {/* FINES */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-text-primary block">
+                FINES (مخالفات)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
                 <input
                   type="number"
                   min="0"
@@ -965,20 +1283,19 @@ function ReturnPageContent() {
                   value={finesCharge}
                   onChange={(e) => setFinesCharge(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 rounded-lg border border-border bg-surface text-sm font-bold text-red-600 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  className="w-full pl-6 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-red-600 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                 />
               </div>
-              <span className="text-[10px] text-text-muted block">Traffic violations &amp; penalties</span>
+              <span className="text-[9px] text-text-muted block">Traffic violations</span>
             </div>
 
-            {/* 4. FUEL */}
-            <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-border/80 shadow-2xs">
-              <label className="text-xs font-bold text-text-primary flex items-center justify-between">
-                <span>FUEL (وقود)</span>
-                <span className="text-[10px] text-text-muted">AED / $</span>
+            {/* FUEL */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-text-primary block">
+                FUEL (وقود)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
                 <input
                   type="number"
                   min="0"
@@ -986,89 +1303,14 @@ function ReturnPageContent() {
                   value={fuelCharge}
                   onChange={(e) => setFuelCharge(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 rounded-lg border border-border bg-surface text-sm font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  className="w-full pl-6 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                 />
               </div>
-              <span className="text-[10px] text-text-muted block">Refueling / fuel difference fee</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Summary Breakdown Card */}
-        <div className="p-5 rounded-2xl bg-surface border border-border/80 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border/60">
-            <div className="flex items-center gap-2">
-              <DollarSign size={18} className="text-brand" />
-              <h3 className="text-sm font-bold text-text-primary">Return Settlement Summary</h3>
-            </div>
-            {totalReturnCharges > 0 ? (
-              <span className="text-xs font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
-                Payment Due: ${totalReturnCharges.toFixed(2)}
-              </span>
-            ) : (
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                Zero Extra Charges ($0.00)
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-2.5 text-sm">
-            <div className="flex items-center justify-between py-1.5 border-b border-border/40">
-              <span className="text-text-secondary">Distance Driven:</span>
-              <strong className="font-semibold text-text-primary">{kmDriven} km (Checkout: {initialMileage} km → Return: {returnOdometer} km)</strong>
-            </div>
-
-            <div className="flex items-center justify-between py-1.5 border-b border-border/40">
-              <span className="text-text-secondary">Extra Mileage Fee:</span>
-              <strong className={`font-bold ${extraKmCharge > 0 ? 'text-brand' : 'text-text-primary'}`}>
-                {extraKmCharge > 0 ? `+$${extraKmCharge.toFixed(2)} (${extraKm} km)` : "$0.00"}
-              </strong>
-            </div>
-
-            <div className="flex items-center justify-between py-1.5 border-b border-border/40">
-              <span className="text-text-secondary">Damage / Repair Fee:</span>
-              <strong className={`font-bold ${damageChargeNum > 0 ? 'text-brand' : 'text-text-primary'}`}>
-                {damageChargeNum > 0 ? `+$${damageChargeNum.toFixed(2)}` : "$0.00"}
-              </strong>
-            </div>
-
-            {salikChargeNum > 0 && (
-              <div className="flex items-center justify-between py-1.5 border-b border-border/40">
-                <span className="text-text-secondary">SALIK / Tolls Fee:</span>
-                <strong className="font-bold text-brand">+${salikChargeNum.toFixed(2)}</strong>
-              </div>
-            )}
-
-            {parkingChargeNum > 0 && (
-              <div className="flex items-center justify-between py-1.5 border-b border-border/40">
-                <span className="text-text-secondary">Parking Fee:</span>
-                <strong className="font-bold text-brand">+${parkingChargeNum.toFixed(2)}</strong>
-              </div>
-            )}
-
-            {finesChargeNum > 0 && (
-              <div className="flex items-center justify-between py-1.5 border-b border-border/40">
-                <span className="text-text-secondary">Traffic Fines:</span>
-                <strong className="font-bold text-red-600">+${finesChargeNum.toFixed(2)}</strong>
-              </div>
-            )}
-
-            {fuelChargeNum > 0 && (
-              <div className="flex items-center justify-between py-1.5 border-b border-border/40">
-                <span className="text-text-secondary">Fuel Charge:</span>
-                <strong className="font-bold text-brand">+${fuelChargeNum.toFixed(2)}</strong>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-gray-50 border border-border/60">
-              <span className="text-text-primary font-bold text-xs uppercase tracking-wider">Total Return Charges Due:</span>
-              <strong className={`font-black text-xl ${totalReturnCharges > 0 ? 'text-brand' : 'text-emerald-700'}`}>
-                ${totalReturnCharges.toFixed(2)}
-              </strong>
+              <span className="text-[9px] text-text-muted block">Refueling charge</span>
             </div>
           </div>
 
-          {/* Banner Status */}
+          {/* Settlement Banner */}
           <div className={`p-4 rounded-xl border text-center transition-all ${
             totalReturnCharges > 0
               ? 'bg-red-50 border-red-200 text-brand'
@@ -1077,7 +1319,7 @@ function ReturnPageContent() {
             {totalReturnCharges > 0 ? (
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider block text-brand">
-                  Additional Client Payment Required
+                  Additional Settlement Due from Client
                 </span>
                 <div className="mt-1 flex items-center justify-center gap-1.5 text-brand">
                   <span className="font-black text-2xl">+${totalReturnCharges.toFixed(2)}</span>
@@ -1119,7 +1361,7 @@ function ReturnPageContent() {
         <div className="space-y-1.5">
           <label className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
             <FileText size={15} className="text-brand" />
-            <span>Staff Return Remarks (Optional)</span>
+            <span>Staff Return Remarks (ملاحظات الإدارة)</span>
           </label>
           <textarea
             rows={2}
@@ -1129,227 +1371,148 @@ function ReturnPageContent() {
             className="w-full text-sm border border-border rounded-xl p-3 bg-white text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none resize-none shadow-sm"
           />
         </div>
+
+        {/* Confirmation Checkbox */}
+        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-2xs">
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isConfirmed}
+              onChange={(e) => setIsConfirmed(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
+            />
+            <div className="text-xs">
+              <strong className="font-bold text-text-primary block">
+                Confirm Vehicle Return &amp; Settlement (تأكيد استلام السيارة وإتمام التسوية) *
+              </strong>
+              <span className="text-text-muted mt-0.5 block">
+                I certify that the vehicle has been physically received and inspected, recorded return odometer is {Number(returnOdometer).toLocaleString()} km, return fuel level is {returnFuelLevel}%, and all settlements are verified.
+              </span>
+            </div>
+          </label>
+        </div>
       </div>
     );
   };
 
-  // STEP 2 (Dispatch): Assign Driver & Logistics
+  // ===================== STEP 2 (Dispatch): ASSIGN DRIVER =====================
   const renderDispatchDriverStep = () => {
     return (
       <div className="space-y-6 animate-fade-in-up">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 2: Assign Return Driver &amp; Logistics</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step 2: Assign Return Driver</h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Select an available driver and specify where and when they should collect the vehicle from the client.
+            Select an available driver to retrieve the vehicle from the client at the specified location.
           </p>
         </div>
 
-        {/* Driver Selection Card */}
-        <div className="p-5 rounded-2xl bg-surface border border-border/80 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-border/60">
-            <UserCheck size={18} className="text-brand" />
-            <h3 className="text-sm font-bold text-text-primary">Choose Collection Driver</h3>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-text-primary block">
-              Assign Return Driver <span className="text-brand">*</span>
-            </label>
-            <select
-              value={returnDriverId}
-              onChange={(e) => setReturnDriverId(e.target.value)}
-              className="w-full p-3 rounded-xl border border-border bg-white text-sm font-semibold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none cursor-pointer shadow-sm"
-              required
-            >
-              <option value="">-- Choose Driver to Collect Vehicle --</option>
-              {drivers.map(d => (
-                <option key={d._id || d.userId} value={d._id || d.userId}>
-                  {d.name} {d.phone ? `(${d.phone})` : ""} {d.dutyStatus ? `• ${d.dutyStatus}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Pickup Logistics Card */}
-        <div className="p-5 rounded-2xl bg-surface border border-border/80 space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b border-border/60">
-            <MapPin size={18} className="text-brand" />
-            <h3 className="text-sm font-bold text-text-primary">Collection Location &amp; Schedule</h3>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-text-primary">
-                  Collection Pickup Location <span className="text-brand">*</span>
-                </label>
-                {pickupLocation.trim() && (
-                  <button
-                    type="button"
-                    onClick={() => openGoogleMaps(pickupLocation.trim())}
-                    className="text-xs font-bold text-brand hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Navigation size={11} className="rotate-45" />
-                    <span>Google Maps</span>
-                  </button>
-                )}
-              </div>
-              <input
-                type="text"
-                value={pickupLocation}
-                onChange={(e) => setPickupLocation(e.target.value)}
-                placeholder="e.g. Airport Terminal 1, Hotel Lobby, Client Residence..."
-                className="w-full p-3 rounded-xl border border-border bg-white text-sm font-medium focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none shadow-sm"
-                required
-              />
-              {handoverLocation && (
-                <button
-                  type="button"
-                  onClick={() => setPickupLocation(handoverLocation)}
-                  className="text-xs text-text-secondary hover:text-text-primary font-semibold flex items-center gap-1 cursor-pointer mt-1"
-                >
-                  <MapPin size={12} className="text-brand" />
-                  <span>Use Handover Address ({handoverLocation})</span>
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
-                  <Clock size={14} className="text-brand" />
-                  <span>Scheduled Pickup Time</span>
-                </label>
-                <input
-                  type="text"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  placeholder="10:00 AM"
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm font-semibold focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none shadow-sm"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
-                  <User size={14} className="text-brand" />
-                  <span>Customer Phone Contact</span>
-                </label>
-                <input
-                  type="text"
-                  disabled
-                  value={`${customerName} (${selectedContract?.customerPhone || "No Phone"})`}
-                  className="w-full p-2.5 rounded-xl border border-border bg-surface text-sm font-semibold text-text-muted cursor-not-allowed"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Instructions */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
-            <FileText size={15} className="text-brand" />
-            <span>Return Instructions for Driver</span>
+        {/* Driver Selection Grid */}
+        <div className="space-y-3">
+          <label className="text-xs font-bold text-text-primary block">
+            Choose Driver for Retrieval <span className="text-brand">*</span>
           </label>
-          <textarea
-            rows={3}
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            placeholder="e.g. Call client 20 minutes prior to arrival, inspect tires and bumpers, retrieve all keys and papers."
-            className="w-full text-sm border border-border rounded-xl p-3 bg-white text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none resize-none shadow-sm"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {drivers.map((d) => {
+              const dId = d._id || d.userId;
+              const isSelected = returnDriverId === dId;
+              return (
+                <button
+                  key={dId}
+                  type="button"
+                  onClick={() => setReturnDriverId(dId)}
+                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                    isSelected
+                      ? "border-brand bg-brand/5 ring-2 ring-brand/20 shadow-xs"
+                      : "border-border bg-white hover:border-gray-300 hover:shadow-xs"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand font-bold flex items-center justify-center shrink-0">
+                      <User size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-text-primary truncate">{d.name}</h4>
+                      <p className="text-xs text-text-muted truncate">{d.phone || "No phone"}</p>
+                    </div>
+                  </div>
+                  {isSelected ? (
+                    <span className="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
+                      <Check size={14} />
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-text-muted px-2 py-0.5 bg-gray-50 rounded border border-gray-200 shrink-0">
+                      Select
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
   };
 
-  // STEP 3 (Dispatch): Review & Dispatch
+  // ===================== STEP 3 (Dispatch): REVIEW & DISPATCH =====================
   const renderDispatchReviewStep = () => {
     const selectedDriver = drivers.find(d => (d._id || d.userId) === returnDriverId);
 
     return (
       <div className="space-y-6 animate-fade-in-up">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 3: Review &amp; Dispatch Task</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step 3: Review &amp; Dispatch Driver</h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Review assignment details. Once dispatched, the driver will automatically be notified via WhatsApp and Gmail.
+            Confirm retrieval assignment details and notify the driver to pick up the vehicle.
           </p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-surface border border-border/80 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-border/60">
-            <div className="flex items-center gap-2">
-              <Send size={18} className="text-brand" />
-              <h3 className="text-sm font-bold text-text-primary">Dispatch Task Summary</h3>
-            </div>
-            <span className="text-xs font-bold text-brand bg-brand/10 px-2.5 py-1 rounded-full">
-              Driver Return Pickup Task
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            {/* Driver Box */}
-            <div className="p-4 rounded-xl bg-white border border-border shadow-2xs space-y-2">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Assigned Driver</span>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center font-bold text-xs">
-                  {getInitials(selectedDriver?.name || "Driver")}
-                </div>
-                <div>
-                  <h4 className="font-bold text-text-primary">{selectedDriver?.name || "Unassigned"}</h4>
-                  <p className="text-xs text-text-secondary">{selectedDriver?.phone || "No phone"}</p>
-                </div>
-              </div>
+        <div className="bg-white rounded-2xl border border-border p-6 space-y-4 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <span className="text-xs text-text-muted block mb-1">Vehicle</span>
+              <strong className="text-sm font-bold text-text-primary block">{vehicleName}</strong>
+              <span className="text-xs font-mono text-brand">{plateNumber || "NO-PLATE"}</span>
             </div>
 
-            {/* Client & Vehicle Box */}
-            <div className="p-4 rounded-xl bg-white border border-border shadow-2xs space-y-2">
-              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Target Vehicle &amp; Client</span>
-              <div>
-                <h4 className="font-bold text-text-primary">{vehicleName} ({plateNumber})</h4>
-                <p className="text-xs text-text-secondary">Client: {customerName} ({selectedContract?.customerPhone})</p>
-              </div>
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <span className="text-xs text-text-muted block mb-1">Customer Contact</span>
+              <strong className="text-sm font-bold text-text-primary block">{customerName}</strong>
+              <span className="text-xs text-text-muted">{customerPhone || "No phone"}</span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <span className="text-xs text-text-muted block mb-1">Assigned Retrieval Driver</span>
+              <strong className="text-sm font-bold text-brand block">{selectedDriver?.name || "Assigned Driver"}</strong>
+              <span className="text-xs text-text-muted">{selectedDriver?.phone || "No phone"}</span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+              <span className="text-xs text-text-muted block mb-1">Pickup Schedule</span>
+              <strong className="text-sm font-bold text-text-primary block">{scheduledTime || "10:00 AM"}</strong>
+              <span className="text-xs text-text-muted truncate block" title={pickupLocation}>{pickupLocation}</span>
             </div>
           </div>
 
-          {/* Pickup Details Box */}
-          <div className="p-4 rounded-xl bg-white border border-border shadow-2xs space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">Collection Location:</span>
-              <strong className="font-semibold text-text-primary">{pickupLocation}</strong>
+          {instructions && (
+            <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
+              <span className="font-semibold text-text-muted block mb-0.5">Driver Remarks:</span>
+              <p className="text-text-primary italic">{instructions}</p>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-text-muted">Scheduled Time:</span>
-              <strong className="font-semibold text-text-primary">{scheduledTime || "10:00 AM"}</strong>
-            </div>
-            {instructions && (
-              <div className="pt-2 border-t border-border/40 text-xs">
-                <span className="text-text-muted block font-semibold mb-1">Driver Instructions:</span>
-                <p className="text-text-primary bg-gray-50 p-2 rounded-lg border border-border/60">{instructions}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Automated Notification Note */}
-          <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-900 text-xs flex items-center gap-2.5">
-            <Clock size={16} className="text-blue-600 shrink-0" />
-            <span>The assigned driver will automatically receive the task notification with pickup coordinates and client details.</span>
-          </div>
+          )}
         </div>
       </div>
     );
   };
 
-  // Determine step content
+  // Determine what to render based on current step and return mode
   const renderStepContent = () => {
     if (returnMode === "shop") {
-      if (currentStep === 1) return renderContractStep();
-      if (currentStep === 2) return renderMileageAndFuelStep();
-      if (currentStep === 3) return renderInspectionStep();
+      if (currentStep === 1) return renderVehicleStep();
+      if (currentStep === 2) return renderPhotosStep();
+      if (currentStep === 3) return renderDamageStep();
       if (currentStep === 4) return renderSettlementStep();
     } else {
-      if (currentStep === 1) return renderContractStep();
+      if (currentStep === 1) return renderVehicleStep();
       if (currentStep === 2) return renderDispatchDriverStep();
       if (currentStep === 3) return renderDispatchReviewStep();
     }
@@ -1359,7 +1522,7 @@ function ReturnPageContent() {
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
       
-      {/* ===== HEADER ===== */}
+      {/* ===== HEADER (Matching New Booking & Driver Delivery) ===== */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
         <div>
           <button
@@ -1371,7 +1534,7 @@ function ReturnPageContent() {
           <h1 className="text-2xl font-bold text-text-primary">Vehicle Return &amp; Check-in</h1>
           <p className="text-sm text-text-secondary mt-1">
             {returnMode === "shop"
-              ? "In-Store Return — inspect mileage, record fuel, document condition, and settle contract at counter."
+              ? "In-Store Return — verify mileage & fuel, inspect vehicle condition, and settle contract."
               : "Driver Dispatch — assign a driver to pick up and retrieve the vehicle from the client."}
           </p>
         </div>
@@ -1411,7 +1574,7 @@ function ReturnPageContent() {
         </div>
       </div>
 
-      {/* ===== STEPPER HEADER (Matches /bookings/new) ===== */}
+      {/* ===== STEPPER HEADER (100% Identical to /bookings/new) ===== */}
       <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-6 animate-fade-in-up stagger-1">
         <div className="relative w-full max-w-4xl mx-auto px-2 sm:px-4">
           {/* Background Track Line */}
@@ -1475,10 +1638,10 @@ function ReturnPageContent() {
       </div>
 
       {/* ===== WIZARD STEP CONTENT ===== */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-6 sm:p-8 animate-fade-in-up stagger-2">
+      <div className="bg-card rounded-2xl border border-border shadow-sm p-6 sm:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
         {renderStepContent()}
 
-        {/* Step Navigation Buttons */}
+        {/* Step Navigation Buttons (Matching /bookings/new) */}
         <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
           {currentStep > 1 ? (
             <button

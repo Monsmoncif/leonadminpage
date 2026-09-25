@@ -47,8 +47,8 @@ import { useToast } from "@/components/providers/ToastProvider";
 const STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
   { id: 2, title: "Client", icon: User },
-  { id: 3, title: "Rental Data", icon: FileText },
-  { id: 4, title: "Inspection Photos", icon: Camera },
+  { id: 3, title: "Inspection Photos", icon: Camera },
+  { id: 4, title: "Rental Data", icon: FileText },
   { id: 5, title: "Sign & Review", icon: PenTool },
 ];
 
@@ -210,8 +210,8 @@ export default function ConfirmDeliveryPage() {
         // Initialize primary client
         if (contractData.clientId) {
           const cid = contractData.clientId._id || contractData.clientId.id || contractData.clientId;
-          setSelectedClient(cid);
-          setClientToEdit(contractData.clientId);
+          setSelectedClient(String(cid));
+          setClientToEdit(typeof contractData.clientId === "object" ? contractData.clientId : null);
         }
 
         // Initialize additional / second driver
@@ -485,17 +485,17 @@ export default function ConfirmDeliveryPage() {
     }
 
     if (currentStep === 3) {
-      if (!isDepositConfirmed) {
-        setError("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' to confirm collection of rental and deposit funds.");
-        toast.error("Please confirm collection of all due money before proceeding.");
-        return;
+      const photoCount = Object.values(inspectionPhotos).filter(Boolean).length;
+      if (photoCount < 8) {
+        toast.info(`Note: ${photoCount}/8 inspection photos captured. You can proceed or add remaining angles.`);
       }
     }
 
     if (currentStep === 4) {
-      const photoCount = Object.values(inspectionPhotos).filter(Boolean).length;
-      if (photoCount < 8) {
-        toast.info(`Note: ${photoCount}/8 inspection photos captured. You can proceed or add remaining angles.`);
+      if (!isDepositConfirmed) {
+        setError("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' to confirm collection of rental and deposit funds.");
+        toast.error("Please confirm collection of all due money before proceeding.");
+        return;
       }
     }
 
@@ -528,7 +528,7 @@ export default function ConfirmDeliveryPage() {
     if (!isDepositConfirmed) {
       setError("Please confirm collection of all due funds before completing handover.");
       toast.error("Confirm Get All Money is required.");
-      setCurrentStep(3);
+      setCurrentStep(4);
       return;
     }
 
@@ -602,8 +602,8 @@ export default function ConfirmDeliveryPage() {
       )
     : (() => {
         const top6 = clients.slice(0, 6);
-        if (selectedClient && !top6.some((c) => c._id === selectedClient)) {
-          const selected = clients.find((c) => c._id === selectedClient);
+        if (selectedClient && !top6.some((c) => String(c._id) === String(selectedClient))) {
+          const selected = clients.find((c) => String(c._id) === String(selectedClient));
           if (selected) return [selected, ...top6];
         }
         return top6;
@@ -685,8 +685,10 @@ export default function ConfirmDeliveryPage() {
   const depositTotal = Number(rentalData.depositAmount || 0);
   const grandTotal = collectionTotal + depositTotal;
 
-  // Selected client object
-  const selectedClientObj = clients.find((c) => c._id === selectedClient) || clientToEdit;
+  // Selected client object (strictly null when deselected)
+  const selectedClientObj = selectedClient
+    ? clients.find((c) => String(c._id) === String(selectedClient)) || (typeof clientToEdit === "object" && clientToEdit?._id ? clientToEdit : null)
+    : null;
   const secondDriverName = secondDriverClient?.name || additionalDriver.name;
   const secondDriverLicense = secondDriverClient?.licenseNumber || additionalDriver.license;
 
@@ -920,6 +922,18 @@ export default function ConfirmDeliveryPage() {
               >
                 Edit
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedClient(null);
+                  setClientToEdit(null);
+                  setError(null);
+                }}
+                className="text-text-muted hover:text-red-500 transition-colors cursor-pointer ml-0.5"
+                title="Deselect client"
+              >
+                <X size={13} />
+              </button>
             </div>
           )}
           {secondDriverName && (
@@ -963,13 +977,21 @@ export default function ConfirmDeliveryPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClients.map((client) => {
-            const isSelected = selectedClient === client._id;
+            const isSelected = selectedClient ? String(selectedClient) === String(client._id) : false;
             return (
               <div
                 key={client._id}
                 onClick={() => {
-                  setSelectedClient(client._id);
-                  setClientToEdit(client);
+                  setError(null);
+                  if (selectedClient && String(selectedClient) === String(client._id)) {
+                    // Clicked again on selected client -> Deselect
+                    setSelectedClient(null);
+                    setClientToEdit(null);
+                  } else {
+                    // Select client
+                    setSelectedClient(String(client._id));
+                    setClientToEdit(client);
+                  }
                 }}
                 className={`bg-card rounded-2xl border p-4 flex items-center justify-between transition-all cursor-pointer group card-hover ${
                   isSelected
@@ -1377,7 +1399,7 @@ export default function ConfirmDeliveryPage() {
           </span>
           <button
             type="button"
-            onClick={() => setCurrentStep(4)}
+            onClick={() => setCurrentStep(3)}
             className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
           >
             Edit Photos
@@ -1473,8 +1495,8 @@ export default function ConfirmDeliveryPage() {
   const renderStepContent = () => {
     if (currentStep === 1) return renderCarStep();
     if (currentStep === 2) return renderClientStep();
-    if (currentStep === 3) return renderRentalDataStep();
-    if (currentStep === 4) return renderInspectionStep();
+    if (currentStep === 3) return renderInspectionStep();
+    if (currentStep === 4) return renderRentalDataStep();
     if (currentStep === 5) return renderReviewStep();
     return null;
   };
