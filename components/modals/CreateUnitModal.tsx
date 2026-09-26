@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
+import { CarMakeCombobox, CarModelCombobox } from "@/components/ui/CarMakeModelCombobox";
 
 interface CreateUnitModalProps {
   isOpen: boolean;
@@ -365,31 +366,43 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Make <span className="text-red-500">*</span>
-                  </label>
-                  <input 
-                    required
-                    placeholder="e.g. Toyota" 
-                    className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                    value={formData.make}
-                    onChange={(e) => setFormData({...formData, make: e.target.value})}
-                  />
-                </div>
+                <CarMakeCombobox
+                  required
+                  value={formData.make}
+                  onChange={(newMake) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      make: newMake,
+                      model: prev.make && prev.make !== newMake ? "" : prev.model
+                    }));
+                  }}
+                  onSelectMake={(newMake) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      make: newMake,
+                      model: prev.make && prev.make !== newMake ? "" : prev.model
+                    }));
+                  }}
+                />
 
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Model <span className="text-red-500">*</span>
-                  </label>
-                  <input 
-                    required
-                    placeholder="e.g. Camry" 
-                    className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                    value={formData.model}
-                    onChange={(e) => setFormData({...formData, model: e.target.value})}
-                  />
-                </div>
+                <CarModelCombobox
+                  required
+                  value={formData.model}
+                  make={formData.make}
+                  onChange={(newModel) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      model: newModel
+                    }));
+                  }}
+                  onSelectMakeAndModel={(autoMake, newModel) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      make: autoMake || prev.make,
+                      model: newModel
+                    }));
+                  }}
+                />
                 
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">
