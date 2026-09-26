@@ -10,7 +10,6 @@ import {
   Camera, 
   CheckCircle2, 
   CreditCard, 
-  Car, 
   Settings2 
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -356,7 +355,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900 tracking-wide uppercase flex items-center gap-2">
-                    <Car size={16} className="text-brand" />
+                    <ExecutiveCarIcon size={18} className="text-brand" />
                     Vehicle Identification
                   </h3>
                   <p className="text-xs text-text-secondary">
