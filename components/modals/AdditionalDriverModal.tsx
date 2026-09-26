@@ -141,9 +141,9 @@ export default function AdditionalDriverModal({
         throw new Error(resData.error || "فشل مسح الوثائق");
       }
 
-      const { data, imageUrls, imageUrl } = resData;
+      const { data } = resData;
 
-      // 1. Auto-fill form fields
+      // 1. Auto-fill form fields strictly from extracted data
       setFormData((prev) => ({
         ...prev,
         name: data.name || prev.name,
@@ -152,11 +152,6 @@ export default function AdditionalDriverModal({
         nationality: data.nationality || prev.nationality,
         issuedAt: data.address || prev.issuedAt,
       }));
-
-      // 2. Update doc previews with permanent cloud URLs if returned
-      if (imageUrls && imageUrls.length > 0) {
-        setDocPreviews(imageUrls);
-      }
 
       toast.success("تم استخراج بيانات السائق من كافة الصور بنجاح! ✓");
     } catch (err: any) {
@@ -184,10 +179,15 @@ export default function AdditionalDriverModal({
         if (b64) base64List.push(b64);
       }
 
-      const allTargets = Array.from(new Set([...docPreviews, ...base64List]));
-      setDocPreviews(allTargets);
+      setDocPreviews((prev) => {
+        const combined = [...prev];
+        base64List.forEach((b64) => {
+          if (!combined.includes(b64)) combined.push(b64);
+        });
+        return combined;
+      });
 
-      await scanUploadedDocs(allTargets);
+      await scanUploadedDocs(base64List);
     } catch (err: any) {
       console.error("Scan error:", err);
       setError(err.message);

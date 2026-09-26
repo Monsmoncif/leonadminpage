@@ -475,16 +475,6 @@ export default function CreateClientModal({
         return updated;
       });
 
-      // Add to previews if imageUrls returned
-      const docsToAdd = imageUrls && imageUrls.length > 0 ? imageUrls : (imageUrl ? [imageUrl] : targets);
-      setDocPreviews((prev) => {
-        const combined = [...prev];
-        docsToAdd.forEach((img: string) => {
-          if (!combined.includes(img)) combined.unshift(img);
-        });
-        return combined;
-      });
-
       setAutoScannedSuccess(true);
       toast.success("✓ تم مسح الوثائق واستخراج كافة البيانات وتعبئتها تلقائياً!");
     } catch (err: any) {

@@ -147,14 +147,10 @@ export default function CreateDriverModal({
   const handleDocChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
-      const totalDocs = documents.length + docPreviews.length + newFiles.length;
-      
-      if (totalDocs > 5) {
+      if (docPreviews.length + newFiles.length > 5) {
         setError("Maximum 5 documents allowed");
         return;
       }
-
-      setDocuments(prev => [...prev, ...newFiles]);
 
       try {
         const processedFiles = await Promise.all(
@@ -165,16 +161,14 @@ export default function CreateDriverModal({
       } catch (err) {
         console.error("Error processing documents:", err);
         setError("Failed to process one or more documents");
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     }
   };
 
   const removeDoc = (index: number) => {
     setDocPreviews((prev) => prev.filter((_, i) => i !== index));
-    if (index >= (docPreviews.length - documents.length)) {
-      const fileIndex = index - (docPreviews.length - documents.length);
-      setDocuments(prev => prev.filter((_, i) => i !== fileIndex));
-    }
   };
 
   // Scan all currently uploaded driver document images with AI
@@ -201,9 +195,9 @@ export default function CreateDriverModal({
         throw new Error(resData.error || "Failed to scan documents");
       }
 
-      const { data, imageUrls } = resData;
+      const { data } = resData;
 
-      // 1. Auto-fill driver fields
+      // Auto-fill driver fields strictly from extracted data without touching or duplicating doc previews
       setFormData((prev) => ({
         ...prev,
         name: data.name || prev.name,
@@ -215,11 +209,6 @@ export default function CreateDriverModal({
         phone: data.phone || prev.phone,
         email: data.email || prev.email,
       }));
-
-      // 2. Update doc previews with permanent cloud URLs if returned
-      if (imageUrls && imageUrls.length > 0) {
-        setDocPreviews(imageUrls);
-      }
 
       setAutoScannedSuccess(true);
       toast.success("Driver details extracted successfully! ✓");
@@ -248,10 +237,16 @@ export default function CreateDriverModal({
         if (b64) base64List.push(b64);
       }
 
-      const allTargets = Array.from(new Set([...docPreviews, ...base64List]));
-      setDocPreviews(allTargets);
+      // Add to previews without duplicating
+      setDocPreviews((prev) => {
+        const combined = [...prev];
+        base64List.forEach((b64) => {
+          if (!combined.includes(b64)) combined.push(b64);
+        });
+        return combined;
+      });
 
-      await scanUploadedDocs(allTargets);
+      await scanUploadedDocs(base64List);
     } catch (err: any) {
       console.error("Scan error:", err);
       setError(err.message || "An error occurred while scanning documents");

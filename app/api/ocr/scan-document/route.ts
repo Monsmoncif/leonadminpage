@@ -43,32 +43,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Upload image(s) to Cloudinary in parallel
-    const uploadPromises = imagesList.map(async (img) => {
-      try {
-        if (img.startsWith("http://") || img.startsWith("https://")) {
-          return img;
-        }
-        if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
-          const uploadRes = await cloudinary.uploader.upload(img, {
-            folder: "wheelzie_fleet/documents",
-            resource_type: "auto",
-            timeout: 60000,
-          });
-          return uploadRes.secure_url;
-        }
-      } catch (uploadErr) {
-        console.warn("Cloudinary upload error in OCR route:", uploadErr);
-      }
-      return null;
-    });
-
-    const uploadedResults = await Promise.all(uploadPromises);
-    const uploadedUrls: string[] = uploadedResults.filter(Boolean) as string[];
-
-    // 2. Prepare formatted base64 data items for AI processing
+    // 1. Prepare formatted base64 data items for AI processing
     const parsedImages = await Promise.all(
-      imagesList.map(async (img, idx) => {
+      imagesList.map(async (img) => {
         let mimeType = "image/jpeg";
         let base64Data = img;
         let fullDataUrl = img;
@@ -101,7 +78,7 @@ export async function POST(req: NextRequest) {
           mimeType,
           base64Data,
           fullDataUrl,
-          resolvedUrl: uploadedResults[idx] || (img.startsWith("http") ? img : fullDataUrl),
+          resolvedUrl: fullDataUrl,
         };
       })
     );
