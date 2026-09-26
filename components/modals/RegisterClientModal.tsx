@@ -19,7 +19,9 @@ import {
   CreditCard,
   BookOpen,
   CheckCircle2,
-  Upload
+  Upload,
+  Camera,
+  ImageIcon
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -50,6 +52,7 @@ export default function RegisterClientModal({
   const [scanningDoc, setScanningDoc] = useState(false);
   const [scanSlotLoading, setScanSlotLoading] = useState<string | null>(null);
   const [autoScannedSuccess, setAutoScannedSuccess] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"camera" | "gallery">("camera");
   const [error, setError] = useState<string | null>(null);
   const [docPreviews, setDocPreviews] = useState<string[]>([]);
 
@@ -59,7 +62,9 @@ export default function RegisterClientModal({
   const [licenseBackThumb, setLicenseBackThumb] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const scanCameraInputRef = useRef<HTMLInputElement>(null);
   const scanPassportRef = useRef<HTMLInputElement>(null);
   const scanLicenseFrontRef = useRef<HTMLInputElement>(null);
   const scanLicenseBackRef = useRef<HTMLInputElement>(null);
@@ -972,7 +977,24 @@ export default function RegisterClientModal({
                 </div>
               </div>
 
-              {/* Hidden Inputs for AI Scanners */}
+              {/* Hidden Inputs for Documents and AI Scanners */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleDocChange}
+                accept="image/*,application/pdf"
+                multiple
+                className="hidden"
+              />
+              {/* Camera input with capture="environment" for taking photo */}
+              <input
+                type="file"
+                ref={cameraInputRef}
+                onChange={handleDocChange}
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+              />
               <input
                 type="file"
                 ref={scanInputRef}
@@ -985,13 +1007,17 @@ export default function RegisterClientModal({
                 multiple
                 className="hidden"
               />
-              {/* Hidden Inputs for Documents and AI Scanners */}
+              {/* Direct Scan Camera input */}
               <input
                 type="file"
-                ref={fileInputRef}
-                onChange={handleDocChange}
-                accept="image/*,application/pdf"
-                multiple
+                ref={scanCameraInputRef}
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (files && files.length > 0) executeScan(Array.from(files));
+                  if (scanCameraInputRef.current) scanCameraInputRef.current.value = "";
+                }}
+                accept="image/*"
+                capture="environment"
                 className="hidden"
               />
               <input
@@ -1039,9 +1065,9 @@ export default function RegisterClientModal({
                 className="hidden"
               />
 
-              {/* Document Upload Section (Inspired from Add New Driver modal) */}
-              <div id="driver-doc-upload-section" className="bg-white p-5 rounded-2xl border border-border shadow-xs">
-                <div className="flex items-center justify-between mb-2">
+              {/* Document Upload Section (Camera or Gallery Upload) */}
+              <div id="driver-doc-upload-section" className="bg-white p-5 rounded-2xl border border-border shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
                     <span>Documents (License, ID, etc.)</span>
                     <span className="text-red-500 font-bold">*</span>
@@ -1049,38 +1075,86 @@ export default function RegisterClientModal({
                       {docPreviews.length}/5
                     </span>
                   </label>
-                  <button
-                    type="button"
-                    disabled={scanningDoc || submitting}
-                    onClick={() => {
-                      if (docPreviews.length > 0) {
-                        scanUploadedDocs();
-                      } else {
-                        scanInputRef.current?.click();
-                      }
-                    }}
-                    className="px-3.5 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {scanningDoc ? (
-                      <>
-                        <Loader2 size={13} className="animate-spin" />
-                        <span>Scanning...</span>
-                      </>
-                    ) : (
-                      <>
-                        <ScanLine size={13} />
-                        <span>Scan Document</span>
-                      </>
-                    )}
-                  </button>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Mode Switcher: Camera vs Gallery (like car inspection) */}
+                    <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setUploadMode("camera")}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                          uploadMode === "camera"
+                            ? "bg-white text-brand shadow-xs font-bold"
+                            : "text-text-muted hover:text-text-primary"
+                        }`}
+                        title="Camera Mode (التقاط بالكاميرا)"
+                      >
+                        <Camera size={14} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                        <span>Camera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUploadMode("gallery")}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                          uploadMode === "gallery"
+                            ? "bg-white text-brand shadow-xs font-bold"
+                            : "text-text-muted hover:text-text-primary"
+                        }`}
+                        title="Gallery / Files Mode (رفع من الملفات)"
+                      >
+                        <ImageIcon size={14} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                        <span>Gallery</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={scanningDoc || submitting}
+                      onClick={() => {
+                        if (docPreviews.length > 0) {
+                          scanUploadedDocs();
+                        } else {
+                          if (uploadMode === "camera") {
+                            scanCameraInputRef.current?.click();
+                          } else {
+                            scanInputRef.current?.click();
+                          }
+                        }
+                      }}
+                      className="px-3.5 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                    >
+                      {scanningDoc ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          <span>Scanning...</span>
+                        </>
+                      ) : (
+                        <>
+                          {uploadMode === "camera" && docPreviews.length === 0 ? (
+                            <Camera size={13} />
+                          ) : (
+                            <ScanLine size={13} />
+                          )}
+                          <span>
+                            {docPreviews.length > 0 
+                              ? "Scan Document" 
+                              : uploadMode === "camera" 
+                              ? "Take Photo & Scan" 
+                              : "Scan Document"}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-4">
+
+                <div className="flex flex-wrap gap-3">
                   {docPreviews.map((doc, idx) => {
                     const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
                     return (
                       <div
                         key={idx}
-                        className="relative w-24 h-24 rounded-xl border border-gray-200 overflow-hidden group"
+                        className="relative w-24 h-24 rounded-xl border border-gray-200 overflow-hidden group shadow-2xs"
                       >
                         {isPdf ? (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-brand">
@@ -1098,6 +1172,7 @@ export default function RegisterClientModal({
                           type="button"
                           onClick={() => removeDoc(idx)}
                           className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
+                          title="Remove Document"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -1105,19 +1180,44 @@ export default function RegisterClientModal({
                     );
                   })}
 
+                  {/* Take Photo Button */}
+                  {docPreviews.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className={`w-24 h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
+                        uploadMode === "camera"
+                          ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
+                          : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
+                      }`}
+                      title="Take Photo with Camera (التقاط بالكاميرا)"
+                    >
+                      <Camera size={22} className="mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-[10px] font-bold">Take Photo</span>
+                      <span className="text-[8px] opacity-70">Camera</span>
+                    </button>
+                  )}
+
+                  {/* Upload File Button */}
                   {docPreviews.length < 5 && (
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:text-brand hover:border-brand hover:bg-brand/5 transition-all cursor-pointer"
+                      className={`w-24 h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
+                        uploadMode === "gallery"
+                          ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
+                          : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
+                      }`}
+                      title="Upload File or PDF from Device (رفع من الجهاز)"
                     >
-                      <ImagePlus size={24} className="mb-1" />
-                      <span className="text-[10px] font-semibold">Upload</span>
+                      <ImagePlus size={22} className="mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-[10px] font-bold">Upload</span>
+                      <span className="text-[8px] opacity-70">Gallery / PDF</span>
                     </button>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Upload copies of driver's license and national ID (max 5 files).
+                <p className="text-xs text-gray-500">
+                  Take photos or upload copies of driver&apos;s license and national ID (max 5 files).
                 </p>
               </div>
 

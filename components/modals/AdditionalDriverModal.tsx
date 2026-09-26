@@ -10,7 +10,10 @@ import {
   ScanLine, 
   Users,
   CheckCircle2,
-  FileText
+  FileText,
+  Camera,
+  ImageIcon,
+  ImagePlus
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -41,10 +44,13 @@ export default function AdditionalDriverModal({
   existingClients = [],
 }: AdditionalDriverModalProps) {
   const [scanningDoc, setScanningDoc] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"camera" | "gallery">("camera");
   const [error, setError] = useState<string | null>(null);
   const [docPreviews, setDocPreviews] = useState<string[]>([]);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const scanCameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
   const [formData, setFormData] = useState<AdditionalDriverData>({
@@ -288,12 +294,38 @@ export default function AdditionalDriverModal({
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
           <form id="additional-driver-form" onSubmit={handleSubmit} className="space-y-6">
+            {/* Hidden Inputs for Scan & Upload */}
             <input
               type="file"
               ref={scanInputRef}
               onChange={handleScanDocument}
               accept="image/*,application/pdf"
               multiple
+              className="hidden"
+            />
+            {/* Direct Scan Camera input */}
+            <input
+              type="file"
+              ref={scanCameraInputRef}
+              onChange={handleScanDocument}
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleDocChange}
+              multiple
+              accept="image/*,application/pdf"
+              className="hidden"
+            />
+            {/* Camera input with capture="environment" for taking photo */}
+            <input
+              type="file"
+              ref={cameraInputRef}
+              onChange={handleDocChange}
+              accept="image/*"
               capture="environment"
               className="hidden"
             />
@@ -328,68 +360,138 @@ export default function AdditionalDriverModal({
             )}
 
             {/* Document Upload & Scan Document */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-bold text-gray-900">
-                  Documents (Passport, ID, License)
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-border shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <span>Documents (Passport, ID, License)</span>
+                  <span className="text-xs text-gray-500 font-normal">
+                    {docPreviews.length}/5
+                  </span>
                 </label>
-                <button
-                  type="button"
-                  disabled={scanningDoc}
-                  onClick={() => {
-                    if (docPreviews.length > 0) {
-                      scanUploadedDocs();
-                    } else {
-                      scanInputRef.current?.click();
-                    }
-                  }}
-                  className="px-3.5 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  {scanningDoc ? (
-                    <>
-                      <Loader2 size={13} className="animate-spin" />
-                      <span>Scanning...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ScanLine size={13} />
-                      <span>Scan Document</span>
-                    </>
-                  )}
-                </button>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Mode Switcher: Camera vs Gallery (like car inspection) */}
+                  <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setUploadMode("camera")}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                        uploadMode === "camera"
+                          ? "bg-white text-brand shadow-xs font-bold"
+                          : "text-text-muted hover:text-text-primary"
+                      }`}
+                      title="Camera Mode (التقاط بالكاميرا)"
+                    >
+                      <Camera size={14} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                      <span>Camera</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUploadMode("gallery")}
+                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                        uploadMode === "gallery"
+                          ? "bg-white text-brand shadow-xs font-bold"
+                          : "text-text-muted hover:text-text-primary"
+                      }`}
+                      title="Gallery / Files Mode (رفع من الملفات)"
+                    >
+                      <ImageIcon size={14} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                      <span>Gallery</span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={scanningDoc}
+                    onClick={() => {
+                      if (docPreviews.length > 0) {
+                        scanUploadedDocs();
+                      } else {
+                        if (uploadMode === "camera") {
+                          scanCameraInputRef.current?.click();
+                        } else {
+                          scanInputRef.current?.click();
+                        }
+                      }
+                    }}
+                    className="px-3.5 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {scanningDoc ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Scanning...</span>
+                      </>
+                    ) : (
+                      <>
+                        {uploadMode === "camera" && docPreviews.length === 0 ? (
+                          <Camera size={13} />
+                        ) : (
+                          <ScanLine size={13} />
+                        )}
+                        <span>
+                          {docPreviews.length > 0 
+                            ? "Scan Document" 
+                            : uploadMode === "camera" 
+                            ? "Take Photo & Scan" 
+                            : "Scan Document"}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Previews */}
               <div className="flex flex-wrap gap-3">
                 {docPreviews.map((src, idx) => (
-                  <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-border group bg-gray-50">
+                  <div key={idx} className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border border-border group bg-gray-50 shadow-2xs">
                     <img src={src} alt="Document" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeDoc(idx)}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      title="Remove Document"
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
                 ))}
 
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 hover:border-brand flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer bg-gray-50 hover:bg-brand/5"
-                >
-                  <FileText size={18} className="text-gray-400" />
-                  <span className="text-[10px] text-text-muted font-semibold">Add Photo</span>
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleDocChange}
-                  multiple
-                  accept="image/*,application/pdf"
-                  className="hidden"
-                />
+                {/* Take Photo Button */}
+                {docPreviews.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
+                      uploadMode === "camera"
+                        ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
+                        : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
+                    }`}
+                    title="Take Photo with Camera (التقاط بالكاميرا)"
+                  >
+                    <Camera size={20} className="mb-0.5 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-bold">Take Photo</span>
+                    <span className="text-[8px] opacity-70">Camera</span>
+                  </button>
+                )}
+
+                {/* Upload File Button */}
+                {docPreviews.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
+                      uploadMode === "gallery"
+                        ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
+                        : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
+                    }`}
+                    title="Upload File or PDF from Device (رفع من الجهاز)"
+                  >
+                    <ImagePlus size={20} className="mb-0.5 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-bold">Upload</span>
+                    <span className="text-[8px] opacity-70">Gallery / PDF</span>
+                  </button>
+                )}
               </div>
             </div>
 
