@@ -49,6 +49,19 @@ export async function PUT(
       }
     }
 
+    // Validate Driving License Expiry
+    if (body.licenseExpiry && typeof body.licenseExpiry === "string" && body.licenseExpiry.trim()) {
+      const expDate = new Date(body.licenseExpiry);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (!isNaN(expDate.getTime()) && expDate < today) {
+        return NextResponse.json(
+          { error: "Driving license is expired. Cannot update client with an expired license. (رخصة القيادة منتهية الصلاحية)" },
+          { status: 400 }
+        );
+      }
+    }
+
     const client = await Client.findByIdAndUpdate(id, body, {
       new: true,
       runValidators: true,

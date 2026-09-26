@@ -21,7 +21,8 @@ import {
   CheckCircle2,
   Upload,
   Camera,
-  ImageIcon
+  ImageIcon,
+  AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -108,6 +109,33 @@ export default function RegisterClientModal({
     visaNumber: "",
     visaExpiry: "",
   });
+
+  // Helper to check if a date string is expired (in the past compared to today)
+  const isDateExpired = (dateStr: string | null | undefined): boolean => {
+    if (!dateStr || !dateStr.trim()) return false;
+    try {
+      const parts = dateStr.trim().split("-");
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const expDate = new Date(year, month, day, 23, 59, 59, 999);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return expDate < today;
+      }
+      const expDate = new Date(dateStr);
+      if (isNaN(expDate.getTime())) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return expDate < today;
+    } catch {
+      return false;
+    }
+  };
+
+  const isLicenseExpired = isDateExpired(formData.licenseExpiry);
+  const isInternationalLicenseExpired = isDateExpired(formData.internationalLicenseExpiry);
 
   // Fetch all existing clients on modal open
   const fetchClients = async () => {
@@ -556,6 +584,26 @@ export default function RegisterClientModal({
     }
     if (!formData.phone.trim()) {
       setError("Please enter customer's phone number.");
+      return;
+    }
+
+    // BLOCK CREATION: If Licence Expiry is late (expired in the past)
+    if (formData.licenseExpiry && isLicenseExpired) {
+      const expiredMsg = "Driving licence is expired! Cannot create client with an expired licence. (رخصة القيادة منتهية الصلاحية! لا يمكن إنشاء العميل برخصة منتهية)";
+      setError(expiredMsg);
+      toast.error(expiredMsg);
+      const el = document.getElementById(
+        clientType === "Tourist" ? "reg-client-license-expiry-tourist" : "reg-client-license-expiry-resident"
+      );
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.focus();
+      return;
+    }
+
+    if (formData.internationalLicenseExpiry && isInternationalLicenseExpired) {
+      const expiredMsg = "International Driving licence is expired! Cannot create client with an expired licence. (رخصة القيادة الدولية منتهية الصلاحية! لا يمكن إنشاء العميل)";
+      setError(expiredMsg);
+      toast.error(expiredMsg);
       return;
     }
 
@@ -1340,17 +1388,35 @@ export default function RegisterClientModal({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          License Expiry (تاريخ الانتهاء)
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-text-secondary">
+                            License Expiry (تاريخ انتهاء صلاحية الرخصة)
+                          </label>
+                          {isLicenseExpired && (
+                            <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                              <AlertTriangle size={11} /> منتهية الصلاحية
+                            </span>
+                          )}
+                        </div>
                         <input
+                          id="reg-client-license-expiry-resident"
                           type="date"
-                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                          className={`w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                            isLicenseExpired
+                              ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20 text-red-900 font-semibold"
+                              : "border-border bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                          }`}
                           value={formData.licenseExpiry}
                           onChange={(e) =>
                             setFormData({ ...formData, licenseExpiry: e.target.value })
                           }
                         />
+                        {isLicenseExpired && (
+                          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-red-600">
+                            <AlertCircle size={14} className="shrink-0 text-red-600" />
+                            <span>Driving License is expired / رخصة القيادة منتهية الصلاحية</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1396,17 +1462,34 @@ export default function RegisterClientModal({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          International License Expiry
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-text-secondary">
+                            International License Expiry
+                          </label>
+                          {isInternationalLicenseExpired && (
+                            <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                              <AlertTriangle size={11} /> منتهية الصلاحية
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="date"
-                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                          className={`w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                            isInternationalLicenseExpired
+                              ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20 text-red-900 font-semibold"
+                              : "border-border bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                          }`}
                           value={formData.internationalLicenseExpiry}
                           onChange={(e) =>
                             setFormData({ ...formData, internationalLicenseExpiry: e.target.value })
                           }
                         />
+                        {isInternationalLicenseExpired && (
+                          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-red-600">
+                            <AlertCircle size={14} className="shrink-0 text-red-600" />
+                            <span>International License is expired / الرخصة الدولية منتهية</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1706,17 +1789,35 @@ export default function RegisterClientModal({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Licence Expiry (تاريخ انتهاء صلاحية الرخصة)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-text-secondary">
+                          Licence Expiry (تاريخ انتهاء صلاحية الرخصة)
+                        </label>
+                        {isLicenseExpired && (
+                          <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                            <AlertTriangle size={11} /> منتهية الصلاحية
+                          </span>
+                        )}
+                      </div>
                       <input
+                        id="reg-client-license-expiry-tourist"
                         type="date"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                        className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all ${
+                          isLicenseExpired
+                            ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20 text-red-900 font-semibold"
+                            : "border-border bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        }`}
                         value={formData.licenseExpiry}
                         onChange={(e) =>
                           setFormData({ ...formData, licenseExpiry: e.target.value })
                         }
                       />
+                      {isLicenseExpired && (
+                        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-red-600">
+                          <AlertCircle size={14} className="shrink-0 text-red-600" />
+                          <span>Licence is expired / رخصة القيادة منتهية الصلاحية</span>
+                        </div>
+                      )}
                     </div>
 
                     <div>
