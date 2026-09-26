@@ -976,6 +976,14 @@ export default function CreateContractModal({
                           <span className="w-5 h-5 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center">1</span>
                           <span className="text-xs font-semibold text-text-primary truncate max-w-[140px]">{selectedClientObj.name}</span>
                           <CheckCircle2 size={13} className="text-brand shrink-0" />
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, clientId: "" }))}
+                            className="text-gray-400 hover:text-red-600 transition-colors cursor-pointer ml-0.5"
+                            title="Remove selected customer"
+                          >
+                            <X size={13} />
+                          </button>
                         </div>
                       )}
                       {formData.additionalDriverName && (
@@ -1019,7 +1027,7 @@ export default function CreateContractModal({
                         return (
                           <div
                             key={client._id}
-                            onClick={() => setFormData(prev => ({ ...prev, clientId: client._id }))}
+                            onClick={() => setFormData(prev => ({ ...prev, clientId: isSelected ? "" : client._id }))}
                             className={`bg-card rounded-2xl border p-4 flex items-center justify-between transition-all cursor-pointer group card-hover ${
                               isSelected 
                                 ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md" 
