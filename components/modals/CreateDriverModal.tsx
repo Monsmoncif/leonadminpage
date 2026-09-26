@@ -242,16 +242,13 @@ export default function CreateDriverModal({
         if (b64) base64List.push(b64);
       }
 
-      // Add to previews without duplicating
-      setDocPreviews((prev) => {
-        const combined = [...prev];
-        base64List.forEach((b64) => {
-          if (!combined.includes(b64)) combined.push(b64);
-        });
-        return combined;
+      const allDocs = [...docPreviews];
+      base64List.forEach((b64) => {
+        if (!allDocs.includes(b64)) allDocs.push(b64);
       });
+      setDocPreviews(allDocs);
 
-      await scanUploadedDocs(base64List);
+      await scanUploadedDocs(allDocs.length > 0 ? allDocs : base64List);
     } catch (err: any) {
       console.error("Scan error:", err);
       setError(err.message || "An error occurred while scanning documents");

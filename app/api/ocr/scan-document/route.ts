@@ -136,43 +136,87 @@ Extraction Guidelines:
 4. For UAE documents: The Emirates ID (784-XXXX-XXXXXXX-X or بطاقة الهوية) maps to idNumber. UAE driving licence number (رخصة القيادة) maps to licenseNumber.
 5. Return ONLY valid JSON. Do not include markdown code block backticks.`;
 
-    let extracted: any = null;
     const errors: string[] = [];
 
-    // Priority 1: Groq AI (Free + Fast)
-    if (groqKey) {
-      try {
-        console.log("[OCR] Attempting Groq Vision...");
-        extracted = await callGroqVision(groqKey, systemPrompt, parsedImages);
-      } catch (groqErr: any) {
-        console.error("Groq OCR error:", groqErr?.message || groqErr);
-        errors.push(`Groq: ${groqErr?.message || groqErr}`);
+    // Helper to scan a batch of images through AI providers
+    async function scanImagesBatch(imagesToProcess: any[]): Promise<any> {
+      let ext: any = null;
+
+      // Priority 1: Groq AI (Free + Fast)
+      if (groqKey) {
+        try {
+          ext = await callGroqVision(groqKey, systemPrompt, imagesToProcess);
+        } catch (groqErr: any) {
+          console.error("Groq OCR error:", groqErr?.message || groqErr);
+          errors.push(`Groq: ${groqErr?.message || groqErr}`);
+        }
+      }
+
+      // Priority 2: Gemini AI (Free Fallback)
+      if (!ext && geminiKey) {
+        try {
+          ext = await callGeminiVision(geminiKey, systemPrompt, imagesToProcess);
+        } catch (geminiErr: any) {
+          console.error("Gemini OCR error:", geminiErr?.message || geminiErr);
+          errors.push(`Gemini: ${geminiErr?.message || geminiErr}`);
+        }
+      }
+
+      // Priority 3: OpenAI (Paid Fallback)
+      if (!ext && openaiKey) {
+        try {
+          ext = await callOpenAIVision(openaiKey, systemPrompt, imagesToProcess);
+        } catch (openaiErr: any) {
+          console.error("OpenAI OCR error:", openaiErr?.message || openaiErr);
+          errors.push(`OpenAI: ${openaiErr?.message || openaiErr}`);
+        }
+      }
+
+      return ext;
+    }
+
+    let extracted: any = null;
+
+    if (parsedImages.length === 1) {
+      extracted = await scanImagesBatch(parsedImages);
+    } else {
+      // Multiple document images provided (e.g. Passport + Driving License Front & Back)
+      // Process every document individually in parallel so the AI examines 100% of EVERY document
+      console.log(`[OCR] Processing ${parsedImages.length} documents in parallel to extract all details...`);
+      const results = await Promise.all(
+        parsedImages.map((img) => scanImagesBatch([img]))
+      );
+
+      // Merge all extracted results from every document
+      const merged: any = {};
+      for (const item of results) {
+        if (!item || typeof item !== "object") continue;
+        for (const [key, val] of Object.entries(item)) {
+          if (val && typeof val === "string" && val.trim() !== "") {
+            const trimmed = val.trim();
+            if (!merged[key] || merged[key].trim() === "") {
+              merged[key] = trimmed;
+            } else if (key === "name" && trimmed.length > merged[key].length) {
+              merged[key] = trimmed;
+            } else if (key === "idNumber" && trimmed.startsWith("784-")) {
+              merged[key] = trimmed;
+            }
+          }
+        }
+      }
+
+      if (Object.keys(merged).length > 0) {
+        if (merged.passportNumber && merged.licenseNumber) {
+          merged.documentType = "tourist_bundle";
+        }
+        extracted = merged;
+      } else {
+        // Fallback to joint batch scan if parallel individual was empty
+        extracted = await scanImagesBatch(parsedImages);
       }
     }
 
-    // Priority 2: Gemini AI (Free Fallback)
-    if (!extracted && geminiKey) {
-      try {
-        console.log("[OCR] Attempting Gemini Vision fallback...");
-        extracted = await callGeminiVision(geminiKey, systemPrompt, parsedImages);
-      } catch (geminiErr: any) {
-        console.error("Gemini OCR error:", geminiErr?.message || geminiErr);
-        errors.push(`Gemini: ${geminiErr?.message || geminiErr}`);
-      }
-    }
-
-    // Priority 3: OpenAI (Paid Fallback)
-    if (!extracted && openaiKey) {
-      try {
-        console.log("[OCR] Attempting OpenAI Vision fallback...");
-        extracted = await callOpenAIVision(openaiKey, systemPrompt, parsedImages);
-      } catch (openaiErr: any) {
-        console.error("OpenAI OCR error:", openaiErr?.message || openaiErr);
-        errors.push(`OpenAI: ${openaiErr?.message || openaiErr}`);
-      }
-    }
-
-    if (!extracted || typeof extracted !== "object") {
+    if (!extracted || typeof extracted !== "object" || Object.keys(extracted).length === 0) {
       throw new Error(
         `فشل استخراج البيانات عبر محركات الذكاء الاصطناعي. تفاصيل الأخطاء: ${errors.join(" | ")}`
       );

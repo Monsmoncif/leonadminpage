@@ -279,24 +279,23 @@ export default function CreateClientModal({
         if (b64) base64List.push(b64);
       }
 
-      // Ensure previews are immediately updated and displayed
-      setDocPreviews((prev) => {
-        const combined = [...prev];
-        base64List.forEach((img) => {
-          if (!combined.includes(img)) combined.push(img);
-        });
-        return combined;
+      const allDocs = [...docPreviews];
+      base64List.forEach((img) => {
+        if (!allDocs.includes(img)) allDocs.push(img);
       });
+      setDocPreviews(allDocs);
 
       // Update slot preview thumbnails
       if (slotName === "passport") setPassportThumb(base64List[0]);
       if (slotName === "license_front") setLicenseFrontThumb(base64List[0]);
       if (slotName === "license_back") setLicenseBackThumb(base64List[0]);
 
+      // Send ALL documents (previous + new) so AI reads all documents and merges all details
+      const targets = allDocs.length > 0 ? allDocs : base64List;
       const res = await fetch("/api/ocr/scan-document", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: base64List }),
+        body: JSON.stringify({ images: targets }),
       });
 
       const resData = await res.json();
