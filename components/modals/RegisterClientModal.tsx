@@ -931,7 +931,7 @@ export default function RegisterClientModal({
               {/* Profile Type Selector (Resident vs Tourist) */}
               <div className="bg-white p-4 rounded-xl border border-border shadow-xs">
                 <label className="block text-xs font-bold text-text-secondary mb-2">
-                  Customer Profile Type (نوع العميل) *
+                  Customer Profile Type (نوع العميل) <span className="text-red-500 font-bold">*</span>
                 </label>
                 <div className="bg-gray-100 p-1 rounded-xl flex items-center w-full">
                   <button
@@ -1147,7 +1147,7 @@ export default function RegisterClientModal({
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          Passport *
+                          Passport <span className="text-red-500 font-bold">*</span>
                         </label>
                         <input
                           placeholder="e.g. 1234567890"
@@ -1160,7 +1160,7 @@ export default function RegisterClientModal({
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          Passport Issued By *
+                          Passport Issued By <span className="text-red-500 font-bold">*</span>
                         </label>
                         <input
                           placeholder="e.g. United States / France"
@@ -1356,7 +1356,7 @@ export default function RegisterClientModal({
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          First Name (English) *
+                          First Name (English) <span className="text-red-500 font-bold">*</span>
                         </label>
                         <input
                           required
@@ -1383,7 +1383,7 @@ export default function RegisterClientModal({
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          Last Name (English) *
+                          Last Name (English) <span className="text-red-500 font-bold">*</span>
                         </label>
                         <input
                           required
@@ -1400,7 +1400,7 @@ export default function RegisterClientModal({
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-gray-100">
                       <div>
                         <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          Gender *
+                          Gender <span className="text-red-500 font-bold">*</span>
                         </label>
                         <select
                           className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white cursor-pointer font-medium"
@@ -1431,7 +1431,7 @@ export default function RegisterClientModal({
 
                       <div>
                         <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          Nationality *
+                          Nationality <span className="text-red-500 font-bold">*</span>
                         </label>
                         <input
                           required
@@ -1460,7 +1460,7 @@ export default function RegisterClientModal({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-text-secondary mb-1">
-                          Phone / Mobile Number *
+                          Phone / Mobile Number <span className="text-red-500 font-bold">*</span>
                         </label>
                         <input
                           required
@@ -1512,7 +1512,7 @@ export default function RegisterClientModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Full Name (الاسم الكامل) *
+                        Full Name (الاسم الكامل) <span className="text-red-500 font-bold">*</span>
                       </label>
                       <input
                         required
@@ -1527,7 +1527,7 @@ export default function RegisterClientModal({
 
                     <div>
                       <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Phone Number (رقم الهاتف) *
+                        Phone Number (رقم الهاتف) <span className="text-red-500 font-bold">*</span>
                       </label>
                       <input
                         required
@@ -1558,7 +1558,7 @@ export default function RegisterClientModal({
 
                     <div>
                       <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Emirates ID (بطاقة الهوية الإماراتية) *
+                        Emirates ID (بطاقة الهوية الإماراتية) <span className="text-red-500 font-bold">*</span>
                       </label>
                       <input
                         required
@@ -1590,7 +1590,7 @@ export default function RegisterClientModal({
 
                     <div>
                       <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        UAE Driving Licence (رخصة القيادة الإماراتية) *
+                        UAE Driving Licence (رخصة القيادة الإماراتية) <span className="text-red-500 font-bold">*</span>
                       </label>
                       <input
                         required
