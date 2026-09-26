@@ -101,35 +101,80 @@ export default function CreateClientModal({
 
   const formatDateForInput = (d: any) => {
     if (!d) return "";
-    try {
-      return new Date(d).toISOString().split("T")[0];
-    } catch {
-      return "";
+    const str = String(d).trim();
+    if (!str) return "";
+
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      return str;
     }
+
+    // If DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    const dmy = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+    if (dmy) {
+      const day = dmy[1].padStart(2, "0");
+      const month = dmy[2].padStart(2, "0");
+      const year = dmy[3];
+      return `${year}-${month}-${day}`;
+    }
+
+    // If YYYY/MM/DD or YYYY.MM.DD
+    const ymd = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (ymd) {
+      const year = ymd[1];
+      const month = ymd[2].padStart(2, "0");
+      const day = ymd[3].padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    try {
+      const parsed = new Date(str);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().split("T")[0];
+      }
+    } catch {}
+    return str;
   };
 
   // Helper to check if a date string is expired (in the past compared to today)
-  const isDateExpired = (dateStr: string | null | undefined): boolean => {
-    if (!dateStr || !dateStr.trim()) return false;
+  const isDateExpired = (dateVal: any): boolean => {
+    if (!dateVal) return false;
+    const s = String(dateVal).trim();
+    if (!s) return false;
+
     try {
-      const parts = dateStr.trim().split("-");
-      if (parts.length === 3) {
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const day = parseInt(parts[2], 10);
-        const expDate = new Date(year, month, day, 23, 59, 59, 999);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return expDate < today;
-      }
-      const expDate = new Date(dateStr);
-      if (isNaN(expDate.getTime())) return false;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      return expDate < today;
+
+      // If YYYY-MM-DD or YYYY/MM/DD
+      const ymdMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+      if (ymdMatch) {
+        const year = parseInt(ymdMatch[1], 10);
+        const month = parseInt(ymdMatch[2], 10) - 1;
+        const day = parseInt(ymdMatch[3], 10);
+        const expDate = new Date(year, month, day, 23, 59, 59, 999);
+        return expDate.getTime() < today.getTime();
+      }
+
+      // If DD-MM-YYYY or DD/MM/YYYY
+      const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+      if (dmyMatch) {
+        const day = parseInt(dmyMatch[1], 10);
+        const month = parseInt(dmyMatch[2], 10) - 1;
+        const year = parseInt(dmyMatch[3], 10);
+        const expDate = new Date(year, month, day, 23, 59, 59, 999);
+        return expDate.getTime() < today.getTime();
+      }
+
+      const parsed = new Date(s);
+      if (!isNaN(parsed.getTime())) {
+        parsed.setHours(23, 59, 59, 999);
+        return parsed.getTime() < today.getTime();
+      }
     } catch {
       return false;
     }
+    return false;
   };
 
   const isLicenseExpired = isDateExpired(formData.licenseExpiry);
@@ -359,20 +404,20 @@ export default function CreateClientModal({
         // Passport
         if (data.passportNumber) updated.passportNumber = data.passportNumber;
         if (data.passportIssuedBy) updated.passportIssuedBy = data.passportIssuedBy;
-        if (data.passportIssuedDate) updated.passportIssuedDate = data.passportIssuedDate;
-        if (data.passportExpiry) updated.passportExpiry = data.passportExpiry;
+        if (data.passportIssuedDate) updated.passportIssuedDate = formatDateForInput(data.passportIssuedDate);
+        if (data.passportExpiry) updated.passportExpiry = formatDateForInput(data.passportExpiry);
 
         // Driving License
         if (data.licenseNumber) updated.licenseNumber = data.licenseNumber;
         if (data.licenseIssuedBy) updated.licenseIssuedBy = data.licenseIssuedBy;
-        if (data.licenseIssuedDate) updated.licenseIssuedDate = data.licenseIssuedDate;
-        if (data.licenseExpiry) updated.licenseExpiry = data.licenseExpiry;
+        if (data.licenseIssuedDate) updated.licenseIssuedDate = formatDateForInput(data.licenseIssuedDate);
+        if (data.licenseExpiry) updated.licenseExpiry = formatDateForInput(data.licenseExpiry);
 
         // International License
         if (data.internationalLicenseNumber) updated.internationalLicenseNumber = data.internationalLicenseNumber;
         if (data.internationalLicenseIssuedBy) updated.internationalLicenseIssuedBy = data.internationalLicenseIssuedBy;
-        if (data.internationalLicenseIssuedDate) updated.internationalLicenseIssuedDate = data.internationalLicenseIssuedDate;
-        if (data.internationalLicenseExpiry) updated.internationalLicenseExpiry = data.internationalLicenseExpiry;
+        if (data.internationalLicenseIssuedDate) updated.internationalLicenseIssuedDate = formatDateForInput(data.internationalLicenseIssuedDate);
+        if (data.internationalLicenseExpiry) updated.internationalLicenseExpiry = formatDateForInput(data.internationalLicenseExpiry);
 
         // Visa
         if (data.visaNumber) updated.visaNumber = data.visaNumber;
@@ -468,20 +513,20 @@ export default function CreateClientModal({
         // Passport
         if (data.passportNumber) updated.passportNumber = data.passportNumber;
         if (data.passportIssuedBy) updated.passportIssuedBy = data.passportIssuedBy;
-        if (data.passportIssuedDate) updated.passportIssuedDate = data.passportIssuedDate;
-        if (data.passportExpiry) updated.passportExpiry = data.passportExpiry;
+        if (data.passportIssuedDate) updated.passportIssuedDate = formatDateForInput(data.passportIssuedDate);
+        if (data.passportExpiry) updated.passportExpiry = formatDateForInput(data.passportExpiry);
 
         // Driving License
         if (data.licenseNumber) updated.licenseNumber = data.licenseNumber;
         if (data.licenseIssuedBy) updated.licenseIssuedBy = data.licenseIssuedBy;
-        if (data.licenseIssuedDate) updated.licenseIssuedDate = data.licenseIssuedDate;
-        if (data.licenseExpiry) updated.licenseExpiry = data.licenseExpiry;
+        if (data.licenseIssuedDate) updated.licenseIssuedDate = formatDateForInput(data.licenseIssuedDate);
+        if (data.licenseExpiry) updated.licenseExpiry = formatDateForInput(data.licenseExpiry);
 
         // International License
         if (data.internationalLicenseNumber) updated.internationalLicenseNumber = data.internationalLicenseNumber;
         if (data.internationalLicenseIssuedBy) updated.internationalLicenseIssuedBy = data.internationalLicenseIssuedBy;
-        if (data.internationalLicenseIssuedDate) updated.internationalLicenseIssuedDate = data.internationalLicenseIssuedDate;
-        if (data.internationalLicenseExpiry) updated.internationalLicenseExpiry = data.internationalLicenseExpiry;
+        if (data.internationalLicenseIssuedDate) updated.internationalLicenseIssuedDate = formatDateForInput(data.internationalLicenseIssuedDate);
+        if (data.internationalLicenseExpiry) updated.internationalLicenseExpiry = formatDateForInput(data.internationalLicenseExpiry);
 
         // Visa
         if (data.visaNumber) updated.visaNumber = data.visaNumber;
@@ -1085,16 +1130,15 @@ export default function CreateClientModal({
                       />
                     </div>
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-semibold text-text-secondary">
-                          License Expiry (تاريخ انتهاء صلاحية الرخصة)
-                        </label>
-                        {isLicenseExpired && (
-                          <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                            <AlertTriangle size={11} /> منتهية الصلاحية
-                          </span>
-                        )}
-                      </div>
+                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                        License Expiry (تاريخ انتهاء صلاحية الرخصة)
+                      </label>
+                      {isLicenseExpired && (
+                        <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg animate-in fade-in">
+                          <AlertTriangle size={13} className="shrink-0 text-red-600" />
+                          <span>(رخصة القيادة منتهية الصلاحية)</span>
+                        </div>
+                      )}
                       <input
                         id="client-license-expiry-resident"
                         type="date"
@@ -1108,12 +1152,6 @@ export default function CreateClientModal({
                           setFormData({ ...formData, licenseExpiry: e.target.value })
                         }
                       />
-                      {isLicenseExpired && (
-                        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-red-600">
-                          <AlertCircle size={14} className="shrink-0 text-red-600" />
-                          <span>Driving License is expired / رخصة القيادة منتهية الصلاحية</span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -1159,16 +1197,15 @@ export default function CreateClientModal({
                       />
                     </div>
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-semibold text-text-secondary">
-                          International License Expiry
-                        </label>
-                        {isInternationalLicenseExpired && (
-                          <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                            <AlertTriangle size={11} /> منتهية الصلاحية
-                          </span>
-                        )}
-                      </div>
+                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                        International License Expiry
+                      </label>
+                      {isInternationalLicenseExpired && (
+                        <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg animate-in fade-in">
+                          <AlertTriangle size={13} className="shrink-0 text-red-600" />
+                          <span>(رخصة القيادة الدولية منتهية الصلاحية)</span>
+                        </div>
+                      )}
                       <input
                         type="date"
                         className={`w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
@@ -1181,12 +1218,6 @@ export default function CreateClientModal({
                           setFormData({ ...formData, internationalLicenseExpiry: e.target.value })
                         }
                       />
-                      {isInternationalLicenseExpired && (
-                        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-red-600">
-                          <AlertCircle size={14} className="shrink-0 text-red-600" />
-                          <span>International License is expired / الرخصة الدولية منتهية</span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -1486,16 +1517,15 @@ export default function CreateClientModal({
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-text-secondary">
-                        Licence Expiry (تاريخ انتهاء صلاحية الرخصة)
-                      </label>
-                      {isLicenseExpired && (
-                        <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                          <AlertTriangle size={11} /> منتهية الصلاحية
-                        </span>
-                      )}
-                    </div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      Licence Expiry (تاريخ انتهاء صلاحية الرخصة)
+                    </label>
+                    {isLicenseExpired && (
+                      <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg animate-in fade-in">
+                        <AlertTriangle size={13} className="shrink-0 text-red-600" />
+                        <span>(رخصة القيادة منتهية الصلاحية)</span>
+                      </div>
+                    )}
                     <input
                       id="client-license-expiry-tourist"
                       type="date"
@@ -1509,12 +1539,6 @@ export default function CreateClientModal({
                         setFormData({ ...formData, licenseExpiry: e.target.value })
                       }
                     />
-                    {isLicenseExpired && (
-                      <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-red-600">
-                        <AlertCircle size={14} className="shrink-0 text-red-600" />
-                        <span>Licence is expired / رخصة القيادة منتهية الصلاحية</span>
-                      </div>
-                    )}
                   </div>
 
                   <div>
