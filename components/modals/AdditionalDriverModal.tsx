@@ -263,19 +263,19 @@ export default function AdditionalDriverModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="bg-card w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="bg-card w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
-              <UserPlus size={20} />
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold shrink-0">
+              <UserPlus size={18} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-text-primary">
+              <h2 className="text-base sm:text-lg font-bold text-text-primary">
                 Add Second Driver (بيانات السائق الإضافي)
               </h2>
-              <p className="text-xs text-text-secondary">
+              <p className="text-[10px] sm:text-xs text-text-secondary line-clamp-1 sm:line-clamp-none">
                 Scan ID / Driving License or fill details for the additional driver
               </p>
             </div>
@@ -398,44 +398,26 @@ export default function AdditionalDriverModal({
                     </button>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={scanningDoc}
-                    onClick={() => {
-                      if (docPreviews.length > 0) {
-                        scanUploadedDocs();
-                      } else {
-                        if (uploadMode === "camera") {
-                          scanCameraInputRef.current?.click();
-                        } else {
-                          scanInputRef.current?.click();
-                        }
-                      }
-                    }}
-                    className="px-3.5 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {scanningDoc ? (
-                      <>
-                        <Loader2 size={13} className="animate-spin" />
-                        <span>Scanning...</span>
-                      </>
-                    ) : (
-                      <>
-                        {uploadMode === "camera" && docPreviews.length === 0 ? (
-                          <Camera size={13} />
-                        ) : (
-                          <ScanLine size={13} />
-                        )}
-                        <span>
-                          {docPreviews.length > 0 
-                            ? "Scan Document" 
-                            : uploadMode === "camera" 
-                            ? "Take Photo & Scan" 
-                            : "Scan Document"}
-                        </span>
-                      </>
-                    )}
-                  </button>
+                  {docPreviews.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={scanningDoc}
+                      onClick={() => scanUploadedDocs()}
+                      className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
+                    >
+                      {scanningDoc ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>Scanning...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ScanLine size={12} />
+                          <span>Scan Document</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
 

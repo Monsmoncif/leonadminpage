@@ -1224,44 +1224,26 @@ export default function RegisterClientModal({
                       </button>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={scanningDoc || submitting}
-                      onClick={() => {
-                        if (docPreviews.length > 0) {
-                          scanUploadedDocs();
-                        } else {
-                          if (uploadMode === "camera") {
-                            scanCameraInputRef.current?.click();
-                          } else {
-                            scanInputRef.current?.click();
-                          }
-                        }
-                      }}
-                      className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
-                    >
-                      {scanningDoc ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" />
-                          <span>Scanning...</span>
-                        </>
-                      ) : (
-                        <>
-                          {uploadMode === "camera" && docPreviews.length === 0 ? (
-                            <Camera size={12} />
-                          ) : (
+                    {docPreviews.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={scanningDoc || submitting}
+                        onClick={() => scanUploadedDocs()}
+                        className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
+                      >
+                        {scanningDoc ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            <span>Scanning...</span>
+                          </>
+                        ) : (
+                          <>
                             <ScanLine size={12} />
-                          )}
-                          <span>
-                            {docPreviews.length > 0 
-                              ? "Scan Document" 
-                              : uploadMode === "camera" 
-                              ? "Take Photo & Scan" 
-                              : "Scan Document"}
-                          </span>
-                        </>
-                      )}
-                    </button>
+                            <span>Scan Document</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
 

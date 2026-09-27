@@ -457,22 +457,12 @@ export default function CreateDriverModal({
                     </button>
                   </div>
 
-                  {!driverToEdit && (
+                  {!driverToEdit && docPreviews.length > 0 && (
                     <button
                       type="button"
                       disabled={scanningDoc || isSubmitting}
-                      onClick={() => {
-                        if (docPreviews.length > 0) {
-                          scanUploadedDocs();
-                        } else {
-                          if (uploadMode === "camera") {
-                            scanCameraInputRef.current?.click();
-                          } else {
-                            scanInputRef.current?.click();
-                          }
-                        }
-                      }}
-                      className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
+                      onClick={() => scanUploadedDocs()}
+                      className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
                     >
                       {scanningDoc ? (
                         <>
@@ -481,18 +471,8 @@ export default function CreateDriverModal({
                         </>
                       ) : (
                         <>
-                          {uploadMode === "camera" && docPreviews.length === 0 ? (
-                            <Camera size={12} />
-                          ) : (
-                            <ScanLine size={12} />
-                          )}
-                          <span>
-                            {docPreviews.length > 0 
-                              ? "Scan Document" 
-                              : uploadMode === "camera" 
-                              ? "Take Photo & Scan" 
-                              : "Scan Document"}
-                          </span>
+                          <ScanLine size={12} />
+                          <span>Scan Document</span>
                         </>
                       )}
                     </button>
