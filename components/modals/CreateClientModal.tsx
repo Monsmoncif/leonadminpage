@@ -693,18 +693,18 @@ export default function CreateClientModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
       {/* Widescreen Modal (max-w-5xl) */}
-      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh]">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
+        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
           <div>
-            <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
-              <UserPlus className="text-brand" size={22} />
+            <h2 className="text-lg sm:text-xl font-bold text-text-primary flex items-center gap-2">
+              <UserPlus className="text-brand" size={20} />
               {clientToEdit ? "Edit Customer Profile" : "Add New Customer"}
             </h2>
-            <p className="text-xs text-text-secondary mt-0.5">
+            <p className="text-[11px] sm:text-xs text-text-secondary mt-0.5">
               {clientToEdit
                 ? "Update customer identification, documents, and rental details."
                 : "Register a Resident or Tourist client with automated AI document extraction."}
@@ -712,22 +712,22 @@ export default function CreateClientModal({
           </div>
           <button
             onClick={handleClose}
-            className="p-2 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Form Body */}
-        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-6">
-          <form id="create-client-form" onSubmit={handleSubmit} className="space-y-6">
+        <div className="p-3.5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-4 sm:space-y-6">
+          <form id="create-client-form" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             
             {/* Profile Type Selector (Resident vs Tourist) */}
-            <div className="bg-white p-4 rounded-xl border border-border shadow-xs">
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-border shadow-xs">
               <label className="block text-xs font-bold text-text-secondary mb-2">
                 Customer Profile Type (نوع العميل) <span className="text-red-500 font-bold">*</span>
               </label>
-              <div className="bg-gray-100 p-1 rounded-xl flex items-center w-full">
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-gray-100 rounded-xl border border-gray-200 w-full">
                 <button
                   type="button"
                   onClick={() => {
@@ -736,14 +736,18 @@ export default function CreateClientModal({
                       setFormData(prev => ({ ...prev, nationality: "Emirati" }));
                     }
                   }}
-                  className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 min-w-0 ${
                     clientType === "Resident"
-                      ? "bg-white text-brand shadow-sm font-bold"
+                      ? "bg-white text-brand shadow-xs font-bold"
                       : "text-text-muted hover:text-text-primary"
                   }`}
                 >
-                  <Home size={16} className="shrink-0" />
-                  <span className="whitespace-nowrap">Resident (مقيم / مواطن إماراتي)</span>
+                  <Home size={15} className="shrink-0 text-brand" />
+                  <span className="truncate text-center">
+                    <span className="font-bold">Resident</span>
+                    <span className="text-[10px] font-normal ml-1 hidden sm:inline">(مقيم / مواطن إماراتي)</span>
+                    <span className="text-[10px] font-normal ml-1 sm:hidden">(مقيم)</span>
+                  </span>
                 </button>
 
                 <button
@@ -754,14 +758,18 @@ export default function CreateClientModal({
                       setFormData(prev => ({ ...prev, nationality: "" }));
                     }
                   }}
-                  className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 min-w-0 ${
                     clientType === "Tourist"
-                      ? "bg-white text-brand shadow-sm font-bold"
+                      ? "bg-white text-brand shadow-xs font-bold"
                       : "text-text-muted hover:text-text-primary"
                   }`}
                 >
-                  <Plane size={16} className="shrink-0" />
-                  <span className="whitespace-nowrap">Tourist (سائح / أجنبي)</span>
+                  <Plane size={15} className="shrink-0 text-brand" />
+                  <span className="truncate text-center">
+                    <span className="font-bold">Tourist</span>
+                    <span className="text-[10px] font-normal ml-1 hidden sm:inline">(سائح / زائر أجنبي)</span>
+                    <span className="text-[10px] font-normal ml-1 sm:hidden">(سائح)</span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -855,43 +863,50 @@ export default function CreateClientModal({
             />
 
             {/* Document Upload Section (Camera or Gallery Upload) */}
-            <div id="doc-upload-section" className="bg-white p-5 rounded-2xl border border-border shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <label className="block text-sm font-bold text-gray-900 flex items-center gap-2">
-                  <span>Documents (License, ID, etc.)</span>
-                  <span className="text-red-500 font-bold">*</span>
-                  <span className="text-xs text-gray-500 font-normal">
-                    {docPreviews.length}/5
-                  </span>
-                </label>
+            <div id="doc-upload-section" className="bg-white p-3.5 sm:p-5 rounded-2xl border border-border shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center justify-between w-full sm:w-auto">
+                  <label className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <span>Documents (License, ID, etc.)</span>
+                    <span className="text-red-500 font-bold">*</span>
+                    <span className="text-xs text-gray-500 font-normal">
+                      {docPreviews.length}/5
+                    </span>
+                  </label>
+                  {autoScannedSuccess && (
+                    <span className="sm:hidden text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 size={11} /> Auto-Filled
+                    </span>
+                  )}
+                </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
                   {/* Mode Switcher: Camera vs Gallery (like car inspection) */}
-                  <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+                  <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold shrink-0">
                     <button
                       type="button"
                       onClick={() => setUploadMode("camera")}
-                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
                         uploadMode === "camera"
                           ? "bg-white text-brand shadow-xs font-bold"
                           : "text-text-muted hover:text-text-primary"
                       }`}
                       title="Camera Mode (التقاط بالكاميرا)"
                     >
-                      <Camera size={14} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                      <Camera size={13} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
                       <span>Camera</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setUploadMode("gallery")}
-                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
                         uploadMode === "gallery"
                           ? "bg-white text-brand shadow-xs font-bold"
                           : "text-text-muted hover:text-text-primary"
                       }`}
                       title="Gallery / Files Mode (رفع من الملفات)"
                     >
-                      <ImageIcon size={14} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                      <ImageIcon size={13} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
                       <span>Gallery</span>
                     </button>
                   </div>
@@ -910,7 +925,7 @@ export default function CreateClientModal({
                         }
                       }
                     }}
-                    className="px-3.5 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                    className="px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
                   >
                     {scanningDoc ? (
                       <>
@@ -937,17 +952,17 @@ export default function CreateClientModal({
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2.5 sm:gap-3">
                 {docPreviews.map((doc, idx) => {
                   const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
                   return (
                     <div
                       key={idx}
-                      className="relative w-24 h-24 rounded-xl border border-gray-200 overflow-hidden group shadow-2xs"
+                      className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl border border-gray-200 overflow-hidden group shadow-2xs"
                     >
                       {isPdf ? (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-brand">
-                          <FileText size={32} className="text-red-500 mb-1" />
+                          <FileText size={28} className="text-red-500 mb-1" />
                           <span className="text-[10px] font-medium text-gray-500 text-center mt-1 truncate w-full">PDF</span>
                         </div>
                       ) : (
@@ -968,39 +983,37 @@ export default function CreateClientModal({
                   );
                 })}
 
-                {/* Take Photo Button */}
+                {/* Single Contextual Trigger Button matching active uploadMode */}
                 {docPreviews.length < 5 && (
                   <button
                     type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    className={`w-24 h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
+                    onClick={() => {
+                      if (uploadMode === "camera") {
+                        cameraInputRef.current?.click();
+                      } else {
+                        fileInputRef.current?.click();
+                      }
+                    }}
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
                       uploadMode === "camera"
                         ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
                         : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
                     }`}
-                    title="Take Photo with Camera (التقاط بالكاميرا)"
+                    title={uploadMode === "camera" ? "Take Photo with Camera (التقاط بالكاميرا)" : "Upload File or PDF (رفع ملف)"}
                   >
-                    <Camera size={22} className="mb-1 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-bold">Take Photo</span>
-                    <span className="text-[8px] opacity-70">Camera</span>
-                  </button>
-                )}
-
-                {/* Upload File Button */}
-                {docPreviews.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`w-24 h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
-                      uploadMode === "gallery"
-                        ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
-                        : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
-                    }`}
-                    title="Upload File or PDF from Device (رفع من الجهاز)"
-                  >
-                    <ImagePlus size={22} className="mb-1 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-bold">Upload</span>
-                    <span className="text-[8px] opacity-70">Gallery / PDF</span>
+                    {uploadMode === "camera" ? (
+                      <>
+                        <Camera size={20} className="mb-1 group-hover:scale-110 transition-transform text-brand" />
+                        <span className="text-[10px] font-bold text-brand">Take Photo</span>
+                        <span className="text-[8px] opacity-70">Camera</span>
+                      </>
+                    ) : (
+                      <>
+                        <ImagePlus size={20} className="mb-1 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
+                        <span className="text-[10px] font-bold text-gray-700 group-hover:text-brand">Upload</span>
+                        <span className="text-[8px] opacity-70">Gallery / PDF</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -1582,8 +1595,8 @@ export default function CreateClientModal({
           </form>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-between shrink-0">
+        {/* Footer (Matching CreateClientModal) */}
+        <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-border bg-white flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div>
             {autoScannedSuccess && (
               <span className="text-xs text-emerald-700 font-bold flex items-center gap-1.5">
@@ -1591,11 +1604,11 @@ export default function CreateClientModal({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2.5 text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-gray-100 transition-colors cursor-pointer text-center"
               disabled={submitting}
             >
               Cancel
@@ -1604,7 +1617,7 @@ export default function CreateClientModal({
               type="submit"
               form="create-client-form"
               disabled={submitting || scanningDoc}
-              className="px-6 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-colors font-bold text-sm flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+              className="flex-1 sm:flex-initial px-6 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-colors font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
             >
               {submitting ? (
                 <>
