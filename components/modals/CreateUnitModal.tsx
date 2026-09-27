@@ -334,18 +334,18 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      {/* Widescreen Modal (max-w-5xl matching CreateClientModal) */}
-      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      {/* Widescreen Modal (max-w-5xl matching CreateClientModal) - Height minimized on mobile */}
+      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[90vh]">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
           <div>
-            <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
-              <ExecutiveCarIcon className="text-brand" size={22} />
-              {unitToEdit ? "Edit Vehicle Details" : "Add New Vehicle"}
+            <h2 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-1.5 sm:gap-2">
+              <ExecutiveCarIcon className="text-brand shrink-0" size={20} />
+              <span>{unitToEdit ? "Edit Vehicle Details" : "Add New Vehicle"}</span>
             </h2>
-            <p className="text-xs text-text-secondary mt-0.5">
+            <p className="text-[10px] sm:text-xs text-text-secondary mt-0.5 line-clamp-1 sm:line-clamp-none">
               {unitToEdit
                 ? "Update vehicle specifications, rental rates, and profile picture."
                 : "Register a new vehicle with technical specifications and pricing to your fleet."}
@@ -353,15 +353,15 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
           </div>
           <button
             onClick={handleClose}
-            className="p-2 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer shrink-0"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Form Body */}
-        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-6">
-          <form id="create-unit-form" onSubmit={handleSubmit} className="space-y-6">
+        <div className="p-2.5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-3 sm:space-y-6">
+          <form id="create-unit-form" onSubmit={handleSubmit} className="space-y-3 sm:space-y-6">
             
             {/* Hidden Input for Gallery Upload */}
             <input
@@ -383,84 +383,84 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
             />
 
             {/* SECTION 1: VEHICLE PHOTO (Matching Step 4 Inspection Photos with Camera/Gallery toggle) */}
-            <div className="bg-white p-5 rounded-2xl border border-border shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 tracking-wide uppercase flex items-center gap-2">
-                    <Camera size={16} className="text-brand" />
-                    Vehicle Photos
+                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 tracking-wide uppercase flex items-center gap-1.5 sm:gap-2">
+                    <Camera size={15} className="text-brand shrink-0" />
+                    <span>Vehicle Photos</span>
                   </h3>
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-[10px] sm:text-xs text-text-secondary mt-0.5">
                     Take live photo with camera or upload from gallery (up to 8 photos)
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   {/* Mode Switcher: Camera vs Gallery (exact match to user screenshot) */}
-                  <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+                  <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold shrink-0">
                     <button
                       type="button"
                       onClick={() => setUploadMode("camera")}
-                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
                         uploadMode === "camera"
                           ? "bg-white text-brand shadow-xs font-bold"
                           : "text-text-muted hover:text-text-primary"
                       }`}
                       title="Camera Direct Mode (التقاط بالكاميرا)"
                     >
-                      <Camera size={14} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                      <Camera size={13} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
                       <span>Camera</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setUploadMode("gallery")}
-                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
                         uploadMode === "gallery"
                           ? "bg-white text-brand shadow-xs font-bold"
                           : "text-text-muted hover:text-text-primary"
                       }`}
                       title="Gallery Mode (رفع من المعرض)"
                     >
-                      <ImageIcon size={14} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                      <ImageIcon size={13} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
                       <span>Gallery</span>
                     </button>
                   </div>
 
                   {photos.length > 0 && (
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full flex items-center gap-1">
-                      <CheckCircle2 size={11} /> {photos.length} Photo{photos.length > 1 ? "s" : ""}
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full flex items-center gap-1 shrink-0">
+                      <CheckCircle2 size={10} /> {photos.length} Photo{photos.length > 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
               </div>
 
               {/* Photos Grid */}
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
                 {photos.map((item, index) => (
                   <div
                     key={index}
-                    className="relative w-44 h-32 rounded-xl border border-gray-200 overflow-hidden group shadow-2xs bg-gray-50 flex items-center justify-center"
+                    className="relative w-32 h-24 sm:w-44 sm:h-32 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs bg-gray-50 flex items-center justify-center shrink-0"
                   >
                     <img
                       src={item}
                       alt={`Vehicle preview ${index + 1}`}
-                      className="w-full h-full object-contain p-2"
+                      className="w-full h-full object-contain p-1.5 sm:p-2"
                     />
 
                     {/* Primary Badge for index 0 */}
                     {index === 0 && (
-                      <span className="absolute top-2 left-2 z-10 text-[9px] font-bold bg-brand text-white px-2 py-0.5 rounded-md shadow-xs flex items-center gap-1">
+                      <span className="absolute top-1.5 left-1.5 z-10 text-[8px] sm:text-[9px] font-bold bg-brand text-white px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
                         Primary
                       </span>
                     )}
 
                     {/* Overlay Action Buttons */}
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-1.5 sm:gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                       {index !== 0 && (
                         <button
                           type="button"
                           onClick={() => setAsPrimaryPhoto(index)}
-                          className="px-2 py-1 bg-white/90 text-gray-800 text-[10px] font-bold rounded hover:bg-white transition-colors cursor-pointer"
+                          className="px-2 py-1 bg-white/90 text-gray-800 text-[9px] sm:text-[10px] font-bold rounded hover:bg-white transition-colors cursor-pointer"
                           title="Set as Primary Photo"
                         >
                           Make Primary
@@ -469,10 +469,10 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                       <button
                         type="button"
                         onClick={() => removePhoto(index)}
-                        className="p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
+                        className="p-1 sm:p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
                         title="Delete Photo"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -489,7 +489,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                         fileInputRef.current?.click();
                       }
                     }}
-                    className={`w-44 h-32 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
+                    className={`w-32 h-24 sm:w-44 sm:h-32 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
                       uploadMode === "camera"
                         ? "border-brand/40 bg-brand/[0.03] text-brand hover:border-brand hover:bg-brand/10"
                         : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
@@ -497,19 +497,19 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                   >
                     {uploadMode === "camera" ? (
                       <>
-                        <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand mb-2 group-hover:scale-110 transition-transform">
-                          <Camera size={20} />
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand mb-1 sm:mb-2 group-hover:scale-110 transition-transform">
+                          <Camera size={16} />
                         </div>
-                        <span className="text-xs font-bold text-brand">Take Live Photo</span>
-                        <span className="text-[10px] text-text-muted mt-0.5">Camera / Webcam</span>
+                        <span className="text-[10px] sm:text-xs font-bold text-brand">Take Live Photo</span>
+                        <span className="text-[8px] sm:text-[10px] text-text-muted mt-0.5">Camera / Webcam</span>
                       </>
                     ) : (
                       <>
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:text-brand group-hover:bg-brand/10 mb-2 group-hover:scale-110 transition-transform">
-                          <ImageIcon size={20} />
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:text-brand group-hover:bg-brand/10 mb-1 sm:mb-2 group-hover:scale-110 transition-transform">
+                          <ImageIcon size={16} />
                         </div>
-                        <span className="text-xs font-bold text-gray-700 group-hover:text-brand">Upload Photos</span>
-                        <span className="text-[10px] text-text-muted mt-0.5">From Gallery / Device</span>
+                        <span className="text-[10px] sm:text-xs font-bold text-gray-700 group-hover:text-brand">Upload Photos</span>
+                        <span className="text-[8px] sm:text-[10px] text-text-muted mt-0.5">From Gallery / Device</span>
                       </>
                     )}
                   </button>
@@ -824,19 +824,19 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
         </div>
 
         {/* Footer (Matching CreateClientModal) */}
-        <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-between shrink-0">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-t border-border bg-white flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0">
           <div>
             {photos.length > 0 && (
-              <span className="text-xs text-emerald-700 font-bold flex items-center gap-1.5">
-                <CheckCircle2 size={14} /> {photos.length} vehicle photo{photos.length > 1 ? "s" : ""} attached
+              <span className="text-[11px] sm:text-xs text-emerald-700 font-bold flex items-center gap-1 sm:gap-1.5">
+                <CheckCircle2 size={13} /> {photos.length} vehicle photo{photos.length > 1 ? "s" : ""} attached
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+              className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-gray-100 transition-colors cursor-pointer text-center"
               disabled={submitting}
             >
               Cancel
@@ -845,11 +845,11 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
               type="submit"
               form="create-unit-form"
               disabled={submitting}
-              className="px-6 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-colors font-bold text-sm flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+              className="flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-colors font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-sm disabled:opacity-50"
             >
               {submitting ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Saving...
+                  <Loader2 size={15} className="animate-spin" /> Saving...
                 </>
               ) : unitToEdit ? (
                 "Save Changes"

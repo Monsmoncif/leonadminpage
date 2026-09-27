@@ -337,17 +337,17 @@ export default function CreateDriverModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      {/* Widescreen Modal (max-w-5xl matching CreateClientModal & CreateUnitModal) */}
-      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[92vh]">
+      {/* Widescreen Modal (max-w-5xl) - Height minimized on mobile */}
+      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[90vh]">
         
         {/* Header */}
-        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-text-primary flex items-center gap-2">
-              <UserPlus className="text-brand" size={20} />
-              {driverToEdit ? "Edit Driver Profile" : "Add New Driver"}
+            <h2 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-1.5 sm:gap-2">
+              <UserPlus className="text-brand shrink-0" size={18} />
+              <span>{driverToEdit ? "Edit Driver Profile" : "Add New Driver"}</span>
             </h2>
-            <p className="text-[11px] sm:text-xs text-text-secondary mt-0.5">
+            <p className="text-[10px] sm:text-xs text-text-secondary mt-0.5 line-clamp-1 sm:line-clamp-none">
               {driverToEdit
                 ? "Update driver identification, license details, and account credentials."
                 : "Register a new driver with smart AI document extraction and licensing credentials."}
@@ -355,15 +355,15 @@ export default function CreateDriverModal({
           </div>
           <button
             onClick={handleClose}
-            className="p-1.5 sm:p-2 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer shrink-0"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Form Body */}
-        <div className="p-3.5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-4 sm:space-y-6">
-          <form id="create-driver-form" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+        <div className="p-2.5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-3 sm:space-y-6">
+          <form id="create-driver-form" onSubmit={handleSubmit} className="space-y-3 sm:space-y-6">
             
             {/* Hidden Inputs for Document Upload & Scan */}
             <input
@@ -402,25 +402,25 @@ export default function CreateDriverModal({
             />
 
             {/* SECTION 1: DOCUMENTS & AI SCANNING */}
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-border shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
                 <div className="flex items-center justify-between w-full sm:w-auto">
-                  <label className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                    <FileText size={16} className="text-brand" />
+                  <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <FileText size={15} className="text-brand shrink-0" />
                     <span>Driver Documents (وثائق السائق)</span>
                     <span className="text-red-500 font-bold">*</span>
-                    <span className="text-xs text-gray-500 font-normal">
+                    <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
                       {docPreviews.length}/5
                     </span>
                   </label>
                   {autoScannedSuccess && (
-                    <span className="sm:hidden text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <CheckCircle2 size={11} /> Auto-Filled
+                    <span className="sm:hidden text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 size={10} /> Auto-Filled
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
                   {autoScannedSuccess && (
                     <span className="hidden sm:flex text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full items-center gap-1">
                       <CheckCircle2 size={11} /> Auto-Filled by AI
@@ -428,31 +428,31 @@ export default function CreateDriverModal({
                   )}
 
                   {/* Mode Switcher: Camera vs Gallery (like car inspection) */}
-                  <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold shrink-0">
+                  <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold shrink-0">
                     <button
                       type="button"
                       onClick={() => setUploadMode("camera")}
-                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
                         uploadMode === "camera"
                           ? "bg-white text-brand shadow-xs font-bold"
                           : "text-text-muted hover:text-text-primary"
                       }`}
                       title="Camera Mode (التقاط بالكاميرا)"
                     >
-                      <Camera size={13} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                      <Camera size={12} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
                       <span>Camera</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setUploadMode("gallery")}
-                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
                         uploadMode === "gallery"
                           ? "bg-white text-brand shadow-xs font-bold"
                           : "text-text-muted hover:text-text-primary"
                       }`}
                       title="Gallery / Files Mode (رفع من الملفات)"
                     >
-                      <ImageIcon size={13} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                      <ImageIcon size={12} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
                       <span>Gallery</span>
                     </button>
                   </div>
@@ -472,19 +472,19 @@ export default function CreateDriverModal({
                           }
                         }
                       }}
-                      className="px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
+                      className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
                     >
                       {scanningDoc ? (
                         <>
-                          <Loader2 size={13} className="animate-spin" />
+                          <Loader2 size={12} className="animate-spin" />
                           <span>Scanning...</span>
                         </>
                       ) : (
                         <>
                           {uploadMode === "camera" && docPreviews.length === 0 ? (
-                            <Camera size={13} />
+                            <Camera size={12} />
                           ) : (
-                            <ScanLine size={13} />
+                            <ScanLine size={12} />
                           )}
                           <span>
                             {docPreviews.length > 0 
@@ -500,18 +500,18 @@ export default function CreateDriverModal({
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2.5 sm:gap-3">
+              <div className="flex flex-wrap gap-2 sm:gap-3">
                 {docPreviews.map((doc, idx) => {
                   const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
                   return (
                     <div
                       key={idx}
-                      className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl border border-gray-200 overflow-hidden group shadow-2xs"
+                      className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs shrink-0"
                     >
                       {isPdf ? (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-brand">
-                          <FileText size={28} className="text-red-500 mb-1" />
-                          <span className="text-[10px] font-medium text-gray-500 text-center mt-1 truncate w-full px-1">PDF</span>
+                          <FileText size={20} className="text-red-500 mb-0.5" />
+                          <span className="text-[9px] sm:text-[10px] font-medium text-gray-500 text-center truncate w-full px-1">PDF</span>
                         </div>
                       ) : (
                         <img
@@ -526,7 +526,7 @@ export default function CreateDriverModal({
                         className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
                         title="Remove Document"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   );
@@ -543,7 +543,7 @@ export default function CreateDriverModal({
                         fileInputRef.current?.click();
                       }
                     }}
-                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs ${
+                    className={`w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
                       uploadMode === "camera"
                         ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
                         : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
@@ -552,21 +552,21 @@ export default function CreateDriverModal({
                   >
                     {uploadMode === "camera" ? (
                       <>
-                        <Camera size={20} className="mb-1 group-hover:scale-110 transition-transform text-brand" />
-                        <span className="text-[10px] font-bold text-brand">Take Photo</span>
-                        <span className="text-[8px] opacity-70">Camera</span>
+                        <Camera size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-brand" />
+                        <span className="text-[9px] sm:text-[10px] font-bold text-brand leading-tight">Take Photo</span>
+                        <span className="text-[7px] sm:text-[8px] opacity-70">Camera</span>
                       </>
                     ) : (
                       <>
-                        <ImagePlus size={20} className="mb-1 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
-                        <span className="text-[10px] font-bold text-gray-700 group-hover:text-brand">Upload</span>
-                        <span className="text-[8px] opacity-70">Gallery / PDF</span>
+                        <ImagePlus size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
+                        <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 group-hover:text-brand leading-tight">Upload</span>
+                        <span className="text-[7px] sm:text-[8px] opacity-70">Gallery / PDF</span>
                       </>
                     )}
                   </button>
                 )}
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-[10px] sm:text-xs text-gray-500">
                 Supported formats: PNG, JPG, WebP, or PDF.
               </p>
             </div>
@@ -753,11 +753,11 @@ export default function CreateDriverModal({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-border bg-white flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-t border-border bg-white flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0">
           <div>
             {docPreviews.length > 0 && (
-              <span className="text-xs text-emerald-700 font-bold flex items-center gap-1.5">
-                <CheckCircle2 size={14} /> {docPreviews.length} document{docPreviews.length > 1 ? "s" : ""} attached
+              <span className="text-[11px] sm:text-xs text-emerald-700 font-bold flex items-center gap-1 sm:gap-1.5">
+                <CheckCircle2 size={13} /> {docPreviews.length} document{docPreviews.length > 1 ? "s" : ""} attached
               </span>
             )}
           </div>
@@ -765,7 +765,7 @@ export default function CreateDriverModal({
             <button
               type="button"
               onClick={handleClose}
-              className="flex-1 sm:flex-initial px-4 py-2.5 text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-gray-100 transition-colors cursor-pointer text-center"
+              className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-gray-100 transition-colors cursor-pointer text-center"
               disabled={isSubmitting}
             >
               Cancel
@@ -774,11 +774,11 @@ export default function CreateDriverModal({
               type="submit"
               form="create-driver-form"
               disabled={isSubmitting || scanningDoc}
-              className="flex-1 sm:flex-initial px-6 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-colors font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+              className="flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-colors font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-sm disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Saving...
+                  <Loader2 size={15} className="animate-spin" /> Saving...
                 </>
               ) : driverToEdit ? (
                 "Save Changes"
