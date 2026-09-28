@@ -101,6 +101,14 @@ export default function CreateContractModal({
   const [drivers, setDrivers] = useState<any[]>([]);
 
   // Form State
+  const getCurrentFormattedTime = () => {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date());
+  };
+
   const [inspectionPhotos, setInspectionPhotos] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     unitId: "",
@@ -1197,19 +1205,41 @@ export default function CreateContractModal({
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
-                          <Clock size={13} className="text-brand" />
-                          Delivery / Handover Time (وقت تسليم السيارة للسائق) <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input 
-                            type="text" 
-                            value={formData.checkoutTime} 
-                            onChange={e => setFormData({...formData, checkoutTime: e.target.value})} 
-                            placeholder="e.g. 10:00 AM"
-                            className="w-full p-2.5 pl-8 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium" 
-                          />
-                          <Clock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-text-secondary flex items-center gap-1">
+                            <Clock size={13} className="text-brand" />
+                            <span>Delivery / Handover Time (وقت تسليم السيارة للسائق)</span>
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
+                            className="text-xs text-brand hover:text-brand-dark font-bold hover:underline cursor-pointer flex items-center gap-1"
+                          >
+                            <Clock size={12} />
+                            <span>Set time now</span>
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                            <input 
+                              type="text" 
+                              value={formData.checkoutTime} 
+                              onChange={e => setFormData({...formData, checkoutTime: e.target.value})} 
+                              placeholder="e.g. 10:00 AM"
+                              className="w-full p-2.5 pl-9 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary" 
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
+                            className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-secondary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 shadow-2xs flex items-center gap-1.5"
+                            title="Set time now"
+                          >
+                            <Clock size={14} className="text-brand" />
+                            <span>Now</span>
+                          </button>
                         </div>
                       </div>
 
