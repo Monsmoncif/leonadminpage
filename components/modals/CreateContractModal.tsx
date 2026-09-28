@@ -1372,13 +1372,13 @@ export default function CreateContractModal({
                             Total to Collect on Handover (إجمالي المبلغ المطلوب تحصيله)
                           </span>
                           <p className="text-xs text-text-muted mt-0.5">
-                            Collection Price (${formData.collectionAmount || 0}) + Deposit (${formData.depositAmount || 0})
+                            Collection Price (${formData.collectionAmount || 0})
                             {formData.deliveryCharges > 0 ? ` + Delivery Fee ($${formData.deliveryCharges})` : ""}
                           </p>
                         </div>
                         <div className="text-left sm:text-right">
                           <span className="text-2xl font-black text-brand">
-                            ${Number(formData.collectionAmount || 0) + Number(formData.depositAmount || 0) + Number(formData.deliveryCharges || 0)}
+                            ${Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)}
                           </span>
                         </div>
                       </div>
@@ -1587,10 +1587,10 @@ export default function CreateContractModal({
                         <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
                           <div>
                             <span className="font-bold text-brand block">Total Handover Collection (إجمالي التحصيل):</span>
-                            <span className="text-[10px] text-text-muted">Collection Price + Deposit {formData.deliveryCharges > 0 ? "+ Delivery" : ""}</span>
+                            <span className="text-[10px] text-text-muted">Collection Price {formData.deliveryCharges > 0 ? "+ Delivery" : ""}</span>
                           </div>
                           <span className="text-base font-black text-brand">
-                            ${Number(formData.collectionAmount || 0) + Number(formData.depositAmount || 0) + Number(formData.deliveryCharges || 0)}
+                            ${Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)}
                           </span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100 items-center">

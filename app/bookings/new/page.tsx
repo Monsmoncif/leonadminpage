@@ -1279,13 +1279,13 @@ export default function NewRentalAdminPage() {
                   Total to Collect on Handover (إجمالي المبلغ المطلوب تحصيله)
                 </span>
                 <p className="text-xs text-text-muted mt-0.5">
-                  Collection Price (${rentalData.collectionAmount || 0}) + Deposit (${rentalData.depositAmount || 0})
+                  Collection Price (${rentalData.collectionAmount || 0})
                   {rentalData.deliveryFee > 0 ? ` + Delivery Fee ($${rentalData.deliveryFee})` : ""}
                 </p>
               </div>
               <div className="text-left sm:text-right">
                 <span className="text-2xl font-black text-brand">
-                  ${Number(rentalData.collectionAmount || 0) + Number(rentalData.depositAmount || 0) + Number(rentalData.deliveryFee || 0)}
+                  ${Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)}
                 </span>
               </div>
             </div>
@@ -1502,10 +1502,10 @@ export default function NewRentalAdminPage() {
               <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
                 <div>
                   <span className="font-bold text-brand block">Total Handover Collection (إجمالي التحصيل):</span>
-                  <span className="text-[10px] text-text-muted">Collection Price + Deposit {rentalData.deliveryFee > 0 ? "+ Delivery" : ""}</span>
+                  <span className="text-[10px] text-text-muted">Collection Price {rentalData.deliveryFee > 0 ? "+ Delivery" : ""}</span>
                 </div>
                 <span className="text-base font-black text-brand">
-                  ${Number(rentalData.collectionAmount || 0) + Number(rentalData.depositAmount || 0) + Number(rentalData.deliveryFee || 0)}
+                  ${Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100 items-center">

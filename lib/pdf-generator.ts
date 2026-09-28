@@ -282,7 +282,7 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
       doc.font("Helvetica-Bold").text(data.paymentMethod || "Cash", rightColX + 110, itemY);
 
       const extraCharges = (Number(data.salikCharge) || 0) + (Number(data.parkingCharge) || 0) + (Number(data.finesCharge) || 0) + (Number(data.fuelCharge) || 0);
-      const totalDue = Number(data.totalAmount || 0) + Number(data.depositAmount || 0) + extraCharges;
+      const totalDue = Number(data.totalAmount || 0) + extraCharges;
 
       itemY += 18;
       doc.rect(rightColX + 10, itemY - 2, colWidth - 20, 22).fill("#e2e8f0");

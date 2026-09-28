@@ -464,12 +464,11 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                     const days = Number(contract.totalDays) || 1;
                     const rate = Number(contract.dailyRate) || 0;
                     const totalRent = days * rate;
-                    const deposit = Number(contract.depositAmount) || 0;
                     const salik = Number(contract.salikCharge || contract.salikFees) || 0;
                     const parking = Number(contract.parkingCharge || contract.parkingFees) || 0;
                     const fines = Number(contract.finesCharge || contract.finesFees) || 0;
                     const fuel = Number(contract.fuelCharge || contract.fuelFees) || 0;
-                    return (totalRent + deposit + salik + parking + fines + fuel).toFixed(2);
+                    return (totalRent + salik + parking + fines + fuel).toFixed(2);
                   })()}
                 </span>
               </div>
