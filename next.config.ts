@@ -12,28 +12,15 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    return [
-      // Keep NextAuth routes inside Next.js
-      {
-        source: "/api/auth/:path*",
-        destination: "/api/auth/:path*",
-      },
-      // Keep OCR routes inside Next.js
-      {
-        source: "/api/ocr/:path*",
-        destination: "/api/ocr/:path*",
-      },
-      // Keep Contract PDF routes inside Next.js
-      {
-        source: "/api/contracts/:id/pdf",
-        destination: "/api/contracts/:id/pdf",
-      },
-      // Proxy all other API calls to NestJS backend on port 4000
-      {
-        source: "/api/:path*",
-        destination: `${BACKEND_URL}/api/:path*`,
-      },
-    ];
+    return {
+      fallback: [
+        // Proxy to NestJS backend only for routes not handled directly by Next.js
+        {
+          source: "/api/:path*",
+          destination: `${BACKEND_URL}/api/:path*`,
+        },
+      ],
+    };
   },
 };
 
