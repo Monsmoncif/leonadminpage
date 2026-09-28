@@ -88,6 +88,7 @@ export async function sendClientContractNotification(
         clientPhone: clientPhone || "",
         clientEmail: clientEmail || "",
         clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
+        clientType: clientDoc.clientType || (clientDoc.idNumber ? "Resident" : "Tourist"),
         clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
         vehicleName,
         vehiclePlate,

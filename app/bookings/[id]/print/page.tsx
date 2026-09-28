@@ -91,6 +91,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   const client = contract.clientId || {};
   const unit = contract.unitId || {};
   const driver = contract.driverId || {};
+  const isResident = client.clientType ? client.clientType === "Resident" : Boolean(client.idNumber || !client.passportNumber);
 
   // Form serial number
   const serialNo = contract.contractNumber
@@ -332,19 +333,31 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               </div>
               <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Issued At / صادرة من</span>
-                <span className="font-bold truncate">{client.licenseIssuedAt || "Dubai"}</span>
+                <span className="font-bold truncate">{client.licenseIssuedBy || client.licenseIssuedAt || (isResident ? "Dubai" : "N/A")}</span>
               </div>
               <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Valid Up To / صالحة لغاية</span>
                 <span className="font-bold truncate">{client.licenseExpiry ? formatDate(client.licenseExpiry) : "N/A"}</span>
               </div>
               <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Passport or ID No / جواز السفر / الهوية</span>
-                <span className="font-bold truncate">{client.passportNumber || client.idNumber || "N/A"}</span>
+                <span className="text-gray-500 font-bold uppercase text-[6px]">
+                  {isResident ? "ID No / رقم الهوية" : "Passport No / رقم جواز السفر"}
+                </span>
+                <span className="font-bold truncate">
+                  {isResident
+                    ? (client.idNumber || client.passportNumber || "N/A")
+                    : (client.passportNumber || client.idNumber || "N/A")}
+                </span>
               </div>
               <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Passport Expiry / تاريخ انتهاء الجواز</span>
-                <span className="font-bold truncate">{client.passportExpiry ? formatDate(client.passportExpiry) : "N/A"}</span>
+                <span className="text-gray-500 font-bold uppercase text-[6px]">
+                  {isResident ? "ID Expiry / تاريخ انتهاء الهوية" : "Passport Expiry / تاريخ انتهاء الجواز"}
+                </span>
+                <span className="font-bold truncate">
+                  {isResident
+                    ? (client.idExpiry ? formatDate(client.idExpiry) : (client.passportExpiry ? formatDate(client.passportExpiry) : "N/A"))
+                    : (client.passportExpiry ? formatDate(client.passportExpiry) : (client.idExpiry ? formatDate(client.idExpiry) : "N/A"))}
+                </span>
               </div>
               <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Nationality / الجنسية</span>
@@ -352,7 +365,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               </div>
               <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Date of Birth / تاريخ الميلاد</span>
-                <span className="font-bold truncate">{client.dob ? formatDate(client.dob) : "N/A"}</span>
+                <span className="font-bold truncate">{client.dateOfBirth || client.dob ? formatDate(client.dateOfBirth || client.dob) : "N/A"}</span>
               </div>
               <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Tel/Mobile / الهاتف</span>

@@ -8,6 +8,7 @@ export interface ContractPdfData {
   clientPhone: string;
   clientEmail?: string;
   clientIdNumber?: string;
+  clientType?: string;
   clientLicense?: string;
   vehicleName: string;
   vehiclePlate: string;
@@ -208,7 +209,8 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
       doc.font("Helvetica-Bold").text(data.clientEmail || "N/A", leftColX + 85, itemY);
 
       itemY += 16;
-      doc.font("Helvetica").text(`ID / Passport:`, leftColX + 12, itemY);
+      const idLabel = data.clientType === "Resident" ? "ID Number:" : (data.clientType === "Tourist" ? "Passport No:" : "ID / Passport:");
+      doc.font("Helvetica").text(idLabel, leftColX + 12, itemY);
       doc.font("Helvetica-Bold").text(data.clientIdNumber || "Verified", leftColX + 85, itemY);
 
       itemY += 16;
