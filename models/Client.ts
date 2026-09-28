@@ -12,6 +12,7 @@ export interface IClient extends Document {
   email: string;
   nationality: string;
   idNumber: string; // Passport or National ID
+  idExpiry?: Date | string; // Emirates ID Expiry Date
 
   // Tourist Passport Details
   passportNumber?: string;
@@ -56,6 +57,7 @@ const clientSchema = new Schema<IClient>(
     email: { type: String, required: false, default: "" },
     nationality: { type: String, required: true },
     idNumber: { type: String, required: true },
+    idExpiry: { type: Date, required: false },
 
     // Tourist Passport Details
     passportNumber: { type: String, required: false },

@@ -123,6 +123,7 @@ Extract the relevant fields and return STRICTLY a JSON object matching this sche
   "visaExpiry": "Visa expiry date in YYYY-MM-DD format",
 
   "idNumber": "Emirates ID number (784-XXXX-XXXXXXX-X) or National ID or Passport Number",
+  "idExpiry": "Emirates ID / National ID expiry date in YYYY-MM-DD format if visible",
   "address": "Address if visible",
   "phone": "Phone number if visible",
   "email": "Email address if visible",
@@ -133,7 +134,7 @@ Extraction Guidelines:
 1. If a field is not visible, set its value to "" (empty string).
 2. For dates, always convert to YYYY-MM-DD format (e.g., 2028-05-14).
 3. If both passport and driving licence are present, ensure passport fields are placed in passportNumber/passportExpiry/etc., and licence fields in licenseNumber/licenseExpiry/etc.
-4. For UAE documents: The Emirates ID (784-XXXX-XXXXXXX-X or بطاقة الهوية) maps to idNumber. UAE driving licence number (رخصة القيادة) maps to licenseNumber.
+4. For UAE documents: The Emirates ID (784-XXXX-XXXXXXX-X or بطاقة الهوية) maps to idNumber, and its expiry date maps to idExpiry. UAE driving licence number (رخصة القيادة) maps to licenseNumber, and its expiry date maps to licenseExpiry.
 5. Return ONLY valid JSON. Do not include markdown code block backticks.`;
 
     const errors: string[] = [];

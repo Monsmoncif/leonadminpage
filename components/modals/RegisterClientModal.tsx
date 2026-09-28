@@ -22,7 +22,8 @@ import {
   Upload,
   Camera,
   ImageIcon,
-  AlertTriangle
+  AlertTriangle,
+  ShieldCheck
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -57,6 +58,10 @@ export default function RegisterClientModal({
   const [error, setError] = useState<string | null>(null);
   const [docPreviews, setDocPreviews] = useState<string[]>([]);
 
+  // Resident specific document previews
+  const [licensePreviews, setLicensePreviews] = useState<string[]>([]);
+  const [idCardPreviews, setIdCardPreviews] = useState<string[]>([]);
+
   // Specific scan thumbnails
   const [passportThumb, setPassportThumb] = useState<string | null>(null);
   const [licenseFrontThumb, setLicenseFrontThumb] = useState<string | null>(null);
@@ -70,6 +75,12 @@ export default function RegisterClientModal({
   const scanLicenseFrontRef = useRef<HTMLInputElement>(null);
   const scanLicenseBackRef = useRef<HTMLInputElement>(null);
   const scanBatchRef = useRef<HTMLInputElement>(null);
+
+  // Resident specific refs for Driving Licence & Emirates ID
+  const licenseInputRef = useRef<HTMLInputElement>(null);
+  const licenseCameraRef = useRef<HTMLInputElement>(null);
+  const idInputRef = useRef<HTMLInputElement>(null);
+  const idCameraRef = useRef<HTMLInputElement>(null);
 
   const toast = useToast();
 
@@ -85,6 +96,7 @@ export default function RegisterClientModal({
     email: "",
     nationality: "Emirati",
     idNumber: "",
+    idExpiry: "",
     address: "",
 
     // Passport Details
@@ -188,6 +200,7 @@ export default function RegisterClientModal({
     return false;
   };
 
+  const isIdExpired = isDateExpired(formData.idExpiry);
   const isLicenseExpired = isDateExpired(formData.licenseExpiry);
   const isInternationalLicenseExpired = isDateExpired(formData.internationalLicenseExpiry);
 
@@ -225,6 +238,7 @@ export default function RegisterClientModal({
           email: clientToEdit.email || "",
           nationality: clientToEdit.nationality || (type === "Tourist" ? "" : "Emirati"),
           idNumber: clientToEdit.idNumber || "",
+          idExpiry: clientToEdit.idExpiry ? new Date(clientToEdit.idExpiry).toISOString().split("T")[0] : "",
           address: clientToEdit.address || "",
 
           passportNumber: clientToEdit.passportNumber || (type === "Tourist" ? clientToEdit.idNumber || "" : ""),
@@ -245,7 +259,23 @@ export default function RegisterClientModal({
           visaNumber: clientToEdit.visaNumber || "",
           visaExpiry: clientToEdit.visaExpiry ? new Date(clientToEdit.visaExpiry).toISOString().split("T")[0] : "",
         });
-        setDocPreviews(clientToEdit.documents || []);
+        const docs = clientToEdit.documents || [];
+        setDocPreviews(docs);
+        if (type === "Resident") {
+          if (docs.length >= 2) {
+            setLicensePreviews(docs.slice(0, Math.ceil(docs.length / 2)));
+            setIdCardPreviews(docs.slice(Math.ceil(docs.length / 2)));
+          } else if (docs.length === 1) {
+            setLicensePreviews(docs);
+            setIdCardPreviews([]);
+          } else {
+            setLicensePreviews([]);
+            setIdCardPreviews([]);
+          }
+        } else {
+          setLicensePreviews([]);
+          setIdCardPreviews([]);
+        }
       } else {
         setActiveTab("search");
         setClientType("Resident");
@@ -272,6 +302,7 @@ export default function RegisterClientModal({
       email: "",
       nationality: "Emirati",
       idNumber: "",
+      idExpiry: "",
       address: "",
 
       passportNumber: "",
@@ -292,11 +323,85 @@ export default function RegisterClientModal({
       visaNumber: "",
       visaExpiry: "",
     });
+    setLicensePreviews([]);
+    setIdCardPreviews([]);
     setDocPreviews([]);
     setPassportThumb(null);
     setLicenseFrontThumb(null);
     setLicenseBackThumb(null);
     setAutoScannedSuccess(false);
+  };
+
+  const handleLicenseDocChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles = Array.from(files);
+    if (licensePreviews.length + newFiles.length > 4) {
+      toast.error("Maximum 4 images allowed for Driving Licence (الحد الأقصى 4 صور لرخصة القيادة)");
+      return;
+    }
+
+    toast.success("Uploading driving licence image(s)...");
+    const processedFiles: string[] = [];
+
+    for (const file of newFiles) {
+      const processedBase64 = await processFile(file);
+      if (processedBase64) {
+        processedFiles.push(processedBase64);
+      }
+    }
+
+    if (processedFiles.length > 0) {
+      setLicensePreviews((prev) => [...prev, ...processedFiles]);
+      setDocPreviews((prev) => [...prev, ...processedFiles]);
+      toast.success(`${processedFiles.length} licence image(s) uploaded.`);
+    }
+    if (e.target) e.target.value = "";
+  };
+
+  const handleIdCardDocChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles = Array.from(files);
+    if (idCardPreviews.length + newFiles.length > 4) {
+      toast.error("Maximum 4 images allowed for Emirates ID (الحد الأقصى 4 صور لبطاقة الهوية)");
+      return;
+    }
+
+    toast.success("Uploading Emirates ID image(s)...");
+    const processedFiles: string[] = [];
+
+    for (const file of newFiles) {
+      const processedBase64 = await processFile(file);
+      if (processedBase64) {
+        processedFiles.push(processedBase64);
+      }
+    }
+
+    if (processedFiles.length > 0) {
+      setIdCardPreviews((prev) => [...prev, ...processedFiles]);
+      setDocPreviews((prev) => [...prev, ...processedFiles]);
+      toast.success(`${processedFiles.length} Emirates ID image(s) uploaded.`);
+    }
+    if (e.target) e.target.value = "";
+  };
+
+  const removeLicenseDoc = (index: number) => {
+    const target = licensePreviews[index];
+    setLicensePreviews((prev) => prev.filter((_, i) => i !== index));
+    if (target) {
+      setDocPreviews((prev) => prev.filter((img) => img !== target));
+    }
+  };
+
+  const removeIdCardDoc = (index: number) => {
+    const target = idCardPreviews[index];
+    setIdCardPreviews((prev) => prev.filter((_, i) => i !== index));
+    if (target) {
+      setDocPreviews((prev) => prev.filter((img) => img !== target));
+    }
   };
 
   const processFile = (file: File): Promise<string> => {
@@ -393,6 +498,8 @@ export default function RegisterClientModal({
       if (slotName === "passport") setPassportThumb(base64List[0]);
       if (slotName === "license_front") setLicenseFrontThumb(base64List[0]);
       if (slotName === "license_back") setLicenseBackThumb(base64List[0]);
+      if (slotName === "license") setLicensePreviews((prev) => [...prev, ...base64List]);
+      if (slotName === "id_card") setIdCardPreviews((prev) => [...prev, ...base64List]);
 
       // Send ALL documents (previous + new) so AI reads all documents and merges all details
       const targets = allDocs.length > 0 ? allDocs : base64List;
@@ -409,11 +516,13 @@ export default function RegisterClientModal({
 
       const { data, imageUrls, imageUrl } = resData;
 
-      if (
-        data.documentType === "passport" || 
-        data.documentType === "tourist_bundle" || 
-        data.passportNumber ||
-        (data.nationality && data.nationality.toLowerCase() !== "emirati" && data.nationality.toLowerCase() !== "uae" && data.nationality.toLowerCase() !== "united arab emirates")
+      // Smart resident vs tourist classification without forcing tourist for non-emirati residents
+      if (data.documentType === "emirates_id" || (data.idNumber && data.idNumber.startsWith("784"))) {
+        setClientType("Resident");
+      } else if (
+        (data.documentType === "passport" || data.documentType === "tourist_bundle" || data.passportNumber) &&
+        !data.idNumber?.startsWith("784") &&
+        data.documentType !== "emirates_id"
       ) {
         setClientType("Tourist");
       }
@@ -454,6 +563,7 @@ export default function RegisterClientModal({
 
         // Standard
         if (data.idNumber) updated.idNumber = data.idNumber;
+        if (data.idExpiry) updated.idExpiry = formatDateForInput(data.idExpiry);
         if (data.address) updated.address = data.address;
         if (data.phone) updated.phone = data.phone;
         if (data.email) updated.email = data.email;
@@ -494,7 +604,11 @@ export default function RegisterClientModal({
 
   // Scan all currently uploaded document images with AI
   const scanUploadedDocs = async (imagesToScan?: string[]) => {
-    const targets = imagesToScan || docPreviews;
+    const targets = imagesToScan || (
+      clientType === "Resident"
+        ? (licensePreviews.length > 0 || idCardPreviews.length > 0 ? Array.from(new Set([...licensePreviews, ...idCardPreviews])) : docPreviews)
+        : docPreviews
+    );
     if (!targets || targets.length === 0) {
       toast.error("Please upload at least one document image first.");
       return;
@@ -521,7 +635,11 @@ export default function RegisterClientModal({
 
       if (data.documentType === "emirates_id" || (data.idNumber && data.idNumber.startsWith("784"))) {
         setClientType("Resident");
-      } else if (data.documentType === "passport" || data.documentType === "tourist_bundle") {
+      } else if (
+        (data.documentType === "passport" || data.documentType === "tourist_bundle" || data.passportNumber) &&
+        !data.idNumber?.startsWith("784") &&
+        data.documentType !== "emirates_id"
+      ) {
         setClientType("Tourist");
       }
 
@@ -561,6 +679,7 @@ export default function RegisterClientModal({
 
         // Standard / Common
         if (data.idNumber) updated.idNumber = data.idNumber;
+        if (data.idExpiry) updated.idExpiry = formatDateForInput(data.idExpiry);
         if (data.address) updated.address = data.address;
         if (data.phone) updated.phone = data.phone;
         if (data.email) updated.email = data.email;
@@ -641,6 +760,17 @@ export default function RegisterClientModal({
       return;
     }
 
+    // BLOCK CREATION: If Emirates ID is expired (for Resident)
+    if (clientType === "Resident" && formData.idExpiry && isIdExpired) {
+      const expiredMsg = "Emirates ID is expired! Cannot create client with an expired ID. (بطاقة الهوية الإماراتية منتهية الصلاحية! لا يمكن إنشاء العميل بهوية منتهية)";
+      setError(expiredMsg);
+      toast.error(expiredMsg);
+      const el = document.getElementById("reg-client-id-expiry-resident");
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.focus();
+      return;
+    }
+
     // BLOCK CREATION: If Licence Expiry is late (expired in the past)
     if (formData.licenseExpiry && isLicenseExpired) {
       const expiredMsg = "Driving licence is expired! Cannot create client with an expired licence. (رخصة القيادة منتهية الصلاحية! لا يمكن إنشاء العميل برخصة منتهية)";
@@ -662,7 +792,12 @@ export default function RegisterClientModal({
     }
 
     // MANDATORY: Documents are strictly required to create a client
-    if (!docPreviews || docPreviews.length === 0) {
+    const residentDocsCount = licensePreviews.length + idCardPreviews.length;
+    const totalDocs = clientType === "Resident"
+      ? (residentDocsCount > 0 ? residentDocsCount : docPreviews.length)
+      : docPreviews.length;
+
+    if (totalDocs === 0) {
       const docMsg = clientType === "Tourist"
         ? "Upload Passport & Driver Licence (Front & Back) is required. Without upload we cannot create client. (يرجى تحميل جواز السفر ورخصة القيادة - الأمام والخلف)"
         : "Upload Emirates ID & UAE Driving Licence (Front & Back) is required. Without upload we cannot create client. (يرجى تحميل بطاقة الهوية الإماراتية ورخصة القيادة - الأمام والخلف)";
@@ -675,9 +810,13 @@ export default function RegisterClientModal({
     setSubmitting(true);
 
     try {
+      const allPreviewsToUpload = clientType === "Resident"
+        ? (residentDocsCount > 0 ? Array.from(new Set([...licensePreviews, ...idCardPreviews])) : docPreviews)
+        : docPreviews;
+
       // 1. Upload documents
-      const newFiles = docPreviews.filter((img) => img.startsWith("data:image") || img.startsWith("data:application/pdf"));
-      const existingUrls = docPreviews.filter((img) => img.startsWith("http"));
+      const newFiles = allPreviewsToUpload.filter((img) => img.startsWith("data:image") || img.startsWith("data:application/pdf"));
+      const existingUrls = allPreviewsToUpload.filter((img) => img.startsWith("http"));
       let uploadedUrls: string[] = [];
 
       if (newFiles.length > 0) {
@@ -716,6 +855,7 @@ export default function RegisterClientModal({
         email: formData.email.trim() || "",
         nationality: formData.nationality.trim() || (clientType === "Tourist" ? "International" : "Emirati"),
         idNumber: resolvedId,
+        idExpiry: formData.idExpiry || undefined,
         passportNumber: clientType === "Tourist" ? resolvedId : formData.passportNumber,
         licenseNumber: formData.licenseNumber.trim() || "N/A",
         licenseExpiry: formData.licenseExpiry || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
@@ -1180,143 +1320,367 @@ export default function RegisterClientModal({
                 className="hidden"
               />
 
-              {/* Document Upload Section (Camera or Gallery Upload) */}
-              <div id="driver-doc-upload-section" className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
-                  <div className="flex items-center justify-between w-full sm:w-auto">
-                    <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                      <span>Documents (License, ID, etc.)</span>
-                      <span className="text-red-500 font-bold">*</span>
-                      <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
-                        {docPreviews.length}/5
-                      </span>
-                    </label>
-                  </div>
+              {/* Resident specific hidden inputs */}
+              <input
+                type="file"
+                ref={licenseInputRef}
+                onChange={handleLicenseDocChange}
+                accept="image/*,application/pdf"
+                multiple
+                className="hidden"
+              />
+              <input
+                type="file"
+                ref={licenseCameraRef}
+                onChange={handleLicenseDocChange}
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+              />
+              <input
+                type="file"
+                ref={idInputRef}
+                onChange={handleIdCardDocChange}
+                accept="image/*,application/pdf"
+                multiple
+                className="hidden"
+              />
+              <input
+                type="file"
+                ref={idCameraRef}
+                onChange={handleIdCardDocChange}
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+              />
 
-                  <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
-                    {/* Mode Switcher: Camera vs Gallery (like car inspection) */}
-                    <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setUploadMode("camera")}
-                        className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
-                          uploadMode === "camera"
-                            ? "bg-white text-brand shadow-xs font-bold"
-                            : "text-text-muted hover:text-text-primary"
-                        }`}
-                        title="Camera Mode (التقاط بالكاميرا)"
-                      >
-                        <Camera size={12} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
-                        <span>Camera</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUploadMode("gallery")}
-                        className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
-                          uploadMode === "gallery"
-                            ? "bg-white text-brand shadow-xs font-bold"
-                            : "text-text-muted hover:text-text-primary"
-                        }`}
-                        title="Gallery / Files Mode (رفع من الملفات)"
-                      >
-                        <ImageIcon size={12} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
-                        <span>Gallery</span>
-                      </button>
+              {/* ================= DOCUMENT UPLOAD SECTION ================= */}
+              {clientType === "Resident" ? (
+                /* DUAL UPLOAD CARDS FOR RESIDENT: UAE DRIVING LICENCE + EMIRATES ID */
+                <div id="driver-doc-upload-section" className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
+                    <div className="flex items-center justify-between w-full sm:w-auto">
+                      <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                        <ShieldCheck size={16} className="text-brand shrink-0" />
+                        <span>Resident Required Documents (الوثائق الإلزامية للمقيم)</span>
+                        <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      {autoScannedSuccess && (
+                        <span className="sm:hidden text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 size={10} /> Auto-Filled
+                        </span>
+                      )}
                     </div>
 
-                    {docPreviews.length > 0 && (
+                    <div className="flex items-center gap-2 justify-between sm:justify-end w-full sm:w-auto">
+                      {autoScannedSuccess && (
+                        <span className="hidden sm:flex text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full items-center gap-1">
+                          <CheckCircle2 size={11} /> Auto-Filled by AI
+                        </span>
+                      )}
+
+                      {(licensePreviews.length > 0 || idCardPreviews.length > 0 || docPreviews.length > 0) && (
+                        <button
+                          type="button"
+                          disabled={scanningDoc || submitting}
+                          onClick={() => scanUploadedDocs()}
+                          className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
+                        >
+                          {scanningDoc ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              <span>Scanning...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ScanLine size={12} />
+                              <span>Scan Documents (مسح وقراءة الوثائق)</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dual Upload Cards: 1. UAE Driving Licence, 2. Emirates ID */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    {/* CARD 1: UAE Driving Licence */}
+                    <div className="border border-gray-200 rounded-xl p-3 bg-gray-50/50 flex flex-col justify-between space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                            <CreditCard size={15} />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-900 leading-tight">UAE Driving Licence</h4>
+                            <p className="text-[10px] text-gray-500 font-medium">رخصة القيادة الإماراتية (الوجهان)</p>
+                          </div>
+                        </div>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          licensePreviews.length > 0
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}>
+                          {licensePreviews.length > 0 ? `${licensePreviews.length} Uploaded ✓` : "Required *"}
+                        </span>
+                      </div>
+
+                      {/* Thumbnails grid */}
+                      <div className="flex flex-wrap gap-2 min-h-[58px] items-center">
+                        {licensePreviews.map((doc, idx) => (
+                          <div
+                            key={idx}
+                            className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-lg border border-gray-200 overflow-hidden group shadow-2xs shrink-0 bg-white"
+                          >
+                            <img src={doc} alt="Licence" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeLicenseDoc(idx)}
+                              className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+
+                        {licensePreviews.length === 0 && (
+                          <div className="text-[11px] text-gray-400 italic py-1">
+                            No licence images attached yet
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Buttons: Camera & Upload */}
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-200/60">
+                        <button
+                          type="button"
+                          onClick={() => licenseCameraRef.current?.click()}
+                          className="py-1.5 px-2 bg-white hover:bg-brand/5 border border-brand/30 hover:border-brand text-brand rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Camera size={13} />
+                          <span>Camera (كاميرا)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => licenseInputRef.current?.click()}
+                          className="py-1.5 px-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <ImageIcon size={13} />
+                          <span>Gallery (ملف)</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* CARD 2: Emirates ID */}
+                    <div className="border border-gray-200 rounded-xl p-3 bg-gray-50/50 flex flex-col justify-between space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                            <ShieldCheck size={15} />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-900 leading-tight">Emirates ID (EID)</h4>
+                            <p className="text-[10px] text-gray-500 font-medium">بطاقة الهوية الإماراتية (الوجهان)</p>
+                          </div>
+                        </div>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          idCardPreviews.length > 0
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}>
+                          {idCardPreviews.length > 0 ? `${idCardPreviews.length} Uploaded ✓` : "Required *"}
+                        </span>
+                      </div>
+
+                      {/* Thumbnails grid */}
+                      <div className="flex flex-wrap gap-2 min-h-[58px] items-center">
+                        {idCardPreviews.map((doc, idx) => (
+                          <div
+                            key={idx}
+                            className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-lg border border-gray-200 overflow-hidden group shadow-2xs shrink-0 bg-white"
+                          >
+                            <img src={doc} alt="Emirates ID" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeIdCardDoc(idx)}
+                              className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+
+                        {idCardPreviews.length === 0 && (
+                          <div className="text-[11px] text-gray-400 italic py-1">
+                            No Emirates ID images attached yet
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Buttons: Camera & Upload */}
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-200/60">
+                        <button
+                          type="button"
+                          onClick={() => idCameraRef.current?.click()}
+                          className="py-1.5 px-2 bg-white hover:bg-brand/5 border border-brand/30 hover:border-brand text-brand rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Camera size={13} />
+                          <span>Camera (كاميرا)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => idInputRef.current?.click()}
+                          className="py-1.5 px-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <ImageIcon size={13} />
+                          <span>Gallery (ملف)</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] sm:text-xs text-gray-500">
+                    Please capture or upload copies of both the UAE Driving Licence and Emirates ID (Front & Back).
+                  </p>
+                </div>
+              ) : (
+                /* TOURIST UPLOAD SECTION */
+                <div id="driver-doc-upload-section" className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
+                    <div className="flex items-center justify-between w-full sm:w-auto">
+                      <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                        <span>Documents (Passport, License, etc.)</span>
+                        <span className="text-red-500 font-bold">*</span>
+                        <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
+                          {docPreviews.length}/5
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
+                      {/* Mode Switcher: Camera vs Gallery */}
+                      <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setUploadMode("camera")}
+                          className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                            uploadMode === "camera"
+                              ? "bg-white text-brand shadow-xs font-bold"
+                              : "text-text-muted hover:text-text-primary"
+                          }`}
+                          title="Camera Mode (التقاط بالكاميرا)"
+                        >
+                          <Camera size={12} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                          <span>Camera</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUploadMode("gallery")}
+                          className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                            uploadMode === "gallery"
+                              ? "bg-white text-brand shadow-xs font-bold"
+                              : "text-text-muted hover:text-text-primary"
+                          }`}
+                          title="Gallery / Files Mode (رفع من الملفات)"
+                        >
+                          <ImageIcon size={12} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                          <span>Gallery</span>
+                        </button>
+                      </div>
+
+                      {docPreviews.length > 0 && (
+                        <button
+                          type="button"
+                          disabled={scanningDoc || submitting}
+                          onClick={() => scanUploadedDocs()}
+                          className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
+                        >
+                          {scanningDoc ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              <span>Scanning...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ScanLine size={12} />
+                              <span>Scan Document</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 sm:gap-3">
+                    {docPreviews.map((doc, idx) => {
+                      const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
+                      return (
+                        <div
+                          key={idx}
+                          className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs shrink-0"
+                        >
+                          {isPdf ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-brand">
+                              <FileText size={20} className="text-red-500 mb-0.5" />
+                              <span className="text-[9px] sm:text-[10px] font-medium text-gray-500 text-center mt-0.5 truncate w-full">PDF</span>
+                            </div>
+                          ) : (
+                            <img
+                              src={doc}
+                              alt="Document"
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeDoc(idx)}
+                            className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
+                            title="Remove Document"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {docPreviews.length < 5 && (
                       <button
                         type="button"
-                        disabled={scanningDoc || submitting}
-                        onClick={() => scanUploadedDocs()}
-                        className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
+                        onClick={() => {
+                          if (uploadMode === "camera") {
+                            cameraInputRef.current?.click();
+                          } else {
+                            fileInputRef.current?.click();
+                          }
+                        }}
+                        className={`w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
+                          uploadMode === "camera"
+                            ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
+                            : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
+                        }`}
+                        title={uploadMode === "camera" ? "Take Photo with Camera (التقاط بالكاميرا)" : "Upload File or PDF (رفع ملف)"}
                       >
-                        {scanningDoc ? (
+                        {uploadMode === "camera" ? (
                           <>
-                            <Loader2 size={12} className="animate-spin" />
-                            <span>Scanning...</span>
+                            <Camera size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-brand" />
+                            <span className="text-[9px] sm:text-[10px] font-bold text-brand leading-tight">Take Photo</span>
+                            <span className="text-[7px] sm:text-[8px] opacity-70">Camera</span>
                           </>
                         ) : (
                           <>
-                            <ScanLine size={12} />
-                            <span>Scan Document</span>
+                            <ImagePlus size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
+                            <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 group-hover:text-brand leading-tight">Upload</span>
+                            <span className="text-[7px] sm:text-[8px] opacity-70">Gallery / PDF</span>
                           </>
                         )}
                       </button>
                     )}
                   </div>
+                  <p className="text-[10px] sm:text-xs text-gray-500">
+                    Take photos or upload copies of passport and international driver&apos;s license (max 5 files).
+                  </p>
                 </div>
-
-                <div className="flex flex-wrap gap-2 sm:gap-3">
-                  {docPreviews.map((doc, idx) => {
-                    const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
-                    return (
-                      <div
-                        key={idx}
-                        className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs shrink-0"
-                      >
-                        {isPdf ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-brand">
-                            <FileText size={20} className="text-red-500 mb-0.5" />
-                            <span className="text-[9px] sm:text-[10px] font-medium text-gray-500 text-center mt-0.5 truncate w-full">PDF</span>
-                          </div>
-                        ) : (
-                          <img
-                            src={doc}
-                            alt="Document"
-                            className="w-full h-full object-cover"
-                          />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeDoc(idx)}
-                          className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
-                          title="Remove Document"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  {/* Single Contextual Trigger Button matching active uploadMode */}
-                  {docPreviews.length < 5 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (uploadMode === "camera") {
-                          cameraInputRef.current?.click();
-                        } else {
-                          fileInputRef.current?.click();
-                        }
-                      }}
-                      className={`w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
-                        uploadMode === "camera"
-                          ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
-                          : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
-                      }`}
-                      title={uploadMode === "camera" ? "Take Photo with Camera (التقاط بالكاميرا)" : "Upload File or PDF (رفع ملف)"}
-                    >
-                      {uploadMode === "camera" ? (
-                        <>
-                          <Camera size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-brand" />
-                          <span className="text-[9px] sm:text-[10px] font-bold text-brand leading-tight">Take Photo</span>
-                          <span className="text-[7px] sm:text-[8px] opacity-70">Camera</span>
-                        </>
-                      ) : (
-                        <>
-                          <ImagePlus size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
-                          <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 group-hover:text-brand leading-tight">Upload</span>
-                          <span className="text-[7px] sm:text-[8px] opacity-70">Gallery / PDF</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] sm:text-xs text-gray-500">
-                  Take photos or upload copies of driver&apos;s license and national ID (max 5 files).
-                </p>
-              </div>
+              )}
 
               {/* ================= FORM FIELDS ================= */}
               {clientType === "Tourist" ? (
@@ -1794,14 +2158,25 @@ export default function RegisterClientModal({
 
                     <div>
                       <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Date of Birth (تاريخ الميلاد)
+                        Emirates ID Expiry (تاريخ انتهاء بطاقة الهوية)
                       </label>
+                      {isIdExpired && (
+                        <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg animate-in fade-in">
+                          <AlertTriangle size={13} className="shrink-0 text-red-600" />
+                          <span>(بطاقة الهوية منتهية الصلاحية)</span>
+                        </div>
+                      )}
                       <input
+                        id="reg-client-id-expiry-resident"
                         type="date"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
-                        value={formData.dateOfBirth}
+                        className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all ${
+                          isIdExpired
+                            ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20 text-red-900 font-semibold"
+                            : "border-border bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        }`}
+                        value={formData.idExpiry}
                         onChange={(e) =>
-                          setFormData({ ...formData, dateOfBirth: e.target.value })
+                          setFormData({ ...formData, idExpiry: e.target.value })
                         }
                       />
                     </div>
@@ -1835,7 +2210,7 @@ export default function RegisterClientModal({
                         </div>
                       )}
                       <input
-                        id="reg-client-license-expiry-tourist"
+                        id="reg-client-license-expiry-resident"
                         type="date"
                         className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all ${
                           isLicenseExpired
@@ -1845,6 +2220,20 @@ export default function RegisterClientModal({
                         value={formData.licenseExpiry}
                         onChange={(e) =>
                           setFormData({ ...formData, licenseExpiry: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                        Date of Birth (تاريخ الميلاد)
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                        value={formData.dateOfBirth}
+                        onChange={(e) =>
+                          setFormData({ ...formData, dateOfBirth: e.target.value })
                         }
                       />
                     </div>
