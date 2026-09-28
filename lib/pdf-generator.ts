@@ -17,6 +17,9 @@ export interface ContractPdfData {
   checkoutFuelLevel?: number;
   startDate: string;
   endDate: string;
+  returnedAt?: string | Date;
+  status?: string;
+  deliveryStatus?: string;
   totalDays: number;
   dailyRate: number;
   depositAmount: number;
@@ -249,19 +252,27 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
       itemY = y + 32;
       doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
       doc.text(`Pickup Date:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.startDate, leftColX + 85, itemY);
+      doc.font("Helvetica-Bold").text(data.startDate, leftColX + 100, itemY);
 
       itemY += 16;
-      doc.font("Helvetica").text(`Return Date:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.endDate, leftColX + 85, itemY);
+      doc.font("Helvetica").text(`Expected End:`, leftColX + 12, itemY);
+      doc.font("Helvetica-Bold").text(data.endDate, leftColX + 100, itemY);
+
+      const isReturned = data.status === "Completed" || data.deliveryStatus === "Returned" || Boolean(data.returnedAt);
+      if (isReturned) {
+        itemY += 16;
+        const returnDateStr = data.returnedAt ? new Date(data.returnedAt).toLocaleDateString() : data.endDate;
+        doc.font("Helvetica").text(`Date of Return:`, leftColX + 12, itemY);
+        doc.font("Helvetica-Bold").text(returnDateStr, leftColX + 100, itemY);
+      }
 
       itemY += 16;
       doc.font("Helvetica").text(`Total Duration:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`${data.totalDays} Days`, leftColX + 85, itemY);
+      doc.font("Helvetica-Bold").text(`${data.totalDays} Days`, leftColX + 100, itemY);
 
       itemY += 16;
       doc.font("Helvetica").text(`Daily Rate:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`$${data.dailyRate}/day`, leftColX + 85, itemY);
+      doc.font("Helvetica-Bold").text(`$${data.dailyRate}/day`, leftColX + 100, itemY);
 
       // Box 4: Financial Settlement
       doc.rect(rightColX, y, colWidth, 120).fillAndStroke(lightBg, borderColor);

@@ -1109,7 +1109,9 @@ export default function NewRentalAdminPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">End Date</label>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">
+                  Expected End Date (تاريخ الانتهاء المتوقع)
+                </label>
                 <input 
                   type="date" 
                   value={rentalData.endDate} 
@@ -1485,7 +1487,7 @@ export default function NewRentalAdminPage() {
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-gray-100">
                 <span className="text-text-muted">Rental Period:</span>
-                <span className="font-semibold text-text-primary">{rentalData.startDate} to {rentalData.endDate} ({totalDays} days)</span>
+                <span className="font-semibold text-text-primary">{rentalData.startDate} to {rentalData.endDate} (Expected, {totalDays} days)</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100 items-center">
                 <span className="text-text-muted">Rental &amp; Customer Type:</span>

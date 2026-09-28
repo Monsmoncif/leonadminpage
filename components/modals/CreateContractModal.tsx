@@ -1183,7 +1183,9 @@ export default function CreateContractModal({
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">End Date</label>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1">
+                            Expected End Date (تاريخ الانتهاء المتوقع)
+                          </label>
                           <input 
                             type="date" 
                             value={formData.endDate} 
@@ -1582,7 +1584,7 @@ export default function CreateContractModal({
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-text-muted">Rental Period:</span>
-                          <span className="font-semibold text-text-primary">{formData.startDate} to {formData.endDate} ({durationDays} days)</span>
+                          <span className="font-semibold text-text-primary">{formData.startDate} to {formData.endDate} (Expected, {durationDays} days)</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-text-muted">Scheduled Delivery Time:</span>

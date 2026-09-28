@@ -414,14 +414,33 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                 <span className="font-bold truncate">{contract.checkoutTime || "07:00 AM"}</span>
               </div>
 
-              <div className="col-span-2 px-1 py-[1.5px] border-r border-black flex flex-col justify-between">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Check In Date / تاريخ العودة</span>
+              {/* Expected End Date / تاريخ الانتهاء المتوقع */}
+              <div className={`col-span-2 px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Date / تاريخ الانتهاء المتوقع</span>
                 <span className="font-bold truncate">{formatDate(contract.endDate)}</span>
               </div>
-              <div className="px-1 py-[1.5px] flex flex-col justify-between">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Check In Time / وقت العودة</span>
-                <span className="font-bold truncate">{contract.status === "Completed" ? (contract.checkinTime || "") : ""}</span>
+              <div className={`px-1 py-[1.5px] flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Time / وقت العودة المتوقع</span>
+                <span className="font-bold truncate">{contract.checkinTime || "10:00 AM"}</span>
               </div>
+
+              {/* Date of Return / تاريخ الإرجاع الفعلي (يظهر تلقائياً عند إرجاع السيارة) */}
+              {(contract.status === "Completed" || contract.deliveryStatus === "Returned" || Boolean(contract.returnedAt)) && (
+                <>
+                  <div className="col-span-2 px-1 py-[1.5px] border-r border-black flex flex-col justify-between bg-emerald-50/60">
+                    <span className="text-[6px] text-emerald-800 font-bold uppercase">Date of Return / تاريخ الإرجاع الفعلي</span>
+                    <span className="font-black text-emerald-950 truncate">
+                      {formatDate(contract.returnedAt || contract.updatedAt)}
+                    </span>
+                  </div>
+                  <div className="px-1 py-[1.5px] flex flex-col justify-between bg-emerald-50/60">
+                    <span className="text-[6px] text-emerald-800 font-bold uppercase">Return Time / وقت الإرجاع</span>
+                    <span className="font-black text-emerald-950 truncate">
+                      {contract.checkinTime || "N/A"}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* HIRE INFORMATION */}

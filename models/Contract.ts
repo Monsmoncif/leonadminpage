@@ -73,6 +73,8 @@ export interface IContract extends Document {
   returnAmountCollected?: number;
   returnPaymentMethod?: string;
   returnCustomerSignature?: string;
+  returnedAt?: Date | string;
+  returnedBy?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -173,6 +175,8 @@ const contractSchema = new Schema<IContract>(
     returnAmountCollected: { type: Number, required: false, default: 0 },
     returnPaymentMethod: { type: String, required: false, default: "Cash" },
     returnCustomerSignature: { type: String, required: false, default: null },
+    returnedAt: { type: Date, required: false },
+    returnedBy: { type: String, required: false },
   },
   { timestamps: true }
 );
