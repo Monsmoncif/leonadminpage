@@ -12,6 +12,8 @@ export interface IClient extends Document {
   email: string;
   nationality: string;
   idNumber: string; // Passport or National ID
+  idIssuedBy?: string; // Issuing authority for National ID / Emirates ID
+  idIssuedDate?: Date | string; // Issue date of Emirates ID
   idExpiry?: Date | string; // Emirates ID Expiry Date
 
   // Tourist Passport Details
@@ -57,6 +59,8 @@ const clientSchema = new Schema<IClient>(
     email: { type: String, required: false, default: "" },
     nationality: { type: String, required: true },
     idNumber: { type: String, required: true },
+    idIssuedBy: { type: String, required: false },
+    idIssuedDate: { type: Date, required: false },
     idExpiry: { type: Date, required: false },
 
     // Tourist Passport Details

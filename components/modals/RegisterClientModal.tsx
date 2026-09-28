@@ -96,6 +96,8 @@ export default function RegisterClientModal({
     email: "",
     nationality: "Emirati",
     idNumber: "",
+    idIssuedBy: "",
+    idIssuedDate: "",
     idExpiry: "",
     address: "",
 
@@ -238,6 +240,8 @@ export default function RegisterClientModal({
           email: clientToEdit.email || "",
           nationality: clientToEdit.nationality || (type === "Tourist" ? "" : "Emirati"),
           idNumber: clientToEdit.idNumber || "",
+          idIssuedBy: (clientToEdit as any).idIssuedBy || "",
+          idIssuedDate: (clientToEdit as any).idIssuedDate ? new Date((clientToEdit as any).idIssuedDate).toISOString().split("T")[0] : "",
           idExpiry: clientToEdit.idExpiry ? new Date(clientToEdit.idExpiry).toISOString().split("T")[0] : "",
           address: clientToEdit.address || "",
 
@@ -261,21 +265,8 @@ export default function RegisterClientModal({
         });
         const docs = clientToEdit.documents || [];
         setDocPreviews(docs);
-        if (type === "Resident") {
-          if (docs.length >= 2) {
-            setLicensePreviews(docs.slice(0, Math.ceil(docs.length / 2)));
-            setIdCardPreviews(docs.slice(Math.ceil(docs.length / 2)));
-          } else if (docs.length === 1) {
-            setLicensePreviews(docs);
-            setIdCardPreviews([]);
-          } else {
-            setLicensePreviews([]);
-            setIdCardPreviews([]);
-          }
-        } else {
-          setLicensePreviews([]);
-          setIdCardPreviews([]);
-        }
+        setLicensePreviews(docs);
+        setIdCardPreviews(docs);
       } else {
         setActiveTab("search");
         setClientType("Resident");
@@ -302,6 +293,8 @@ export default function RegisterClientModal({
       email: "",
       nationality: "Emirati",
       idNumber: "",
+      idIssuedBy: "",
+      idIssuedDate: "",
       idExpiry: "",
       address: "",
 
@@ -563,6 +556,8 @@ export default function RegisterClientModal({
 
         // Standard
         if (data.idNumber) updated.idNumber = data.idNumber;
+        if (data.idIssuedBy) updated.idIssuedBy = data.idIssuedBy;
+        if (data.idIssuedDate) updated.idIssuedDate = formatDateForInput(data.idIssuedDate);
         if (data.idExpiry) updated.idExpiry = formatDateForInput(data.idExpiry);
         if (data.address) updated.address = data.address;
         if (data.phone) updated.phone = data.phone;
@@ -604,11 +599,7 @@ export default function RegisterClientModal({
 
   // Scan all currently uploaded document images with AI
   const scanUploadedDocs = async (imagesToScan?: string[]) => {
-    const targets = imagesToScan || (
-      clientType === "Resident"
-        ? (licensePreviews.length > 0 || idCardPreviews.length > 0 ? Array.from(new Set([...licensePreviews, ...idCardPreviews])) : docPreviews)
-        : docPreviews
-    );
+    const targets = imagesToScan || docPreviews;
     if (!targets || targets.length === 0) {
       toast.error("Please upload at least one document image first.");
       return;
@@ -679,6 +670,8 @@ export default function RegisterClientModal({
 
         // Standard / Common
         if (data.idNumber) updated.idNumber = data.idNumber;
+        if (data.idIssuedBy) updated.idIssuedBy = data.idIssuedBy;
+        if (data.idIssuedDate) updated.idIssuedDate = formatDateForInput(data.idIssuedDate);
         if (data.idExpiry) updated.idExpiry = formatDateForInput(data.idExpiry);
         if (data.address) updated.address = data.address;
         if (data.phone) updated.phone = data.phone;
@@ -792,10 +785,7 @@ export default function RegisterClientModal({
     }
 
     // MANDATORY: Documents are strictly required to create a client
-    const residentDocsCount = licensePreviews.length + idCardPreviews.length;
-    const totalDocs = clientType === "Resident"
-      ? (residentDocsCount > 0 ? residentDocsCount : docPreviews.length)
-      : docPreviews.length;
+    const totalDocs = docPreviews.length;
 
     if (totalDocs === 0) {
       const docMsg = clientType === "Tourist"
@@ -803,16 +793,14 @@ export default function RegisterClientModal({
         : "Upload Emirates ID & UAE Driving Licence (Front & Back) is required. Without upload we cannot create client. (يرجى تحميل بطاقة الهوية الإماراتية ورخصة القيادة - الأمام والخلف)";
       setError(docMsg);
       toast.error(docMsg);
-      document.getElementById("driver-doc-upload-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("doc-upload-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const allPreviewsToUpload = clientType === "Resident"
-        ? (residentDocsCount > 0 ? Array.from(new Set([...licensePreviews, ...idCardPreviews])) : docPreviews)
-        : docPreviews;
+      const allPreviewsToUpload = docPreviews;
 
       // 1. Upload documents
       const newFiles = allPreviewsToUpload.filter((img) => img.startsWith("data:image") || img.startsWith("data:application/pdf"));
@@ -855,9 +843,16 @@ export default function RegisterClientModal({
         email: formData.email.trim() || "",
         nationality: formData.nationality.trim() || (clientType === "Tourist" ? "International" : "Emirati"),
         idNumber: resolvedId,
+        idIssuedBy: formData.idIssuedBy || undefined,
+        idIssuedDate: formData.idIssuedDate || undefined,
         idExpiry: formData.idExpiry || undefined,
         passportNumber: clientType === "Tourist" ? resolvedId : formData.passportNumber,
+        passportIssuedBy: formData.passportIssuedBy || undefined,
+        passportIssuedDate: formData.passportIssuedDate || undefined,
+        passportExpiry: formData.passportExpiry || undefined,
         licenseNumber: formData.licenseNumber.trim() || "N/A",
+        licenseIssuedBy: formData.licenseIssuedBy || undefined,
+        licenseIssuedDate: formData.licenseIssuedDate || undefined,
         licenseExpiry: formData.licenseExpiry || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         address: formData.address.trim() || (clientType === "Tourist" ? "Hotel / Tourist stay" : "Local residence"),
         clientType,
@@ -1355,207 +1350,22 @@ export default function RegisterClientModal({
               />
 
               {/* ================= DOCUMENT UPLOAD SECTION ================= */}
-              {clientType === "Resident" ? (
-                /* DUAL UPLOAD CARDS FOR RESIDENT: UAE DRIVING LICENCE + EMIRATES ID */
-                <div id="driver-doc-upload-section" className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
-                    <div className="flex items-center justify-between w-full sm:w-auto">
-                      <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                        <ShieldCheck size={16} className="text-brand shrink-0" />
-                        <span>Resident Required Documents (الوثائق الإلزامية للمقيم)</span>
-                        <span className="text-red-500 font-bold">*</span>
-                      </label>
-                      {autoScannedSuccess && (
-                        <span className="sm:hidden text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <CheckCircle2 size={10} /> Auto-Filled
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 justify-between sm:justify-end w-full sm:w-auto">
-                      {autoScannedSuccess && (
-                        <span className="hidden sm:flex text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full items-center gap-1">
-                          <CheckCircle2 size={11} /> Auto-Filled by AI
-                        </span>
-                      )}
-
-                      {(licensePreviews.length > 0 || idCardPreviews.length > 0 || docPreviews.length > 0) && (
-                        <button
-                          type="button"
-                          disabled={scanningDoc || submitting}
-                          onClick={() => scanUploadedDocs()}
-                          className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
-                        >
-                          {scanningDoc ? (
-                            <>
-                              <Loader2 size={12} className="animate-spin" />
-                              <span>Scanning...</span>
-                            </>
-                          ) : (
-                            <>
-                              <ScanLine size={12} />
-                              <span>Scan Documents (مسح وقراءة الوثائق)</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
+              <div id="driver-doc-upload-section" className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
+                  <div className="flex items-center justify-between w-full sm:w-auto">
+                    <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                      <span>Documents ({clientType === "Resident" ? "Emirates ID, License, etc." : "Passport, License, etc."})</span>
+                      <span className="text-red-500 font-bold">*</span>
+                      <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
+                        {docPreviews.length}/5
+                      </span>
+                    </label>
+                    {autoScannedSuccess && (
+                      <span className="sm:hidden text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 size={10} /> Auto-Filled
+                      </span>
+                    )}
                   </div>
-
-                  {/* Dual Upload Cards: 1. UAE Driving Licence, 2. Emirates ID */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    {/* CARD 1: UAE Driving Licence */}
-                    <div className="border border-gray-200 rounded-xl p-3 bg-gray-50/50 flex flex-col justify-between space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                            <CreditCard size={15} />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-gray-900 leading-tight">UAE Driving Licence</h4>
-                            <p className="text-[10px] text-gray-500 font-medium">رخصة القيادة الإماراتية (الوجهان)</p>
-                          </div>
-                        </div>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          licensePreviews.length > 0
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}>
-                          {licensePreviews.length > 0 ? `${licensePreviews.length} Uploaded ✓` : "Required *"}
-                        </span>
-                      </div>
-
-                      {/* Thumbnails grid */}
-                      <div className="flex flex-wrap gap-2 min-h-[58px] items-center">
-                        {licensePreviews.map((doc, idx) => (
-                          <div
-                            key={idx}
-                            className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-lg border border-gray-200 overflow-hidden group shadow-2xs shrink-0 bg-white"
-                          >
-                            <img src={doc} alt="Licence" className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => removeLicenseDoc(idx)}
-                              className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        ))}
-
-                        {licensePreviews.length === 0 && (
-                          <div className="text-[11px] text-gray-400 italic py-1">
-                            No licence images attached yet
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Buttons: Camera & Upload */}
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-200/60">
-                        <button
-                          type="button"
-                          onClick={() => licenseCameraRef.current?.click()}
-                          className="py-1.5 px-2 bg-white hover:bg-brand/5 border border-brand/30 hover:border-brand text-brand rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                        >
-                          <Camera size={13} />
-                          <span>Camera (كاميرا)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => licenseInputRef.current?.click()}
-                          className="py-1.5 px-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                        >
-                          <ImageIcon size={13} />
-                          <span>Gallery (ملف)</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* CARD 2: Emirates ID */}
-                    <div className="border border-gray-200 rounded-xl p-3 bg-gray-50/50 flex flex-col justify-between space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                            <ShieldCheck size={15} />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-gray-900 leading-tight">Emirates ID (EID)</h4>
-                            <p className="text-[10px] text-gray-500 font-medium">بطاقة الهوية الإماراتية (الوجهان)</p>
-                          </div>
-                        </div>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          idCardPreviews.length > 0
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}>
-                          {idCardPreviews.length > 0 ? `${idCardPreviews.length} Uploaded ✓` : "Required *"}
-                        </span>
-                      </div>
-
-                      {/* Thumbnails grid */}
-                      <div className="flex flex-wrap gap-2 min-h-[58px] items-center">
-                        {idCardPreviews.map((doc, idx) => (
-                          <div
-                            key={idx}
-                            className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-lg border border-gray-200 overflow-hidden group shadow-2xs shrink-0 bg-white"
-                          >
-                            <img src={doc} alt="Emirates ID" className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => removeIdCardDoc(idx)}
-                              className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        ))}
-
-                        {idCardPreviews.length === 0 && (
-                          <div className="text-[11px] text-gray-400 italic py-1">
-                            No Emirates ID images attached yet
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Buttons: Camera & Upload */}
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-200/60">
-                        <button
-                          type="button"
-                          onClick={() => idCameraRef.current?.click()}
-                          className="py-1.5 px-2 bg-white hover:bg-brand/5 border border-brand/30 hover:border-brand text-brand rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                        >
-                          <Camera size={13} />
-                          <span>Camera (كاميرا)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => idInputRef.current?.click()}
-                          className="py-1.5 px-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                        >
-                          <ImageIcon size={13} />
-                          <span>Gallery (ملف)</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] sm:text-xs text-gray-500">
-                    Please capture or upload copies of both the UAE Driving Licence and Emirates ID (Front & Back).
-                  </p>
-                </div>
-              ) : (
-                /* TOURIST UPLOAD SECTION */
-                <div id="driver-doc-upload-section" className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
-                    <div className="flex items-center justify-between w-full sm:w-auto">
-                      <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                        <span>Documents (Passport, License, etc.)</span>
-                        <span className="text-red-500 font-bold">*</span>
-                        <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
-                          {docPreviews.length}/5
-                        </span>
-                      </label>
-                    </div>
 
                     <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
                       {/* Mode Switcher: Camera vs Gallery */}
@@ -1676,11 +1486,12 @@ export default function RegisterClientModal({
                       </button>
                     )}
                   </div>
-                  <p className="text-[10px] sm:text-xs text-gray-500">
-                    Take photos or upload copies of passport and international driver&apos;s license (max 5 files).
-                  </p>
-                </div>
-              )}
+                <p className="text-[10px] sm:text-xs text-gray-500">
+                  {clientType === "Resident"
+                    ? "Take photos or upload copies of Emirates ID and UAE driver's license (max 5 files)."
+                    : "Take photos or upload copies of passport and international driver's license (max 5 files)."}
+                </p>
+              </div>
 
               {/* ================= FORM FIELDS ================= */}
               {clientType === "Tourist" ? (
@@ -2090,181 +1901,263 @@ export default function RegisterClientModal({
                 </div>
               ) : (
                 /* RESIDENT FORM LAYOUT */
-                <div className="bg-white p-5 rounded-2xl border border-border shadow-xs space-y-4 animate-fade-in">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Full Name (الاسم الكامل) <span className="text-red-500 font-bold">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder="e.g. Ahmed Al Rashid / أحمد الراشدي"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Phone Number (رقم الهاتف) <span className="text-red-500 font-bold">*</span>
-                      </label>
-                      <input
-                        required
-                        type="tel"
-                        placeholder="e.g. +971 50 123 4567"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
-                        value={formData.phone}
-                        onChange={(e) =>
-                          setFormData({ ...formData, phone: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Email Address (البريد الإلكتروني)
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="e.g. customer@example.com"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Emirates ID (بطاقة الهوية الإماراتية) <span className="text-red-500 font-bold">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder="e.g. 784-1990-1234567-1"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand uppercase font-mono"
-                        value={formData.idNumber}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            idNumber: e.target.value.toUpperCase(),
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Emirates ID Expiry (تاريخ انتهاء بطاقة الهوية)
-                      </label>
-                      {isIdExpired && (
-                        <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg animate-in fade-in">
-                          <AlertTriangle size={13} className="shrink-0 text-red-600" />
-                          <span>(بطاقة الهوية منتهية الصلاحية)</span>
-                        </div>
+                <div className="space-y-5 animate-fade-in">
+                  
+                  {/* SECTION 1: IDENTIFICATION */}
+                  <div className="bg-white p-5 rounded-2xl border border-border shadow-xs space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900 tracking-wide uppercase">
+                          Identification (بيانات الهوية ورخصة القيادة)
+                        </h3>
+                        <p className="text-xs text-text-secondary">
+                          Enter Emirates ID and UAE Driving Licence details
+                        </p>
+                      </div>
+                      {autoScannedSuccess && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full flex items-center gap-1">
+                          <Sparkles size={11} /> Auto-Filled by Scanner
+                        </span>
                       )}
-                      <input
-                        id="reg-client-id-expiry-resident"
-                        type="date"
-                        className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all ${
-                          isIdExpired
-                            ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20 text-red-900 font-semibold"
-                            : "border-border bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                        }`}
-                        value={formData.idExpiry}
-                        onChange={(e) =>
-                          setFormData({ ...formData, idExpiry: e.target.value })
-                        }
-                      />
                     </div>
 
+                    {/* 1. Emirates ID Row (Matching Passport 4-column row) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Emirates ID (بطاقة الهوية) <span className="text-red-500 font-bold">*</span>
+                        </label>
+                        <input
+                          required
+                          placeholder="e.g. 784-1990-1234567-1"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand uppercase font-mono"
+                          value={formData.idNumber}
+                          onChange={(e) =>
+                            setFormData({ ...formData, idNumber: e.target.value.toUpperCase() })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          ID Issued By (جهة الإصدار) <span className="text-red-500 font-bold">*</span>
+                        </label>
+                        <input
+                          placeholder="e.g. ICP / UAE"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                          value={formData.idIssuedBy}
+                          onChange={(e) =>
+                            setFormData({ ...formData, idIssuedBy: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          ID Issued Date (تاريخ الإصدار)
+                        </label>
+                        <input
+                          type="date"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                          value={formData.idIssuedDate}
+                          onChange={(e) =>
+                            setFormData({ ...formData, idIssuedDate: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          ID Expiry (تاريخ انتهاء الصلاحية)
+                        </label>
+                        {isIdExpired && (
+                          <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg animate-in fade-in">
+                            <AlertTriangle size={13} className="shrink-0 text-red-600" />
+                            <span>(بطاقة الهوية منتهية الصلاحية)</span>
+                          </div>
+                        )}
+                        <input
+                          id="reg-client-id-expiry-resident"
+                          type="date"
+                          className={`w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                            isIdExpired
+                              ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20 text-red-900 font-semibold"
+                              : "border-border bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                          }`}
+                          value={formData.idExpiry}
+                          onChange={(e) =>
+                            setFormData({ ...formData, idExpiry: e.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* 2. UAE Driving Licence Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-gray-100">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          UAE Driving Licence (رخصة القيادة) <span className="text-red-500 font-bold">*</span>
+                        </label>
+                        <input
+                          required
+                          placeholder="e.g. 1234567"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand uppercase font-mono"
+                          value={formData.licenseNumber}
+                          onChange={(e) =>
+                            setFormData({ ...formData, licenseNumber: e.target.value.toUpperCase() })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Licence Issued By (جهة الإصدار)
+                        </label>
+                        <input
+                          placeholder="e.g. RTA Dubai / Abu Dhabi Police"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                          value={formData.licenseIssuedBy}
+                          onChange={(e) =>
+                            setFormData({ ...formData, licenseIssuedBy: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Licence Issue Date (تاريخ الإصدار)
+                        </label>
+                        <input
+                          type="date"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                          value={formData.licenseIssuedDate}
+                          onChange={(e) =>
+                            setFormData({ ...formData, licenseIssuedDate: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Licence Expiry (تاريخ انتهاء الصلاحية)
+                        </label>
+                        {isLicenseExpired && (
+                          <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg animate-in fade-in">
+                            <AlertTriangle size={13} className="shrink-0 text-red-600" />
+                            <span>(رخصة القيادة منتهية الصلاحية)</span>
+                          </div>
+                        )}
+                        <input
+                          id="reg-client-license-expiry-resident"
+                          type="date"
+                          className={`w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                            isLicenseExpired
+                              ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20 text-red-900 font-semibold"
+                              : "border-border bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                          }`}
+                          value={formData.licenseExpiry}
+                          onChange={(e) =>
+                            setFormData({ ...formData, licenseExpiry: e.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: PERSONAL */}
+                  <div className="bg-white p-5 rounded-2xl border border-border shadow-xs space-y-4">
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        UAE Driving Licence (رخصة القيادة الإماراتية) <span className="text-red-500 font-bold">*</span>
-                      </label>
-                      <input
-                        required
-                        placeholder="e.g. 1234567"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand uppercase font-mono"
-                        value={formData.licenseNumber}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            licenseNumber: e.target.value.toUpperCase(),
-                          })
-                        }
-                      />
+                      <h3 className="text-sm font-bold text-gray-900 tracking-wide uppercase">
+                        Personal Details (البيانات الشخصية)
+                      </h3>
+                      <p className="text-xs text-text-secondary">
+                        Enter Contact, Personal, and Address Information
+                      </p>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Licence Expiry (تاريخ انتهاء صلاحية الرخصة)
-                      </label>
-                      {isLicenseExpired && (
-                        <div className="flex items-center gap-1.5 mb-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg animate-in fade-in">
-                          <AlertTriangle size={13} className="shrink-0 text-red-600" />
-                          <span>(رخصة القيادة منتهية الصلاحية)</span>
-                        </div>
-                      )}
-                      <input
-                        id="reg-client-license-expiry-resident"
-                        type="date"
-                        className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all ${
-                          isLicenseExpired
-                            ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20 text-red-900 font-semibold"
-                            : "border-border bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                        }`}
-                        value={formData.licenseExpiry}
-                        onChange={(e) =>
-                          setFormData({ ...formData, licenseExpiry: e.target.value })
-                        }
-                      />
-                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Full Name (الاسم الكامل) <span className="text-red-500 font-bold">*</span>
+                        </label>
+                        <input
+                          required
+                          placeholder="e.g. Ahmed Al Rashid / أحمد الراشدي"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
+                          value={formData.name}
+                          onChange={(e) =>
+                            setFormData({ ...formData, name: e.target.value })
+                          }
+                        />
+                      </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Date of Birth (تاريخ الميلاد)
-                      </label>
-                      <input
-                        type="date"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
-                        value={formData.dateOfBirth}
-                        onChange={(e) =>
-                          setFormData({ ...formData, dateOfBirth: e.target.value })
-                        }
-                      />
-                    </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Phone Number (رقم الهاتف) <span className="text-red-500 font-bold">*</span>
+                        </label>
+                        <input
+                          required
+                          type="tel"
+                          placeholder="e.g. +971 50 123 4567"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
+                          value={formData.phone}
+                          onChange={(e) =>
+                            setFormData({ ...formData, phone: e.target.value })
+                          }
+                        />
+                      </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Nationality (الجنسية)
-                      </label>
-                      <input
-                        placeholder="e.g. Emirati / إماراتي"
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                        value={formData.nationality}
-                        onChange={(e) =>
-                          setFormData({ ...formData, nationality: e.target.value })
-                        }
-                      />
-                    </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Email Address (البريد الإلكتروني)
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="e.g. customer@example.com"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                          value={formData.email}
+                          onChange={(e) =>
+                            setFormData({ ...formData, email: e.target.value })
+                          }
+                        />
+                      </div>
 
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Residential Address (عنوان السكن الدائم)
-                      </label>
-                      <textarea
-                        rows={2}
-                        placeholder="Full UAE residential address, building, district, Dubai / Abu Dhabi..."
-                        className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand resize-none"
-                        value={formData.address}
-                        onChange={(e) =>
-                          setFormData({ ...formData, address: e.target.value })
-                        }
-                      />
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Date of Birth (تاريخ الميلاد)
+                        </label>
+                        <input
+                          type="date"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                          value={formData.dateOfBirth}
+                          onChange={(e) =>
+                            setFormData({ ...formData, dateOfBirth: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Nationality (الجنسية)
+                        </label>
+                        <input
+                          placeholder="e.g. Emirati / إماراتي"
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                          value={formData.nationality}
+                          onChange={(e) =>
+                            setFormData({ ...formData, nationality: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2 lg:col-span-3">
+                        <label className="block text-xs font-semibold text-text-secondary mb-1">
+                          Residential Address (عنوان السكن الدائم)
+                        </label>
+                        <textarea
+                          rows={2}
+                          placeholder="Full UAE residential address, building, district, Dubai / Abu Dhabi..."
+                          className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand resize-none"
+                          value={formData.address}
+                          onChange={(e) =>
+                            setFormData({ ...formData, address: e.target.value })
+                          }
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

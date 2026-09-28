@@ -123,6 +123,8 @@ Extract the relevant fields and return STRICTLY a JSON object matching this sche
   "visaExpiry": "Visa expiry date in YYYY-MM-DD format",
 
   "idNumber": "Emirates ID number (784-XXXX-XXXXXXX-X) or National ID or Passport Number",
+  "idIssuedBy": "Issuing authority of Emirates ID / National ID (e.g. ICP / UAE / Federal Authority for Identity)",
+  "idIssuedDate": "Emirates ID / National ID issue date in YYYY-MM-DD format if visible",
   "idExpiry": "Emirates ID / National ID expiry date in YYYY-MM-DD format if visible",
   "address": "Address if visible",
   "phone": "Phone number if visible",
@@ -134,7 +136,7 @@ Extraction Guidelines:
 1. If a field is not visible, set its value to "" (empty string).
 2. For dates, always convert to YYYY-MM-DD format (e.g., 2028-05-14).
 3. If both passport and driving licence are present, ensure passport fields are placed in passportNumber/passportExpiry/etc., and licence fields in licenseNumber/licenseExpiry/etc.
-4. For UAE documents: The Emirates ID (784-XXXX-XXXXXXX-X or بطاقة الهوية) maps to idNumber, and its expiry date maps to idExpiry. UAE driving licence number (رخصة القيادة) maps to licenseNumber, and its expiry date maps to licenseExpiry.
+4. For UAE documents: The Emirates ID (784-XXXX-XXXXXXX-X or بطاقة الهوية) maps to idNumber, issuing authority to idIssuedBy (e.g. ICP / UAE), issue date to idIssuedDate, and expiry date to idExpiry. UAE driving licence number (رخصة القيادة) maps to licenseNumber, issuing authority to licenseIssuedBy (e.g. RTA Dubai), issue date to licenseIssuedDate, and expiry to licenseExpiry.
 5. Return ONLY valid JSON. Do not include markdown code block backticks.`;
 
     const errors: string[] = [];
