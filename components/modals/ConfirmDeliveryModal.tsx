@@ -547,10 +547,10 @@ export default function ConfirmDeliveryModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="bg-white w-full max-w-xl md:max-w-3xl lg:max-w-4xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] sm:max-h-[90vh] my-auto border border-border/60">
+      <div className="bg-white w-full max-w-xl md:max-w-3xl lg:max-w-4xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[90vh] my-auto border border-border/60">
         
         {/* Modal Header */}
-        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-gray-50/80">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-gray-50/80">
           <div className="pr-2 min-w-0">
             <h2 className="text-base sm:text-lg font-bold text-text-primary truncate">
               Confirm Vehicle Handover (تسليم السيارة للعميل)
@@ -571,7 +571,7 @@ export default function ConfirmDeliveryModal({
         </div>
 
         {/* 5-Step Stepper Header (Like Admin) */}
-        <div className="border-b border-border bg-gray-50/60 px-3 py-2 sm:px-6 sm:py-3 shrink-0">
+        <div className="border-b border-border bg-gray-50/60 px-3 py-1.5 sm:px-6 sm:py-3 shrink-0">
           <div className="flex items-center justify-between">
             {STEPS.map((s, idx) => {
               const Icon = s.icon;
@@ -619,7 +619,7 @@ export default function ConfirmDeliveryModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div ref={modalScrollRef} className="p-4 sm:p-6 overflow-y-auto flex-1 custom-scrollbar overscroll-contain">
+        <div ref={modalScrollRef} className="p-3 sm:p-6 overflow-y-auto flex-1 custom-scrollbar overscroll-contain">
           {error && (
             <div className="mb-4 bg-red-50 text-red-600 p-3 sm:p-4 rounded-xl text-xs sm:text-sm font-medium flex items-start gap-2.5 border border-red-100 animate-shake">
               <AlertCircle size={18} className="shrink-0 mt-0.5" />
@@ -1311,7 +1311,7 @@ export default function ConfirmDeliveryModal({
                     onTouchStart={startDrawing}
                     onTouchMove={draw}
                     onTouchEnd={stopDrawing}
-                    className="w-full h-36 sm:h-44 cursor-crosshair bg-white block"
+                    className="w-full h-28 sm:h-44 cursor-crosshair bg-white block"
                   />
                   {!signatureData && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1">
@@ -1326,7 +1326,7 @@ export default function ConfirmDeliveryModal({
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-border flex items-center justify-between gap-3 shrink-0 bg-gray-50/90">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-t border-border flex items-center justify-between gap-3 shrink-0 bg-gray-50/90">
           <button
             type="button"
             onClick={step === 1 ? onClose : handleBack}

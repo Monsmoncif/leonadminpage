@@ -47,25 +47,25 @@ export default function SelectSecondDriverModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs animate-fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-border flex flex-col max-h-[85vh] animate-scale-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 bg-black/60 backdrop-blur-xs animate-fade-in">
+      <div className="bg-white rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-border flex flex-col max-h-[82vh] sm:max-h-[90vh] animate-scale-up">
         
         {/* Modal Header */}
-        <div className="p-5 sm:p-6 border-b border-border/80 flex items-center justify-between bg-gradient-to-r from-gray-50 via-white to-red-50/40">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-700 flex items-center justify-center shadow-2xs">
-                <User size={20} />
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-5 border-b border-border/80 flex items-center justify-between bg-gradient-to-r from-gray-50 via-white to-red-50/40 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
+            <div className="relative shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-red-100 text-red-700 flex items-center justify-center shadow-2xs">
+                <User size={18} />
               </div>
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
                 2
               </span>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-text-primary">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-lg font-bold text-text-primary truncate">
                 Select Second Driver (اختيار السائق الثاني)
               </h2>
-              <p className="text-xs text-text-muted mt-0.5">
+              <p className="text-[11px] sm:text-xs text-text-muted mt-0.5 truncate">
                 Choose an existing customer or register a new one with instant OCR scan
               </p>
             </div>
@@ -74,24 +74,25 @@ export default function SelectSecondDriverModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-gray-100 transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
+            aria-label="Close modal"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Action & Search Bar in Same Line */}
-        <div className="p-4 sm:p-5 border-b border-border/60 bg-gray-50/50">
-          <div className="flex items-center gap-2.5">
+        <div className="px-3.5 py-2 sm:px-5 sm:py-3.5 border-b border-border/60 bg-gray-50/50 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Search Input */}
             <div className="relative flex-1">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search customer by name, phone, or license..."
-                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-600 outline-none transition-all shadow-2xs text-text-primary placeholder:text-text-muted"
+                className="w-full pl-8.5 pr-8 py-2 sm:py-2.5 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-600 outline-none transition-all shadow-2xs text-text-primary placeholder:text-text-muted"
               />
               {searchQuery && (
                 <button
@@ -114,15 +115,15 @@ export default function SelectSecondDriverModal({
               }}
               title="Add New Driver (إضافة سائق جديد)"
               aria-label="Add New Driver"
-              className="h-10 w-10 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white flex items-center justify-center shrink-0 shadow-sm hover:shadow-md transition-all active:scale-95 cursor-pointer group"
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white flex items-center justify-center shrink-0 shadow-sm hover:shadow-md transition-all active:scale-95 cursor-pointer group"
             >
-              <UserPlus size={18} className="transition-transform group-hover:scale-110" />
+              <UserPlus size={16} className="transition-transform group-hover:scale-110" />
             </button>
           </div>
         </div>
 
         {/* Customers List */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 custom-scrollbar space-y-2.5">
+        <div className="p-2.5 sm:p-6 overflow-y-auto flex-1 custom-scrollbar space-y-2 sm:space-y-2.5">
           {filteredClients.length === 0 ? (
             <div className="text-center py-10 border-2 border-dashed border-border rounded-2xl bg-gray-50/50">
               <User size={36} className="text-gray-300 mx-auto mb-2" />
@@ -130,7 +131,7 @@ export default function SelectSecondDriverModal({
               <p className="text-xs text-text-muted mt-1">Click the + button above to register and scan a new customer.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               {filteredClients.map((client) => {
                 const isPrimary = primaryClientId && (client._id === primaryClientId || client.id === primaryClientId);
                 const isSelectedSecond = selectedSecondDriverClientId && (client._id === selectedSecondDriverClientId || client.id === selectedSecondDriverClientId);
@@ -143,7 +144,7 @@ export default function SelectSecondDriverModal({
                       onSelectSecondDriver(client);
                       onClose();
                     }}
-                    className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                    className={`p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all flex items-center justify-between gap-2.5 sm:gap-3 ${
                       isPrimary
                         ? "bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed"
                         : isSelectedSecond
@@ -152,7 +153,7 @@ export default function SelectSecondDriverModal({
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 ${
                         isSelectedSecond 
                           ? "bg-red-600 text-white shadow-xs" 
                           : "bg-red-100 text-red-800"
@@ -198,12 +199,12 @@ export default function SelectSecondDriverModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-border/80 bg-gray-50/60 flex items-center justify-between text-xs text-text-muted">
-          <span>A driving license is required for insurance coverage of second driver.</span>
+        <div className="px-3.5 py-2 sm:px-6 sm:py-3 border-t border-border/80 bg-gray-50/60 flex items-center justify-between text-[11px] sm:text-xs text-text-muted shrink-0">
+          <span className="truncate pr-2">A driving license is required for insurance coverage of second driver.</span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-border bg-white hover:bg-gray-100 text-text-secondary font-semibold transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl border border-border bg-white hover:bg-gray-100 text-text-secondary font-semibold transition-colors cursor-pointer shrink-0"
           >
             Close
           </button>

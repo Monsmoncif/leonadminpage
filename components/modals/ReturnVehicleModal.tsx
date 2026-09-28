@@ -513,13 +513,13 @@ export default function ReturnVehicleModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="bg-card w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden border border-border flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="bg-card w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden border border-border flex flex-col max-h-[82vh] sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-gray-50/50 shrink-0">
-          <h2 className="text-lg font-bold text-text-primary">Return Vehicle</h2>
-          <button onClick={onClose} className="p-1.5 text-text-muted hover:bg-gray-200 rounded-lg transition-colors cursor-pointer">
-            <X size={20} />
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex justify-between items-center bg-gray-50/50 shrink-0">
+          <h2 className="text-base sm:text-lg font-bold text-text-primary">Return Vehicle</h2>
+          <button onClick={onClose} className="p-1.5 text-text-muted hover:bg-gray-200 rounded-lg transition-colors cursor-pointer" aria-label="Close modal">
+            <X size={18} />
           </button>
         </div>
 
@@ -532,9 +532,9 @@ export default function ReturnVehicleModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-3 sm:p-6 overflow-y-auto flex-1 custom-scrollbar">
           {error && (
-            <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium flex items-start gap-3 border border-red-100">
+            <div className="mb-4 bg-red-50 text-red-600 p-3 sm:p-4 rounded-xl text-xs sm:text-sm font-medium flex items-start gap-2.5 border border-red-100">
               <AlertCircle size={18} className="shrink-0 mt-0.5" />
               <p>{error}</p>
             </div>
@@ -543,7 +543,7 @@ export default function ReturnVehicleModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border bg-gray-50/50 flex justify-between items-center shrink-0">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-t border-border bg-gray-50/50 flex justify-between items-center shrink-0">
           {step > 1 ? (
             <button
               onClick={handleBack}

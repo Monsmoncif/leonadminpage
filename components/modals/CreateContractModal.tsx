@@ -651,10 +651,10 @@ export default function CreateContractModal({
 
   return (
     <div ref={modalOverlayRef} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-      <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden border border-border flex flex-col max-h-[92vh]">
+      <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden border border-border flex flex-col max-h-[82vh] sm:max-h-[90vh]">
         
         {/* ================= MODAL HEADER ================= */}
-        <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-white shrink-0">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex justify-between items-center bg-white shrink-0">
           <div>
             <h1 className="text-xl font-bold text-text-primary">
               {contractToEdit ? "Edit Rental Contract" : "Create New Booking"}
@@ -677,7 +677,7 @@ export default function CreateContractModal({
         </div>
 
         {/* ================= STEPPER HEADER (MATCHES BOOKINGS/NEW) ================= */}
-        <div className="bg-card border-b border-border p-4 sm:p-6 shrink-0">
+        <div className="bg-card border-b border-border p-3 sm:p-6 shrink-0">
           <div className="relative w-full max-w-3xl mx-auto px-2 sm:px-4">
             {/* Background Track Line (connected precisely through centers of first and last circles) */}
             <div 
@@ -756,7 +756,7 @@ export default function CreateContractModal({
         </div>
 
         {/* ================= MODAL BODY / WIZARD CONTENT ================= */}
-        <div ref={modalBodyRef} className="p-6 sm:p-8 overflow-y-auto flex-1 custom-scrollbar overscroll-contain space-y-6">
+        <div ref={modalBodyRef} className="p-3.5 sm:p-8 overflow-y-auto flex-1 custom-scrollbar overscroll-contain space-y-4 sm:space-y-6">
           
           {error && (
             <div className="bg-red-50 text-red-700 p-3.5 sm:p-4 rounded-xl text-xs sm:text-sm font-medium border border-red-200 shadow-2xs animate-fade-in">
@@ -1764,7 +1764,7 @@ export default function CreateContractModal({
         </div>
 
         {/* ================= MODAL FOOTER (MATCHES BOOKINGS/NEW) ================= */}
-        <div className="flex items-center justify-between border-t border-border pt-4 sm:pt-6 mt-2 px-6 pb-6 bg-white shrink-0">
+        <div className="flex items-center justify-between border-t border-border p-3.5 sm:p-6 bg-white shrink-0">
           {currentStep > 1 ? (
             <button
               type="button"

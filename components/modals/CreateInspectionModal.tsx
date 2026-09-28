@@ -284,15 +284,15 @@ export default function CreateInspectionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-card w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden border border-border bg-white transform transition-all scale-100 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-card w-full max-w-3xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-border bg-white transform transition-all scale-100 flex flex-col max-h-[82vh] sm:max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-border">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-8 sm:py-5 border-b border-border">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-base sm:text-xl font-bold text-gray-900">
               {inspectionToEdit ? "Edit Inspection" : "Log New Inspection"}
             </h2>
-            <p className="text-xs text-text-muted mt-1">
+            <p className="text-xs text-text-muted mt-0.5">
               Complete vehicle condition checklist
             </p>
           </div>
@@ -305,7 +305,7 @@ export default function CreateInspectionModal({
         </div>
 
         {/* Form Container */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-6 custom-scrollbar">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
               <AlertCircle size={16} />
@@ -481,7 +481,7 @@ export default function CreateInspectionModal({
         </form>
 
         {/* Footer */}
-        <div className="px-8 py-5 border-t border-border flex justify-end gap-3 bg-gray-50/50">
+        <div className="px-4 py-3 sm:px-8 sm:py-5 border-t border-border flex justify-end gap-3 bg-gray-50/50 shrink-0">
           <button
             type="button"
             onClick={onClose}

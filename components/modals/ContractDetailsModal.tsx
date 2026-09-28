@@ -269,10 +269,10 @@ export default function ContractDetailsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="bg-card w-full max-w-2xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] sm:max-h-[92vh] my-auto border border-border/60">
+      <div className="bg-card w-full max-w-2xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[90vh] my-auto border border-border/60">
         
         {/* ================= HEADER ================= */}
-        <div className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-gray-50/80">
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-gray-50/80">
           <div className="flex items-center gap-2.5">
             <h2 className="text-base sm:text-lg font-bold text-text-primary truncate">
               Booking &amp; Handover Details
