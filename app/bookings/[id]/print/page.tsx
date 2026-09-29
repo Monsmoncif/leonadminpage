@@ -119,6 +119,18 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
     return "";
   };
 
+  const getReturnMileageDisplay = () => {
+    const rawVal = contract.returnOdometer ?? contract.returnMileage ?? contract.checkinMileage;
+    if (rawVal !== undefined && rawVal !== null && rawVal !== "" && !isNaN(Number(rawVal)) && Number(rawVal) > 0) {
+      return `${Number(rawVal).toLocaleString()} km`;
+    }
+    // Fallback: If returned/completed, vehicle unit has updated mileage
+    if (isReturned && unit && unit.mileage !== undefined && unit.mileage !== null && Number(unit.mileage) > 0) {
+      return `${Number(unit.mileage).toLocaleString()} km`;
+    }
+    return "N/A";
+  };
+
   const handleDownloadPdf = async () => {
     if (isDownloading) return;
     try {
@@ -486,7 +498,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                   <div className="px-1 py-[1.5px] flex flex-col justify-between bg-emerald-50/60">
                     <span className="text-[6px] text-emerald-800 font-bold uppercase">In KM / عداد الإرجاع</span>
                     <span className="font-black text-emerald-950 truncate">
-                      {contract.checkinMileage ? `${contract.checkinMileage.toLocaleString()} km` : "N/A"}
+                      {getReturnMileageDisplay()}
                     </span>
                   </div>
                 </>
@@ -824,8 +836,8 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               <div className="grid grid-cols-2 gap-2 mt-1 pt-1 border-t border-black/10 text-[7.5px]">
                 <div className="flex justify-between items-center bg-white px-1.5 py-0.5 rounded border border-gray-200">
                   <span className="text-gray-600 font-semibold">Return KM / عداد العودة:</span>
-                  <span className={`text-[8px] ${contract.status === "Completed" ? "font-extrabold text-brand" : "font-medium text-gray-400"}`}>
-                    {contract.status === "Completed" ? `${contract.returnOdometer || contract.returnMileage || "N/A"} km` : "Pending"}
+                  <span className={`text-[8px] ${isReturned ? "font-extrabold text-brand" : "font-medium text-gray-400"}`}>
+                    {isReturned ? getReturnMileageDisplay() : "Pending"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center bg-white px-1.5 py-0.5 rounded border border-gray-200">
