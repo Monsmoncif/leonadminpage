@@ -9,6 +9,23 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Cooldown tracker to skip failing or decommissioned AI providers instead of waiting on repeated timeouts
+const providerCooldown = new Map<string, number>();
+
+function isProviderAvailable(providerName: string): boolean {
+  const until = providerCooldown.get(providerName);
+  if (!until) return true;
+  if (Date.now() > until) {
+    providerCooldown.delete(providerName);
+    return true;
+  }
+  return false;
+}
+
+function markProviderFailed(providerName: string, cooldownMs = 60000) {
+  providerCooldown.set(providerName, Date.now() + cooldownMs);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -142,34 +159,38 @@ Extraction Guidelines:
     const errors: string[] = [];
 
     // Helper to scan a batch of images through AI providers
+    // Helper to scan a batch of images through AI providers
     async function scanImagesBatch(imagesToProcess: any[]): Promise<any> {
       let ext: any = null;
 
       // Priority 1: Groq AI (Free + Fast)
-      if (groqKey) {
+      if (groqKey && isProviderAvailable("groq")) {
         try {
           ext = await callGroqVision(groqKey, systemPrompt, imagesToProcess);
         } catch (groqErr: any) {
+          markProviderFailed("groq", 60000);
           console.error("Groq OCR error:", groqErr?.message || groqErr);
           errors.push(`Groq: ${groqErr?.message || groqErr}`);
         }
       }
 
       // Priority 2: Gemini AI (Free Fallback)
-      if (!ext && geminiKey) {
+      if (!ext && geminiKey && isProviderAvailable("gemini")) {
         try {
           ext = await callGeminiVision(geminiKey, systemPrompt, imagesToProcess);
         } catch (geminiErr: any) {
+          markProviderFailed("gemini", 60000);
           console.error("Gemini OCR error:", geminiErr?.message || geminiErr);
           errors.push(`Gemini: ${geminiErr?.message || geminiErr}`);
         }
       }
 
       // Priority 3: OpenAI (Paid Fallback)
-      if (!ext && openaiKey) {
+      if (!ext && openaiKey && isProviderAvailable("openai")) {
         try {
           ext = await callOpenAIVision(openaiKey, systemPrompt, imagesToProcess);
         } catch (openaiErr: any) {
+          markProviderFailed("openai", 15000);
           console.error("OpenAI OCR error:", openaiErr?.message || openaiErr);
           errors.push(`OpenAI: ${openaiErr?.message || openaiErr}`);
         }
@@ -183,39 +204,43 @@ Extraction Guidelines:
     if (parsedImages.length === 1) {
       extracted = await scanImagesBatch(parsedImages);
     } else {
-      // Multiple document images provided (e.g. Passport + Driving License Front & Back)
-      // Process every document individually in parallel so the AI examines 100% of EVERY document
-      console.log(`[OCR] Processing ${parsedImages.length} documents in parallel to extract all details...`);
-      const results = await Promise.all(
-        parsedImages.map((img) => scanImagesBatch([img]))
-      );
+      // Multiple document images provided:
+      // First attempt: pass all images in ONE single unified call (fastest, 1-2s, vision model correlates context across all docs)
+      console.log(`[OCR] Scanning ${parsedImages.length} documents in unified pass for high speed...`);
+      extracted = await scanImagesBatch(parsedImages);
 
-      // Merge all extracted results from every document
-      const merged: any = {};
-      for (const item of results) {
-        if (!item || typeof item !== "object") continue;
-        for (const [key, val] of Object.entries(item)) {
-          if (val && typeof val === "string" && val.trim() !== "") {
-            const trimmed = val.trim();
-            if (!merged[key] || merged[key].trim() === "") {
-              merged[key] = trimmed;
-            } else if (key === "name" && trimmed.length > merged[key].length) {
-              merged[key] = trimmed;
-            } else if (key === "idNumber" && trimmed.startsWith("784-")) {
-              merged[key] = trimmed;
+      // If the unified pass missed critical data, fallback to scanning each individually
+      const hasCoreData = extracted && typeof extracted === "object" && (extracted.name || extracted.passportNumber || extracted.licenseNumber || extracted.idNumber);
+      if (!hasCoreData) {
+        console.log(`[OCR] Unified pass returned incomplete data, falling back to parallel scanning...`);
+        const results = await Promise.all(
+          parsedImages.map((img) => scanImagesBatch([img]))
+        );
+
+        // Merge all extracted results from every document
+        const merged: any = {};
+        for (const item of results) {
+          if (!item || typeof item !== "object") continue;
+          for (const [key, val] of Object.entries(item)) {
+            if (val && typeof val === "string" && val.trim() !== "") {
+              const trimmed = val.trim();
+              if (!merged[key] || merged[key].trim() === "") {
+                merged[key] = trimmed;
+              } else if (key === "name" && trimmed.length > merged[key].length) {
+                merged[key] = trimmed;
+              } else if (key === "idNumber" && trimmed.startsWith("784-")) {
+                merged[key] = trimmed;
+              }
             }
           }
         }
+        if (Object.keys(merged).length > 0) {
+          extracted = merged;
+        }
       }
 
-      if (Object.keys(merged).length > 0) {
-        if (merged.passportNumber && merged.licenseNumber) {
-          merged.documentType = "tourist_bundle";
-        }
-        extracted = merged;
-      } else {
-        // Fallback to joint batch scan if parallel individual was empty
-        extracted = await scanImagesBatch(parsedImages);
+      if (extracted && extracted.passportNumber && extracted.licenseNumber) {
+        extracted.documentType = "tourist_bundle";
       }
     }
 
@@ -336,6 +361,7 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, parsedI
     generationConfig: {
       temperature: 0.1,
       response_mime_type: "application/json",
+      maxOutputTokens: 1500,
     },
   };
 
@@ -343,6 +369,7 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, parsedI
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(geminiPayload),
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!aiRes.ok) {
@@ -377,7 +404,7 @@ async function callGroqVision(groqKey: string, systemPrompt: string, parsedImage
     model,
     messages: [{ role: "user", content: messageContent }],
     temperature: 0.1,
-    max_tokens: 4096,
+    max_tokens: 1500,
     response_format: { type: "json_object" },
   };
 
@@ -388,6 +415,7 @@ async function callGroqVision(groqKey: string, systemPrompt: string, parsedImage
       Authorization: `Bearer ${groqKey}`,
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!aiRes.ok) {
@@ -412,7 +440,7 @@ async function callOpenAIVision(openaiKey: string, systemPrompt: string, parsedI
       type: "image_url",
       image_url: {
         url: item.resolvedUrl,
-        detail: "high",
+        detail: "auto",
       },
     });
   }
@@ -423,6 +451,7 @@ async function callOpenAIVision(openaiKey: string, systemPrompt: string, parsedI
     messages: [{ role: "user", content: messageContent }],
     response_format: { type: "json_object" },
     temperature: 0.1,
+    max_tokens: 1500,
   };
 
   const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -432,6 +461,7 @@ async function callOpenAIVision(openaiKey: string, systemPrompt: string, parsedI
       Authorization: `Bearer ${openaiKey}`,
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(12000),
   });
 
   if (!aiRes.ok) {

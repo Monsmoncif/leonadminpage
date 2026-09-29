@@ -119,8 +119,8 @@ export default function CreateDriverModal({
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
+          const MAX_WIDTH = 1024;
+          const MAX_HEIGHT = 1024;
           let width = img.width;
           let height = img.height;
 
@@ -141,7 +141,7 @@ export default function CreateDriverModal({
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
 
-          resolve(canvas.toDataURL("image/jpeg", 0.7));
+          resolve(canvas.toDataURL("image/jpeg", 0.75));
         };
         img.onerror = (error) => reject(error);
       };
@@ -248,7 +248,7 @@ export default function CreateDriverModal({
       });
       setDocPreviews(allDocs);
 
-      await scanUploadedDocs(allDocs.length > 0 ? allDocs : base64List);
+      await scanUploadedDocs(base64List.length > 0 ? base64List : allDocs);
     } catch (err: any) {
       console.error("Scan error:", err);
       setError(err.message || "An error occurred while scanning documents");

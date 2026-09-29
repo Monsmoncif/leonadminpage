@@ -377,8 +377,8 @@ export default function CreateClientModal({
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 1400;
-          const MAX_HEIGHT = 1400;
+          const MAX_WIDTH = 1024;
+          const MAX_HEIGHT = 1024;
           let width = img.width;
           let height = img.height;
 
@@ -397,7 +397,7 @@ export default function CreateClientModal({
           canvas.height = height;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", 0.8));
+          resolve(canvas.toDataURL("image/jpeg", 0.75));
         };
         img.src = event.target?.result as string;
       };
@@ -463,8 +463,8 @@ export default function CreateClientModal({
       if (slotName === "license") setLicensePreviews((prev) => [...prev, ...base64List]);
       if (slotName === "id_card") setIdCardPreviews((prev) => [...prev, ...base64List]);
 
-      // Send ALL documents (previous + new) so AI reads all documents and merges all details
-      const targets = allDocs.length > 0 ? allDocs : base64List;
+      // Send only the newly uploaded files for this slot scan for maximum speed
+      const targets = base64List.length > 0 ? base64List : allDocs;
       const res = await fetch("/api/ocr/scan-document", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
