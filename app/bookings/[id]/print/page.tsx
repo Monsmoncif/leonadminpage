@@ -418,38 +418,54 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                 <span className="font-bold truncate">{contract.dailyKmLimit > 0 ? `${contract.dailyKmLimit} km` : "Unlimited"}</span>
               </div>
 
-              <div className="col-span-2 px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
+              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Check Out Date / تاريخ الخروج</span>
                 <span className="font-bold truncate">{formatDate(contract.startDate)}</span>
               </div>
-              <div className="px-1 py-[1.5px] border-b border-black flex flex-col justify-between">
+              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Check Out Time / وقت الخروج</span>
                 <span className="font-bold truncate">{contract.checkoutTime || "07:00 AM"}</span>
               </div>
+              <div className="px-1 py-[1.5px] border-b border-black flex flex-col justify-between">
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Out KM / عداد الخروج</span>
+                <span className="font-extrabold truncate text-brand">
+                  {contract.checkoutMileage ? `${contract.checkoutMileage.toLocaleString()} km` : (unit.mileage ? `${unit.mileage.toLocaleString()} km` : "N/A")}
+                </span>
+              </div>
 
               {/* Expected End Date / تاريخ الانتهاء المتوقع */}
-              <div className={`col-span-2 px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Date / تاريخ الانتهاء المتوقع</span>
+              <div className={`px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Date / تاريخ النهاية</span>
                 <span className="font-bold truncate">{formatDate(contract.endDate)}</span>
               </div>
-              <div className={`px-1 py-[1.5px] flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Time / وقت العودة المتوقع</span>
+              <div className={`px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected Time / وقت النهاية</span>
                 <span className="font-bold truncate">{contract.checkinTime || "10:00 AM"}</span>
+              </div>
+              <div className={`px-1 py-[1.5px] flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Out Fuel / وقود الخروج</span>
+                <span className="font-bold text-emerald-700 truncate">{contract.checkoutFuelLevel || 100}%</span>
               </div>
 
               {/* Date of Return / تاريخ الإرجاع الفعلي (يظهر تلقائياً عند إرجاع السيارة) */}
               {(contract.status === "Completed" || contract.deliveryStatus === "Returned" || Boolean(contract.returnedAt)) && (
                 <>
-                  <div className="col-span-2 px-1 py-[1.5px] border-r border-black flex flex-col justify-between bg-emerald-50/60">
-                    <span className="text-[6px] text-emerald-800 font-bold uppercase">Date of Return / تاريخ الإرجاع الفعلي</span>
+                  <div className="px-1 py-[1.5px] border-r border-black flex flex-col justify-between bg-emerald-50/60">
+                    <span className="text-[6px] text-emerald-800 font-bold uppercase">Return Date / تاريخ الإرجاع</span>
                     <span className="font-black text-emerald-950 truncate">
                       {formatDate(contract.returnedAt || contract.updatedAt)}
                     </span>
                   </div>
-                  <div className="px-1 py-[1.5px] flex flex-col justify-between bg-emerald-50/60">
+                  <div className="px-1 py-[1.5px] border-r border-black flex flex-col justify-between bg-emerald-50/60">
                     <span className="text-[6px] text-emerald-800 font-bold uppercase">Return Time / وقت الإرجاع</span>
                     <span className="font-black text-emerald-950 truncate">
                       {contract.checkinTime || "N/A"}
+                    </span>
+                  </div>
+                  <div className="px-1 py-[1.5px] flex flex-col justify-between bg-emerald-50/60">
+                    <span className="text-[6px] text-emerald-800 font-bold uppercase">In KM / عداد الإرجاع</span>
+                    <span className="font-black text-emerald-950 truncate">
+                      {contract.checkinMileage ? `${contract.checkinMileage.toLocaleString()} km` : "N/A"}
                     </span>
                   </div>
                 </>

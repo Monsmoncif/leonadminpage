@@ -174,7 +174,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const checkoutMileage = unitDoc.mileage || 0;
+    const checkoutMileage = body.checkoutMileage !== undefined && body.checkoutMileage !== "" && Number(body.checkoutMileage) >= 0
+      ? Number(body.checkoutMileage)
+      : (unitDoc.mileage || 0);
+
+    // If admin enters a higher mileage, sync vehicle unit's mileage
+    if (checkoutMileage > (unitDoc.mileage || 0)) {
+      unitDoc.mileage = checkoutMileage;
+      await unitDoc.save();
+    }
 
     const contractType = body.contractType || "Delivery";
 

@@ -165,6 +165,21 @@ export async function PUT(
       updatedData.returnDriver = body.returnDriver;
     }
 
+    if (body.checkoutMileage !== undefined && body.checkoutMileage !== "") {
+      const coMileage = Number(body.checkoutMileage);
+      if (!isNaN(coMileage) && coMileage >= 0) {
+        updatedData.checkoutMileage = coMileage;
+        const targetUnitId = body.unitId || existingContract.unitId;
+        if (targetUnitId) {
+          const uDoc = await Unit.findById(targetUnitId);
+          if (uDoc && coMileage > (uDoc.mileage || 0)) {
+            uDoc.mileage = coMileage;
+            await uDoc.save();
+          }
+        }
+      }
+    }
+
     // Sanitize deliveryStatus: only allow valid enum values; strip out non-enums like "Return Scheduled"
     if (updatedData.deliveryStatus && !["Pending", "Delivered", "Returned"].includes(updatedData.deliveryStatus)) {
       delete updatedData.deliveryStatus;

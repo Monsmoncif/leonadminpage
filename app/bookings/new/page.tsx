@@ -27,7 +27,8 @@ import {
   X,
   Camera,
   PenTool,
-  RotateCcw
+  RotateCcw,
+  Gauge
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -162,6 +163,7 @@ export default function NewRentalAdminPage() {
     babySeatFee: 0,
     deliveryFee: 0,
     checkoutFuelLevel: 100,
+    checkoutMileage: 0,
     paymentMethod: "Cash" as string,
     paymentStatus: "Pending" as "Pending" | "Partial" | "Paid"
   });
@@ -568,6 +570,7 @@ export default function NewRentalAdminPage() {
         babySeatFees: Number(rentalData.babySeatFee),
         deliveryCharges: Number(rentalData.deliveryFee),
         checkoutFuelLevel: Number(rentalData.checkoutFuelLevel || 100),
+        checkoutMileage: Number(rentalData.checkoutMileage || 0),
         paymentMethod: rentalData.paymentMethod,
         paymentStatus: rentalData.paymentStatus,
         status: contractType === "Shop" ? "Active" : "Draft",
@@ -772,6 +775,7 @@ export default function NewRentalAdminPage() {
                     collectionAmount: defaultRate * days,
                     dailyKmLimit: unit.dailyKmLimit || 0,
                     pricePerExtraKm: unit.pricePerExtraKm || 0,
+                    checkoutMileage: unit.mileage || 0,
                   }));
                 }}
                 className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group ${
@@ -1209,13 +1213,42 @@ export default function NewRentalAdminPage() {
               />
             </div>
 
-            {/* Fuel Level Selector */}
-            <div className="pt-2 border-t border-gray-200/70">
-              <FuelLevelSelector
-                value={rentalData.checkoutFuelLevel}
-                onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
-                label={contractType === "Delivery" ? "Fuel Level Percentage (مستوى الوقود عند التسليم للسائق)" : "Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"}
-              />
+            {/* Kilometrage & Fuel Level */}
+            <div className="pt-2 border-t border-gray-200/70 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Gauge size={13} className="text-brand" />
+                    <span>Kilometrage / Odometer (عداد الكيلومترات عند التسليم)</span>
+                  </span>
+                  {selectedVehicle && (
+                    <span className="text-[11px] text-text-muted">
+                      Vehicle registered: {units.find(u => u._id === selectedVehicle)?.mileage || 0} km
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    value={rentalData.checkoutMileage === 0 ? "" : rentalData.checkoutMileage} 
+                    onChange={e => setRentalData({...rentalData, checkoutMileage: Number(e.target.value)})} 
+                    placeholder="e.g. 15000"
+                    className="w-full p-2.5 pr-12 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                    KM
+                  </span>
+                </div>
+              </div>
+
+              {/* Fuel Level Selector */}
+              <div>
+                <FuelLevelSelector
+                  value={rentalData.checkoutFuelLevel}
+                  onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
+                  label={contractType === "Delivery" ? "Fuel Level Percentage (مستوى الوقود عند التسليم للسائق)" : "Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"}
+                />
+              </div>
             </div>
           </div>
 
@@ -1515,8 +1548,13 @@ export default function NewRentalAdminPage() {
                 <span className="font-bold text-text-primary">${rentalData.collectionAmount} (~${rentalData.dailyRate}/day)</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-text-muted">Initial Fuel Level:</span>
-                <span className="font-bold text-emerald-600">{rentalData.checkoutFuelLevel || 100}%</span>
+                <span className="text-text-muted">Initial Fuel &amp; Odometer:</span>
+                <span className="font-bold text-text-primary flex items-center gap-1.5">
+                  <span className="text-emerald-600">{rentalData.checkoutFuelLevel || 100}% Fuel</span>
+                  {rentalData.checkoutMileage > 0 && (
+                    <span className="text-gray-500 font-mono text-[11px]">({rentalData.checkoutMileage.toLocaleString()} km)</span>
+                  )}
+                </span>
               </div>
               {rentalData.deliveryFee > 0 && (
                 <div className="flex justify-between py-1 border-b border-gray-100">

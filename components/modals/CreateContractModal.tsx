@@ -22,7 +22,8 @@ import {
   Coins,
   AlertCircle,
   UserPlus,
-  Camera
+  Camera,
+  Gauge
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -143,6 +144,7 @@ export default function CreateContractModal({
     cleaningFees: 0,
     notes: "",
     checkoutFuelLevel: 100,
+    checkoutMileage: 0,
     paymentMethod: "Cash",
     paymentStatus: "Pending" as "Pending" | "Partial" | "Paid",
   });
@@ -285,6 +287,7 @@ export default function CreateContractModal({
           cleaningFees: contractToEdit.cleaningFees || 0,
           notes: contractToEdit.notes || "",
           checkoutFuelLevel: contractToEdit.checkoutFuelLevel || 100,
+          checkoutMileage: contractToEdit.checkoutMileage || 0,
           paymentMethod: contractToEdit.paymentMethod || "Cash",
           paymentStatus: contractToEdit.paymentStatus || "Pending",
         });
@@ -344,6 +347,7 @@ export default function CreateContractModal({
           salikFees: 0,
           cleaningFees: 0,
           checkoutFuelLevel: 100,
+          checkoutMileage: 0,
           notes: "",
           paymentMethod: "Cash",
           paymentStatus: "Pending",
@@ -582,6 +586,7 @@ export default function CreateContractModal({
 
       const payload = {
         ...formData,
+        checkoutMileage: Number(formData.checkoutMileage) >= 0 ? Number(formData.checkoutMileage) : 0,
         contractType: determinedContractType,
         dailyRate: calculatedDailyRate,
         totalDays: days,
@@ -867,6 +872,7 @@ export default function CreateContractModal({
                                 collectionAmount: rate * days,
                                 dailyKmLimit: unit.dailyKmLimit ?? prev.dailyKmLimit ?? 0,
                                 pricePerExtraKm: unit.pricePerExtraKm ?? prev.pricePerExtraKm ?? 0,
+                                checkoutMileage: unit.mileage ?? prev.checkoutMileage ?? 0,
                               }));
                             }}
                             className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group ${
@@ -1297,13 +1303,42 @@ export default function CreateContractModal({
                         />
                       </div>
 
-                      {/* Fuel Level Selector */}
-                      <div className="pt-2 border-t border-gray-200/70">
-                        <FuelLevelSelector
-                          value={formData.checkoutFuelLevel}
-                          onChange={(val) => setFormData({ ...formData, checkoutFuelLevel: val })}
-                          label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
-                        />
+                      {/* Kilometrage & Fuel Level */}
+                      <div className="pt-2 border-t border-gray-200/70 space-y-3">
+                        <div>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center justify-between">
+                            <span className="flex items-center gap-1">
+                              <Gauge size={13} className="text-brand" />
+                              <span>Kilometrage / Odometer (عداد الكيلومترات عند التسليم)</span>
+                            </span>
+                            {selectedVehicleObj && (
+                              <span className="text-[11px] text-text-muted">
+                                Vehicle registered: {selectedVehicleObj.mileage || 0} km
+                              </span>
+                            )}
+                          </label>
+                          <div className="relative">
+                            <input 
+                              type="number" 
+                              value={formData.checkoutMileage === 0 ? "" : formData.checkoutMileage} 
+                              onChange={e => setFormData({...formData, checkoutMileage: Number(e.target.value)})} 
+                              placeholder="e.g. 15000"
+                              className="w-full p-2.5 pr-12 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                              KM
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Fuel Level Selector */}
+                        <div>
+                          <FuelLevelSelector
+                            value={formData.checkoutFuelLevel}
+                            onChange={(val) => setFormData({ ...formData, checkoutFuelLevel: val })}
+                            label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -1595,8 +1630,13 @@ export default function CreateContractModal({
                           <span className="font-bold text-text-primary">${formData.collectionAmount} (~${formData.dailyRate}/day)</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100">
-                          <span className="text-text-muted">Initial Fuel Level:</span>
-                          <span className="font-bold text-emerald-600">{formData.checkoutFuelLevel || 100}%</span>
+                          <span className="text-text-muted">Initial Fuel &amp; Odometer:</span>
+                          <span className="font-bold text-text-primary flex items-center gap-1.5">
+                            <span className="text-emerald-600">{formData.checkoutFuelLevel || 100}% Fuel</span>
+                            {formData.checkoutMileage > 0 && (
+                              <span className="text-gray-500 font-mono text-[11px]">({formData.checkoutMileage.toLocaleString()} km)</span>
+                            )}
+                          </span>
                         </div>
                         {formData.deliveryCharges > 0 && (
                           <div className="flex justify-between py-1 border-b border-gray-100">
