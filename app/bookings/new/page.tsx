@@ -779,7 +779,7 @@ export default function NewRentalAdminPage() {
                   : "text-text-muted hover:text-text-primary"
               }`}
             >
-              Available for Dates ({availableUnits.length})
+              Available ({availableUnits.length})
             </button>
           </div>
 
@@ -796,72 +796,17 @@ export default function NewRentalAdminPage() {
         </div>
       </div>
 
-      {/* Booking Dates Bar for Car Selection */}
-      <div className="bg-brand-50/40 border border-brand/20 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs font-bold text-text-primary shrink-0">
-          <Calendar size={16} className="text-brand shrink-0" />
-          <span>Booking Period for Availability (فترة الحجز):</span>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="flex-1 sm:w-38">
-            <label className="text-[10px] uppercase font-bold text-text-muted block mb-0.5">Start Date</label>
-            <input
-              type="date"
-              value={rentalData.startDate}
-              onChange={(e) => {
-                const newStart = e.target.value;
-                setRentalData(prev => {
-                  const startD = new Date(newStart);
-                  const endD = new Date(prev.endDate);
-                  const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)));
-                  const rate = Number(prev.dailyRate) || 85;
-                  return {
-                    ...prev,
-                    startDate: newStart,
-                    collectionAmount: rate * days,
-                  };
-                });
-              }}
-              className="w-full px-2.5 py-1 text-xs bg-white border border-border rounded-lg font-medium focus:ring-2 focus:ring-brand/20"
-            />
-          </div>
-          <span className="text-text-muted mt-3 font-bold">→</span>
-          <div className="flex-1 sm:w-38">
-            <label className="text-[10px] uppercase font-bold text-text-muted block mb-0.5">Expected End Date</label>
-            <input
-              type="date"
-              value={rentalData.endDate}
-              onChange={(e) => {
-                const newEnd = e.target.value;
-                setRentalData(prev => {
-                  const startD = new Date(prev.startDate);
-                  const endD = new Date(newEnd);
-                  const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)));
-                  const rate = Number(prev.dailyRate) || 85;
-                  return {
-                    ...prev,
-                    endDate: newEnd,
-                    collectionAmount: rate * days,
-                  };
-                });
-              }}
-              className="w-full px-2.5 py-1 text-xs bg-white border border-border rounded-lg font-medium focus:ring-2 focus:ring-brand/20"
-            />
-          </div>
-        </div>
-      </div>
-
       {filteredUnits.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl bg-gray-50/50">
           <div className="w-14 h-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-3 border border-red-100">
             <AlertCircle size={28} />
           </div>
           <p className="text-sm font-bold text-text-primary">
-            {fleetFilter === "available" ? "No Available Cars for Selected Dates" : "No matching cars found"}
+            {fleetFilter === "available" ? "No Available Cars" : "No matching cars found"}
           </p>
           <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
             {fleetFilter === "available" 
-              ? "All cars are booked during these dates or under maintenance. Try choosing different dates or switch to All Cars."
+              ? "All cars are currently booked or under maintenance. Switch to All Cars to view fleet."
               : "No cars match your search keywords. Try searching by make, model, or license plate."}
           </p>
         </div>
