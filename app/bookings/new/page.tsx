@@ -75,7 +75,7 @@ export default function NewRentalAdminPage() {
   // Search & Filter States
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState("");
-  const [fleetFilter, setFleetFilter] = useState<"available" | "all">("available");
+  const [fleetFilter, setFleetFilter] = useState<"available" | "all">("all");
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -510,15 +510,8 @@ export default function NewRentalAdminPage() {
         return;
       }
       const vehicle = units.find(u => u._id === selectedVehicle);
-      const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
-      if (conflict) {
-        if (conflict.reason === "Booked") {
-          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          toast.error(`This car is already booked from ${conflictStart} to ${conflictEnd}. Please resolve the date conflict.`);
-        } else {
-          toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
-        }
+      if (vehicle && (vehicle.status === "Maintenance" || vehicle.status === "Out of Service")) {
+        toast.error(`The selected car is currently in ${vehicle.status} and cannot be booked.`);
         return;
       }
     }
@@ -527,6 +520,19 @@ export default function NewRentalAdminPage() {
     if (contractType === "Shop" && currentStep === 2) {
       if (!selectedClient) {
         toast.error("Please select a client first.");
+        return;
+      }
+    }
+
+    // Validate dates conflict when leaving Rental Data step
+    const isRentalDataStep = (contractType === "Delivery" && currentStep === 2) || (contractType === "Shop" && currentStep === 3);
+    if (isRentalDataStep) {
+      const vehicle = units.find(u => u._id === selectedVehicle);
+      const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
+      if (conflict && conflict.reason === "Booked") {
+        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please choose different dates.`);
         return;
       }
     }
@@ -755,17 +761,6 @@ export default function NewRentalAdminPage() {
           <div className="flex items-center bg-gray-100 p-1 rounded-xl shrink-0">
             <button
               type="button"
-              onClick={() => setFleetFilter("available")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                fleetFilter === "available"
-                  ? "bg-white text-brand shadow-xs"
-                  : "text-text-muted hover:text-text-primary"
-              }`}
-            >
-              Available ({availableUnits.length})
-            </button>
-            <button
-              type="button"
               onClick={() => setFleetFilter("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 fleetFilter === "all"
@@ -774,6 +769,17 @@ export default function NewRentalAdminPage() {
               }`}
             >
               All Cars ({units.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFleetFilter("available")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                fleetFilter === "available"
+                  ? "bg-white text-brand shadow-xs"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              Available for Dates ({availableUnits.length})
             </button>
           </div>
 
@@ -870,14 +876,8 @@ export default function NewRentalAdminPage() {
               <div
                 key={unit._id}
                 onClick={() => {
-                  if (!isAvailable) {
-                    if (conflict?.reason === "Booked") {
-                      const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                      const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                      toast.error(`This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please choose other dates or another car.`);
-                    } else {
-                      toast.error(`This car is currently in ${conflict?.reason || unit.status} and cannot be booked.`);
-                    }
+                  if (unit.status === "Maintenance" || unit.status === "Out of Service") {
+                    toast.error(`This car is currently in ${unit.status} and cannot be booked.`);
                     return;
                   }
                   setSelectedVehicle(unit._id);
@@ -893,13 +893,19 @@ export default function NewRentalAdminPage() {
                     pricePerExtraKm: unit.pricePerExtraKm || 0,
                     checkoutMileage: unit.mileage || 0,
                   }));
+
+                  if (conflict && conflict.reason === "Booked") {
+                    const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    toast.info(`Selected ${unit.make} ${unit.model}. Note: It is booked from ${conflictStart} to ${conflictEnd}. Please choose non-overlapping dates.`);
+                  } else {
+                    toast.success(`Selected ${unit.make} ${unit.model} (${unit.plate})`);
+                  }
                 }}
-                className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group ${
-                  !isAvailable
-                    ? "opacity-60 bg-gray-50/70 border-gray-200 cursor-not-allowed"
-                    : isSelected 
-                    ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md cursor-pointer card-hover" 
-                    : "border-border shadow-sm hover:border-gray-300 cursor-pointer card-hover"
+                className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group cursor-pointer card-hover ${
+                  isSelected 
+                    ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md" 
+                    : "border-border shadow-sm hover:border-gray-300"
                 }`}
               >
                 <div className="flex justify-between items-start mb-2">
@@ -911,11 +917,13 @@ export default function NewRentalAdminPage() {
                   </div>
                   {isSelected ? (
                     <span className="bg-brand text-white p-1 rounded-full"><CheckCircle2 size={16} /></span>
-                  ) : !isAvailable ? (
+                  ) : conflict?.reason === "Booked" ? (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                      {conflict?.reason === "Booked"
-                        ? `Booked (${new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })})`
-                        : (unit.status || "Unavailable")}
+                      Booked ({new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+                    </span>
+                  ) : unit.status === "Maintenance" || unit.status === "Out of Service" ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                      {unit.status}
                     </span>
                   ) : (
                     <StatusBadge variant="available" text="Available" />
@@ -933,14 +941,8 @@ export default function NewRentalAdminPage() {
                 <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
                   <span className="font-mono text-text-muted bg-gray-100 px-2 py-0.5 rounded">{unit.plate}</span>
                   <div>
-                    {!isAvailable ? (
-                      <span className="text-[11px] font-semibold text-amber-700">Unavailable for dates</span>
-                    ) : (
-                      <>
-                        <span className="text-base font-bold text-text-primary">${unit.dailyRate || 85}</span>
-                        <span className="text-text-muted text-[11px]">/day</span>
-                      </>
-                    )}
+                    <span className="text-base font-bold text-text-primary">${unit.dailyRate || 85}</span>
+                    <span className="text-text-muted text-[11px]">/day</span>
                   </div>
                 </div>
               </div>

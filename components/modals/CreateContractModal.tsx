@@ -68,7 +68,7 @@ export default function CreateContractModal({
   // Search & Modals
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState("");
   const [clientSearchQuery, setClientSearchQuery] = useState("");
-  const [fleetFilter, setFleetFilter] = useState<"available" | "all">("available");
+  const [fleetFilter, setFleetFilter] = useState<"all" | "available">("all");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isSelectSecondDriverModalOpen, setIsSelectSecondDriverModalOpen] = useState(false);
   const [secondDriverClient, setSecondDriverClient] = useState<any>(null);
@@ -237,7 +237,7 @@ export default function CreateContractModal({
       setError(null);
       setVehicleSearchQuery("");
       setClientSearchQuery("");
-      setFleetFilter("available");
+      setFleetFilter("all");
       fetchData();
 
       if (contractToEdit) {
@@ -414,15 +414,8 @@ export default function CreateContractModal({
         return;
       }
       const selectedUnit = units.find(u => u._id === formData.unitId);
-      const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate) : null;
-      if (conflict && !isCurrentContractUnit(formData.unitId)) {
-        if (conflict.reason === "Booked") {
-          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          toast.error(`This car is already booked from ${conflictStart} to ${conflictEnd}. Please resolve the date conflict.`);
-        } else {
-          toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
-        }
+      if (selectedUnit && (selectedUnit.status === "Maintenance" || selectedUnit.status === "Out of Service")) {
+        toast.error(`The selected car is currently in ${selectedUnit.status} and cannot be booked.`);
         return;
       }
     }
@@ -434,7 +427,13 @@ export default function CreateContractModal({
       const selectedUnit = units.find(u => u._id === formData.unitId);
       const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate) : null;
       if (conflict && !isCurrentContractUnit(formData.unitId)) {
-        toast.error("The selected dates conflict with an existing booking for this car. Please adjust the dates.");
+        if (conflict.reason === "Booked") {
+          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please choose different dates.`);
+        } else {
+          toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
+        }
         return;
       }
     }
@@ -614,9 +613,9 @@ export default function CreateContractModal({
       if (conflict.reason === "Booked") {
         const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
         const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        toast.error(`Date Conflict: This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please adjust dates.`);
+        toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please choose different dates.`);
       } else {
-        toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
+        toast.error(`The selected car is in ${conflict.reason} and cannot be booked.`);
       }
       return;
     }
@@ -682,7 +681,7 @@ export default function CreateContractModal({
 
   if (!isOpen) return null;
 
-  // Filter Units: By default show vehicles available for selected dates; allow switching to All Fleet view
+  // Filter Units: By default show all fleet; allow filtering to only cars available for selected dates
   const availableUnits = units.filter(u => isUnitBookable(u, formData.startDate, formData.endDate));
   const baseUnits = fleetFilter === "available" ? availableUnits : units;
   const filteredUnits = baseUnits.filter(u => {
@@ -859,17 +858,6 @@ export default function CreateContractModal({
                       <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200 shrink-0">
                         <button
                           type="button"
-                          onClick={() => setFleetFilter("available")}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                            fleetFilter === "available"
-                              ? "bg-white text-brand shadow-xs"
-                              : "text-text-muted hover:text-text-primary"
-                          }`}
-                        >
-                          Available ({availableUnits.length})
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => setFleetFilter("all")}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                             fleetFilter === "all"
@@ -878,6 +866,17 @@ export default function CreateContractModal({
                           }`}
                         >
                           All Cars ({units.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFleetFilter("available")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                            fleetFilter === "available"
+                              ? "bg-white text-brand shadow-xs"
+                              : "text-text-muted hover:text-text-primary"
+                          }`}
+                        >
+                          Available for Dates ({availableUnits.length})
                         </button>
                       </div>
 
@@ -974,14 +973,8 @@ export default function CreateContractModal({
                           <div
                             key={unit._id}
                             onClick={() => {
-                              if (!isAvailable) {
-                                if (conflict?.reason === "Booked") {
-                                  const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                                  const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                                  toast.error(`This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please choose other dates or another car.`);
-                                } else {
-                                  toast.error(`This car is currently in ${conflict?.reason || unit.status} and cannot be booked.`);
-                                }
+                              if (unit.status === "Maintenance" || unit.status === "Out of Service") {
+                                toast.error(`This car is currently in ${unit.status} and cannot be booked.`);
                                 return;
                               }
                               const start = new Date(formData.startDate);
@@ -997,13 +990,19 @@ export default function CreateContractModal({
                                 pricePerExtraKm: unit.pricePerExtraKm ?? prev.pricePerExtraKm ?? 0,
                                 checkoutMileage: unit.mileage ?? prev.checkoutMileage ?? 0,
                               }));
+
+                              if (conflict && conflict.reason === "Booked") {
+                                const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                toast.info(`Selected ${unit.make} ${unit.model}. Note: It is booked from ${conflictStart} to ${conflictEnd}. Please choose non-overlapping dates.`);
+                              } else {
+                                toast.success(`Selected ${unit.make} ${unit.model} (${unit.plate})`);
+                              }
                             }}
-                            className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group ${
-                              !isAvailable
-                                ? "opacity-60 bg-gray-50/70 border-gray-200 cursor-not-allowed"
-                                : isSelected 
-                                ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md cursor-pointer card-hover" 
-                                : "border-border shadow-sm hover:border-gray-300 cursor-pointer card-hover"
+                            className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group cursor-pointer card-hover ${
+                              isSelected 
+                                ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md" 
+                                : "border-border shadow-sm hover:border-gray-300"
                             }`}
                           >
                             <div className="flex justify-between items-start mb-2">
@@ -1015,11 +1014,13 @@ export default function CreateContractModal({
                               </div>
                               {isSelected ? (
                                 <span className="bg-brand text-white p-1 rounded-full"><CheckCircle2 size={16} /></span>
-                              ) : !isAvailable ? (
+                              ) : conflict?.reason === "Booked" ? (
                                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                  {conflict?.reason === "Booked"
-                                    ? `Booked (${new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })})`
-                                    : (unit.status || "Unavailable")}
+                                  Booked ({new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+                                </span>
+                              ) : unit.status === "Maintenance" || unit.status === "Out of Service" ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                  {unit.status}
                                 </span>
                               ) : (
                                 <StatusBadge variant="available" text="Available" />
@@ -1037,14 +1038,8 @@ export default function CreateContractModal({
                             <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
                               <span className="font-mono text-text-muted bg-gray-100 px-2 py-0.5 rounded">{unit.plate}</span>
                               <div>
-                                {!isAvailable ? (
-                                  <span className="text-[11px] font-semibold text-amber-700">Unavailable for dates</span>
-                                ) : (
-                                  <>
-                                    <span className="text-base font-bold text-text-primary">${unit.dailyRate || 85}</span>
-                                    <span className="text-text-muted text-[11px]">/day</span>
-                                  </>
-                                )}
+                                <span className="text-base font-bold text-text-primary">${unit.dailyRate || 85}</span>
+                                <span className="text-text-muted text-[11px]">/day</span>
                               </div>
                             </div>
                           </div>
