@@ -362,10 +362,49 @@ export default function CreateContractModal({
     return currentId === unitId;
   };
 
-  const isUnitBookable = (unit: any) => {
+  const getUnitConflict = (unit: any, startDateStr?: string, endDateStr?: string) => {
+    if (!unit) return null;
+    if (unit.status === "Maintenance" || unit.status === "Out of Service") {
+      return { reason: unit.status };
+    }
+    const currentContractId = contractToEdit?._id || contractToEdit?.id;
+    const startStr = startDateStr || formData.startDate;
+    const endStr = endDateStr || formData.endDate;
+    if (!startStr || !endStr) return null;
+
+    const start = new Date(startStr);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endStr);
+    end.setHours(23, 59, 59, 999);
+
+    if (Array.isArray(unit.activeBookings) && unit.activeBookings.length > 0) {
+      for (const booking of unit.activeBookings) {
+        if (currentContractId && (booking.contractId === currentContractId || booking._id === currentContractId)) {
+          continue;
+        }
+        const bStart = new Date(booking.startDate);
+        bStart.setHours(0, 0, 0, 0);
+        const bEnd = new Date(booking.endDate);
+        bEnd.setHours(23, 59, 59, 999);
+
+        if (bStart <= end && bEnd >= start) {
+          return {
+            reason: "Booked",
+            startDate: booking.startDate,
+            endDate: booking.endDate,
+            contractNumber: booking.contractNumber || (booking.contractId ? booking.contractId.substring(0, 8).toUpperCase() : ""),
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const isUnitBookable = (unit: any, startDateStr?: string, endDateStr?: string) => {
     if (!unit) return false;
+    if (unit.status === "Maintenance" || unit.status === "Out of Service") return false;
     if (isCurrentContractUnit(unit._id)) return true;
-    return unit.status?.toLowerCase() === "available";
+    return !getUnitConflict(unit, startDateStr, endDateStr);
   };
 
   const handleNext = () => {
@@ -375,14 +414,29 @@ export default function CreateContractModal({
         return;
       }
       const selectedUnit = units.find(u => u._id === formData.unitId);
-      if (selectedUnit && !isUnitBookable(selectedUnit)) {
-        toast.error(`The selected car (${selectedUnit?.make || ""} ${selectedUnit?.model || ""}) is currently ${selectedUnit?.status || "Delivered/Rented"} and cannot be booked.`);
+      const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate) : null;
+      if (conflict && !isCurrentContractUnit(formData.unitId)) {
+        if (conflict.reason === "Booked") {
+          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          toast.error(`This car is already booked from ${conflictStart} to ${conflictEnd}. Please resolve the date conflict.`);
+        } else {
+          toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
+        }
         return;
       }
     }
     if (currentStep === 2 && !formData.clientId) {
       toast.error("Please select a client first.");
       return;
+    }
+    if (currentStep === 3) {
+      const selectedUnit = units.find(u => u._id === formData.unitId);
+      const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate) : null;
+      if (conflict && !isCurrentContractUnit(formData.unitId)) {
+        toast.error("The selected dates conflict with an existing booking for this car. Please adjust the dates.");
+        return;
+      }
     }
     if (currentStep < STEPS.length) {
       setCurrentStep((c) => c + 1);
@@ -555,8 +609,15 @@ export default function CreateContractModal({
     }
 
     const selectedUnit = units.find(u => u._id === formData.unitId);
-    if (!selectedUnit || !isUnitBookable(selectedUnit)) {
-      toast.error(`The selected car (${selectedUnit?.make || ""} ${selectedUnit?.model || ""}) is currently ${selectedUnit?.status || "Delivered/Rented"} and cannot be booked.`);
+    const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate) : null;
+    if (conflict && !isCurrentContractUnit(formData.unitId)) {
+      if (conflict.reason === "Booked") {
+        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        toast.error(`Date Conflict: This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please adjust dates.`);
+      } else {
+        toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
+      }
       return;
     }
 
@@ -621,8 +682,8 @@ export default function CreateContractModal({
 
   if (!isOpen) return null;
 
-  // Filter Units: By default show strictly Available vehicles; allow switching to All Fleet view
-  const availableUnits = units.filter(u => isUnitBookable(u));
+  // Filter Units: By default show vehicles available for selected dates; allow switching to All Fleet view
+  const availableUnits = units.filter(u => isUnitBookable(u, formData.startDate, formData.endDate));
   const baseUnits = fleetFilter === "available" ? availableUnits : units;
   const filteredUnits = baseUnits.filter(u => {
     if (!vehicleSearchQuery) return true;
@@ -833,17 +894,72 @@ export default function CreateContractModal({
                     </div>
                   </div>
 
+                  {/* Booking Dates Bar for Car Selection */}
+                  <div className="bg-brand-50/40 border border-brand/20 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-text-primary shrink-0">
+                      <Calendar size={16} className="text-brand shrink-0" />
+                      <span>Booking Period for Availability (فترة الحجز):</span>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <div className="flex-1 sm:w-38">
+                        <label className="text-[10px] uppercase font-bold text-text-muted block mb-0.5">Start Date</label>
+                        <input
+                          type="date"
+                          value={formData.startDate}
+                          onChange={(e) => {
+                            const newStart = e.target.value;
+                            setFormData(prev => {
+                              const startD = new Date(newStart);
+                              const endD = new Date(prev.endDate);
+                              const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)));
+                              const rate = Number(prev.dailyRate) || 85;
+                              return {
+                                ...prev,
+                                startDate: newStart,
+                                collectionAmount: rate * days,
+                              };
+                            });
+                          }}
+                          className="w-full px-2.5 py-1 text-xs bg-white border border-border rounded-lg font-medium focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+                      <span className="text-text-muted mt-3 font-bold">→</span>
+                      <div className="flex-1 sm:w-38">
+                        <label className="text-[10px] uppercase font-bold text-text-muted block mb-0.5">Expected End Date</label>
+                        <input
+                          type="date"
+                          value={formData.endDate}
+                          onChange={(e) => {
+                            const newEnd = e.target.value;
+                            setFormData(prev => {
+                              const startD = new Date(prev.startDate);
+                              const endD = new Date(newEnd);
+                              const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)));
+                              const rate = Number(prev.dailyRate) || 85;
+                              return {
+                                ...prev,
+                                endDate: newEnd,
+                                collectionAmount: rate * days,
+                              };
+                            });
+                          }}
+                          className="w-full px-2.5 py-1 text-xs bg-white border border-border rounded-lg font-medium focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {filteredUnits.length === 0 ? (
                     <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl bg-gray-50/50">
                       <div className="w-14 h-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-3 border border-red-100">
                         <AlertCircle size={28} />
                       </div>
                       <p className="text-sm font-bold text-text-primary">
-                        {fleetFilter === "available" ? "No Available Cars" : "No matching cars found"}
+                        {fleetFilter === "available" ? "No Available Cars for Selected Dates" : "No matching cars found"}
                       </p>
                       <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
                         {fleetFilter === "available" 
-                          ? "All cars are currently rented, delivered, or under maintenance. Check in returned cars in Bookings to free them up."
+                          ? "All cars are booked during these dates or under maintenance. Try choosing different dates or switch to All Cars."
                           : "No cars match your search keywords. Try searching by make, model, or license plate."}
                       </p>
                     </div>
@@ -851,14 +967,21 @@ export default function CreateContractModal({
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredUnits.map((unit) => {
                         const isSelected = formData.unitId === unit._id;
-                        const isAvailable = isUnitBookable(unit);
+                        const conflict = getUnitConflict(unit, formData.startDate, formData.endDate);
+                        const isAvailable = !conflict || isCurrentContractUnit(unit._id);
 
                         return (
                           <div
                             key={unit._id}
                             onClick={() => {
                               if (!isAvailable) {
-                                toast.error(`This car is currently ${unit.status || "Delivered/Rented"} and cannot be booked until returned.`);
+                                if (conflict?.reason === "Booked") {
+                                  const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                  const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                  toast.error(`This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please choose other dates or another car.`);
+                                } else {
+                                  toast.error(`This car is currently in ${conflict?.reason || unit.status} and cannot be booked.`);
+                                }
                                 return;
                               }
                               const start = new Date(formData.startDate);
@@ -894,7 +1017,9 @@ export default function CreateContractModal({
                                 <span className="bg-brand text-white p-1 rounded-full"><CheckCircle2 size={16} /></span>
                               ) : !isAvailable ? (
                                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                  {unit.status === "Rented" ? "Delivered / Rented" : (unit.status || "Unavailable")}
+                                  {conflict?.reason === "Booked"
+                                    ? `Booked (${new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })})`
+                                    : (unit.status || "Unavailable")}
                                 </span>
                               ) : (
                                 <StatusBadge variant="available" text="Available" />
@@ -913,7 +1038,7 @@ export default function CreateContractModal({
                               <span className="font-mono text-text-muted bg-gray-100 px-2 py-0.5 rounded">{unit.plate}</span>
                               <div>
                                 {!isAvailable ? (
-                                  <span className="text-[11px] font-semibold text-amber-700">Currently in use</span>
+                                  <span className="text-[11px] font-semibold text-amber-700">Unavailable for dates</span>
                                 ) : (
                                   <>
                                     <span className="text-base font-bold text-text-primary">${unit.dailyRate || 85}</span>
@@ -1211,6 +1336,25 @@ export default function CreateContractModal({
                           />
                         </div>
                       </div>
+
+                      {/* Conflict Alert Banner if selected vehicle is booked for these dates */}
+                      {(() => {
+                        const conflict = selectedVehicleObj ? getUnitConflict(selectedVehicleObj, formData.startDate, formData.endDate) : null;
+                        if (!conflict || conflict.reason !== "Booked") return null;
+                        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                        return (
+                          <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in">
+                            <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
+                            <div>
+                              <p className="font-bold">Date Conflict Detected (تعارض في التواريخ):</p>
+                              <p className="mt-0.5">
+                                This car ({selectedVehicleObj.make} {selectedVehicleObj.model} - {selectedVehicleObj.plate}) is already booked from <span className="font-semibold">{conflictStart}</span> to <span className="font-semibold">{conflictEnd}</span> (Contract #{conflict.contractNumber}). Please choose different dates or pick another vehicle.
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       <div>
                         <div className="flex items-center justify-between mb-1">

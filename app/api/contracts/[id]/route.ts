@@ -14,6 +14,7 @@ import nodemailer from "nodemailer";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { sendClientContractNotification, sendDriverTaskNotification } from "@/lib/contract-notifications";
+import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
 
 export async function GET(
   request: Request,
@@ -122,34 +123,39 @@ export async function PUT(
       fuelCharge: fuelFees,
     };
 
-    // If changing the assigned vehicle, ensure the target vehicle is available
-    if (body.unitId && body.unitId.toString() !== existingContract.unitId?.toString()) {
-      const newUnitDoc = await Unit.findById(body.unitId);
-      if (!newUnitDoc) {
-        return NextResponse.json({ error: "Selected replacement vehicle not found." }, { status: 404 });
+    // Validate target vehicle and date conflicts
+    const targetUnitId = body.unitId || existingContract.unitId;
+    const targetStartDate = body.startDate || existingContract.startDate;
+    const targetEndDate = body.endDate || existingContract.endDate;
+
+    if (body.unitId || body.startDate || body.endDate) {
+      const targetUnitDoc = await Unit.findById(targetUnitId);
+      if (!targetUnitDoc) {
+        return NextResponse.json({ error: "Selected vehicle not found." }, { status: 404 });
       }
-      if (newUnitDoc.status?.toLowerCase() !== "available") {
+      if (targetUnitDoc.status === "Maintenance" || targetUnitDoc.status === "Out of Service") {
         return NextResponse.json(
-          { error: `Vehicle (${newUnitDoc.make} ${newUnitDoc.model} - ${newUnitDoc.plate}) is currently ${newUnitDoc.status} and cannot be assigned.` },
+          { error: `Vehicle (${targetUnitDoc.make} ${targetUnitDoc.model} - ${targetUnitDoc.plate}) is currently in ${targetUnitDoc.status} and cannot be assigned.` },
           { status: 400 }
         );
       }
-      const conflictingContract = await Contract.findOne({
-        _id: { $ne: resolvedParams.id },
-        unitId: body.unitId,
-        status: { $in: ["Active", "Draft"] }
+
+      const conflictingContract: any = await checkContractDateOverlap({
+        unitId: targetUnitId,
+        startDate: targetStartDate,
+        endDate: targetEndDate,
+        excludeContractId: resolvedParams.id,
       });
+
       if (conflictingContract) {
+        const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        const conflictNumber = conflictingContract.contractNumber || conflictingContract._id.toString().substring(0, 8).toUpperCase();
         return NextResponse.json(
-          { error: `Vehicle (${newUnitDoc.make} ${newUnitDoc.model} - ${newUnitDoc.plate}) is already assigned to active contract #${conflictingContract._id.toString().substring(0, 8).toUpperCase()}.` },
+          { error: `Date Conflict: Vehicle (${targetUnitDoc.make} ${targetUnitDoc.model} - ${targetUnitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflictNumber}). Please select different dates.` },
           { status: 400 }
         );
       }
-      // Revert status of previous unit to Available and reserve new unit as Rented
-      if (existingContract.unitId) {
-        await Unit.findByIdAndUpdate(existingContract.unitId, { status: "Available" });
-      }
-      await Unit.findByIdAndUpdate(body.unitId, { status: "Rented" });
     }
 
     if (body.driverId !== undefined) {
@@ -297,7 +303,7 @@ export async function PUT(
 
         await Unit.findByIdAndUpdate(existingContract.unitId, updateData);
       } else if (body.status === "Active") {
-        await Unit.findByIdAndUpdate(existingContract.unitId, { status: "Rented" });
+        await syncUnitStatuses(existingContract.unitId);
       }
     }
 
@@ -419,6 +425,14 @@ export async function PUT(
       }
     } catch (e) { console.error("Failed to log contract update", e); }
 
+    // Ensure all affected vehicle statuses are in sync with current reality
+    if (body.unitId && body.unitId.toString() !== existingContract.unitId?.toString()) {
+      await syncUnitStatuses(existingContract.unitId);
+      await syncUnitStatuses(body.unitId);
+    } else if (existingContract.unitId) {
+      await syncUnitStatuses(existingContract.unitId);
+    }
+
     return NextResponse.json(updatedContract, { status: 200 });
   } catch (error: any) {
     console.error("Error updating contract:", error);
@@ -453,22 +467,18 @@ export async function DELETE(
     await Damage.deleteMany({ contractId: resolvedParams.id });
     await Inspection.deleteMany({ contractId: resolvedParams.id });
 
-    // If no other active or draft contracts exist for this vehicle, restore to Available
+    // Sync vehicle status after contract deletion
     if (deletedContract.unitId) {
-      const otherContract = await Contract.findOne({
+      const hasPendingDamage = await Damage.findOne({
         unitId: deletedContract.unitId,
-        _id: { $ne: deletedContract._id },
-        status: { $in: ["Active", "Draft"] },
+        status: "Pending",
       });
-
-      if (!otherContract) {
-        const hasPendingDamage = await Damage.findOne({
-          unitId: deletedContract.unitId,
-          status: "Pending",
-        });
+      if (hasPendingDamage) {
         await Unit.findByIdAndUpdate(deletedContract.unitId, {
-          status: hasPendingDamage ? "Maintenance" : "Available",
+          status: "Maintenance",
         });
+      } else {
+        await syncUnitStatuses(deletedContract.unitId);
       }
     }
 

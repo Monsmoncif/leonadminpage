@@ -12,6 +12,7 @@ import nodemailer from "nodemailer";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { sendClientContractNotification, sendDriverTaskNotification } from "@/lib/contract-notifications";
+import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
 
 const emptyResponse = {
   contracts: [],
@@ -155,21 +156,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Selected vehicle not found." }, { status: 404 });
     }
 
-    if (unitDoc.status?.toLowerCase() !== "available") {
+    if (unitDoc.status === "Maintenance" || unitDoc.status === "Out of Service") {
       return NextResponse.json(
-        { error: `Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is currently ${unitDoc.status} and cannot be booked.` },
+        { error: `Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is currently in ${unitDoc.status} and cannot be booked.` },
         { status: 400 }
       );
     }
 
-    // Check if vehicle is already assigned to an ongoing Active or Delivered contract
-    const existingActiveContract = await Contract.findOne({
+    // Check if vehicle has any overlapping booking/contract during requested dates
+    const conflictingContract: any = await checkContractDateOverlap({
       unitId: body.unitId,
-      status: { $in: ["Active", "Draft"] },
+      startDate: body.startDate,
+      endDate: body.endDate,
     });
-    if (existingActiveContract) {
+
+    if (conflictingContract) {
+      const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const conflictNumber = conflictingContract.contractNumber || conflictingContract._id.toString().substring(0, 8).toUpperCase();
       return NextResponse.json(
-        { error: `Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is currently out on contract #${existingActiveContract._id.toString().substring(0, 8).toUpperCase()} and cannot be booked.` },
+        { error: `Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflictNumber}). Please select different dates or choose another car.` },
         { status: 400 }
       );
     }
@@ -281,8 +287,8 @@ export async function POST(req: Request) {
       });
     } catch (e) { console.error("Failed to create log", e); }
 
-    // Reserve unit status to Rented upon contract creation
-    await Unit.findByIdAndUpdate(body.unitId, { status: "Rented" });
+    // Synchronize vehicle status: if contract starts today or in past, it becomes Rented; if it starts in the future, it stays Available until the start date arrives
+    await syncUnitStatuses(body.unitId);
 
     // 1. Send contract PDF/details to client in background ONLY if getting the car right now (Shop contract)
     // Non-blocking so contract creation responds immediately (<200ms) to user and redirects
