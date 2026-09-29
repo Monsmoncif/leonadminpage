@@ -118,7 +118,7 @@ const contractSchema = new Schema<IContract>(
     pickupLocation: { type: String, required: true },
     dropoffLocation: { type: String, required: false, default: "" },
     checkoutTime: { type: String, default: "07:00 AM" },
-    checkinTime: { type: String, default: "07:00 AM" },
+    checkinTime: { type: String, default: "" },
     additionalDriverName: { type: String },
     additionalDriverLicense: { type: String },
     additionalDriverNationality: { type: String },

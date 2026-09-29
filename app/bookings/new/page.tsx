@@ -151,7 +151,7 @@ export default function NewRentalAdminPage() {
     startDate: new Date().toISOString().split("T")[0],
     endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     checkoutTime: "10:00 AM",
-    checkinTime: "10:00 AM",
+    checkinTime: "",
     collectionAmount: 595, // Price driver or admin will collect for the rental
     dailyRate: 85,
     dailyKmLimit: 0,
@@ -565,7 +565,7 @@ export default function NewRentalAdminPage() {
         pickupLocation: rentalData.pickupLocation,
         dropoffLocation: rentalData.dropoffLocation || "",
         checkoutTime: rentalData.checkoutTime || "Pending Handover",
-        checkinTime: rentalData.checkinTime || "Pending Return",
+        checkinTime: rentalData.checkinTime || "",
         notes: rentalData.notes,
         babySeatFees: Number(rentalData.babySeatFee),
         deliveryCharges: Number(rentalData.deliveryFee),

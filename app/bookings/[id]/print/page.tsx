@@ -98,6 +98,27 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
     ? String(contract.contractNumber)
     : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2000");
 
+  const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned" || Boolean(contract.returnedAt);
+
+  const getReturnTimeDisplay = () => {
+    if (!isReturned) return "";
+    if (contract.checkinTime && contract.checkinTime !== "Pending Return" && contract.checkinTime !== "Pending Handover") {
+      return contract.checkinTime;
+    }
+    if (contract.returnedAt) {
+      try {
+        return new Date(contract.returnedAt).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      } catch {
+        return "";
+      }
+    }
+    return "";
+  };
+
   const handleDownloadPdf = async () => {
     if (isDownloading) return;
     try {
@@ -434,21 +455,21 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Expected End Date / تاريخ الانتهاء المتوقع */}
-              <div className={`px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
+              <div className={`px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${isReturned ? "border-b border-black" : ""}`}>
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Date / تاريخ النهاية</span>
                 <span className="font-bold truncate">{formatDate(contract.endDate)}</span>
               </div>
-              <div className={`px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
+              <div className={`px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${isReturned ? "border-b border-black" : ""}`}>
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Expected Time / وقت النهاية</span>
-                <span className="font-bold truncate">{contract.checkinTime || "10:00 AM"}</span>
+                <span className="font-bold truncate">{isReturned ? getReturnTimeDisplay() : ""}</span>
               </div>
-              <div className={`px-1 py-[1.5px] flex flex-col justify-between ${(contract.status === "Completed" || contract.deliveryStatus === "Returned" || contract.returnedAt) ? "border-b border-black" : ""}`}>
+              <div className={`px-1 py-[1.5px] flex flex-col justify-between ${isReturned ? "border-b border-black" : ""}`}>
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Out Fuel / وقود الخروج</span>
                 <span className="font-bold text-emerald-700 truncate">{contract.checkoutFuelLevel || 100}%</span>
               </div>
 
               {/* Date of Return / تاريخ الإرجاع الفعلي (يظهر تلقائياً عند إرجاع السيارة) */}
-              {(contract.status === "Completed" || contract.deliveryStatus === "Returned" || Boolean(contract.returnedAt)) && (
+              {isReturned && (
                 <>
                   <div className="px-1 py-[1.5px] border-r border-black flex flex-col justify-between bg-emerald-50/60">
                     <span className="text-[6px] text-emerald-800 font-bold uppercase">Return Date / تاريخ الإرجاع</span>
@@ -459,7 +480,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                   <div className="px-1 py-[1.5px] border-r border-black flex flex-col justify-between bg-emerald-50/60">
                     <span className="text-[6px] text-emerald-800 font-bold uppercase">Return Time / وقت الإرجاع</span>
                     <span className="font-black text-emerald-950 truncate">
-                      {contract.checkinTime || "N/A"}
+                      {getReturnTimeDisplay() || "N/A"}
                     </span>
                   </div>
                   <div className="px-1 py-[1.5px] flex flex-col justify-between bg-emerald-50/60">

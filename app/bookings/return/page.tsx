@@ -171,11 +171,11 @@ function ReturnPageContent() {
       setReturnDriverId(selectedContract.returnDriverId || "");
 
       const nowTimeStr = getCurrentFormattedTime();
-      if (selectedContract.checkinTime && selectedContract.checkinTime !== "Pending Handover") {
+      if (selectedContract.checkinTime && selectedContract.checkinTime !== "Pending Handover" && selectedContract.checkinTime !== "Pending Return") {
         setScheduledTime(selectedContract.checkinTime);
         setShopReturnTime(selectedContract.checkinTime);
       } else {
-        setScheduledTime("10:00 AM");
+        setScheduledTime(nowTimeStr);
         setShopReturnTime(nowTimeStr);
       }
 
