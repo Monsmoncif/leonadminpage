@@ -285,6 +285,31 @@ export async function POST(req: Request) {
         message: `Contract #${contract.contractNumber || contract._id.toString().substring(0,8).toUpperCase()} was created.`,
         type: "contract"
       });
+
+      // If scheduled to start tomorrow, create a handover reminder notification immediately
+      const now = new Date();
+      const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+      const tomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 23, 59, 59, 999);
+      const contractStartDate = new Date(contract.startDate);
+      
+      if (contractStartDate >= tomorrowStart && contractStartDate <= tomorrowEnd) {
+        const contractNum = contract.contractNumber 
+          ? `#${contract.contractNumber}` 
+          : `#${contract._id.toString().substring(0, 8).toUpperCase()}`;
+        const dateFormatted = contractStartDate.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        const vehicle = unitDoc ? `${unitDoc.make} ${unitDoc.model} (${unitDoc.plate || ""})`.trim() : "Vehicle";
+        
+        await Notification.create({
+          title: `Handover Reminder: Contract ${contractNum} (Tomorrow)`,
+          message: `Reminder: Contract ${contractNum} starts tomorrow (${dateFormatted}) for ${vehicle}. Please ensure vehicle is ready for delivery.`,
+          type: "reminder",
+          read: false,
+        });
+      }
     } catch (e) { console.error("Failed to create notification", e); }
 
     // Automatically create a Log for the new contract

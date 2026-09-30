@@ -1,12 +1,76 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import { Notification } from "@/models/Notification";
+import { Contract } from "@/models/Contract";
+import "@/models/Unit";
+import "@/models/Client";
 
 export const dynamic = "force-dynamic";
+
+async function checkUpcomingHandoverReminders() {
+  try {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+    const tomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 23, 59, 59, 999);
+
+    // Find contracts starting today or tomorrow that haven't been delivered/completed/cancelled
+    const upcomingContracts = await Contract.find({
+      startDate: { $gte: todayStart, $lte: tomorrowEnd },
+      status: { $ne: "Cancelled" },
+      deliveryStatus: { $ne: "Delivered" },
+    })
+      .populate({ path: "unitId", select: "make model plate", strictPopulate: false })
+      .populate({ path: "clientId", select: "name", strictPopulate: false })
+      .lean();
+
+    for (const contract of upcomingContracts) {
+      const contractNum = contract.contractNumber 
+        ? `#${contract.contractNumber}` 
+        : `#${contract._id.toString().substring(0, 8).toUpperCase()}`;
+
+      const contractStartDate = new Date(contract.startDate);
+      const isTomorrow = contractStartDate >= tomorrowStart && contractStartDate <= tomorrowEnd;
+      const timingLabel = isTomorrow ? "Tomorrow" : "Today";
+
+      // Check if reminder notification already exists for this contract and timing
+      const existing = await Notification.findOne({
+        type: "reminder",
+        $or: [
+          { title: { $regex: `${contractNum}.*${timingLabel}`, $options: "i" } },
+          { message: { $regex: `${contractNum}.*${timingLabel}`, $options: "i" } },
+        ],
+      });
+
+      if (!existing) {
+        const vehicle = (contract.unitId as any)?.make 
+          ? `${(contract.unitId as any).make} ${(contract.unitId as any).model || ""} (${(contract.unitId as any).plate || ""})`.trim()
+          : "Vehicle";
+        const client = (contract.clientId as any)?.name || (contract as any).additionalDriverName || "Client";
+        const dateFormatted = contractStartDate.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+
+        await Notification.create({
+          title: `Handover Reminder: Contract ${contractNum} (${timingLabel})`,
+          message: `Reminder: Contract ${contractNum} starts ${timingLabel.toLowerCase()} (${dateFormatted}) for ${vehicle} with client ${client}. Please ensure vehicle is ready for delivery.`,
+          type: "reminder",
+          read: false,
+        });
+      }
+    }
+  } catch (reminderErr) {
+    console.error("Error generating handover reminders:", reminderErr);
+  }
+}
 
 export async function GET() {
   try {
     await connectDB();
+    await checkUpcomingHandoverReminders();
     const notifications = await Notification.find({}).sort({ createdAt: -1 });
     return NextResponse.json(notifications);
   } catch (error: any) {

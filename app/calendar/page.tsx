@@ -36,6 +36,7 @@ type SelectedBooking = {
   client: string;
   driver: string;
   type: "pickup" | "return";
+  status: "Pending" | "Active" | "Completed";
   color: string;
   dateStr: string;
   notes: string;
@@ -89,7 +90,7 @@ const formatShortTime = (timeStr: string) => {
 };
 
 export default function CalendarPage() {
-  const [filter, setFilter] = useState<"all" | "pickup" | "return">("all");
+  const [filter, setFilter] = useState<"all" | "pickup" | "return" | "pending">("all");
   const [selectedBooking, setSelectedBooking] = useState<SelectedBooking>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [bookings, setBookings] = useState<any[]>([]);
@@ -128,8 +129,21 @@ export default function CalendarPage() {
         
         (data.contracts || []).forEach((c: any) => {
           if (!c.rawStartDate || !c.rawEndDate) return;
-          if (c.status === "Cancelled" || c.status === "Draft") return;
+          if (c.status === "Cancelled") return;
           
+          const contractStart = new Date(c.rawStartDate);
+          const nowStartOfDay = new Date();
+          nowStartOfDay.setHours(0, 0, 0, 0);
+
+          let effectiveStatus: "Pending" | "Active" | "Completed" = "Pending";
+          if (c.deliveryStatus === "Returned" || c.status === "Completed") {
+            effectiveStatus = "Completed";
+          } else if (c.deliveryStatus === "Delivered" && c.status === "Active" && contractStart <= nowStartOfDay) {
+            effectiveStatus = "Active";
+          } else {
+            effectiveStatus = "Pending";
+          }
+
           const pickupDate = startOfDay(new Date(c.rawStartDate));
           const returnDate = startOfDay(new Date(c.rawEndDate));
           
@@ -157,6 +171,7 @@ export default function CalendarPage() {
                client: c.customer,
                driver: pickupDriver,
                type: "pickup",
+               status: effectiveStatus,
                color: getAvatarColor(c.customer),
                dateStr: pickupDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
                notes: pickupNotes,
@@ -193,6 +208,7 @@ export default function CalendarPage() {
                client: c.customer,
                driver: returnDriver,
                type: "return",
+               status: effectiveStatus,
                color: getAvatarColor(c.customer),
                dateStr: returnDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
                notes: returnNotes,
@@ -212,7 +228,9 @@ export default function CalendarPage() {
 
   // Filtered bookings based on type filter AND search
   const filteredBookings = bookings.filter((b) => {
-    const matchesType = filter === "all" || b.type === filter;
+    const matchesType =
+      filter === "all" ||
+      (filter === "pending" ? b.status === "Pending" : b.type === filter);
     const query = searchQuery.toLowerCase();
     const matchesSearch = !query || 
       (b.client && b.client.toLowerCase().includes(query)) ||
@@ -393,7 +411,7 @@ export default function CalendarPage() {
                     className="text-sm border border-border rounded-xl px-3 py-2 text-text-secondary hover:bg-white flex items-center gap-2 font-medium transition-colors bg-white whitespace-nowrap shadow-sm cursor-pointer"
                   >
                     <Filter size={14} className="text-text-muted" /> 
-                    {filter === "all" ? "Type" : filter === "pickup" ? "Pickups" : "Returns"}
+                    {filter === "all" ? "Type" : filter === "pickup" ? "Pickups" : filter === "return" ? "Returns" : "Pending"}
                     <ChevronDown size={14} className="text-text-muted ml-1" />
                   </button>
                   {isFilterDropdownOpen && (
@@ -402,6 +420,7 @@ export default function CalendarPage() {
                         { key: "all", label: "All Types" },
                         { key: "pickup", label: "Pickups" },
                         { key: "return", label: "Returns" },
+                        { key: "pending", label: "Pending" },
                       ] as const).map(({ key, label }) => (
                         <button
                           key={key}
@@ -421,7 +440,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Legend Bar */}
-            <div className="flex items-center gap-5 px-5 py-3 border-b border-border/50 bg-white">
+            <div className="flex items-center gap-5 px-5 py-3 border-b border-border/50 bg-white flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm" /> 
                 <span className="text-xs font-medium text-text-secondary">Pickup</span>
@@ -429,6 +448,10 @@ export default function CalendarPage() {
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" /> 
                 <span className="text-xs font-medium text-text-secondary">Return</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm" /> 
+                <span className="text-xs font-medium text-text-secondary">Pending Contract</span>
               </div>
               <div className="ml-auto text-xs text-text-muted font-medium">
                 {filteredBookings.length} event{filteredBookings.length !== 1 ? "s" : ""} this month
@@ -468,19 +491,29 @@ export default function CalendarPage() {
                       <div className="space-y-1 max-h-[80px] overflow-y-auto scrollbar-thin pr-0.5">
                         {dayBookings.map((booking, bIdx) => {
                           const isSelected = selectedBooking?.id === booking?.id;
+                          const isPending = booking.status === "Pending";
                           return (
                             <button
                               key={bIdx}
                               onClick={() => setSelectedBooking(booking as any)}
                               className={`w-full px-2 py-1.5 mb-1 last:mb-0 rounded text-left transition-colors border-l-4 ${
-                                booking.type === 'pickup' 
-                                  ? 'bg-blue-50 hover:bg-blue-100 border-blue-500 text-blue-900' 
-                                  : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-500 text-emerald-900'
+                                isPending
+                                  ? 'bg-amber-50/90 hover:bg-amber-100 border-amber-500 text-amber-900'
+                                  : booking.type === 'pickup' 
+                                    ? 'bg-blue-50 hover:bg-blue-100 border-blue-500 text-blue-900' 
+                                    : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-500 text-emerald-900'
                               } ${isSelected ? "ring-1 ring-brand shadow-sm z-10 relative" : ""} cursor-pointer`}
                             >
-                              <div className="flex items-center gap-1.5 overflow-hidden">
-                                <span className="font-bold text-[10px] whitespace-nowrap">{booking.shortTime}</span>
-                                <span className="font-medium text-[11px] truncate">{booking.client}</span>
+                              <div className="flex items-center justify-between gap-1 overflow-hidden">
+                                <div className="flex items-center gap-1.5 overflow-hidden">
+                                  <span className="font-bold text-[10px] whitespace-nowrap">{booking.shortTime}</span>
+                                  <span className="font-medium text-[11px] truncate">{booking.client}</span>
+                                </div>
+                                {isPending && (
+                                  <span className="text-[8px] font-black px-1 py-0.2 rounded bg-amber-200/90 text-amber-800 uppercase tracking-tighter shrink-0">
+                                    Pending
+                                  </span>
+                                )}
                               </div>
                             </button>
                           );
@@ -538,6 +571,15 @@ export default function CalendarPage() {
                           <h2 className="text-lg font-bold text-text-primary">{selectedBooking.client}</h2>
                           <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${selectedBooking.type === 'pickup' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
                             {selectedBooking.type === 'pickup' ? 'Pickup' : 'Return'}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            selectedBooking.status === 'Active'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : selectedBooking.status === 'Pending'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {selectedBooking.status}
                           </span>
                         </div>
                         <div className="flex items-center gap-4 mt-1.5">
