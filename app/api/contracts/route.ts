@@ -217,6 +217,21 @@ export async function POST(req: Request) {
         ? (lastContract as any).contractNumber + 1
         : 2000;
 
+    // If contract start date is in the future, it is strictly Pending / Draft.
+    // Car can ONLY be marked Delivered/Active if startDate is today or in the past AND it is a Shop contract.
+    const nowStartOfDay = new Date();
+    nowStartOfDay.setHours(0, 0, 0, 0);
+    const contractStartDate = new Date(body.startDate);
+    const isFutureStartDate = contractStartDate > nowStartOfDay;
+
+    const initialStatus = isFutureStartDate
+      ? "Draft"
+      : (contractType === "Shop" ? (body.status || "Active") : (body.status || "Draft"));
+
+    const initialDeliveryStatus = isFutureStartDate
+      ? "Pending"
+      : (body.deliveryStatus || (contractType === "Shop" ? "Delivered" : "Pending"));
+
     const contract = await Contract.create({
       contractNumber: nextContractNumber,
       clientId: body.clientId || null,
@@ -239,7 +254,7 @@ export async function POST(req: Request) {
       depositAmount: body.depositAmount || 0,
       pickupLocation: body.pickupLocation || body.deliveryLocation || body.location || "Main Office",
       dropoffLocation: body.dropoffLocation || body.returnLocation || "",
-      status: contractType === "Shop" ? "Active" : (body.status || "Draft"),
+      status: initialStatus,
       notes: body.notes || "",
       returnNotes: body.returnNotes || "",
       checkoutTime: body.checkoutTime || "08:00 AM",
@@ -252,8 +267,7 @@ export async function POST(req: Request) {
       customerSignature: body.customerSignature,
       adminSignature: body.adminSignature,
       inspectionPhotos: body.inspectionPhotos || [],
-      // Shop contracts: car is already at the shop, mark as Delivered immediately
-      deliveryStatus: contractType === "Shop" ? "Delivered" : (body.deliveryStatus || "Pending"),
+      deliveryStatus: initialDeliveryStatus,
       paymentMethod: body.paymentMethod || "Cash",
       paymentStatus: body.paymentStatus || "Pending",
       additionalDriverName: body.additionalDriverName || "",

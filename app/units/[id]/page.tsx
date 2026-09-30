@@ -42,6 +42,7 @@ import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CreateUnitModal from "@/components/modals/CreateUnitModal";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
+import { useToast } from "@/components/providers/ToastProvider";
 
 // Helper for generating client initials
 const getInitials = (name?: string) => {
@@ -77,6 +78,17 @@ const getEffectiveStatus = (c: any): "Active" | "Pending" | "Completed" => {
   if (c.status === "Completed" || c.deliveryStatus === "Returned" || Boolean(c.returnedAt)) {
     return "Completed";
   }
+  // Check if contract start date is in the future (another day)
+  const nowEndOfDay = new Date();
+  nowEndOfDay.setHours(23, 59, 59, 999);
+  const contractStart = new Date(c.startDate);
+  
+  // If contract starts in the future, it is strictly Pending (cannot be active yet)
+  if (contractStart > nowEndOfDay) {
+    return "Pending";
+  }
+
+  // Active ONLY when car is delivered to client and contract has started
   if (c.deliveryStatus === "Delivered") {
     return "Active";
   }
@@ -136,10 +148,34 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Rental History Modal & Filters State
+  const toast = useToast();
+  const [deliveringContractId, setDeliveringContractId] = useState<string | null>(null);
   const [selectedContractForModal, setSelectedContractForModal] = useState<any | null>(null);
   const [isContractDetailsOpen, setIsContractDetailsOpen] = useState(false);
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
+
+  const handleConfirmDelivery = async (contract: any) => {
+    try {
+      setDeliveringContractId(contract._id);
+      const res = await fetch(`/api/contracts/${contract._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryStatus: "Delivered", status: "Active" }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || "Failed to confirm delivery");
+      }
+      toast.success(`Car confirmed as Delivered & Active (Contract #${contract.contractNumber || contract._id.slice(-6)})`);
+      await fetchUnit();
+    } catch (err: any) {
+      console.error("Delivery confirmation error:", err);
+      toast.error(err.message || "Failed to confirm delivery");
+    } finally {
+      setDeliveringContractId(null);
+    }
+  };
 
   const fetchUnit = async (retryCount = 0) => {
     const MAX_RETRIES = 3;
@@ -664,7 +700,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                 </button>
               </div>
             ) : pendingRental ? (
-              <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-xs flex items-center justify-between">
+              <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-xs flex items-center justify-between gap-2">
                 <div>
                   <p className="font-bold text-amber-900">
                     Delivery pending for {pendingRental.clientId?.name || "Client"}
@@ -673,15 +709,29 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     Starts {new Date(pendingRental.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedContractForModal(pendingRental);
-                    setIsContractDetailsOpen(true);
-                  }}
-                  className="px-2.5 py-1 bg-amber-600 text-white font-semibold rounded-lg text-[11px] hover:bg-amber-700 transition-colors cursor-pointer"
-                >
-                  View
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handleConfirmDelivery(pendingRental)}
+                    disabled={deliveringContractId === pendingRental._id}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                  >
+                    {deliveringContractId === pendingRental._id ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={12} />
+                    )}
+                    <span>Confirm Delivered</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedContractForModal(pendingRental);
+                      setIsContractDetailsOpen(true);
+                    }}
+                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-text-primary font-semibold rounded-lg text-[11px] transition-colors cursor-pointer"
+                  >
+                    View
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -899,10 +949,25 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                                 Delivered & Active
                               </span>
                             ) : effectiveStatus === "Pending" ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                Pending Handover
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                  Pending Handover
+                                </span>
+                                <button
+                                  onClick={() => handleConfirmDelivery(contract)}
+                                  disabled={deliveringContractId === contract._id}
+                                  title="Confirm Car Delivered to Client"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 px-2 py-0.5 rounded-full border border-emerald-300 transition-colors cursor-pointer"
+                                >
+                                  {deliveringContractId === contract._id ? (
+                                    <Loader2 size={10} className="animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 size={11} className="text-emerald-600" />
+                                  )}
+                                  <span>Confirm Delivered</span>
+                                </button>
+                              </div>
                             ) : null}
                           </div>
                         </div>
@@ -944,25 +1009,29 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                         </div>
                       </td>
 
-                      {/* Financials */}
+                      {/* Financials - Hidden for Pending contracts */}
                       <td className="py-4 px-5">
-                        <div className="flex flex-col">
-                          <div className="flex items-baseline gap-1 font-bold text-text-primary">
-                            <span className="text-sm font-black text-emerald-700">
-                              ${(contract.totalAmount || 0).toLocaleString()}
-                            </span>
-                            {contract.dailyRate && (
-                              <span className="text-[10px] text-text-muted font-normal">
-                                (${contract.dailyRate}/d)
+                        {effectiveStatus === "Pending" ? (
+                          <span className="text-text-muted text-xs font-semibold">—</span>
+                        ) : (
+                          <div className="flex flex-col">
+                            <div className="flex items-baseline gap-1 font-bold text-text-primary">
+                              <span className="text-sm font-black text-emerald-700">
+                                ${(contract.totalAmount || 0).toLocaleString()}
                               </span>
-                            )}
+                              {contract.dailyRate && (
+                                <span className="text-[10px] text-text-muted font-normal">
+                                  (${contract.dailyRate}/d)
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${paymentBadge}`}>
+                                {contract.paymentStatus || "Pending"}
+                              </span>
+                            </div>
                           </div>
-                          <div className="mt-1">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${paymentBadge}`}>
-                              {contract.paymentStatus || "Pending"}
-                            </span>
-                          </div>
-                        </div>
+                        )}
                       </td>
 
                       {/* Status */}
@@ -976,6 +1045,21 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                       {/* Actions */}
                       <td className="py-4 px-5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {effectiveStatus === "Pending" && (
+                            <button
+                              onClick={() => handleConfirmDelivery(contract)}
+                              disabled={deliveringContractId === contract._id}
+                              title="Confirm Car Delivered to Client (تأكيد تسليم السيارة)"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer"
+                            >
+                              {deliveringContractId === contract._id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <CheckCircle2 size={13} />
+                              )}
+                              <span className="hidden sm:inline">Confirm Delivered</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setSelectedContractForModal(contract);
