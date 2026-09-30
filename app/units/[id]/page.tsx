@@ -69,27 +69,36 @@ const getAvatarColor = (name?: string) => {
   return colors[charCode % colors.length];
 };
 
-const getContractStatusBadge = (status?: string) => {
-  switch (status?.toLowerCase()) {
-    case "active":
+// Effective contract status: Active ONLY when car is delivered; otherwise Pending
+const getEffectiveStatus = (c: any): "Active" | "Pending" | "Completed" | "Cancelled" => {
+  if (c.status === "Completed" || c.deliveryStatus === "Returned") return "Completed";
+  if (c.status === "Cancelled") return "Cancelled";
+  if (c.deliveryStatus === "Delivered") return "Active";
+  // If car is not delivered yet, show Pending
+  return "Pending";
+};
+
+const getContractStatusBadge = (effectiveStatus: string) => {
+  switch (effectiveStatus) {
+    case "Active":
       return {
         bg: "bg-emerald-50 text-emerald-700 border-emerald-200",
         dot: "bg-emerald-500",
         label: "Active"
       };
-    case "completed":
+    case "Pending":
+      return {
+        bg: "bg-amber-50 text-amber-700 border-amber-200",
+        dot: "bg-amber-500",
+        label: "Pending"
+      };
+    case "Completed":
       return {
         bg: "bg-blue-50 text-blue-700 border-blue-200",
         dot: "bg-blue-500",
         label: "Completed"
       };
-    case "draft":
-      return {
-        bg: "bg-amber-50 text-amber-700 border-amber-200",
-        dot: "bg-amber-500",
-        label: "Draft"
-      };
-    case "cancelled":
+    case "Cancelled":
       return {
         bg: "bg-red-50 text-red-700 border-red-200",
         dot: "bg-red-500",
@@ -99,7 +108,7 @@ const getContractStatusBadge = (status?: string) => {
       return {
         bg: "bg-gray-50 text-gray-700 border-gray-200",
         dot: "bg-gray-500",
-        label: status || "Unknown"
+        label: effectiveStatus || "Unknown"
       };
   }
 };
@@ -246,7 +255,9 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
   const contractsList: any[] = unit.contracts || [];
 
   const totalRentals = contractsList.length;
-  const activeRental = contractsList.find((c: any) => c.status === "Active");
+  const activeRental = contractsList.find((c: any) => getEffectiveStatus(c) === "Active");
+  const pendingRental = contractsList.find((c: any) => getEffectiveStatus(c) === "Pending");
+
   const totalRevenue = contractsList
     .filter((c: any) => c.status !== "Cancelled")
     .reduce((sum: number, c: any) => sum + (Number(c.totalAmount) || 0), 0);
@@ -262,14 +273,15 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
 
   const statusCounts = {
     all: contractsList.length,
-    Active: contractsList.filter((c: any) => c.status === "Active").length,
-    Completed: contractsList.filter((c: any) => c.status === "Completed").length,
-    Draft: contractsList.filter((c: any) => c.status === "Draft").length,
-    Cancelled: contractsList.filter((c: any) => c.status === "Cancelled").length,
+    Active: contractsList.filter((c: any) => getEffectiveStatus(c) === "Active").length,
+    Pending: contractsList.filter((c: any) => getEffectiveStatus(c) === "Pending").length,
+    Completed: contractsList.filter((c: any) => getEffectiveStatus(c) === "Completed").length,
+    Cancelled: contractsList.filter((c: any) => getEffectiveStatus(c) === "Cancelled").length,
   };
 
   const filteredContracts = contractsList.filter((c: any) => {
-    if (historyStatusFilter !== "all" && c.status !== historyStatusFilter) {
+    const effStatus = getEffectiveStatus(c);
+    if (historyStatusFilter !== "all" && effStatus !== historyStatusFilter) {
       return false;
     }
     if (historySearchQuery.trim()) {
@@ -623,22 +635,24 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <p className="text-sm font-bold text-text-primary truncate">
                   {activeRental ? (
-                    <span className="text-blue-600">Rented (#{activeRental.contractNumber})</span>
+                    <span className="text-emerald-600">Rented (#{activeRental.contractNumber})</span>
+                  ) : pendingRental ? (
+                    <span className="text-amber-600">Pending Delivery (#{pendingRental.contractNumber})</span>
                   ) : (
-                    <span className="text-emerald-600">Available</span>
+                    <span className="text-text-muted">Available</span>
                   )}
                 </p>
               </div>
             </div>
 
-            {activeRental && (
-              <div className="bg-blue-50/70 border border-blue-200/60 rounded-xl p-3 text-xs flex items-center justify-between">
+            {activeRental ? (
+              <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-xl p-3 text-xs flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-blue-900">
-                    Currently with {activeRental.clientId?.name || "Client"}
+                  <p className="font-bold text-emerald-900">
+                    Currently delivered to {activeRental.clientId?.name || "Client"}
                   </p>
-                  <p className="text-[11px] text-blue-700">
-                    Until {new Date(activeRental.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  <p className="text-[11px] text-emerald-700">
+                    Active until {new Date(activeRental.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </p>
                 </div>
                 <button
@@ -646,12 +660,32 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     setSelectedContractForModal(activeRental);
                     setIsContractDetailsOpen(true);
                   }}
-                  className="px-2.5 py-1 bg-blue-600 text-white font-semibold rounded-lg text-[11px] hover:bg-blue-700 transition-colors cursor-pointer"
+                  className="px-2.5 py-1 bg-emerald-600 text-white font-semibold rounded-lg text-[11px] hover:bg-emerald-700 transition-colors cursor-pointer"
                 >
                   View
                 </button>
               </div>
-            )}
+            ) : pendingRental ? (
+              <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-xs flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-amber-900">
+                    Delivery pending for {pendingRental.clientId?.name || "Client"}
+                  </p>
+                  <p className="text-[11px] text-amber-700">
+                    Starts {new Date(pendingRental.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedContractForModal(pendingRental);
+                    setIsContractDetailsOpen(true);
+                  }}
+                  className="px-2.5 py-1 bg-amber-600 text-white font-semibold rounded-lg text-[11px] hover:bg-amber-700 transition-colors cursor-pointer"
+                >
+                  View
+                </button>
+              </div>
+            ) : null}
           </div>
           
         </div>
@@ -666,12 +700,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               <History size={20} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-text-primary">Rental History (سجل التأجير)</h2>
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-brand-light text-brand">
-                  {totalRentals}
-                </span>
-              </div>
+              <h2 className="text-lg font-bold text-text-primary">Rental History (سجل التأجير)</h2>
               <p className="text-xs text-text-muted mt-0.5">
                 Complete record of all contracts, renters, mileage, and revenue for this vehicle
               </p>
@@ -712,6 +741,16 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               Active ({statusCounts.Active})
             </button>
             <button
+              onClick={() => setHistoryStatusFilter("Pending")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                historyStatusFilter === "Pending"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "bg-gray-100 text-text-secondary hover:bg-gray-200/80"
+              }`}
+            >
+              Pending ({statusCounts.Pending})
+            </button>
+            <button
               onClick={() => setHistoryStatusFilter("Completed")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 historyStatusFilter === "Completed"
@@ -720,16 +759,6 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               }`}
             >
               Completed ({statusCounts.Completed})
-            </button>
-            <button
-              onClick={() => setHistoryStatusFilter("Draft")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                historyStatusFilter === "Draft"
-                  ? "bg-amber-600 text-white shadow-xs"
-                  : "bg-gray-100 text-text-secondary hover:bg-gray-200/80"
-              }`}
-            >
-              Draft ({statusCounts.Draft})
             </button>
             <button
               onClick={() => setHistoryStatusFilter("Cancelled")}
@@ -781,9 +810,10 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredContracts.map((contract: any) => {
-                  const statusBadge = getContractStatusBadge(contract.status);
+                  const effectiveStatus = getEffectiveStatus(contract);
+                  const statusBadge = getContractStatusBadge(effectiveStatus);
                   const paymentBadge = getPaymentBadge(contract.paymentStatus);
-                  const isOngoing = contract.status === "Active";
+                  const isCarDelivered = effectiveStatus === "Active";
 
                   const startFormatted = new Date(contract.startDate).toLocaleDateString("en-US", {
                     month: "short",
@@ -874,35 +904,53 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                             <span className="text-[10px] font-bold text-text-muted bg-gray-100 px-2 py-0.5 rounded">
                               {contract.totalDays || 1} {contract.totalDays === 1 ? "day" : "days"}
                             </span>
-                            {isOngoing && (
+                            {isCarDelivered ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Ongoing Now
+                                Delivered & Active
                               </span>
-                            )}
+                            ) : effectiveStatus === "Pending" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                Pending Handover
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       </td>
 
-                      {/* Mileage (Out → In) */}
+                      {/* Mileage (Out → In) - Formatted like Financials font */}
                       <td className="py-4 px-5">
-                        <div className="flex flex-col text-text-secondary">
-                          <div className="flex items-center gap-1 font-mono text-[11px]">
-                            <span className="text-text-muted">Out:</span>
-                            <span className="font-bold text-text-primary">{checkoutKm.toLocaleString()} km</span>
+                        <div className="flex flex-col">
+                          <div className="flex items-baseline gap-1.5 font-medium text-text-primary">
+                            <span className="text-[11px] text-text-muted">Out:</span>
+                            <span className="text-xs font-bold text-text-primary">
+                              {checkoutKm.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] text-text-muted font-normal">km</span>
                           </div>
-                          <div className="flex items-center gap-1 font-mono text-[11px] mt-0.5">
-                            <span className="text-text-muted">In:</span>
+                          <div className="flex items-baseline gap-1.5 mt-0.5 font-medium text-text-primary">
+                            <span className="text-[11px] text-text-muted">In:</span>
                             {returnKm != null && returnKm > 0 ? (
-                              <span className="font-bold text-text-primary">{returnKm.toLocaleString()} km</span>
+                              <>
+                                <span className="text-xs font-bold text-text-primary">
+                                  {returnKm.toLocaleString()}
+                                </span>
+                                <span className="text-[10px] text-text-muted font-normal">km</span>
+                              </>
                             ) : (
-                              <span className="text-text-muted italic">{isOngoing ? "In Use" : "N/A"}</span>
+                              <span className="text-[11px] text-text-muted italic font-normal">
+                                {isCarDelivered ? "In Use" : "N/A"}
+                              </span>
                             )}
                           </div>
                           {kmTraveled != null && (
-                            <span className="text-[10px] font-bold text-emerald-600 mt-0.5">
-                              +{kmTraveled.toLocaleString()} km traveled
-                            </span>
+                            <div className="mt-1 flex items-baseline gap-1">
+                              <span className="text-xs font-black text-emerald-700">
+                                +{kmTraveled.toLocaleString()}
+                              </span>
+                              <span className="text-[10px] font-semibold text-emerald-600">km traveled</span>
+                            </div>
                           )}
                         </div>
                       </td>
