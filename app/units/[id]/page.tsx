@@ -69,12 +69,17 @@ const getAvatarColor = (name?: string) => {
   return colors[charCode % colors.length];
 };
 
-// Effective contract status: Active ONLY when car is delivered; otherwise Pending
-const getEffectiveStatus = (c: any): "Active" | "Pending" | "Completed" | "Cancelled" => {
-  if (c.status === "Completed" || c.deliveryStatus === "Returned") return "Completed";
-  if (c.status === "Cancelled") return "Cancelled";
-  if (c.deliveryStatus === "Delivered") return "Active";
-  // If car is not delivered yet, show Pending
+// Status rules:
+// - Active: ONLY when car is delivered to client (deliveryStatus === "Delivered" and not returned)
+// - Completed: when car is back (status === "Completed", deliveryStatus === "Returned", or returnedAt)
+// - Pending: otherwise (before delivery)
+const getEffectiveStatus = (c: any): "Active" | "Pending" | "Completed" => {
+  if (c.status === "Completed" || c.deliveryStatus === "Returned" || Boolean(c.returnedAt)) {
+    return "Completed";
+  }
+  if (c.deliveryStatus === "Delivered") {
+    return "Active";
+  }
   return "Pending";
 };
 
@@ -97,12 +102,6 @@ const getContractStatusBadge = (effectiveStatus: string) => {
         bg: "bg-blue-50 text-blue-700 border-blue-200",
         dot: "bg-blue-500",
         label: "Completed"
-      };
-    case "Cancelled":
-      return {
-        bg: "bg-red-50 text-red-700 border-red-200",
-        dot: "bg-red-500",
-        label: "Cancelled"
       };
     default:
       return {
@@ -252,7 +251,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
   ];
 
   // Contracts & Rental History calculations
-  const contractsList: any[] = unit.contracts || [];
+  const contractsList: any[] = (unit.contracts || []).filter((c: any) => c.status !== "Cancelled");
 
   const totalRentals = contractsList.length;
   const activeRental = contractsList.find((c: any) => getEffectiveStatus(c) === "Active");
@@ -276,7 +275,6 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
     Active: contractsList.filter((c: any) => getEffectiveStatus(c) === "Active").length,
     Pending: contractsList.filter((c: any) => getEffectiveStatus(c) === "Pending").length,
     Completed: contractsList.filter((c: any) => getEffectiveStatus(c) === "Completed").length,
-    Cancelled: contractsList.filter((c: any) => getEffectiveStatus(c) === "Cancelled").length,
   };
 
   const filteredContracts = contractsList.filter((c: any) => {
@@ -760,16 +758,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
             >
               Completed ({statusCounts.Completed})
             </button>
-            <button
-              onClick={() => setHistoryStatusFilter("Cancelled")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                historyStatusFilter === "Cancelled"
-                  ? "bg-red-600 text-white shadow-xs"
-                  : "bg-gray-100 text-text-secondary hover:bg-gray-200/80"
-              }`}
-            >
-              Cancelled ({statusCounts.Cancelled})
-            </button>
+            
           </div>
 
           {/* Search Input */}
