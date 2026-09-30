@@ -249,6 +249,22 @@ export default function DriverDashboard() {
     additionalDriverIssuedAt?: string;
   }) => {
     if (!deliveryModalContract) return;
+
+    const nowStartOfDay = new Date();
+    nowStartOfDay.setHours(0, 0, 0, 0);
+    const contractStartDate = new Date(deliveryModalContract.rawStartDate || deliveryModalContract.startDate);
+    contractStartDate.setHours(0, 0, 0, 0);
+
+    if (contractStartDate > nowStartOfDay) {
+      const formattedDate = contractStartDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+      toast.error(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
+      return;
+    }
+
     const contractId = deliveryModalContract._id || deliveryModalContract.id;
     const contractNumber = deliveryModalContract.id || deliveryModalContract._id?.substring(0,8);
     setIsConfirmingDelivery(true);

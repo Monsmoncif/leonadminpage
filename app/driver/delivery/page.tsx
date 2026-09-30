@@ -538,6 +538,22 @@ export default function ConfirmDeliveryPage() {
       return;
     }
 
+    const nowStartOfDay = new Date();
+    nowStartOfDay.setHours(0, 0, 0, 0);
+    const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
+    contractStartDate.setHours(0, 0, 0, 0);
+
+    if (contractStartDate > nowStartOfDay) {
+      const formattedDate = contractStartDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+      setError(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
+      toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
+      return;
+    }
+
     setIsSubmitting(true);
     toast.success("Activating contract and completing vehicle handover...");
 

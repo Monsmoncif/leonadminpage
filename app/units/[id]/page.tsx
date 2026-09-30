@@ -156,6 +156,21 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
   const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
 
   const handleConfirmDelivery = async (contract: any) => {
+    const nowStartOfDay = new Date();
+    nowStartOfDay.setHours(0, 0, 0, 0);
+    const contractStartDate = new Date(contract.startDate);
+    contractStartDate.setHours(0, 0, 0, 0);
+
+    if (contractStartDate > nowStartOfDay) {
+      const formattedDate = contractStartDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+      toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
+      return;
+    }
+
     try {
       setDeliveringContractId(contract._id);
       const res = await fetch(`/api/contracts/${contract._id}`, {

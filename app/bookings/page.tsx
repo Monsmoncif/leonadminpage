@@ -19,6 +19,7 @@ import {
   ArrowLeftRight,
   UserCheck,
   CheckCircle,
+  CheckCircle2,
   XCircle
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
@@ -97,6 +98,43 @@ export default function ContractsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const toast = useToast();
+  const [deliveringContractId, setDeliveringContractId] = useState<string | null>(null);
+
+  const handleConfirmDelivery = async (contract: any) => {
+    const nowStartOfDay = new Date();
+    nowStartOfDay.setHours(0, 0, 0, 0);
+    const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
+    contractStartDate.setHours(0, 0, 0, 0);
+
+    if (contractStartDate > nowStartOfDay) {
+      const formattedDate = contractStartDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+      toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
+      return;
+    }
+
+    try {
+      setDeliveringContractId(contract._id);
+      const res = await fetch(`/api/contracts/${contract._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryStatus: "Delivered", status: "Active" }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || "Failed to confirm handover");
+      }
+      toast.success(`Handover confirmed! Contract #${contract.id || contract._id.slice(-6)} is now Active.`);
+      fetchContracts();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to confirm delivery");
+    } finally {
+      setDeliveringContractId(null);
+    }
+  };
 
   const fetchContracts = async (retryCount = 0) => {
     const MAX_RETRIES = 3;
@@ -548,13 +586,32 @@ export default function ContractsPage() {
                                   value={contract.status}
                                   onChange={async (e) => {
                                     const newStatus = e.target.value;
+                                    if (newStatus === "Active") {
+                                      const nowStartOfDay = new Date();
+                                      nowStartOfDay.setHours(0, 0, 0, 0);
+                                      const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
+                                      contractStartDate.setHours(0, 0, 0, 0);
+
+                                      if (contractStartDate > nowStartOfDay) {
+                                        const formattedDate = contractStartDate.toLocaleDateString("en-US", {
+                                          month: "short",
+                                          day: "numeric",
+                                          year: "numeric"
+                                        });
+                                        toast.error(`Cannot activate contract before start date (${formattedDate}).`);
+                                        return;
+                                      }
+                                    }
                                     try {
                                       const res = await fetch(`/api/contracts/${contract._id}`, {
                                         method: "PUT",
                                         headers: { "Content-Type": "application/json" },
                                         body: JSON.stringify({ status: newStatus })
                                       });
-                                      if (!res.ok) throw new Error("Failed to update status");
+                                      if (!res.ok) {
+                                        const errJson = await res.json().catch(() => null);
+                                        throw new Error(errJson?.error || "Failed to update status");
+                                      }
                                       toast.success(`Status updated to ${newStatus}`);
                                       fetchContracts();
                                     } catch (err: any) {
@@ -581,7 +638,47 @@ export default function ContractsPage() {
 
                             {/* Actions Column (Matches Clients Page) */}
                             <td className="py-3 px-4">
-                              <div className="flex items-center justify-end gap-1 transition-opacity">
+                              <div className="flex items-center justify-end gap-1.5 transition-opacity">
+                                {(contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
+                                  const nowStartOfDay = new Date();
+                                  nowStartOfDay.setHours(0, 0, 0, 0);
+                                  const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
+                                  contractStartDate.setHours(0, 0, 0, 0);
+                                  const isFuture = contractStartDate > nowStartOfDay;
+                                  const formattedStart = contractStartDate.toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric"
+                                  });
+
+                                  return (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleConfirmDelivery(contract);
+                                      }}
+                                      disabled={deliveringContractId === contract._id}
+                                      title={
+                                        isFuture
+                                          ? `Scheduled for ${formattedStart} — Handover can be activated on start date`
+                                          : "Confirm Vehicle Handover & Activate Contract (تأكيد تسليم السيارة)"
+                                      }
+                                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
+                                        isFuture
+                                          ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300"
+                                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      }`}
+                                    >
+                                      {deliveringContractId === contract._id ? (
+                                        <Loader2 size={12} className="animate-spin" />
+                                      ) : (
+                                        <CheckCircle2 size={13} className={isFuture ? "text-amber-600" : "text-white"} />
+                                      )}
+                                      <span className="hidden sm:inline">
+                                        {isFuture ? `Starts ${formattedStart}` : "Confirm Handover"}
+                                      </span>
+                                    </button>
+                                  );
+                                })()}
                                 <button 
                                   className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
                                   title="View Details" 

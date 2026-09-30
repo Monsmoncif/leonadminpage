@@ -196,7 +196,31 @@ export async function PUT(
       updatedData.deliveryStatus = "Returned";
     }
 
-    // When driver marks as Delivered, activate contract if it was Draft and ensure car is Rented
+    // Enforce that contract can only be confirmed as Delivered & Active on or after the start date
+    const nowStartOfDay = new Date();
+    nowStartOfDay.setHours(0, 0, 0, 0);
+    const contractStartDate = new Date(existingContract.startDate);
+    contractStartDate.setHours(0, 0, 0, 0);
+
+    const isEarlyHandover = contractStartDate > nowStartOfDay;
+    const isActivating = (body.deliveryStatus === "Delivered" && existingContract.deliveryStatus !== "Delivered") ||
+                         (body.status === "Active" && existingContract.status !== "Active");
+
+    if (isActivating && isEarlyHandover) {
+      const formattedStart = contractStartDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+      return NextResponse.json(
+        { 
+          error: `Contract handover cannot be activated before its start date (${formattedStart}). Handover can be confirmed once the start date arrives.` 
+        },
+        { status: 400 }
+      );
+    }
+
+    // When driver or admin marks as Delivered, activate contract if it was Draft and ensure car is Rented
     if (body.deliveryStatus === "Delivered" && existingContract.deliveryStatus !== "Delivered") {
       if (existingContract.status === "Draft") {
         updatedData.status = "Active";
