@@ -8,26 +8,113 @@ import {
   Gauge, 
   Fuel, 
   Calendar,
-  MapPin,
-  Activity,
-  Droplet,
-  Loader2,
-  AlertCircle,
-  Edit,
-  Settings,
-  ChevronRight,
-  Hash,
-  Palette,
-  Cog,
-  Copy,
-  Check,
-  ExternalLink,
-  TrendingUp,
-  BarChart3
+  MapPin, 
+  Activity, 
+  Droplet, 
+  Loader2, 
+  AlertCircle, 
+  Edit, 
+  Settings, 
+  ChevronRight, 
+  Hash, 
+  Palette, 
+  Cog, 
+  Copy, 
+  Check, 
+  ExternalLink, 
+  TrendingUp, 
+  BarChart3,
+  History,
+  FileText,
+  DollarSign,
+  Plus,
+  Printer,
+  Search,
+  Phone,
+  CheckCircle2,
+  Clock,
+  Eye,
+  ArrowRight,
+  User,
+  X
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CreateUnitModal from "@/components/modals/CreateUnitModal";
+import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
+
+// Helper for generating client initials
+const getInitials = (name?: string) => {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+};
+
+// Avatar colors matching clients page
+const getAvatarColor = (name?: string) => {
+  const colors = [
+    "bg-blue-100 text-blue-700",
+    "bg-emerald-100 text-emerald-700",
+    "bg-amber-100 text-amber-700",
+    "bg-purple-100 text-purple-700",
+    "bg-rose-100 text-rose-700",
+    "bg-cyan-100 text-cyan-700",
+  ];
+  const charCode = (name || "A").charCodeAt(0) || 0;
+  return colors[charCode % colors.length];
+};
+
+const getContractStatusBadge = (status?: string) => {
+  switch (status?.toLowerCase()) {
+    case "active":
+      return {
+        bg: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        dot: "bg-emerald-500",
+        label: "Active"
+      };
+    case "completed":
+      return {
+        bg: "bg-blue-50 text-blue-700 border-blue-200",
+        dot: "bg-blue-500",
+        label: "Completed"
+      };
+    case "draft":
+      return {
+        bg: "bg-amber-50 text-amber-700 border-amber-200",
+        dot: "bg-amber-500",
+        label: "Draft"
+      };
+    case "cancelled":
+      return {
+        bg: "bg-red-50 text-red-700 border-red-200",
+        dot: "bg-red-500",
+        label: "Cancelled"
+      };
+    default:
+      return {
+        bg: "bg-gray-50 text-gray-700 border-gray-200",
+        dot: "bg-gray-500",
+        label: status || "Unknown"
+      };
+  }
+};
+
+const getPaymentBadge = (status?: string) => {
+  switch (status?.toLowerCase()) {
+    case "paid":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "partial":
+      return "bg-purple-50 text-purple-700 border-purple-200";
+    case "pending":
+    default:
+      return "bg-amber-50 text-amber-700 border-amber-200";
+  }
+};
 
 export default function UnitDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -39,6 +126,12 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Rental History Modal & Filters State
+  const [selectedContractForModal, setSelectedContractForModal] = useState<any | null>(null);
+  const [isContractDetailsOpen, setIsContractDetailsOpen] = useState(false);
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
 
   const fetchUnit = async (retryCount = 0) => {
     const MAX_RETRIES = 3;
@@ -116,7 +209,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
   // Build chart data from real mileage history
   const hasRealHistory = unit.mileageHistory && unit.mileageHistory.length > 1;
 
-  const chartData: { name: string; km: number }[] = unit.mileageHistory && unit.mileageHistory.length > 0
+  const chartData: { name: string; km: number; date?: string }[] = unit.mileageHistory && unit.mileageHistory.length > 0
     ? unit.mileageHistory
     : [{ name: 'Baseline', km: unit.mileage || 0 }, { name: 'Current', km: unit.mileage || 0 }];
 
@@ -149,8 +242,54 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
     { icon: Hash, label: "VIN Number", value: unit.vin || "N/A", copyable: true },
   ];
 
+  // Contracts & Rental History calculations
+  const contractsList: any[] = unit.contracts || [];
+
+  const totalRentals = contractsList.length;
+  const activeRental = contractsList.find((c: any) => c.status === "Active");
+  const totalRevenue = contractsList
+    .filter((c: any) => c.status !== "Cancelled")
+    .reduce((sum: number, c: any) => sum + (Number(c.totalAmount) || 0), 0);
+  const totalDaysRented = contractsList
+    .filter((c: any) => c.status !== "Cancelled")
+    .reduce((sum: number, c: any) => sum + (Number(c.totalDays) || 0), 0);
+  const totalKmDriven = contractsList.reduce((sum: number, c: any) => {
+    if (c.returnOdometer && c.checkoutMileage && c.returnOdometer > c.checkoutMileage) {
+      return sum + (c.returnOdometer - c.checkoutMileage);
+    }
+    return sum;
+  }, 0);
+
+  const statusCounts = {
+    all: contractsList.length,
+    Active: contractsList.filter((c: any) => c.status === "Active").length,
+    Completed: contractsList.filter((c: any) => c.status === "Completed").length,
+    Draft: contractsList.filter((c: any) => c.status === "Draft").length,
+    Cancelled: contractsList.filter((c: any) => c.status === "Cancelled").length,
+  };
+
+  const filteredContracts = contractsList.filter((c: any) => {
+    if (historyStatusFilter !== "all" && c.status !== historyStatusFilter) {
+      return false;
+    }
+    if (historySearchQuery.trim()) {
+      const q = historySearchQuery.toLowerCase();
+      const clientName = (c.clientId?.name || "").toLowerCase();
+      const clientPhone = (c.clientId?.phone || "").toLowerCase();
+      const contractNum = String(c.contractNumber || "");
+      const nationality = (c.clientId?.nationality || "").toLowerCase();
+      return (
+        clientName.includes(q) ||
+        clientPhone.includes(q) ||
+        contractNum.includes(q) ||
+        nationality.includes(q)
+      );
+    }
+    return true;
+  });
+
   return (
-    <div className="max-w-[1600px] mx-auto pb-10">
+    <div className="max-w-[1600px] mx-auto pb-12">
       {/* Header */}
       <div className="flex items-center justify-between mb-8 border-b border-border pb-5 animate-fade-in-up stagger-1">
         <div className="flex items-center gap-4">
@@ -175,13 +314,23 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
         </div>
-        <button 
-          onClick={() => setIsEditModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl text-sm font-semibold hover:bg-brand-dark transition-all cursor-pointer shadow-sm hover:shadow-md"
-        >
-          <Edit size={15} />
-          Edit Vehicle
-        </button>
+
+        <div className="flex items-center gap-2.5">
+          <button 
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-border text-text-primary rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer shadow-xs"
+          >
+            <Edit size={15} />
+            Edit Vehicle
+          </button>
+          <button 
+            onClick={() => router.push("/bookings/new")}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl text-sm font-semibold hover:bg-brand-dark transition-all cursor-pointer shadow-sm hover:shadow-md"
+          >
+            <Plus size={15} />
+            New Booking
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8 animate-fade-in-up stagger-2">
@@ -338,7 +487,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                 <h3 className="text-base font-bold text-text-primary">Mileage Activity</h3>
               </div>
               <span className="text-[11px] border border-border rounded-lg px-2.5 py-1 text-text-secondary bg-gray-50/80 font-medium">
-                Last 6 Months
+                Progression
               </span>
             </div>
 
@@ -418,10 +567,446 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               </p>
             )}
           </div>
+
+          {/* Quick Vehicle Rental Summary KPI Card */}
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <History size={16} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">Rental Summary</h3>
+                  <p className="text-[11px] text-text-muted">Vehicle performance at a glance</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-text-primary bg-gray-100 px-3 py-1 rounded-lg">
+                {totalRentals} {totalRentals === 1 ? "Booking" : "Bookings"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-gray-50/80 rounded-xl p-3.5 border border-border/50">
+                <div className="flex items-center gap-1.5 text-text-muted mb-1">
+                  <DollarSign size={13} className="text-emerald-600" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">Revenue</span>
+                </div>
+                <p className="text-lg font-black text-text-primary">
+                  ${totalRevenue.toLocaleString()}
+                </p>
+              </div>
+
+              <div className="bg-gray-50/80 rounded-xl p-3.5 border border-border/50">
+                <div className="flex items-center gap-1.5 text-text-muted mb-1">
+                  <Calendar size={13} className="text-blue-600" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">Days Rented</span>
+                </div>
+                <p className="text-lg font-black text-text-primary">
+                  {totalDaysRented} <span className="text-xs font-semibold text-text-muted">days</span>
+                </p>
+              </div>
+
+              <div className="bg-gray-50/80 rounded-xl p-3.5 border border-border/50">
+                <div className="flex items-center gap-1.5 text-text-muted mb-1">
+                  <Gauge size={13} className="text-purple-600" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">Km On Trips</span>
+                </div>
+                <p className="text-lg font-black text-text-primary">
+                  {totalKmDriven > 0 ? `+${totalKmDriven.toLocaleString()}` : "0"} <span className="text-xs font-semibold text-text-muted">km</span>
+                </p>
+              </div>
+
+              <div className="bg-gray-50/80 rounded-xl p-3.5 border border-border/50">
+                <div className="flex items-center gap-1.5 text-text-muted mb-1">
+                  <Activity size={13} className="text-amber-600" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">Current State</span>
+                </div>
+                <p className="text-sm font-bold text-text-primary truncate">
+                  {activeRental ? (
+                    <span className="text-blue-600">Rented (#{activeRental.contractNumber})</span>
+                  ) : (
+                    <span className="text-emerald-600">Available</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {activeRental && (
+              <div className="bg-blue-50/70 border border-blue-200/60 rounded-xl p-3 text-xs flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-blue-900">
+                    Currently with {activeRental.clientId?.name || "Client"}
+                  </p>
+                  <p className="text-[11px] text-blue-700">
+                    Until {new Date(activeRental.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedContractForModal(activeRental);
+                    setIsContractDetailsOpen(true);
+                  }}
+                  className="px-2.5 py-1 bg-blue-600 text-white font-semibold rounded-lg text-[11px] hover:bg-blue-700 transition-colors cursor-pointer"
+                >
+                  View
+                </button>
+              </div>
+            )}
+          </div>
           
         </div>
       </div>
 
+      {/* ==================== FULL-WIDTH RENTAL HISTORY SECTION ==================== */}
+      <div className="mt-10 bg-card rounded-2xl border border-border shadow-sm overflow-hidden animate-fade-in-up stagger-3">
+        {/* Section Header */}
+        <div className="p-6 border-b border-border bg-gray-50/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
+              <History size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-text-primary">Rental History (سجل التأجير)</h2>
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-brand-light text-brand">
+                  {totalRentals}
+                </span>
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">
+                Complete record of all contracts, renters, mileage, and revenue for this vehicle
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => router.push("/bookings/new")}
+            className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-all cursor-pointer shadow-xs self-start md:self-auto"
+          >
+            <Plus size={14} />
+            Create Booking for this Car
+          </button>
+        </div>
+
+        {/* Filter & Search Bar */}
+        <div className="p-4 border-b border-border bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Status Tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0" style={{ scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => setHistoryStatusFilter("all")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                historyStatusFilter === "all"
+                  ? "bg-brand text-white shadow-xs"
+                  : "bg-gray-100 text-text-secondary hover:bg-gray-200/80"
+              }`}
+            >
+              All ({statusCounts.all})
+            </button>
+            <button
+              onClick={() => setHistoryStatusFilter("Active")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                historyStatusFilter === "Active"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "bg-gray-100 text-text-secondary hover:bg-gray-200/80"
+              }`}
+            >
+              Active ({statusCounts.Active})
+            </button>
+            <button
+              onClick={() => setHistoryStatusFilter("Completed")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                historyStatusFilter === "Completed"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-gray-100 text-text-secondary hover:bg-gray-200/80"
+              }`}
+            >
+              Completed ({statusCounts.Completed})
+            </button>
+            <button
+              onClick={() => setHistoryStatusFilter("Draft")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                historyStatusFilter === "Draft"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "bg-gray-100 text-text-secondary hover:bg-gray-200/80"
+              }`}
+            >
+              Draft ({statusCounts.Draft})
+            </button>
+            <button
+              onClick={() => setHistoryStatusFilter("Cancelled")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                historyStatusFilter === "Cancelled"
+                  ? "bg-red-600 text-white shadow-xs"
+                  : "bg-gray-100 text-text-secondary hover:bg-gray-200/80"
+              }`}
+            >
+              Cancelled ({statusCounts.Cancelled})
+            </button>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative w-full sm:w-72">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search by renter, contract #, phone..."
+              value={historySearchQuery}
+              onChange={(e) => setHistorySearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+            />
+            {historySearchQuery && (
+              <button
+                onClick={() => setHistorySearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Rental History Table */}
+        {filteredContracts.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-border bg-gray-50/60 text-text-muted font-bold uppercase tracking-wider text-[11px]">
+                  <th className="py-3 px-5">Contract #</th>
+                  <th className="py-3 px-5">Renter / Client</th>
+                  <th className="py-3 px-5">Rental Period</th>
+                  <th className="py-3 px-5">Mileage (Out → In)</th>
+                  <th className="py-3 px-5">Financials</th>
+                  <th className="py-3 px-5">Status</th>
+                  <th className="py-3 px-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredContracts.map((contract: any) => {
+                  const statusBadge = getContractStatusBadge(contract.status);
+                  const paymentBadge = getPaymentBadge(contract.paymentStatus);
+                  const isOngoing = contract.status === "Active";
+
+                  const startFormatted = new Date(contract.startDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric"
+                  });
+                  const endFormatted = new Date(contract.endDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric"
+                  });
+
+                  const checkoutKm = contract.checkoutMileage != null ? contract.checkoutMileage : 0;
+                  const returnKm = contract.returnOdometer;
+                  const kmTraveled = returnKm && returnKm > checkoutKm ? returnKm - checkoutKm : null;
+
+                  const clientName = contract.clientId?.name || "Walk-in Customer";
+                  const clientPhone = contract.clientId?.phone || "N/A";
+                  const clientNationality = contract.clientId?.nationality;
+
+                  return (
+                    <tr 
+                      key={contract._id} 
+                      className="hover:bg-gray-50/60 transition-colors group"
+                    >
+                      {/* Contract # */}
+                      <td className="py-4 px-5">
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => {
+                              setSelectedContractForModal(contract);
+                              setIsContractDetailsOpen(true);
+                            }}
+                            className="font-bold text-text-primary hover:text-brand transition-colors text-left flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>#{contract.contractNumber || contract._id.slice(-6)}</span>
+                            <Eye size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
+                          </button>
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-[10px] font-semibold text-text-muted bg-gray-100 px-1.5 py-0.5 rounded">
+                              {contract.contractType || "Delivery"}
+                            </span>
+                            {contract.rentalType && (
+                              <span className="text-[10px] font-medium text-text-muted">
+                                • {contract.rentalType}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Renter / Client */}
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${getAvatarColor(clientName)}`}>
+                            {getInitials(clientName)}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-text-primary truncate max-w-[180px]">
+                              {clientName}
+                            </span>
+                            <div className="flex items-center gap-1.5 text-text-muted text-[11px] mt-0.5">
+                              {clientPhone !== "N/A" && (
+                                <span className="flex items-center gap-0.5">
+                                  <Phone size={10} />
+                                  {clientPhone}
+                                </span>
+                              )}
+                              {clientNationality && (
+                                <span className="truncate max-w-[100px]">
+                                  • {clientNationality}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Rental Period */}
+                      <td className="py-4 px-5">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5 font-semibold text-text-primary">
+                            <span>{startFormatted}</span>
+                            <span className="text-text-muted text-[10px]">→</span>
+                            <span>{endFormatted}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] font-bold text-text-muted bg-gray-100 px-2 py-0.5 rounded">
+                              {contract.totalDays || 1} {contract.totalDays === 1 ? "day" : "days"}
+                            </span>
+                            {isOngoing && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Ongoing Now
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Mileage (Out → In) */}
+                      <td className="py-4 px-5">
+                        <div className="flex flex-col text-text-secondary">
+                          <div className="flex items-center gap-1 font-mono text-[11px]">
+                            <span className="text-text-muted">Out:</span>
+                            <span className="font-bold text-text-primary">{checkoutKm.toLocaleString()} km</span>
+                          </div>
+                          <div className="flex items-center gap-1 font-mono text-[11px] mt-0.5">
+                            <span className="text-text-muted">In:</span>
+                            {returnKm != null && returnKm > 0 ? (
+                              <span className="font-bold text-text-primary">{returnKm.toLocaleString()} km</span>
+                            ) : (
+                              <span className="text-text-muted italic">{isOngoing ? "In Use" : "N/A"}</span>
+                            )}
+                          </div>
+                          {kmTraveled != null && (
+                            <span className="text-[10px] font-bold text-emerald-600 mt-0.5">
+                              +{kmTraveled.toLocaleString()} km traveled
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Financials */}
+                      <td className="py-4 px-5">
+                        <div className="flex flex-col">
+                          <div className="flex items-baseline gap-1 font-bold text-text-primary">
+                            <span className="text-sm font-black text-emerald-700">
+                              ${(contract.totalAmount || 0).toLocaleString()}
+                            </span>
+                            {contract.dailyRate && (
+                              <span className="text-[10px] text-text-muted font-normal">
+                                (${contract.dailyRate}/d)
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${paymentBadge}`}>
+                              {contract.paymentStatus || "Pending"}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-4 px-5">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${statusBadge.bg}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`}></span>
+                          {statusBadge.label}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-4 px-5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => {
+                              setSelectedContractForModal(contract);
+                              setIsContractDetailsOpen(true);
+                            }}
+                            title="View Contract Details"
+                            className="p-1.5 bg-gray-100 hover:bg-brand/10 text-text-muted hover:text-brand rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <a
+                            href={`/bookings/${contract._id}/print`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Print / View Contract PDF"
+                            className="p-1.5 bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-text-primary rounded-lg transition-colors inline-block"
+                          >
+                            <Printer size={14} />
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-12 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-200 text-gray-400 flex items-center justify-center mx-auto mb-3">
+              <History size={28} />
+            </div>
+            {contractsList.length === 0 ? (
+              <>
+                <h3 className="text-sm font-bold text-text-primary">No Rental History for this Vehicle</h3>
+                <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+                  This car has not been assigned to any contracts yet. Once a rental is created, all history and mileage details will appear here.
+                </p>
+                <button
+                  onClick={() => router.push("/bookings/new")}
+                  className="mt-4 px-4 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-all cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  Create First Booking
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 className="text-sm font-bold text-text-primary">No Matching Contracts Found</h3>
+                <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+                  No rental records match your current filter or search query. Try clearing your filters.
+                </p>
+                <button
+                  onClick={() => {
+                    setHistorySearchQuery("");
+                    setHistoryStatusFilter("all");
+                  }}
+                  className="mt-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-text-secondary rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Clear Filters
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Edit Vehicle Modal */}
       <CreateUnitModal 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -430,6 +1015,19 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
           fetchUnit();
         }}
         unitToEdit={unit}
+      />
+
+      {/* Contract Details Modal */}
+      <ContractDetailsModal
+        isOpen={isContractDetailsOpen}
+        onClose={() => {
+          setIsContractDetailsOpen(false);
+          setSelectedContractForModal(null);
+        }}
+        contract={selectedContractForModal}
+        onEdit={() => {
+          fetchUnit();
+        }}
       />
     </div>
   );

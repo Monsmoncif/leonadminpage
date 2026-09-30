@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import { Unit } from "@/models/Unit";
 import { Contract } from "@/models/Contract";
+import { Client } from "@/models/Client";
+import { Driver } from "@/models/Driver";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,14 +15,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    // جلب العقود المرتبطة بهذه المركبة (مكتملة أو نشطة) لبناء تاريخ الكيلومترات الحقيقي
-    const contracts = await Contract.find({
-      unitId: id,
-      status: { $in: ["Completed", "Active"] },
-    })
-      .sort({ startDate: 1 })
-      .select("startDate endDate checkoutMileage returnOdometer status")
+    // Ensure models are registered for population
+    const _c = Client;
+    const _d = Driver;
+
+    // Fetch all contracts associated with this vehicle (latest first)
+    const allContracts = await Contract.find({ unitId: id })
+      .sort({ startDate: -1, createdAt: -1 })
+      .populate({
+        path: "clientId",
+        select: "name firstName lastName phone nationality idNumber email clientType"
+      })
+      .populate({
+        path: "driverId",
+        select: "name phone"
+      })
       .lean();
+
+    // Build mileage history from real contract data (Completed & Active)
+    const contracts = allContracts
+      .filter((c: any) => ["Completed", "Active"].includes(c.status))
+      .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
     // Build mileage history from real contract data
     const mileageHistory: { name: string; km: number; date: string }[] = [];
@@ -76,7 +91,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         ? [{ name: "Current", km: (unit as any).mileage || 0 }]
         : deduped;
 
-    return NextResponse.json({ ...unit, mileageHistory: finalHistory });
+    return NextResponse.json({ ...unit, mileageHistory: finalHistory, contracts: allContracts });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
