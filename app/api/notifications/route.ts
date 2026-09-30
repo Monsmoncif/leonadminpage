@@ -4,6 +4,7 @@ import { Notification } from "@/models/Notification";
 import { Contract } from "@/models/Contract";
 import "@/models/Unit";
 import "@/models/Client";
+import { sendHandoverReminderNotification } from "@/lib/contract-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,11 @@ async function checkUpcomingHandoverReminders() {
           message: `Reminder: Contract ${contractNum} starts ${timingLabel.toLowerCase()} (${dateFormatted}) for ${vehicle} with client ${client}. Please ensure vehicle is ready for delivery.`,
           type: "reminder",
           read: false,
+        });
+
+        // Also send automated Gmail + WhatsApp to Admin
+        sendHandoverReminderNotification(contract._id.toString(), timingLabel).catch((dispatchErr) => {
+          console.error("Failed to dispatch Gmail/WhatsApp handover reminder:", dispatchErr);
         });
       }
     }

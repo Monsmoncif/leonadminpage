@@ -423,3 +423,201 @@ export async function sendDriverTaskNotification(
 
   return results;
 }
+
+/**
+ * Sends automated Handover Reminder via Gmail + WhatsApp to Admin
+ * Triggered 1 day before contract start date (or when scheduled for tomorrow/today)
+ */
+export async function sendHandoverReminderNotification(
+  contractId: string,
+  timingLabel: "Tomorrow" | "Today" = "Tomorrow"
+): Promise<{ email: boolean; whatsapp: boolean }> {
+  const results = { email: false, whatsapp: false };
+
+  try {
+    await connectDB();
+
+    const _c = Client;
+    const _u = Unit;
+    const _usr = User;
+
+    const contract = await Contract.findById(contractId)
+      .populate({ path: "clientId", strictPopulate: false })
+      .populate({ path: "unitId", select: "make model plate color year", strictPopulate: false })
+      .populate({ path: "deliveryDriverId", select: "name phone", strictPopulate: false })
+      .lean() as any;
+
+    if (!contract) {
+      console.warn(`[HandoverReminder] Contract ${contractId} not found`);
+      return results;
+    }
+
+    let clientDoc = contract.clientId;
+    if (clientDoc && (!clientDoc.name || !clientDoc.phone)) {
+      const fullClient = await Client.findById(clientDoc._id || clientDoc).lean() as any;
+      if (fullClient) clientDoc = fullClient;
+    }
+
+    const clientName = clientDoc?.name || (contract as any).additionalDriverName || "Client";
+    const clientPhone = clientDoc?.phone || (contract as any).additionalDriverPhone || "";
+    const contractNum = contract.contractNumber 
+      ? `#${contract.contractNumber}` 
+      : `#${contract._id.toString().substring(0, 8).toUpperCase()}`;
+
+    const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
+    const vehiclePlate = contract.unitId?.plate || "";
+    const location = contract.pickupLocation || "Main Office";
+    const checkoutTime = contract.checkoutTime || "08:00 AM";
+
+    const startDateFormatted = new Date(contract.startDate).toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const endDateFormatted = new Date(contract.endDate).toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    const isTomorrow = timingLabel === "Tomorrow";
+    const timingArabic = isTomorrow ? "غداً" : "اليوم";
+    const timingBadgeText = isTomorrow ? "Starts Tomorrow (غداً)" : "Starts Today (اليوم)";
+
+    // 1. SEND GMAIL TO ADMIN
+    const transporter = getTransporter();
+    if (transporter && process.env.SMTP_USER) {
+      try {
+        const adminUsers = await User.find({ role: "admin" }).select("email").lean();
+        const recipientSet = new Set<string>();
+        if (process.env.SMTP_USER) recipientSet.add(process.env.SMTP_USER.trim());
+        adminUsers.forEach((a: any) => {
+          if (a.email && a.email.includes("@")) recipientSet.add(a.email.trim());
+        });
+
+        const recipients = Array.from(recipientSet);
+
+        const emailHtml = `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e; line-height: 1.7; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
+            <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 28px 32px; color: white;">
+              <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
+                ${timingBadgeText}
+              </span>
+              <h1 style="color: white; margin: 12px 0 4px; font-size: 22px; font-weight: 800;">تذكير بموعد تسليم سيارة</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 14px;">Contract Handover Reminder — Contract ${contractNum}</p>
+            </div>
+            
+            <div style="padding: 30px 32px; background: #fafafa;">
+              <p style="font-size: 15px; margin: 0 0 20px; color: #334155;">
+                مرحباً <strong>إدارة ليون كار</strong>، هذا تذكير بموعد تسليم سيارة مجدول <strong>${timingArabic}</strong>:
+              </p>
+              
+              <table style="width: 100%; border-collapse: separate; border-spacing: 0; background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px; font-size: 14px;">
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 12px 18px; color: #64748b; width: 130px; border-bottom: 1px solid #f1f5f9;">رقم العقد</td>
+                  <td style="padding: 12px 18px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${contractNum}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 12px 18px; color: #64748b; border-bottom: 1px solid #f1f5f9;">السيارة / Vehicle</td>
+                  <td style="padding: 12px 18px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${vehicleName} ${vehiclePlate ? `(${vehiclePlate})` : ''}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 12px 18px; color: #64748b; border-bottom: 1px solid #f1f5f9;">العميل / Client</td>
+                  <td style="padding: 12px 18px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${clientName} ${clientPhone ? `(${clientPhone})` : ''}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 12px 18px; color: #64748b; border-bottom: 1px solid #f1f5f9;">موعد البدء / Start</td>
+                  <td style="padding: 12px 18px; font-weight: 700; color: #b45309; border-bottom: 1px solid #f1f5f9;">${startDateFormatted} — ${checkoutTime}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 12px 18px; color: #64748b; border-bottom: 1px solid #f1f5f9;">تاريخ الانتهاء / End</td>
+                  <td style="padding: 12px 18px; color: #334155; border-bottom: 1px solid #f1f5f9;">${endDateFormatted}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 18px; color: #64748b;">موقع التسليم</td>
+                  <td style="padding: 12px 18px; color: #334155;">${location}</td>
+                </tr>
+              </table>
+
+              <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 18px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 13px; color: #92400e; font-weight: 600;">
+                  ⚠️ يرجى التأكد من فحص ونظافة السيارة وتجهيز المفاتيح والوثائق قبل تسليمها للعميل.
+                </p>
+              </div>
+
+              <div style="text-align: center; margin-top: 10px;">
+                <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/bookings" style="background: #0f172a; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-size: 14px; font-weight: 700; display: inline-block;">
+                  فتح لوحة العقود / View Contract
+                </a>
+              </div>
+
+              <p style="font-size: 12px; color: #94a3b8; margin-top: 28px; text-align: center;">— Leon Rent Car Automated Dispatch System</p>
+            </div>
+          </div>
+        `;
+
+        await transporter.sendMail({
+          from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
+          to: recipients.join(", "),
+          subject: `⏰ تذكير بموعد تسليم سيارة ${timingArabic} — عقد ${contractNum} | ${vehicleName}`,
+          html: emailHtml,
+        });
+
+        results.email = true;
+        console.log(`[HandoverReminder] Gmail sent to ${recipients.join(", ")}`);
+      } catch (mailErr) {
+        console.error("[HandoverReminder] Failed to send Gmail reminder:", mailErr);
+      }
+    }
+
+    // 2. SEND WHATSAPP TO ADMIN
+    try {
+      const adminUsers = await User.find({ role: "admin", phone: { $exists: true, $ne: "" } })
+        .select("phone name")
+        .lean();
+
+      const phoneSet = new Set<string>();
+      adminUsers.forEach((a: any) => {
+        if (a.phone) phoneSet.add(a.phone.trim());
+      });
+
+      const clientChatLink = clientPhone ? `https://wa.me/${formatPhoneNumberForWhatsApp(clientPhone)}` : null;
+
+      const whatsappMsg = `⏰ *تذكير بموعد تسليم سيارة ${timingArabic} / Handover Reminder (${timingLabel})*\n\n` +
+        `📄 *رقم العقد / Contract:* ${contractNum}\n` +
+        `🚙 *السيارة / Vehicle:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+        `👤 *العميل / Client:* ${clientName}\n` +
+        `📞 *هاتف العميل / Phone:* ${clientPhone || "N/A"}\n` +
+        (clientChatLink ? `💬 *مراسلة العميل:* ${clientChatLink}\n` : '') +
+        `📅 *تاريخ التسليم / Start:* ${startDateFormatted} — ${checkoutTime}\n` +
+        `📍 *الموقع / Location:* ${location}\n\n` +
+        `⚠️ *تنبيه:* يرجى التأكد من جاهزية السيارة ونظافتها قبل الموعد.\n\n` +
+        `— *Leon Rent Car Dispatch*`;
+
+      for (const rawPhone of Array.from(phoneSet)) {
+        const cleanPhone = formatPhoneNumberForWhatsApp(rawPhone);
+        if (cleanPhone) {
+          const waRes = await sendWhatsApp({
+            to: cleanPhone,
+            message: whatsappMsg,
+          });
+
+          if (waRes.success) {
+            results.whatsapp = true;
+            console.log(`[HandoverReminder] WhatsApp sent to ${cleanPhone}`);
+          } else {
+            console.error(`[HandoverReminder] WhatsApp failed for ${cleanPhone}:`, waRes.error);
+          }
+        }
+      }
+    } catch (waErr) {
+      console.error("[HandoverReminder] WhatsApp exception:", waErr);
+    }
+  } catch (err) {
+    console.error("[HandoverReminder] Execution error:", err);
+  }
+
+  return results;
+}

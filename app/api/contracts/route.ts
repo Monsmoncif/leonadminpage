@@ -11,7 +11,7 @@ import { User } from "@/models/User";
 import nodemailer from "nodemailer";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { sendClientContractNotification, sendDriverTaskNotification } from "@/lib/contract-notifications";
+import { sendClientContractNotification, sendDriverTaskNotification, sendHandoverReminderNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
 
 const emptyResponse = {
@@ -308,6 +308,11 @@ export async function POST(req: Request) {
           message: `Reminder: Contract ${contractNum} starts tomorrow (${dateFormatted}) for ${vehicle}. Please ensure vehicle is ready for delivery.`,
           type: "reminder",
           read: false,
+        });
+
+        // Dispatch Gmail + WhatsApp reminder immediately to Admin
+        sendHandoverReminderNotification(contract._id.toString(), "Tomorrow").catch((dispatchErr) => {
+          console.error("Failed to dispatch Gmail/WhatsApp reminder on create:", dispatchErr);
         });
       }
     } catch (e) { console.error("Failed to create notification", e); }
