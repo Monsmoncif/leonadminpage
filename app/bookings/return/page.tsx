@@ -1620,42 +1620,6 @@ function ReturnPageContent() {
               </span>
             </label>
           </div>
-
-          {moneyPhotos.length === 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl border border-dashed border-gray-200 bg-gray-50/50">
-              <span className="text-xs text-text-muted">
-                No money photos attached yet. Admin can take a photo of cash or upload a receipt.
-              </span>
-              <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
-                <label className="px-3.5 py-1.5 rounded-lg bg-white text-emerald-700 shadow-2xs font-bold flex items-center gap-1.5 cursor-pointer hover:bg-emerald-50 transition-all">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onClick={(e) => { e.currentTarget.value = ""; }}
-                    onChange={handleMoneyPhotoUpload}
-                    disabled={isUploadingMoneyPhoto}
-                  />
-                  <Camera size={13} className="text-emerald-600" />
-                  <span>Camera</span>
-                </label>
-                <label className="px-3.5 py-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 flex items-center gap-1.5 cursor-pointer transition-all">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onClick={(e) => { e.currentTarget.value = ""; }}
-                    onChange={handleMoneyPhotoUpload}
-                    disabled={isUploadingMoneyPhoto}
-                  />
-                  <ImageIcon size={13} className="text-emerald-600" />
-                  <span>Gallery</span>
-                </label>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Staff Remarks */}
