@@ -754,11 +754,7 @@ export function NewRentalAdminPageContent() {
       const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
       const collectionPrice = Number(rentalData.collectionAmount || 0);
       const calculatedDailyRate = totalDays > 0 ? Math.round((collectionPrice / totalDays) * 100) / 100 : collectionPrice;
-      const extraFees = Number(rentalData.babySeatFee || 0) + 
-        Number(rentalData.deliveryFee || 0) + 
-        Number(rentalData.salikFees || 0) + 
-        Number(rentalData.tintingFees || 0) + 
-        Number(rentalData.cleaningFees || 0);
+      const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
       const totalAmount = collectionPrice + extraFees;
 
       const contractPayload: any = {
@@ -1572,11 +1568,7 @@ export function NewRentalAdminPageContent() {
 
             {/* Total Handover Collection Card */}
             {(() => {
-              const extraFees = Number(rentalData.babySeatFee || 0) + 
-                Number(rentalData.deliveryFee || 0) + 
-                Number(rentalData.salikFees || 0) + 
-                Number(rentalData.tintingFees || 0) + 
-                Number(rentalData.cleaningFees || 0);
+              const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
               const totalHandover = Number(rentalData.collectionAmount || 0) + extraFees;
               return (
                 <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1586,7 +1578,8 @@ export function NewRentalAdminPageContent() {
                     </span>
                     <p className="text-xs text-text-muted mt-0.5">
                       Collection Price (${rentalData.collectionAmount || 0})
-                      {extraFees > 0 ? ` + Extra Fees ($${extraFees})` : ""}
+                      {rentalData.deliveryFee > 0 ? ` + Delivery Fee ($${rentalData.deliveryFee})` : ""}
+                      {rentalData.babySeatFee > 0 ? ` + Baby Seat ($${rentalData.babySeatFee})` : ""}
                     </p>
                   </div>
                   <div className="text-left sm:text-right">
@@ -1620,8 +1613,8 @@ export function NewRentalAdminPageContent() {
               </div>
             </div>
 
-            {/* Extra Fees Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+            {/* Extra Fees Grid (Baby Seat Fee & Delivery Charge) */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee ($)</label>
                 <input 
@@ -1638,36 +1631,6 @@ export function NewRentalAdminPageContent() {
                   type="number" 
                   value={rentalData.deliveryFee === 0 ? "" : rentalData.deliveryFee} 
                   onChange={e => setRentalData({...rentalData, deliveryFee: Number(e.target.value)})} 
-                  placeholder="0"
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Salik / Tolls ($)</label>
-                <input 
-                  type="number" 
-                  value={rentalData.salikFees === 0 ? "" : rentalData.salikFees} 
-                  onChange={e => setRentalData({...rentalData, salikFees: Number(e.target.value)})} 
-                  placeholder="0"
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Window Tinting ($)</label>
-                <input 
-                  type="number" 
-                  value={rentalData.tintingFees === 0 ? "" : rentalData.tintingFees} 
-                  onChange={e => setRentalData({...rentalData, tintingFees: Number(e.target.value)})} 
-                  placeholder="0"
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Cleaning Fee ($)</label>
-                <input 
-                  type="number" 
-                  value={rentalData.cleaningFees === 0 ? "" : rentalData.cleaningFees} 
-                  onChange={e => setRentalData({...rentalData, cleaningFees: Number(e.target.value)})} 
                   placeholder="0"
                   className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
                 />
