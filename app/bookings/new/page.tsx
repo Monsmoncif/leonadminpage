@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { 
   User, 
@@ -40,6 +40,19 @@ import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
 
+const formatDateToInput = (dateStr: string) => {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return new Date().toISOString().split("T")[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  } catch {
+    return new Date().toISOString().split("T")[0];
+  }
+};
+
 // Dynamic steps based on contract type (Car is first step; Contract Type is chosen via header toggle)
 const DELIVERY_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
@@ -55,8 +68,13 @@ const SHOP_STEPS = [
   { id: 5, title: "Sign & Review", icon: PenTool },
 ];
 
-export default function NewRentalAdminPage() {
+export function NewRentalAdminPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const contractId = searchParams.get("contractId") || searchParams.get("edit");
+  const isEditMode = Boolean(contractId);
+  const [editingContract, setEditingContract] = useState<any>(null);
+
   const toast = useToast();
   const { data: session } = useSession();
 
@@ -162,6 +180,9 @@ export default function NewRentalAdminPage() {
     notes: "",
     babySeatFee: 0,
     deliveryFee: 0,
+    salikFees: 0,
+    tintingFees: 0,
+    cleaningFees: 0,
     checkoutFuelLevel: 100,
     checkoutMileage: 0,
     paymentMethod: "Cash" as string,
@@ -456,11 +477,125 @@ export default function NewRentalAdminPage() {
     }
   };
 
+  const fetchContract = async () => {
+    if (!contractId) return;
+    try {
+      const res = await fetch(`/api/contracts/${contractId}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Contract not found");
+      const c = await res.json();
+      setEditingContract(c);
+
+      // 1. Contract Type
+      const editType = c.contractType || (c.deliveryDriverId ? "Delivery" : "Shop");
+      setContractType(editType);
+
+      // 2. Selected Vehicle & Client
+      const unitId = c.unitId?._id || c.unitId || null;
+      setSelectedVehicle(unitId);
+      if (c.unitId && typeof c.unitId === "object" && c.unitId._id) {
+        setUnits(prev => prev.some(u => u._id === c.unitId._id) ? prev : [c.unitId, ...prev]);
+      }
+
+      const clientId = c.clientId?._id || c.clientId || null;
+      setSelectedClient(clientId);
+      if (c.clientId && typeof c.clientId === "object" && c.clientId._id) {
+        setClients(prev => prev.some(cl => cl._id === c.clientId._id) ? prev : [c.clientId, ...prev]);
+      }
+
+      // 3. Rental Data & Timing
+      const editStart = c.startDate ? formatDateToInput(c.startDate) : new Date().toISOString().split("T")[0];
+      const editEnd = c.endDate ? formatDateToInput(c.endDate) : new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+      const startD = new Date(editStart);
+      const endD = new Date(editEnd);
+      const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)));
+      const editDailyRate = c.dailyRate || 85;
+      const extraFees = (c.babySeatFees || 0) + (c.deliveryCharges || 0) + (c.salikFees || c.salikCharge || 0) + (c.tintingFees || 0) + (c.cleaningFees || 0);
+      const editCollectionAmount = c.collectionAmount !== undefined 
+        ? c.collectionAmount 
+        : (c.totalAmount !== undefined 
+            ? Math.max(0, c.totalAmount - extraFees)
+            : (editDailyRate * days));
+
+      setRentalData({
+        driverId: c.driverId?._id || c.driverId || "",
+        deliveryDriverId: c.deliveryDriverId?._id || c.deliveryDriverId || c.driverId?._id || c.driverId || "",
+        returnDriverId: c.returnDriverId?._id || c.returnDriverId || "",
+        rentalType: c.rentalType || (days >= 30 ? "Monthly" : "Daily"),
+        customerType: c.customerType || "B2C",
+        startDate: editStart,
+        endDate: editEnd,
+        checkoutTime: c.checkoutTime || "10:00 AM",
+        checkinTime: c.checkinTime || "",
+        collectionAmount: editCollectionAmount,
+        dailyRate: editDailyRate,
+        dailyKmLimit: c.dailyKmLimit || 0,
+        pricePerExtraKm: c.pricePerExtraKm || 0,
+        depositAmount: c.depositAmount || 0,
+        pickupLocation: c.pickupLocation || "Main Office",
+        dropoffLocation: c.dropoffLocation || "",
+        notes: c.notes || "",
+        babySeatFee: c.babySeatFees || 0,
+        deliveryFee: c.deliveryCharges || 0,
+        salikFees: c.salikFees || c.salikCharge || 0,
+        tintingFees: c.tintingFees || 0,
+        cleaningFees: c.cleaningFees || 0,
+        checkoutFuelLevel: c.checkoutFuelLevel !== undefined ? c.checkoutFuelLevel : 100,
+        checkoutMileage: c.checkoutMileage !== undefined ? c.checkoutMileage : 0,
+        paymentMethod: c.paymentMethod || "Cash",
+        paymentStatus: c.paymentStatus || "Pending",
+      });
+
+      // 4. Second Driver
+      if (c.additionalDriverName) {
+        setAdditionalDriver({
+          name: c.additionalDriverName || "",
+          license: c.additionalDriverLicense || "",
+          nationality: c.additionalDriverNationality || "",
+          phone: c.additionalDriverPhone || "",
+          expiry: c.additionalDriverExpiry ? formatDateToInput(c.additionalDriverExpiry) : "",
+          issuedAt: c.additionalDriverIssuedAt || "",
+        });
+        setSecondDriverClient({
+          name: c.additionalDriverName,
+          licenseNumber: c.additionalDriverLicense,
+          phone: c.additionalDriverPhone,
+          nationality: c.additionalDriverNationality,
+        });
+      }
+
+      // 5. Inspection Photos
+      const initialPhotos: Record<string, string> = {};
+      if (Array.isArray(c.inspectionPhotos)) {
+        c.inspectionPhotos.forEach((url: string, idx: number) => {
+          if (url && VEHICLE_ANGLES[idx]) {
+            initialPhotos[VEHICLE_ANGLES[idx]] = url;
+          }
+        });
+      }
+      setInspectionPhotos(initialPhotos);
+
+      // 6. Signatures
+      if (c.customerSignature) {
+        setSignatureData(c.customerSignature);
+      }
+      if (c.adminSignature) {
+        setAdminSignatureData(c.adminSignature);
+      }
+    } catch (err: any) {
+      console.error("Failed to load contract:", err);
+      toast.error("Failed to load contract details for editing.");
+    }
+  };
+
   useEffect(() => {
-    Promise.all([fetchUnits(), fetchClients(), fetchDrivers()]).finally(() => {
+    const promises: Promise<any>[] = [fetchUnits(), fetchClients(), fetchDrivers()];
+    if (contractId) {
+      promises.push(fetchContract());
+    }
+    Promise.all(promises).finally(() => {
       setIsPageLoading(false);
     });
-  }, []);
+  }, [contractId]);
 
   const getUnitConflict = (unit: any, startDateStr?: string, endDateStr?: string) => {
     if (!unit) return null;
@@ -478,6 +613,16 @@ export default function NewRentalAdminPage() {
 
     if (Array.isArray(unit.activeBookings) && unit.activeBookings.length > 0) {
       for (const booking of unit.activeBookings) {
+        if (
+          contractId && 
+          (booking.contractId === contractId || 
+           booking._id === contractId || 
+           booking.id === contractId || 
+           (editingContract?.contractNumber && String(booking.contractNumber) === String(editingContract.contractNumber)))
+        ) {
+          continue;
+        }
+
         const bStart = new Date(booking.startDate);
         bStart.setHours(0, 0, 0, 0);
         const bEnd = new Date(booking.endDate);
@@ -609,7 +754,12 @@ export default function NewRentalAdminPage() {
       const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
       const collectionPrice = Number(rentalData.collectionAmount || 0);
       const calculatedDailyRate = totalDays > 0 ? Math.round((collectionPrice / totalDays) * 100) / 100 : collectionPrice;
-      const totalAmount = collectionPrice + Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
+      const extraFees = Number(rentalData.babySeatFee || 0) + 
+        Number(rentalData.deliveryFee || 0) + 
+        Number(rentalData.salikFees || 0) + 
+        Number(rentalData.tintingFees || 0) + 
+        Number(rentalData.cleaningFees || 0);
+      const totalAmount = collectionPrice + extraFees;
 
       const contractPayload: any = {
         unitId: selectedVehicle,
@@ -627,18 +777,18 @@ export default function NewRentalAdminPage() {
         checkoutTime: rentalData.checkoutTime || "Pending Handover",
         checkinTime: rentalData.checkinTime || "",
         notes: rentalData.notes,
-        babySeatFees: Number(rentalData.babySeatFee),
-        deliveryCharges: Number(rentalData.deliveryFee),
+        babySeatFees: Number(rentalData.babySeatFee || 0),
+        deliveryCharges: Number(rentalData.deliveryFee || 0),
+        salikFees: Number(rentalData.salikFees || 0),
+        tintingFees: Number(rentalData.tintingFees || 0),
+        cleaningFees: Number(rentalData.cleaningFees || 0),
         checkoutFuelLevel: Number(rentalData.checkoutFuelLevel || 100),
         checkoutMileage: Number(rentalData.checkoutMileage || 0),
         paymentMethod: rentalData.paymentMethod,
         paymentStatus: rentalData.paymentStatus,
-        status: contractType === "Shop" ? "Active" : "Draft",
         customerSignature: signatureData || null,
         adminSignature: adminSignatureData || null,
-        inspectionPhotos: contractType === "Shop"
-          ? VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || "")
-          : [],
+        inspectionPhotos: VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
         totalAmount,
         additionalDriverName: additionalDriver.name.trim(),
         additionalDriverLicense: additionalDriver.license.trim(),
@@ -646,35 +796,43 @@ export default function NewRentalAdminPage() {
         additionalDriverPhone: additionalDriver.phone.trim(),
         additionalDriverExpiry: additionalDriver.expiry,
         additionalDriverIssuedAt: additionalDriver.issuedAt.trim(),
+        ...(isEditMode && editingContract?.status && { status: editingContract.status }),
       };
 
       if (contractType === "Delivery") {
-        // Delivery: no client yet, driver will register
         contractPayload.driverId = rentalData.deliveryDriverId;
         contractPayload.deliveryDriverId = rentalData.deliveryDriverId;
-        contractPayload.deliveryStatus = "Pending";
-        contractPayload.status = "Draft";
+        if (!isEditMode) {
+          contractPayload.deliveryStatus = "Pending";
+          contractPayload.status = "Draft";
+        }
       } else {
-        // Shop: client selected by admin, no driver needed for delivery
         contractPayload.clientId = selectedClient;
-        contractPayload.deliveryStatus = "Delivered"; // car is already at shop
-        contractPayload.status = "Active";
+        if (!isEditMode) {
+          contractPayload.deliveryStatus = "Delivered";
+          contractPayload.status = "Active";
+        }
       }
 
-      const contractRes = await fetch("/api/contracts", {
-        method: "POST",
+      const url = isEditMode ? `/api/contracts/${contractId}` : "/api/contracts";
+      const method = isEditMode ? "PUT" : "POST";
+
+      const contractRes = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(contractPayload)
       });
 
       if (!contractRes.ok) {
         const err = await contractRes.json();
-        toast.error(err.error || "Failed to create booking");
+        toast.error(err.error || (isEditMode ? "Failed to update contract" : "Failed to create booking"));
         setIsLoading(false);
         return;
       }
 
-      if (contractType === "Delivery") {
+      if (isEditMode) {
+        toast.success("Contract updated successfully! (تم حفظ التعديلات بنجاح)");
+      } else if (contractType === "Delivery") {
         toast.success("Delivery Booking Created & Dispatched! Driver will register the client and deliver the car.");
       } else {
         toast.success("Shop Booking Created! Contract is ready — client is at the shop.");
@@ -1413,22 +1571,32 @@ export default function NewRentalAdminPage() {
             </div>
 
             {/* Total Handover Collection Card */}
-            <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
-                  Total to Collect on Handover (إجمالي المبلغ المطلوب تحصيله)
-                </span>
-                <p className="text-xs text-text-muted mt-0.5">
-                  Collection Price (${rentalData.collectionAmount || 0})
-                  {rentalData.deliveryFee > 0 ? ` + Delivery Fee ($${rentalData.deliveryFee})` : ""}
-                </p>
-              </div>
-              <div className="text-left sm:text-right">
-                <span className="text-2xl font-black text-brand">
-                  ${Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)}
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const extraFees = Number(rentalData.babySeatFee || 0) + 
+                Number(rentalData.deliveryFee || 0) + 
+                Number(rentalData.salikFees || 0) + 
+                Number(rentalData.tintingFees || 0) + 
+                Number(rentalData.cleaningFees || 0);
+              const totalHandover = Number(rentalData.collectionAmount || 0) + extraFees;
+              return (
+                <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
+                      Total to Collect on Handover (إجمالي المبلغ المطلوب تحصيله)
+                    </span>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Collection Price (${rentalData.collectionAmount || 0})
+                      {extraFees > 0 ? ` + Extra Fees ($${extraFees})` : ""}
+                    </p>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <span className="text-2xl font-black text-brand">
+                      ${totalHandover}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1452,23 +1620,56 @@ export default function NewRentalAdminPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Extra Fees Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee ($)</label>
                 <input 
                   type="number" 
-                  value={rentalData.babySeatFee} 
+                  value={rentalData.babySeatFee === 0 ? "" : rentalData.babySeatFee} 
                   onChange={e => setRentalData({...rentalData, babySeatFee: Number(e.target.value)})} 
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none" 
+                  placeholder="0"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
                 />
               </div>
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge ($)</label>
                 <input 
                   type="number" 
-                  value={rentalData.deliveryFee} 
+                  value={rentalData.deliveryFee === 0 ? "" : rentalData.deliveryFee} 
                   onChange={e => setRentalData({...rentalData, deliveryFee: Number(e.target.value)})} 
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none" 
+                  placeholder="0"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Salik / Tolls ($)</label>
+                <input 
+                  type="number" 
+                  value={rentalData.salikFees === 0 ? "" : rentalData.salikFees} 
+                  onChange={e => setRentalData({...rentalData, salikFees: Number(e.target.value)})} 
+                  placeholder="0"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Window Tinting ($)</label>
+                <input 
+                  type="number" 
+                  value={rentalData.tintingFees === 0 ? "" : rentalData.tintingFees} 
+                  onChange={e => setRentalData({...rentalData, tintingFees: Number(e.target.value)})} 
+                  placeholder="0"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Cleaning Fee ($)</label>
+                <input 
+                  type="number" 
+                  value={rentalData.cleaningFees === 0 ? "" : rentalData.cleaningFees} 
+                  onChange={e => setRentalData({...rentalData, cleaningFees: Number(e.target.value)})} 
+                  placeholder="0"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" 
                 />
               </div>
             </div>
@@ -1519,22 +1720,28 @@ export default function NewRentalAdminPage() {
     return (
       <div className="space-y-6 animate-fade-in-up">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Review Booking &amp; {contractType === "Delivery" ? "Dispatch" : "Create"}</h2>
+          <h2 className="text-lg font-bold text-text-primary">
+            {isEditMode 
+              ? "Review & Save Contract Changes" 
+              : `Review Booking & ${contractType === "Delivery" ? "Dispatch" : "Create"}`}
+          </h2>
           <p className="text-xs text-text-muted mt-0.5">
-            {contractType === "Delivery" 
-              ? "Confirm details and dispatch delivery to the driver. Driver will register the client on-site."
-              : "Confirm agreement details for this shop contract. The car is ready for the client."}
+            {isEditMode
+              ? "Confirm agreement details, updated terms, photos, and signatures before saving."
+              : contractType === "Delivery" 
+                ? "Confirm details and dispatch delivery to the driver. Driver will register the client on-site."
+                : "Confirm agreement details for this shop contract. The car is ready for the client."}
           </p>
         </div>
 
         <div className="bg-gray-50/70 rounded-2xl p-6 border border-border space-y-6">
           <div className={`grid grid-cols-1 md:grid-cols-2 ${contractType === "Delivery" ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-4`}>
-            {/* Customer — only for Shop */}
-            {contractType === "Shop" && (
+            {/* Customer — for Shop or whenever a client is selected */}
+            {(contractType === "Shop" || selectedClient) && (
               <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
                 <span className="text-text-muted text-xs block mb-1">Customer</span>
-                <strong className="text-text-primary text-sm font-bold block truncate">{clientObj?.name || "N/A"}</strong>
-                <span className="text-xs text-text-muted">{clientObj?.phone || ""}</span>
+                <strong className="text-text-primary text-sm font-bold block truncate">{clientObj?.name || (editingContract?.clientId?.name) || "N/A"}</strong>
+                <span className="text-xs text-text-muted">{clientObj?.phone || (editingContract?.clientId?.phone) || ""}</span>
               </div>
             )}
 
@@ -1731,7 +1938,7 @@ export default function NewRentalAdminPage() {
                       Customer Signs Here (وقع هنا)
                     </span>
                   </div>
-                  {signatureData && !isDrawing && signatureData.startsWith("data:image") && (
+                  {signatureData && !isDrawing && (signatureData.startsWith("data:image") || signatureData.startsWith("http") || signatureData.startsWith("/")) && (
                     <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-white/40">
                       <img src={signatureData} alt="Client Signature" className="max-h-full max-w-full object-contain" />
                     </div>
@@ -1780,6 +1987,13 @@ export default function NewRentalAdminPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={autoSignAdmin}
+                    className="text-xs text-brand hover:text-brand-dark bg-brand/10 hover:bg-brand/20 px-3 py-1.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                  >
+                    <PenTool size={12} /> Auto-Sign ({session?.user?.name || "Admin"})
+                  </button>
                   {adminSignatureData && (
                     <button
                       type="button"
@@ -1799,7 +2013,7 @@ export default function NewRentalAdminPage() {
                     Authorized Company Sign Here
                   </span>
                 </div>
-                {adminSignatureData && !isDrawingAdmin && adminSignatureData.startsWith("data:image") && (
+                {adminSignatureData && !isDrawingAdmin && (adminSignatureData.startsWith("data:image") || adminSignatureData.startsWith("http") || adminSignatureData.startsWith("/")) && (
                   <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-white/40">
                     <img src={adminSignatureData} alt="Admin Signature" className="max-h-full max-w-full object-contain" />
                   </div>
@@ -1899,11 +2113,29 @@ export default function NewRentalAdminPage() {
           >
             <ArrowLeft size={14} /> Back to Bookings
           </button>
-          <h1 className="text-2xl font-bold text-text-primary">Create New Booking</h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl font-bold text-text-primary">
+              {isEditMode 
+                ? `Edit Rental Contract ${editingContract?.contractNumber ? `#${editingContract.contractNumber}` : ""}`
+                : "Create New Booking"}
+            </h1>
+            {isEditMode && editingContract?.status && (
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                editingContract.status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                editingContract.status === "Completed" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                editingContract.status === "Delivered" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                "bg-amber-50 text-amber-700 border-amber-200"
+              }`}>
+                {editingContract.status}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-text-secondary mt-1">
-            {contractType === "Delivery" 
-              ? "Delivery contract — driver will take the car to the client and register them on-site."
-              : "Shop contract — client is at the shop counter. Complete inspection, sign, and activate."}
+            {isEditMode 
+              ? "Update vehicle, customer, rental schedule, extra fees, inspection photos, and terms."
+              : contractType === "Delivery" 
+                ? "Delivery contract — driver will take the car to the client and register them on-site."
+                : "Shop contract — client is at the shop counter. Complete inspection, sign, and activate."}
           </p>
         </div>
 
@@ -1964,11 +2196,19 @@ export default function NewRentalAdminPage() {
           
           <div className="flex items-start w-full relative z-10">
             {STEPS.map((step) => (
-              <div key={step.id} className="flex-1 min-w-0 flex flex-col items-center">
+              <div 
+                key={step.id} 
+                className={`flex-1 min-w-0 flex flex-col items-center ${isEditMode ? "cursor-pointer" : ""}`}
+                onClick={() => {
+                  if (isEditMode) setCurrentStep(step.id);
+                }}
+              >
                 <button 
                   type="button"
-                  onClick={() => {
-                    if (step.id < currentStep) setCurrentStep(step.id);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isEditMode) setCurrentStep(step.id);
+                    else if (step.id < currentStep) setCurrentStep(step.id);
                     else if (step.id === currentStep + 1) handleNext();
                   }}
                   className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
@@ -2023,15 +2263,31 @@ export default function NewRentalAdminPage() {
           )}
 
           {currentStep < totalSteps ? (
-            <button
-              onClick={handleNext}
-              className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
-            >
-              <span>Next Step</span>
-              <ArrowRight size={16} />
-            </button>
+            <div className="flex items-center gap-3">
+              {isEditMode && (
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={isLoading}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                  title="Save all changes immediately"
+                >
+                  {isLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                  <span>Save Changes (حفظ)</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleNext}
+                className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+              >
+                <span>Next Step</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
           ) : (
             <button
+              type="button"
               onClick={handleGenerate}
               disabled={isLoading}
               className="px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer"
@@ -2039,12 +2295,16 @@ export default function NewRentalAdminPage() {
               {isLoading ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Creating Booking...</span>
+                  <span>{isEditMode ? "Saving Changes..." : "Creating Booking..."}</span>
                 </>
               ) : (
                 <>
                   <CheckCircle size={18} />
-                  <span>{contractType === "Delivery" ? "Create & Dispatch to Driver" : "Create Shop Contract"}</span>
+                  <span>
+                    {isEditMode 
+                      ? "Save Changes (حفظ التعديلات)" 
+                      : (contractType === "Delivery" ? "Create & Dispatch to Driver" : "Create Shop Contract")}
+                  </span>
                 </>
               )}
             </button>
@@ -2076,5 +2336,22 @@ export default function NewRentalAdminPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function NewRentalAdminPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-5xl mx-auto space-y-6 pb-20 animate-pulse p-4 sm:p-6">
+          <div className="h-8 w-64 bg-gray-200 rounded-lg"></div>
+          <div className="h-4 w-96 bg-gray-200 rounded-lg mt-2"></div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-8 h-28 mt-4"></div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-8 min-h-[400px]"></div>
+        </div>
+      }
+    >
+      <NewRentalAdminPageContent />
+    </Suspense>
   );
 }

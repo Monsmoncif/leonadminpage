@@ -22,7 +22,6 @@ import {
   XCircle
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
-import CreateContractModal from "@/components/modals/CreateContractModal";
 
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -82,9 +81,8 @@ export default function ContractsPage() {
   const [data, setData] = useState<{ contracts: any[], stats: any } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [editTarget, setEditTarget] = useState<any>(null);
+
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [contractToDelete, setContractToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -664,17 +662,14 @@ export default function ContractsPage() {
                                   );
                                 })()}
 
-                                <button 
-                                  className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
+                                <Link 
+                                  href={`/bookings/edit?contractId=${contract._id}`}
+                                  className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                   title="Edit Contract" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditTarget(contract);
-                                    setIsContractModalOpen(true);
-                                  }}
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <Edit size={16} />
-                                </button>
+                                </Link>
                                 {contract.status === "Active" && (
                                   <Link 
                                     href={`/bookings/return?contractId=${contract._id}`}
@@ -808,21 +803,6 @@ export default function ContractsPage() {
         </div>
       )}
 
-      {/* Create / Edit Contract Modal */}
-      <CreateContractModal 
-        isOpen={isContractModalOpen} 
-        contractToEdit={editTarget}
-        onClose={() => {
-          setIsContractModalOpen(false);
-          setEditTarget(null);
-        }} 
-        onSuccess={() => {
-          setIsContractModalOpen(false);
-          setEditTarget(null);
-          toast.success("Contract saved successfully");
-          fetchContracts();
-        }}
-      />
 
 
     </div>
