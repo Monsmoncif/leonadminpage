@@ -29,7 +29,8 @@ import {
   Coins,
   Fuel,
   Plus,
-  Trash2
+  Trash2,
+  Image as ImageIcon
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -53,6 +54,57 @@ const DISPATCH_STEPS = [
   { id: 2, title: "Assign Driver", icon: UserCheck },
   { id: 3, title: "Review & Dispatch", icon: Send },
 ];
+
+// Fast client-side image compression for mobile camera photos
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = (event.target?.result as string) || "";
+      if (!result) return resolve("");
+      try {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            let width = img.width || 800;
+            let height = img.height || 600;
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width = Math.round((width * MAX_HEIGHT) / height);
+                height = MAX_HEIGHT;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL("image/jpeg", 0.8));
+              return;
+            }
+            resolve(result);
+          } catch {
+            resolve(result);
+          }
+        };
+        img.onerror = () => resolve(result);
+        img.src = result;
+      } catch {
+        resolve(result);
+      }
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+};
 
 function ReturnPageContent() {
   const searchParams = useSearchParams();
@@ -82,6 +134,7 @@ function ReturnPageContent() {
   const [damagePhotos, setDamagePhotos] = useState<string[]>([]);
   const [isUploadingDamagePhoto, setIsUploadingDamagePhoto] = useState(false);
   const [moneyPhotos, setMoneyPhotos] = useState<string[]>([]);
+  const [moneyUploadMode, setMoneyUploadMode] = useState<"camera" | "gallery">("camera");
   const [isUploadingMoneyPhoto, setIsUploadingMoneyPhoto] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [salikCharge, setSalikCharge] = useState<string>("0");
@@ -313,17 +366,13 @@ function ReturnPageContent() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-        });
+        const base64 = await compressImage(file);
+        if (!base64) continue;
 
         const res = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: base64 }),
+          body: JSON.stringify({ image: base64, folder: "wheelzie_settlement" }),
         });
 
         if (res.ok) {
@@ -1421,47 +1470,93 @@ function ReturnPageContent() {
 
         {/* Cash & Settlement Documentation Photos */}
         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <DollarSign size={18} />
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <DollarSign size={20} />
               </div>
               <div>
-                <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
-                  <span>Cash &amp; Payment Documentation (توثيق النقود / الدفع)</span>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-text-primary">
+                    Cash &amp; Payment Documentation (توثيق النقود / الدفع)
+                  </h3>
                   {moneyPhotos.length > 0 && (
                     <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
                       {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
                     </span>
                   )}
-                </h3>
-                <span className="text-[11px] text-text-muted">
+                </div>
+                <p className="text-xs text-text-muted mt-0.5">
                   Take or attach pictures of cash collected, refunded deposit, or payment receipts
-                </span>
+                </p>
               </div>
             </div>
 
-            {/* Direct Take/Add Button in header */}
-            <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-              isUploadingMoneyPhoto
-                ? "bg-gray-100 border-gray-200 text-gray-400 pointer-events-none"
-                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 shadow-2xs"
-            }`}>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleMoneyPhotoUpload}
-                disabled={isUploadingMoneyPhoto}
-              />
-              {isUploadingMoneyPhoto ? (
-                <Loader2 size={13} className="animate-spin text-emerald-600" />
-              ) : (
-                <Camera size={13} className="text-emerald-600" />
-              )}
-              <span>{isUploadingMoneyPhoto ? "Uploading..." : "Take / Add Picture"}</span>
-            </label>
+            {/* Mode Switcher matching Vehicle Return Inspection */}
+            <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
+              {/* Mode Switcher Pill */}
+              <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setMoneyUploadMode("camera")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    moneyUploadMode === "camera"
+                      ? "bg-white text-emerald-700 shadow-xs font-bold"
+                      : "text-text-muted hover:text-text-primary"
+                  }`}
+                  title="Camera Direct Mode"
+                >
+                  <Camera size={14} className={moneyUploadMode === "camera" ? "text-emerald-600" : "text-text-muted"} />
+                  <span>Camera</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMoneyUploadMode("gallery")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    moneyUploadMode === "gallery"
+                      ? "bg-white text-emerald-700 shadow-xs font-bold"
+                      : "text-text-muted hover:text-text-primary"
+                  }`}
+                  title="Gallery Mode"
+                >
+                  <ImageIcon size={14} className={moneyUploadMode === "gallery" ? "text-emerald-600" : "text-text-muted"} />
+                  <span>Gallery</span>
+                </button>
+              </div>
+
+              {/* Action Trigger Button */}
+              <label className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-2xs ${
+                isUploadingMoneyPhoto
+                  ? "bg-gray-100 border-gray-200 text-gray-400 pointer-events-none"
+                  : "bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white shadow-xs"
+              }`}>
+                <input
+                  key={moneyUploadMode}
+                  type="file"
+                  accept="image/*"
+                  capture={moneyUploadMode === "camera" ? "environment" : undefined}
+                  multiple={moneyUploadMode === "gallery"}
+                  className="hidden"
+                  onClick={(e) => { e.currentTarget.value = ""; }}
+                  onChange={handleMoneyPhotoUpload}
+                  disabled={isUploadingMoneyPhoto}
+                />
+                {isUploadingMoneyPhoto ? (
+                  <Loader2 size={13} className="animate-spin text-white" />
+                ) : moneyUploadMode === "camera" ? (
+                  <Camera size={13} className="text-white" />
+                ) : (
+                  <ImageIcon size={13} className="text-white" />
+                )}
+                <span>
+                  {isUploadingMoneyPhoto
+                    ? "Uploading..."
+                    : moneyUploadMode === "camera"
+                    ? "Take Photo"
+                    : "Choose from Gallery"}
+                </span>
+              </label>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
@@ -1489,17 +1584,20 @@ function ReturnPageContent() {
               </div>
             ))}
 
-            {/* Upload Button Tile */}
+            {/* Upload Button Tile matching mode */}
             <label className={`aspect-square rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group text-center p-2 ${
               isUploadingMoneyPhoto 
                 ? "opacity-50 pointer-events-none border-gray-300 bg-gray-50" 
                 : "border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/60"
             }`}>
               <input
+                key={`tile-${moneyUploadMode}`}
                 type="file"
                 accept="image/*"
-                multiple
+                capture={moneyUploadMode === "camera" ? "environment" : undefined}
+                multiple={moneyUploadMode === "gallery"}
                 className="hidden"
+                onClick={(e) => { e.currentTarget.value = ""; }}
                 onChange={handleMoneyPhotoUpload}
                 disabled={isUploadingMoneyPhoto}
               />
@@ -1507,22 +1605,56 @@ function ReturnPageContent() {
                 <Loader2 size={20} className="animate-spin text-emerald-600" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Plus size={16} />
+                  {moneyUploadMode === "camera" ? <Camera size={16} /> : <ImageIcon size={16} />}
                 </div>
               )}
               <span className="text-[11px] font-bold text-emerald-700">
-                {isUploadingMoneyPhoto ? "Uploading..." : "+ Add Photo"}
+                {isUploadingMoneyPhoto
+                  ? "Uploading..."
+                  : moneyUploadMode === "camera"
+                  ? "+ Take Photo"
+                  : "+ Open Gallery"}
               </span>
               <span className="text-[9px] text-text-muted">
-                Money / Receipt
+                {moneyUploadMode === "camera" ? "Camera Mode" : "Gallery Mode"}
               </span>
             </label>
           </div>
 
           {moneyPhotos.length === 0 && (
-            <p className="text-center text-xs text-text-muted py-1">
-              No money photos attached yet. Click above if you want to take or attach a photo of cash or payment receipt.
-            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl border border-dashed border-gray-200 bg-gray-50/50">
+              <span className="text-xs text-text-muted">
+                No money photos attached yet. Admin can take a photo of cash or upload a receipt.
+              </span>
+              <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+                <label className="px-3.5 py-1.5 rounded-lg bg-white text-emerald-700 shadow-2xs font-bold flex items-center gap-1.5 cursor-pointer hover:bg-emerald-50 transition-all">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onClick={(e) => { e.currentTarget.value = ""; }}
+                    onChange={handleMoneyPhotoUpload}
+                    disabled={isUploadingMoneyPhoto}
+                  />
+                  <Camera size={13} className="text-emerald-600" />
+                  <span>Camera</span>
+                </label>
+                <label className="px-3.5 py-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 flex items-center gap-1.5 cursor-pointer transition-all">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onClick={(e) => { e.currentTarget.value = ""; }}
+                    onChange={handleMoneyPhotoUpload}
+                    disabled={isUploadingMoneyPhoto}
+                  />
+                  <ImageIcon size={13} className="text-emerald-600" />
+                  <span>Gallery</span>
+                </label>
+              </div>
+            </div>
           )}
         </div>
 
