@@ -1,13 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { v2 as cloudinary } from "cloudinary";
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+import fs from "fs/promises";
+import path from "path";
 
 // Cooldown tracker to skip failing or decommissioned AI providers instead of waiting on repeated timeouts
 const providerCooldown = new Map<string, number>();
@@ -76,6 +71,18 @@ export async function POST(req: NextRequest) {
             base64Data = img.split(",")[1] || img;
           }
           fullDataUrl = img;
+        } else if (img.startsWith("/uploads/") || img.startsWith("uploads/")) {
+          try {
+            const cleanPath = img.replace(/^\/+/, "");
+            const filePath = path.join(process.cwd(), "public", cleanPath);
+            const fileBuffer = await fs.readFile(filePath);
+            const ext = path.extname(filePath).toLowerCase().replace(".", "");
+            mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+            base64Data = fileBuffer.toString("base64");
+            fullDataUrl = `data:${mimeType};base64,${base64Data}`;
+          } catch (localErr) {
+            console.warn("Could not read local file for OCR:", img, localErr);
+          }
         } else if (img.startsWith("http://") || img.startsWith("https://")) {
           try {
             const resp = await fetch(img);
