@@ -117,13 +117,14 @@ export default function ContractsPage() {
       const res = await fetch(`/api/contracts/${contract._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveryStatus: "Delivered", status: "Active" }),
+        body: JSON.stringify({ deliveryStatus: "Delivered", status: "Active", notifyClient: true }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
         throw new Error(errJson?.error || "Failed to confirm handover");
       }
-      toast.success(`Handover confirmed! Contract #${contract.id || contract._id.slice(-6)} is now Active.`);
+      const contractNum = contract.contractNumber || contract.id || contract._id.slice(-6);
+      toast.success(`Handover confirmed! Contract #${contractNum} is now Active and notification sent to client.`);
       fetchContracts();
     } catch (err: any) {
       toast.error(err.message || "Failed to confirm delivery");

@@ -273,7 +273,12 @@ export async function PUT(
     }
 
     // Auto-send initial contract PDF to client once vehicle handover is confirmed (Delivered)
-    if (body.deliveryStatus === "Delivered" && existingContract.deliveryStatus !== "Delivered") {
+    const isHandoverConfirmation = 
+      Boolean(body.notifyClient) ||
+      (body.deliveryStatus === "Delivered" && existingContract.deliveryStatus !== "Delivered") ||
+      (body.status === "Active" && existingContract.status !== "Active" && (body.deliveryStatus === "Delivered" || existingContract.deliveryStatus === "Delivered"));
+
+    if (isHandoverConfirmation) {
       sendClientContractNotification(resolvedParams.id, "initial").catch(e => console.error("Client contract send trigger failed (background):", e));
     }
 
