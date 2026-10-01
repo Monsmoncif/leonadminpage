@@ -1325,15 +1325,6 @@ export default function NewRentalAdminPage() {
                   </span>
                 </div>
               </div>
-
-              {/* Fuel Level Selector */}
-              <div>
-                <FuelLevelSelector
-                  value={rentalData.checkoutFuelLevel}
-                  onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
-                  label={contractType === "Delivery" ? "Fuel Level Percentage (مستوى الوقود عند التسليم للسائق)" : "Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"}
-                />
-              </div>
             </div>
           </div>
 
@@ -1856,6 +1847,15 @@ export default function NewRentalAdminPage() {
             Take or upload 8 standard angles to document vehicle condition before client handover at the shop
           </p>
         </div>
+      </div>
+
+      {/* Fuel Level at Checkout */}
+      <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+        <FuelLevelSelector
+          value={rentalData.checkoutFuelLevel}
+          onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
+          label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
+        />
       </div>
 
       <VehicleInspectionPhotoCapture

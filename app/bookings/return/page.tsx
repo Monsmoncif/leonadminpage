@@ -813,15 +813,6 @@ function ReturnPageContent() {
                   </div>
                 </div>
 
-                {/* Return Fuel Level Selector Card */}
-                <div className="bg-white rounded-2xl border border-border p-5 shadow-2xs">
-                  <FuelLevelSelector
-                    value={returnFuelLevel}
-                    onChange={(val) => setReturnFuelLevel(val)}
-                    label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
-                    sublabel={`Handover baseline was ${selectedContract?.checkoutFuelLevel !== undefined ? selectedContract.checkoutFuelLevel : 100}%. Select current tank percentage.`}
-                  />
-                </div>
               </div>
             ) : (
               /* Dispatch Mode: Pickup Logistics Card */
@@ -933,6 +924,16 @@ function ReturnPageContent() {
         </div>
       </div>
 
+      {/* Return Fuel Level */}
+      <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+        <FuelLevelSelector
+          value={returnFuelLevel}
+          onChange={(val) => setReturnFuelLevel(val)}
+          label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
+          sublabel={`Handover baseline was ${selectedContract?.checkoutFuelLevel !== undefined ? selectedContract.checkoutFuelLevel : 100}%. Select current tank percentage.`}
+        />
+      </div>
+
       <VehicleInspectionPhotoCapture
         photos={returnPhotos}
         onChange={setReturnPhotos}
@@ -946,6 +947,7 @@ function ReturnPageContent() {
   // ===================== STEP 3 (Shop): DAMAGE CHECK =====================
   const renderDamageStep = () => (
     <div className="space-y-6 animate-fade-in-up">
+      {/* Header */}
       <div>
         <h2 className="text-lg font-bold text-text-primary">Step 3: Damage Inspection (فحص الأضرار)</h2>
         <p className="text-xs text-text-muted mt-0.5">
@@ -953,136 +955,195 @@ function ReturnPageContent() {
         </p>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
-        <label className="text-sm font-bold text-text-primary flex items-center gap-2">
-          <AlertTriangle size={18} className={hasDamages ? "text-red-500" : "text-brand"} />
-          <span>Were Any New Damages Found Upon Return? (هل توجد أي أضرار جديدة؟)</span>
-        </label>
-
-        {/* Binary Choice Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => {
-              setHasDamages(false);
-              setDamageDescription("");
-              setDamageCost("0");
-              setDamagePhotos([]);
-            }}
-            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3.5 text-left ${
-              !hasDamages
-                ? "border-emerald-500 bg-emerald-50/70 shadow-sm"
-                : "border-border bg-white hover:bg-gray-50 text-text-muted"
-            }`}
-          >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-              !hasDamages ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-400"
-            }`}>
-              <CheckCircle size={20} />
-            </div>
-            <div>
-              <strong className={`block text-sm font-bold ${!hasDamages ? "text-emerald-950" : "text-text-primary"}`}>
-                No New Damages (سليمة تماماً)
-              </strong>
-              <span className="text-xs text-text-muted">Vehicle returned in clean condition without new scratches or dents</span>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setHasDamages(true)}
-            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3.5 text-left ${
-              hasDamages
-                ? "border-red-500 bg-red-50/70 shadow-sm"
-                : "border-border bg-white hover:bg-gray-50 text-text-muted"
-            }`}
-          >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-              hasDamages ? "bg-red-600 text-white" : "bg-gray-100 text-gray-400"
-            }`}>
-              <AlertTriangle size={20} />
-            </div>
-            <div>
-              <strong className={`block text-sm font-bold ${hasDamages ? "text-red-950" : "text-text-primary"}`}>
-                New Damages Found (توجد أضرار)
-              </strong>
-              <span className="text-xs text-text-muted">New scratches, dents, cracked glass, or interior stains noticed</span>
-            </div>
-          </button>
+      {/* Status Banner */}
+      <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border transition-all duration-300 ${
+        hasDamages 
+          ? "bg-gradient-to-r from-red-50 to-red-100/60 border-red-200" 
+          : "bg-gradient-to-r from-emerald-50 to-emerald-100/60 border-emerald-200"
+      }`}>
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+          hasDamages ? "bg-red-500 text-white" : "bg-emerald-500 text-white"
+        }`}>
+          {hasDamages ? <AlertTriangle size={18} /> : <ShieldCheck size={18} />}
         </div>
+        <div>
+          <p className={`text-sm font-bold ${hasDamages ? "text-red-800" : "text-emerald-800"}`}>
+            {hasDamages ? "Damages Reported — Details Required" : "No Damages — Vehicle in Good Condition"}
+          </p>
+          <p className={`text-[11px] ${hasDamages ? "text-red-600" : "text-emerald-600"}`}>
+            {hasDamages 
+              ? `${damagePhotos.length} photo(s) attached • ${damageDescription ? "Description provided" : "Description needed"}`
+              : "All body panels, glass, and interior have been inspected and cleared"
+            }
+          </p>
+        </div>
+      </div>
 
-        {/* Detailed Damage Form If Damages Marked */}
-        {hasDamages && (
-          <div className="p-5 bg-red-50/70 rounded-2xl border border-red-200 space-y-4 animate-fade-in">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-red-950 mb-1.5">
-                  Damage Description (وصف الأضرار بالتفصيل) <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={damageDescription}
-                  onChange={(e) => setDamageDescription(e.target.value)}
-                  placeholder="Describe each damaged part clearly (e.g. Dent on front right fender, deep scratch on rear bumper...)"
-                  className="w-full p-3 rounded-xl border border-red-200 bg-white text-xs text-text-primary focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none resize-none font-medium"
-                  required
-                />
+      {/* Binary Choice Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button
+          type="button"
+          onClick={() => {
+            setHasDamages(false);
+            setDamageDescription("");
+            setDamageCost("0");
+            setDamagePhotos([]);
+          }}
+          className={`group relative p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer text-left ${
+            !hasDamages
+              ? "border-emerald-500 bg-emerald-50/80 shadow-md ring-2 ring-emerald-500/20"
+              : "border-gray-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 hover:shadow-sm"
+          }`}
+        >
+          <div className="flex items-start gap-4">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+              !hasDamages 
+                ? "bg-emerald-600 text-white shadow-sm" 
+                : "bg-gray-100 text-gray-400 group-hover:bg-emerald-100 group-hover:text-emerald-600"
+            }`}>
+              <ShieldCheck size={22} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <strong className={`block text-sm font-bold mb-0.5 ${!hasDamages ? "text-emerald-900" : "text-text-primary"}`}>
+                No New Damages
+              </strong>
+              <span className="text-[11px] text-text-muted leading-tight block">سليمة تماماً — Vehicle returned in clean condition</span>
+            </div>
+            {!hasDamages && (
+              <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                <Check size={14} strokeWidth={3} />
               </div>
+            )}
+          </div>
+        </button>
 
-              <div>
-                <label className="block text-xs font-bold text-red-950 mb-1.5">
-                  Estimated Repair Cost ($)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-sm text-red-600">$</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={damageCost}
-                    onChange={(e) => setDamageCost(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full p-3 pl-8 rounded-xl border border-red-200 bg-white text-base font-bold text-red-600 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none"
+        <button
+          type="button"
+          onClick={() => setHasDamages(true)}
+          className={`group relative p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer text-left ${
+            hasDamages
+              ? "border-red-500 bg-red-50/80 shadow-md ring-2 ring-red-500/20"
+              : "border-gray-200 bg-white hover:border-red-300 hover:bg-red-50/30 hover:shadow-sm"
+          }`}
+        >
+          <div className="flex items-start gap-4">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+              hasDamages 
+                ? "bg-red-600 text-white shadow-sm" 
+                : "bg-gray-100 text-gray-400 group-hover:bg-red-100 group-hover:text-red-600"
+            }`}>
+              <AlertTriangle size={22} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <strong className={`block text-sm font-bold mb-0.5 ${hasDamages ? "text-red-900" : "text-text-primary"}`}>
+                Damages Found
+              </strong>
+              <span className="text-[11px] text-text-muted leading-tight block">توجد أضرار — Scratches, dents, or interior damage</span>
+            </div>
+            {hasDamages && (
+              <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0">
+                <Check size={14} strokeWidth={3} />
+              </div>
+            )}
+          </div>
+        </button>
+      </div>
+
+      {/* Damage Details Panel (Expanded) */}
+      {hasDamages && (
+        <div className="space-y-5 animate-fade-in">
+          {/* Description & Cost Row */}
+          <div className="bg-white rounded-2xl border border-red-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-3.5 bg-red-50/80 border-b border-red-100 flex items-center gap-2">
+              <FileText size={15} className="text-red-600" />
+              <span className="text-xs font-bold text-red-900">Damage Report Details (تفاصيل تقرير الأضرار)</span>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2">
+                  <label className="block text-xs font-semibold text-text-secondary mb-1.5 flex items-center gap-1">
+                    <span>Description</span>
+                    <span className="text-red-500">*</span>
+                    <span className="text-text-muted font-normal">(وصف الأضرار بالتفصيل)</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={damageDescription}
+                    onChange={(e) => setDamageDescription(e.target.value)}
+                    placeholder="Describe each damaged part clearly (e.g. Dent on front right fender, deep scratch on rear bumper, cracked side mirror...)"
+                    className="w-full p-3.5 rounded-xl border border-gray-200 bg-gray-50/50 text-sm text-text-primary focus:ring-2 focus:ring-red-500/20 focus:border-red-400 focus:bg-white outline-none resize-none font-medium transition-all placeholder:text-gray-400"
+                    required
                   />
                 </div>
-                <span className="text-[10px] text-red-700 mt-1 block">Amount charged directly to customer</span>
+
+                <div className="flex flex-col">
+                  <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                    Estimated Repair Cost (تكلفة الإصلاح)
+                  </label>
+                  <div className="relative flex-1">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-lg text-red-500">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={damageCost}
+                      onChange={(e) => setDamageCost(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full h-full p-3.5 pl-10 rounded-xl border border-gray-200 bg-gray-50/50 text-2xl font-bold text-red-600 focus:ring-2 focus:ring-red-500/20 focus:border-red-400 focus:bg-white outline-none transition-all"
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5 px-1">
+                    <DollarSign size={11} className="text-red-400" />
+                    <span className="text-[10px] text-text-muted">Charged to customer's deposit balance</span>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
 
-            {/* Damage Photos Capture */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-red-950 flex items-center gap-1.5">
-                  <Camera size={14} className="text-red-600" />
-                  <span>Damage Photos (صور توثيق الأضرار)</span>
-                  {damagePhotos.length > 0 && (
-                    <span className="bg-red-200 text-red-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      {damagePhotos.length}
-                    </span>
-                  )}
-                </label>
-                <span className="text-[11px] text-red-700">Take clear close-up photos of damaged areas</span>
+          {/* Damage Photos Section */}
+          <div className="bg-white rounded-2xl border border-red-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-3.5 bg-red-50/80 border-b border-red-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Camera size={15} className="text-red-600" />
+                <span className="text-xs font-bold text-red-900">Damage Evidence Photos (صور توثيق الأضرار)</span>
+                {damagePhotos.length > 0 && (
+                  <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {damagePhotos.length}
+                  </span>
+                )}
               </div>
-
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              <span className="text-[11px] text-red-600 hidden sm:block">Clear, close-up photos of each damaged area</span>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {damagePhotos.map((url, idx) => (
-                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-red-200 shadow-xs bg-gray-100">
-                    <img src={url} alt={`Damage ${idx + 1}`} className="w-full h-full object-cover" />
+                  <div key={idx} className="relative group aspect-[4/3] rounded-xl overflow-hidden border border-gray-200 shadow-xs bg-gray-100">
+                    <img src={url} alt={`Damage ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     <button
                       type="button"
                       onClick={() => handleRemoveDamagePhoto(idx)}
-                      className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 cursor-pointer"
+                      className="absolute top-2 right-2 p-1.5 bg-red-600/90 text-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 hover:bg-red-700 transition-all duration-200 cursor-pointer backdrop-blur-sm"
                       title="Delete Photo"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={13} />
                     </button>
-                    <span className="absolute bottom-1 left-1.5 text-[9px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
-                      #{idx + 1}
-                    </span>
+                    <div className="absolute bottom-0 left-0 right-0 px-2.5 py-1.5 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                        Damage #{idx + 1}
+                      </span>
+                    </div>
                   </div>
                 ))}
 
-                <label className={`aspect-square rounded-xl border-2 border-dashed border-red-300 hover:border-red-500 bg-white hover:bg-red-50/50 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group text-center p-2 ${isUploadingDamagePhoto ? "opacity-50 pointer-events-none" : ""}`}>
+                {/* Upload Button */}
+                <label className={`aspect-[4/3] rounded-xl border-2 border-dashed transition-all duration-200 flex flex-col items-center justify-center gap-2 cursor-pointer group text-center ${
+                  isUploadingDamagePhoto 
+                    ? "opacity-50 pointer-events-none border-gray-300 bg-gray-50" 
+                    : "border-red-300 hover:border-red-500 bg-red-50/30 hover:bg-red-50/70 hover:shadow-sm"
+                }`}>
                   <input
                     type="file"
                     accept="image/*"
@@ -1092,21 +1153,47 @@ function ReturnPageContent() {
                     disabled={isUploadingDamagePhoto}
                   />
                   {isUploadingDamagePhoto ? (
-                    <Loader2 size={20} className="animate-spin text-red-600" />
+                    <Loader2 size={24} className="animate-spin text-red-500" />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Plus size={16} />
+                    <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-red-200 transition-all duration-200">
+                      <Camera size={18} />
                     </div>
                   )}
-                  <span className="text-[11px] font-bold text-red-700">
-                    {isUploadingDamagePhoto ? "Uploading..." : "+ Add Photo"}
-                  </span>
+                  <div className="text-center">
+                    <span className="text-xs font-bold text-red-700 block">
+                      {isUploadingDamagePhoto ? "Uploading..." : "Add Photo"}
+                    </span>
+                    <span className="text-[10px] text-red-500">Tap or click</span>
+                  </div>
                 </label>
               </div>
+
+              {damagePhotos.length === 0 && (
+                <p className="text-center text-xs text-text-muted mt-3 py-2">
+                  No damage photos added yet. Upload clear evidence to support your report.
+                </p>
+              )}
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Damage Summary Footer */}
+          {(Number(damageCost) > 0 || damageDescription) && (
+            <div className="flex items-center justify-between px-5 py-3 bg-red-50/60 rounded-xl border border-red-100">
+              <div className="flex items-center gap-2 text-xs text-red-800">
+                <AlertTriangle size={14} />
+                <span className="font-medium">
+                  {damageDescription ? damageDescription.substring(0, 80) + (damageDescription.length > 80 ? "..." : "") : "No description yet"}
+                </span>
+              </div>
+              {Number(damageCost) > 0 && (
+                <span className="text-sm font-bold text-red-700 bg-red-100 px-3 py-1 rounded-lg">
+                  ${Number(damageCost).toFixed(2)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 

@@ -1415,14 +1415,6 @@ export default function CreateContractModal({
                           </div>
                         </div>
 
-                        {/* Fuel Level Selector */}
-                        <div>
-                          <FuelLevelSelector
-                            value={formData.checkoutFuelLevel}
-                            onChange={(val) => setFormData({ ...formData, checkoutFuelLevel: val })}
-                            label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
-                          />
-                        </div>
                       </div>
                     </div>
 
@@ -1614,6 +1606,15 @@ export default function CreateContractModal({
                     <p className="text-xs text-text-muted mt-0.5">
                       Capture or upload 8 standard angles to document vehicle condition before handing over to the client
                     </p>
+                  </div>
+
+                  {/* Fuel Level at Checkout */}
+                  <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+                    <FuelLevelSelector
+                      value={formData.checkoutFuelLevel}
+                      onChange={(val) => setFormData({ ...formData, checkoutFuelLevel: val })}
+                      label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
+                    />
                   </div>
 
                   <VehicleInspectionPhotoCapture

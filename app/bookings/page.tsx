@@ -15,7 +15,6 @@ import {
   AlertCircle, 
   Loader2, 
   Trash2, 
-  Eye, 
   ArrowLeftRight,
   UserCheck,
   CheckCircle,
@@ -24,7 +23,7 @@ import {
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import CreateContractModal from "@/components/modals/CreateContractModal";
-import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
+
 import { useToast } from "@/components/providers/ToastProvider";
 
 // Helper for generating initials for avatars (matches clients page)
@@ -91,8 +90,7 @@ export default function ContractsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [selectedContractForDetails, setSelectedContractForDetails] = useState<any>(null);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
   
   // Pagination (matches clients page UI/UX)
   const [currentPage, setCurrentPage] = useState(1);
@@ -503,14 +501,7 @@ export default function ContractsPage() {
                           >
                             {/* Contract Column */}
                             <td className="py-3 px-4">
-                              <span 
-                                className="font-semibold text-text-primary hover:text-brand cursor-pointer transition-colors"
-                                title="عرض تفاصيل العقد • View Details"
-                                onClick={() => {
-                                  setSelectedContractForDetails(contract);
-                                  setIsDetailsModalOpen(true);
-                                }}
-                              >
+                              <span className="font-semibold text-text-primary">
                                 {contract.id}
                               </span>
                             </td>
@@ -522,14 +513,7 @@ export default function ContractsPage() {
                                   {getInitials(contract.customer)}
                                 </div>
                                 <div className="min-w-0">
-                                  <span 
-                                    className="font-semibold flex items-center gap-1.5 transition-colors text-text-primary hover:text-brand cursor-pointer" 
-                                    title={`عرض تفاصيل: ${contract.customer}`}
-                                    onClick={() => {
-                                      setSelectedContractForDetails(contract);
-                                      setIsDetailsModalOpen(true);
-                                    }}
-                                  >
+                                  <span className="font-semibold flex items-center gap-1.5 text-text-primary">
                                     {contract.customer}
                                   </span>
                                   {(() => {
@@ -679,17 +663,7 @@ export default function ContractsPage() {
                                     </button>
                                   );
                                 })()}
-                                <button 
-                                  className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
-                                  title="View Details" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedContractForDetails(contract);
-                                    setIsDetailsModalOpen(true);
-                                  }}
-                                >
-                                  <Eye size={16} />
-                                </button>
+
                                 <button 
                                   className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
                                   title="Edit Contract" 
@@ -850,20 +824,7 @@ export default function ContractsPage() {
         }}
       />
 
-      {/* Contract Details Modal */}
-      <ContractDetailsModal
-        isOpen={isDetailsModalOpen}
-        onClose={() => {
-          setIsDetailsModalOpen(false);
-          setSelectedContractForDetails(null);
-        }}
-        contract={selectedContractForDetails}
-        onEdit={(contractToEdit) => {
-          setIsDetailsModalOpen(false);
-          setEditTarget(contractToEdit);
-          setIsContractModalOpen(true);
-        }}
-      />
+
     </div>
   );
 }
