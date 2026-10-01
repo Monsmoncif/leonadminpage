@@ -266,6 +266,7 @@ export default function ContractDetailsModal({
   const returnNotes = getReturnNotes(contractData.notes, contractData.returnNotes);
   const inspectionPhotos: string[] = contractData.inspectionPhotos || [];
   const returnPhotos: string[] = contractData.returnPhotos || [];
+  const moneyPhotos: string[] = contractData.moneyPhotos || [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
@@ -966,6 +967,38 @@ export default function ContractDetailsModal({
                   </div>
                 )}
               </div>
+
+              {/* Money & Settlement Payment Photos */}
+              {moneyPhotos.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <DollarSign size={14} className="text-emerald-600" />
+                      Cash &amp; Payment Proof Photos ({moneyPhotos.length} photos)
+                    </span>
+                    <span className="text-[11px] text-emerald-700 font-medium">Settlement Records</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3.5">
+                    {moneyPhotos.map((photoUrl, index) => (
+                      <div 
+                        key={index}
+                        onClick={() => setPreviewImage(photoUrl)}
+                        className="relative h-[125px] sm:h-[145px] md:h-[165px] w-full rounded-xl sm:rounded-2xl border border-emerald-100 overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer"
+                        title="Click to enlarge"
+                      >
+                        <img src={photoUrl} alt={`Money Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                          <Maximize2 size={16} />
+                        </div>
+                        <div className="absolute bottom-1.5 left-2 bg-emerald-950/80 text-white text-[10px] font-semibold px-2 py-0.5 rounded border border-emerald-900/50">
+                          Cash Proof #{index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Recorded Damages / Charges */}
               {(damages.length > 0 || (contractData.newDamages && contractData.newDamages !== "None")) && (

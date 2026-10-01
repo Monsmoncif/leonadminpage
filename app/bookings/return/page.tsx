@@ -81,6 +81,9 @@ function ReturnPageContent() {
   const [damageCost, setDamageCost] = useState<string>("0");
   const [damagePhotos, setDamagePhotos] = useState<string[]>([]);
   const [isUploadingDamagePhoto, setIsUploadingDamagePhoto] = useState(false);
+  const [moneyPhotos, setMoneyPhotos] = useState<string[]>([]);
+  const [isUploadingMoneyPhoto, setIsUploadingMoneyPhoto] = useState(false);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [salikCharge, setSalikCharge] = useState<string>("0");
   const [parkingCharge, setParkingCharge] = useState<string>("0");
   const [finesCharge, setFinesCharge] = useState<string>("0");
@@ -193,6 +196,7 @@ function ReturnPageContent() {
       setDamageDescription("");
       setDamageCost("0");
       setDamagePhotos([]);
+      setMoneyPhotos(Array.isArray(selectedContract.moneyPhotos) ? selectedContract.moneyPhotos : []);
       setSalikCharge(String(selectedContract.salikFees || selectedContract.salikCharge || 0));
       setParkingCharge(String(selectedContract.parkingFees || selectedContract.parkingCharge || 0));
       setFinesCharge(String(selectedContract.finesFees || selectedContract.finesCharge || 0));
@@ -300,6 +304,49 @@ function ReturnPageContent() {
     setDamagePhotos((prev) => prev.filter((_, idx) => idx !== index));
   };
 
+  // Money photo uploader
+  const handleMoneyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingMoneyPhoto(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        });
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64 }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            setMoneyPhotos((prev) => [...prev, data.url]);
+          }
+        }
+      }
+      toast.success("Money photo attached successfully.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload money photo.");
+    } finally {
+      setIsUploadingMoneyPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveMoneyPhoto = (index: number) => {
+    setMoneyPhotos((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   const handleNext = () => {
     // Step 1: Contract & Mileage validation
     if (currentStep === 1) {
@@ -400,6 +447,7 @@ function ReturnPageContent() {
         }] : [],
         newDamages: hasDamages && damageDescription.trim() ? damageDescription.trim() : "None",
         damagePhotos: hasDamages ? damagePhotos : [],
+        moneyPhotos: moneyPhotos,
         paymentMethod: returnPaymentMethod,
         paymentStatus: "Paid",
         returnAmountCollected: totalReturnCharges,
@@ -1065,11 +1113,18 @@ function ReturnPageContent() {
 
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
             {damagePhotos.map((url, idx) => (
-              <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-xs bg-gray-100">
-                <img src={url} alt={`Damage ${idx + 1}`} className="w-full h-full object-cover" />
+              <div 
+                key={idx} 
+                className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-xs bg-gray-100 cursor-pointer"
+                onClick={() => setPreviewPhotoUrl(url)}
+              >
+                <img src={url} alt={`Damage ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 <button
                   type="button"
-                  onClick={() => handleRemoveDamagePhoto(idx)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveDamagePhoto(idx);
+                  }}
                   className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                   title="Delete Photo"
                 >
@@ -1361,6 +1416,113 @@ function ReturnPageContent() {
                 label="Payment Method for Extra Charges (طريقة دفع الرسوم الإضافية)"
               />
             </div>
+          )}
+        </div>
+
+        {/* Cash & Settlement Documentation Photos */}
+        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <DollarSign size={18} />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
+                  <span>Cash &amp; Payment Documentation (توثيق النقود / الدفع)</span>
+                  {moneyPhotos.length > 0 && (
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
+                    </span>
+                  )}
+                </h3>
+                <span className="text-[11px] text-text-muted">
+                  Take or attach pictures of cash collected, refunded deposit, or payment receipts
+                </span>
+              </div>
+            </div>
+
+            {/* Direct Take/Add Button in header */}
+            <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              isUploadingMoneyPhoto
+                ? "bg-gray-100 border-gray-200 text-gray-400 pointer-events-none"
+                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 shadow-2xs"
+            }`}>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleMoneyPhotoUpload}
+                disabled={isUploadingMoneyPhoto}
+              />
+              {isUploadingMoneyPhoto ? (
+                <Loader2 size={13} className="animate-spin text-emerald-600" />
+              ) : (
+                <Camera size={13} className="text-emerald-600" />
+              )}
+              <span>{isUploadingMoneyPhoto ? "Uploading..." : "Take / Add Picture"}</span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            {moneyPhotos.map((url, idx) => (
+              <div 
+                key={idx} 
+                className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-xs bg-gray-100 cursor-pointer"
+                onClick={() => setPreviewPhotoUrl(url)}
+              >
+                <img src={url} alt={`Money ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveMoneyPhoto(idx);
+                  }}
+                  className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete Photo"
+                >
+                  <Trash2 size={12} />
+                </button>
+                <span className="absolute bottom-1 left-1.5 text-[9px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded backdrop-blur-xs">
+                  #{idx + 1} Cash
+                </span>
+              </div>
+            ))}
+
+            {/* Upload Button Tile */}
+            <label className={`aspect-square rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group text-center p-2 ${
+              isUploadingMoneyPhoto 
+                ? "opacity-50 pointer-events-none border-gray-300 bg-gray-50" 
+                : "border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/60"
+            }`}>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleMoneyPhotoUpload}
+                disabled={isUploadingMoneyPhoto}
+              />
+              {isUploadingMoneyPhoto ? (
+                <Loader2 size={20} className="animate-spin text-emerald-600" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Plus size={16} />
+                </div>
+              )}
+              <span className="text-[11px] font-bold text-emerald-700">
+                {isUploadingMoneyPhoto ? "Uploading..." : "+ Add Photo"}
+              </span>
+              <span className="text-[9px] text-text-muted">
+                Money / Receipt
+              </span>
+            </label>
+          </div>
+
+          {moneyPhotos.length === 0 && (
+            <p className="text-center text-xs text-text-muted py-1">
+              No money photos attached yet. Click above if you want to take or attach a photo of cash or payment receipt.
+            </p>
           )}
         </div>
 
@@ -1701,6 +1863,29 @@ function ReturnPageContent() {
         </div>
       </div>
 
+      {/* Lightbox / Preview Modal for Photos */}
+      {previewPhotoUrl && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in"
+          onClick={() => setPreviewPhotoUrl(null)}
+        >
+          <div className="relative max-w-3xl max-h-[90vh] bg-white rounded-2xl overflow-hidden p-2 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <img src={previewPhotoUrl} alt="Preview" className="max-h-[80vh] w-auto max-w-full object-contain rounded-xl" />
+            <div className="flex items-center justify-between p-2">
+              <span className="text-xs font-bold text-text-primary">
+                Photo Preview
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewPhotoUrl(null)}
+                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-text-primary text-xs font-semibold rounded-lg transition-all cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

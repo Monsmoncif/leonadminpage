@@ -185,6 +185,9 @@ export class Contract {
   @Prop({ type: [String], default: [] })
   damagePhotos?: string[];
 
+  @Prop({ type: [String], default: [] })
+  moneyPhotos?: string[];
+
   @Prop()
   newDamages?: string;
 

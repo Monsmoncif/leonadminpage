@@ -63,6 +63,7 @@ export interface IContract extends Document {
   returnFuelLevel?: number;
   returnPhotos?: string[];
   damagePhotos?: string[];
+  moneyPhotos?: string[];
   newDamages?: string;
   damageCharge?: number;
   salikCharge?: number;
@@ -166,6 +167,7 @@ const contractSchema = new Schema<IContract>(
     returnFuelLevel: { type: Number, required: false },
     returnPhotos: { type: [String], required: false },
     damagePhotos: { type: [String], required: false },
+    moneyPhotos: { type: [String], required: false, default: [] },
     newDamages: { type: String, required: false },
     damageCharge: { type: Number, required: false, default: 0 },
     salikCharge: { type: Number, required: false, default: 0 },
