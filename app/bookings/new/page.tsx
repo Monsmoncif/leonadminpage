@@ -1919,20 +1919,13 @@ export function NewRentalAdminPageContent() {
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
-                  <span className="text-text-muted">
-                    Touch screen or drag mouse to sign.
-                  </span>
-                  {signatureData ? (
+                {signatureData && (
+                  <div className="flex items-center justify-end pt-1 text-xs">
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
                       <CheckCircle2 size={13} className="text-emerald-600" /> Signature Captured
                     </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
-                      <AlertCircle size={13} className="text-amber-600" /> Optional / Touch to Sign
-                    </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1950,13 +1943,6 @@ export function NewRentalAdminPageContent() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={autoSignAdmin}
-                    className="text-xs text-brand hover:text-brand-dark bg-brand/10 hover:bg-brand/20 px-3 py-1.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
-                  >
-                    <PenTool size={12} /> Auto-Sign ({session?.user?.name || "Admin"})
-                  </button>
                   {adminSignatureData && (
                     <button
                       type="button"
@@ -1994,20 +1980,13 @@ export function NewRentalAdminPageContent() {
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
-                <span className="text-text-muted">
-                  Drag mouse or stylus to sign.
-                </span>
-                {adminSignatureData ? (
+              {adminSignatureData && (
+                <div className="flex items-center justify-end pt-1 text-xs">
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
                     <CheckCircle2 size={13} className="text-emerald-600" /> Admin Signature Recorded
                   </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
-                    <AlertCircle size={13} className="text-red-600" /> Required / Touch to Sign
-                  </span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

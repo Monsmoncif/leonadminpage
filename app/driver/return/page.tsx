@@ -24,21 +24,75 @@ import {
   ShieldCheck,
   RotateCcw,
   Coins,
-  DollarSign
+  DollarSign,
+  Image as ImageIcon,
+  FileText
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useSession } from "next-auth/react";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
+import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
 
 const STEPS = [
   { id: 1, title: "Vehicle & Mileage", arTitle: "المركبة والعداد" },
   { id: 2, title: "Inspection Photos", arTitle: "صور الفحص" },
   { id: 3, title: "Damage Check", arTitle: "فحص الأضرار" },
-  { id: 4, title: "Review & Check-in", arTitle: "المراجعة والتأكيد" },
+  { id: 4, title: "Settlement & Check-in", arTitle: "التسوية والاسترجاع" },
 ];
+
+// Fast client-side image compression for mobile camera photos
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = (event.target?.result as string) || "";
+      if (!result) return resolve("");
+      try {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            let width = img.width || 800;
+            let height = img.height || 600;
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width = Math.round((width * MAX_HEIGHT) / height);
+                height = MAX_HEIGHT;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL("image/jpeg", 0.8));
+              return;
+            }
+            resolve(result);
+          } catch {
+            resolve(result);
+          }
+        };
+        img.onerror = () => resolve(result);
+        img.src = result;
+      } catch {
+        resolve(result);
+      }
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+};
 
 export default function VehicleReturnPage() {
   const searchParams = useSearchParams();
@@ -69,8 +123,17 @@ export default function VehicleReturnPage() {
   // Damages
   const [hasNewDamage, setHasNewDamage] = useState(false);
   const [newDamages, setNewDamages] = useState("");
+  const [damageCost, setDamageCost] = useState("0");
   const [damagePhotos, setDamagePhotos] = useState<string[]>([]);
+  const [damageUploadMode, setDamageUploadMode] = useState<"camera" | "gallery">("camera");
   const [isUploadingDamagePhoto, setIsUploadingDamagePhoto] = useState(false);
+
+  // Cash / Payment Documentation Photos
+  const [moneyPhotos, setMoneyPhotos] = useState<string[]>([]);
+  const [moneyUploadMode, setMoneyUploadMode] = useState<"camera" | "gallery">("camera");
+  const [isUploadingMoneyPhoto, setIsUploadingMoneyPhoto] = useState(false);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [returnPaymentMethod, setReturnPaymentMethod] = useState("Cash");
 
   // Final confirmation checkbox
   const [isConfirmed, setIsConfirmed] = useState(false);
@@ -176,6 +239,11 @@ export default function VehicleReturnPage() {
           }
         });
       }
+      if (Array.isArray(selectedContractData.returnMoneyPhotos)) {
+        setMoneyPhotos(selectedContractData.returnMoneyPhotos);
+      } else {
+        setMoneyPhotos([]);
+      }
       setReturnPhotos(initialPhotos);
       setIsConfirmed(false);
       setError(null);
@@ -203,6 +271,12 @@ export default function VehicleReturnPage() {
   const totalIncludedKm = dailyKmLimit * totalDays;
   const extraKm = dailyKmLimit > 0 ? Math.max(0, kmDriven - totalIncludedKm) : 0;
   const extraKmCharge = extraKm * pricePerExtraKm;
+  const damageChargeNum = hasNewDamage ? Number(damageCost) || 0 : 0;
+  const salikChargeNum = Number(salikCharge) || 0;
+  const parkingChargeNum = Number(parkingCharge) || 0;
+  const finesChargeNum = Number(finesCharge) || 0;
+  const fuelChargeNum = Number(fuelCharge) || 0;
+  const totalReturnCharges = extraKmCharge + damageChargeNum + salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum;
 
   // Damage photo uploader
   const handleDamagePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,17 +287,13 @@ export default function VehicleReturnPage() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-        });
+        const base64 = await compressImage(file);
+        if (!base64) continue;
 
         const res = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: base64 }),
+          body: JSON.stringify({ image: base64, folder: "wheelzie_damages" }),
         });
 
         if (res.ok) {
@@ -235,6 +305,7 @@ export default function VehicleReturnPage() {
           toast.error(`Failed to upload photo: ${file.name}`);
         }
       }
+      toast.success("Damage photo attached.");
     } catch (err) {
       console.error("Error uploading damage photo:", err);
       toast.error("Failed to upload damage photo.");
@@ -246,6 +317,46 @@ export default function VehicleReturnPage() {
 
   const handleRemoveDamagePhoto = (indexToRemove: number) => {
     setDamagePhotos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  // Money photo uploader
+  const handleMoneyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingMoneyPhoto(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await compressImage(file);
+        if (!base64) continue;
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64, folder: "wheelzie_settlement" }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            setMoneyPhotos((prev) => [...prev, data.url]);
+          }
+        }
+      }
+      toast.success("Payment proof photo attached successfully.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload money photo.");
+    } finally {
+      setIsUploadingMoneyPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveMoneyPhoto = (index: number) => {
+    setMoneyPhotos((prev) => prev.filter((_, idx) => idx !== index));
+    toast.info("Payment photo removed.");
   };
 
   // Step Validation & Navigation
@@ -326,18 +437,31 @@ export default function VehicleReturnPage() {
         returnOdometer: odo,
         returnFuelLevel: Number(returnFuelLevel),
         extraKmCharge: extraKmCharge,
-        salikFees: Number(salikCharge) || 0,
-        salikCharge: Number(salikCharge) || 0,
-        parkingFees: Number(parkingCharge) || 0,
-        parkingCharge: Number(parkingCharge) || 0,
-        finesFees: Number(finesCharge) || 0,
-        finesCharge: Number(finesCharge) || 0,
-        fuelFees: Number(fuelCharge) || 0,
-        fuelCharge: Number(fuelCharge) || 0,
+        damageCharge: damageChargeNum,
+        salikFees: salikChargeNum,
+        salikCharge: salikChargeNum,
+        parkingFees: parkingChargeNum,
+        parkingCharge: parkingChargeNum,
+        finesFees: finesChargeNum,
+        finesCharge: finesChargeNum,
+        fuelFees: fuelChargeNum,
+        fuelCharge: fuelChargeNum,
+        damages: hasNewDamage && newDamages.trim() ? [{
+          description: newDamages.trim(),
+          cost: damageChargeNum,
+          date: new Date()
+        }] : [],
         newDamages: damageDescription,
         damagePhotos: hasNewDamage ? damagePhotos : [],
+        moneyPhotos: selectedContractData?.moneyPhotos || [],
+        returnMoneyPhotos: moneyPhotos,
+        paymentMethod: returnPaymentMethod,
+        paymentStatus: "Paid",
+        returnAmountCollected: totalReturnCharges,
+        returnPaymentMethod: returnPaymentMethod,
         returnPhotos: orderedReturnPhotos,
         returnNotes: returnNotes.trim() ? returnNotes.trim() : selectedContractData?.returnNotes || "",
+        notes: returnNotes.trim() ? `${selectedContractData?.notes || ""}\n[Return Remarks: ${returnNotes.trim()}]`.trim() : selectedContractData?.notes,
         returnedAt: new Date().toISOString(),
         returnedBy: (session?.user as any)?.name || "Driver",
       };
@@ -517,7 +641,7 @@ export default function VehicleReturnPage() {
           </div>
         </div>
 
-        {/* Right: Return Schedule, Mileage & Fuel */}
+        {/* Right: Return Schedule & Mileage */}
         <div className="space-y-5">
           {/* Return Schedule & Mileage Card */}
           <div className="bg-white rounded-2xl border border-border p-5 space-y-4 shadow-2xs">
@@ -632,16 +756,6 @@ export default function VehicleReturnPage() {
               </div>
             </div>
           </div>
-
-          {/* Return Fuel Level Selector Card */}
-          <div className="bg-white rounded-2xl border border-border p-5 shadow-2xs">
-            <FuelLevelSelector
-              value={returnFuelLevel}
-              onChange={(val) => setReturnFuelLevel(val)}
-              label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
-              sublabel={`Handover baseline was ${selectedContractData?.checkoutFuelLevel !== undefined ? selectedContractData.checkoutFuelLevel : 100}%. Select current tank percentage.`}
-            />
-          </div>
         </div>
       </div>
     </div>
@@ -657,6 +771,16 @@ export default function VehicleReturnPage() {
             Capture or upload 8 standard angles to document vehicle condition upon client return
           </p>
         </div>
+      </div>
+
+      {/* Return Fuel Level */}
+      <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+        <FuelLevelSelector
+          value={returnFuelLevel}
+          onChange={(val) => setReturnFuelLevel(val)}
+          label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
+          sublabel={`Handover baseline was ${selectedContractData?.checkoutFuelLevel !== undefined ? selectedContractData.checkoutFuelLevel : 100}%. Select current tank percentage.`}
+        />
       </div>
 
       <VehicleInspectionPhotoCapture
@@ -679,152 +803,225 @@ export default function VehicleReturnPage() {
         </p>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
-        <label className="text-sm font-bold text-text-primary flex items-center gap-2">
-          <AlertTriangle size={18} className={hasNewDamage ? "text-red-500" : "text-brand"} />
-          <span>Were Any New Damages Found Upon Return? (هل توجد أي أضرار جديدة؟)</span>
-        </label>
+      {/* Damage Status Toggle */}
+      <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+        <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+          <ShieldCheck size={16} className="text-brand" /> Vehicle Condition (حالة السيارة)
+        </h3>
 
-        {/* Binary Choice Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2 p-1 bg-white rounded-xl border border-gray-200 shadow-xs">
           <button
             type="button"
             onClick={() => {
               setHasNewDamage(false);
               setNewDamages("");
+              setDamageCost("0");
               setDamagePhotos([]);
             }}
-            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3.5 text-left ${
+            className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               !hasNewDamage
-                ? "border-emerald-500 bg-emerald-50/70 shadow-sm"
-                : "border-border bg-white hover:bg-gray-50 text-text-muted"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
             }`}
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-              !hasNewDamage ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-400"
-            }`}>
-              <CheckCircle size={20} />
-            </div>
-            <div>
-              <strong className={`block text-sm font-bold ${!hasNewDamage ? "text-emerald-950" : "text-text-primary"}`}>
-                No New Damages (سليمة تماماً)
-              </strong>
-              <span className="text-xs text-text-muted">Vehicle returned in clean condition without new scratches or dents</span>
-            </div>
+            <ShieldCheck size={14} />
+            No Damages / سليمة
           </button>
-
           <button
             type="button"
             onClick={() => setHasNewDamage(true)}
-            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3.5 text-left ${
+            className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               hasNewDamage
-                ? "border-red-500 bg-red-50/70 shadow-sm"
-                : "border-border bg-white hover:bg-gray-50 text-text-muted"
+                ? "bg-red-600 text-white shadow-xs"
+                : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
             }`}
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-              hasNewDamage ? "bg-red-600 text-white" : "bg-gray-100 text-gray-400"
-            }`}>
-              <AlertTriangle size={20} />
-            </div>
-            <div>
-              <strong className={`block text-sm font-bold ${hasNewDamage ? "text-red-950" : "text-text-primary"}`}>
-                New Damages Found (توجد أضرار)
-              </strong>
-              <span className="text-xs text-text-muted">New scratches, dents, cracked glass, or interior stains noticed</span>
-            </div>
+            <AlertTriangle size={14} />
+            Damages Found / توجد أضرار
           </button>
         </div>
 
-        {/* Detailed Damage Form If Damages Marked */}
-        {hasNewDamage && (
-          <div className="p-5 bg-red-50/70 rounded-2xl border border-red-200 space-y-4 animate-fade-in">
-            <div>
-              <label className="block text-xs font-bold text-red-950 mb-1.5">
-                Damage Description (وصف الأضرار بالتفصيل) <span className="text-red-500">*</span>
+        <p className={`text-[11px] px-1 ${hasNewDamage ? "text-red-600" : "text-emerald-600"}`}>
+          {hasNewDamage 
+            ? `${damagePhotos.length} photo(s) attached • ${newDamages ? "Description provided" : "Description needed"}`
+            : "All body panels, glass, and interior have been inspected and cleared"
+          }
+        </p>
+      </div>
+
+      {/* Damage Details — only when damages found */}
+      {hasNewDamage && (
+        <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100 animate-fade-in">
+          <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <FileText size={16} className="text-red-600" /> Damage Report (تقرير الأضرار)
+          </h3>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Description */}
+            <div className="lg:col-span-2">
+              <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
+                <span>Damage Description (وصف الأضرار بالتفصيل)</span>
+                <span className="text-red-500">*</span>
               </label>
               <textarea
-                rows={3}
+                rows={4}
                 value={newDamages}
                 onChange={(e) => setNewDamages(e.target.value)}
-                placeholder="Describe each damaged part clearly (e.g. Dent on front right fender, deep scratch on rear bumper...)"
-                className="w-full p-3 rounded-xl border border-red-200 bg-white text-xs text-text-primary focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none resize-none font-medium"
+                placeholder="Describe each damaged part clearly (e.g. Dent on front right fender, deep scratch on rear bumper, cracked side mirror...)"
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none resize-none font-medium text-text-primary placeholder:text-gray-400"
                 required
               />
             </div>
 
-            {/* Damage Photos Capture */}
+            {/* Cost */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-red-950 flex items-center gap-1.5">
-                  <Camera size={14} className="text-red-600" />
-                  <span>Damage Photos (صور توثيق الأضرار)</span>
-                  {damagePhotos.length > 0 && (
-                    <span className="bg-red-200 text-red-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      {damagePhotos.length}
-                    </span>
-                  )}
-                </label>
-                <span className="text-[11px] text-red-700">Take clear close-up photos of damaged areas</span>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">
+                Estimated Repair Cost (تكلفة الإصلاح)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={damageCost}
+                  onChange={(e) => setDamageCost(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary"
+                />
               </div>
-
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                {damagePhotos.map((url, idx) => (
-                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-red-200 shadow-xs bg-gray-100">
-                    <img src={url} alt={`Damage ${idx + 1}`} className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveDamagePhoto(idx)}
-                      className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 cursor-pointer"
-                      title="Delete Photo"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                    <span className="absolute bottom-1 left-1.5 text-[9px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
-                      #{idx + 1}
-                    </span>
-                  </div>
-                ))}
-
-                <label className={`aspect-square rounded-xl border-2 border-dashed border-red-300 hover:border-red-500 bg-white hover:bg-red-50/50 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group text-center p-2 ${isUploadingDamagePhoto ? "opacity-50 pointer-events-none" : ""}`}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleDamagePhotoUpload}
-                    disabled={isUploadingDamagePhoto}
-                  />
-                  {isUploadingDamagePhoto ? (
-                    <Loader2 size={20} className="animate-spin text-red-600" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Plus size={16} />
-                    </div>
-                  )}
-                  <span className="text-[11px] font-bold text-red-700">
-                    {isUploadingDamagePhoto ? "Uploading..." : "+ Add Photo"}
-                  </span>
-                </label>
-              </div>
+              <span className="text-[11px] text-text-muted mt-0.5 block">Deducted from customer deposit</span>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Damage Photos — only when damages found */}
+      {hasNewDamage && (
+        <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-gray-100">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Camera size={16} className="text-red-600" /> Damage Photos (صور توثيق الأضرار)
+                {damagePhotos.length > 0 && (
+                  <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {damagePhotos.length}
+                  </span>
+                )}
+              </h3>
+              <span className="text-[11px] text-text-muted">Clear close-up photos of each damaged area</span>
+            </div>
+
+            {/* Mode Switcher: Camera vs Gallery */}
+            <div className="flex items-center p-1 bg-white rounded-xl border border-gray-200 text-xs font-semibold shadow-2xs self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setDamageUploadMode("camera")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  damageUploadMode === "camera"
+                    ? "bg-red-50 text-red-700 shadow-xs font-bold border border-red-200"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+                title="Camera Mode (التقاط بالكاميرا مباشرة)"
+              >
+                <Camera size={14} className={damageUploadMode === "camera" ? "text-red-600" : "text-text-muted"} />
+                <span>Camera</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDamageUploadMode("gallery")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  damageUploadMode === "gallery"
+                    ? "bg-red-50 text-red-700 shadow-xs font-bold border border-red-200"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+                title="Gallery Mode (رفع من المعرض)"
+              >
+                <ImageIcon size={14} className={damageUploadMode === "gallery" ? "text-red-600" : "text-text-muted"} />
+                <span>Gallery</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            {damagePhotos.map((url, idx) => (
+              <div 
+                key={idx} 
+                onClick={() => setPreviewPhotoUrl(url)}
+                className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-xs bg-gray-100 cursor-pointer"
+              >
+                <img src={url} alt={`Damage ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveDamagePhoto(idx);
+                  }}
+                  className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete Photo"
+                >
+                  <Trash2 size={12} />
+                </button>
+                <span className="absolute bottom-1 left-1.5 text-[9px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded">
+                  #{idx + 1}
+                </span>
+              </div>
+            ))}
+
+            <label className={`aspect-square rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group text-center p-2 ${
+              isUploadingDamagePhoto 
+                ? "opacity-50 pointer-events-none border-gray-300 bg-gray-50" 
+                : "border-red-300 hover:border-red-500 bg-white hover:bg-red-50/50"
+            }`}>
+              <input
+                key={damageUploadMode}
+                type="file"
+                accept="image/*"
+                capture={damageUploadMode === "camera" ? "environment" : undefined}
+                multiple={damageUploadMode === "gallery"}
+                className="hidden"
+                onClick={(e) => { e.currentTarget.value = ""; }}
+                onChange={handleDamagePhotoUpload}
+                disabled={isUploadingDamagePhoto}
+              />
+              {isUploadingDamagePhoto ? (
+                <Loader2 size={20} className="animate-spin text-red-600" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  {damageUploadMode === "camera" ? <Camera size={16} /> : <Plus size={16} />}
+                </div>
+              )}
+              <span className="text-[11px] font-bold text-red-700">
+                {isUploadingDamagePhoto 
+                  ? "Uploading..." 
+                  : damageUploadMode === "camera" 
+                    ? "Take Photo" 
+                    : "From Gallery"}
+              </span>
+            </label>
+          </div>
+
+          {damagePhotos.length === 0 && (
+            <p className="text-center text-xs text-text-muted py-1">
+              No damage photos yet. {damageUploadMode === "camera" ? "Click 'Take Photo' to capture evidence." : "Click 'From Gallery' to upload evidence."}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 
-  // ===================== STEP 4: REVIEW & CHECK-IN =====================
-  const renderReviewStep = () => (
+  // ===================== STEP 4: SETTLEMENT & CHECK-IN =====================
+  const renderSettlementStep = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div>
-        <h2 className="text-lg font-bold text-text-primary">Step 4: Review &amp; Complete Return</h2>
+        <h2 className="text-lg font-bold text-text-primary">Step 4: Settlement &amp; Complete Return</h2>
         <p className="text-xs text-text-muted mt-0.5">
-          Review vehicle inspection details and confirm completion of return check-in
+          Review vehicle inspection summary, calculate additional fees, and settle the contract.
         </p>
       </div>
 
-      {/* Summary Profile Grid (Matching Handover Cards) */}
+      {/* Executive Summary Profile Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
           <span className="text-text-muted text-xs block mb-1">Customer</span>
@@ -837,7 +1034,7 @@ export default function VehicleReturnPage() {
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
           <span className="text-text-muted text-xs block mb-1">Vehicle</span>
           <strong className="text-text-primary text-sm font-bold block truncate">{vehicleName}</strong>
-          <span className="text-xs text-text-muted font-mono">{plateNumber || ""}</span>
+          <span className="text-xs text-text-muted font-mono">{plateNumber || "NO-PLATE"}</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
@@ -857,46 +1054,7 @@ export default function VehicleReturnPage() {
         </div>
       </div>
 
-      {/* Condition & Logistics Summary */}
-      <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
-        <div className="space-y-2 text-xs">
-          <div className="flex justify-between py-1.5 border-b border-gray-100">
-            <span className="text-text-muted">Return Fuel Level:</span>
-            <span className="font-bold text-emerald-700">{returnFuelLevel}%</span>
-          </div>
-
-          <div className="flex justify-between py-1.5 border-b border-gray-100">
-            <span className="text-text-muted">Inspection Photos:</span>
-            <span className="font-bold text-text-primary">
-              {Object.values(returnPhotos).filter(Boolean).length}/8 photos captured
-            </span>
-          </div>
-
-          <div className="flex justify-between py-1.5 border-b border-gray-100 items-center">
-            <span className="text-text-muted">Physical Condition:</span>
-            {hasNewDamage ? (
-              <span className="px-2.5 py-0.5 rounded-lg bg-red-100 text-red-800 text-xs font-bold inline-flex items-center gap-1">
-                <AlertTriangle size={12} className="text-red-600" />
-                <span>New Damages Logged ({damagePhotos.length} photos)</span>
-              </span>
-            ) : (
-              <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold inline-flex items-center gap-1">
-                <CheckCircle2 size={12} className="text-emerald-600" />
-                <span>Clean / No New Damages</span>
-              </span>
-            )}
-          </div>
-
-          {returnNotes && (
-            <div className="flex justify-between py-1.5 border-b border-gray-100">
-              <span className="text-text-muted">Driver Remarks:</span>
-              <span className="font-medium text-text-primary italic text-right max-w-sm">{returnNotes}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Inspection Photos Thumbnails */}
+      {/* Condition & Inspection Photos Summary Strip */}
       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
@@ -934,7 +1092,7 @@ export default function VehicleReturnPage() {
         </div>
       </div>
 
-      {/* Additional Return Charges (SALIK, PARKING, FINES, FUEL) */}
+      {/* Additional Return Charges Card */}
       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-4">
         <div className="flex items-center justify-between pb-2 border-b border-gray-100">
           <div className="flex items-center gap-2">
@@ -943,9 +1101,9 @@ export default function VehicleReturnPage() {
               Additional Return Charges &amp; Penalties (رسوم ومخالفات الإرجاع)
             </h3>
           </div>
-          {(extraKmCharge + (Number(salikCharge) || 0) + (Number(parkingCharge) || 0) + (Number(finesCharge) || 0) + (Number(fuelCharge) || 0)) > 0 && (
+          {totalReturnCharges > 0 && (
             <span className="text-xs font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-full">
-              +${(extraKmCharge + (Number(salikCharge) || 0) + (Number(parkingCharge) || 0) + (Number(finesCharge) || 0) + (Number(fuelCharge) || 0)).toFixed(2)} Total Due
+              +${totalReturnCharges.toFixed(2)} Total Due
             </span>
           )}
         </div>
@@ -957,6 +1115,16 @@ export default function VehicleReturnPage() {
               <span className="text-red-700 text-[11px]">${pricePerExtraKm.toFixed(2)} per extra km • {totalIncludedKm.toLocaleString()} km included</span>
             </div>
             <strong className="font-bold text-sm text-red-600">+${extraKmCharge.toFixed(2)}</strong>
+          </div>
+        )}
+
+        {hasNewDamage && (
+          <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
+            <div>
+              <span className="font-bold block">Reported Vehicle Damage ({damagePhotos.length} photos)</span>
+              <span className="text-red-700 text-[11px] truncate max-w-sm block">{newDamages || "Damage reported"}</span>
+            </div>
+            <strong className="font-bold text-sm text-red-600">+${damageChargeNum.toFixed(2)}</strong>
           </div>
         )}
 
@@ -1042,20 +1210,187 @@ export default function VehicleReturnPage() {
           </div>
         </div>
 
-        {/* Summary note */}
-        {(extraKmCharge + (Number(salikCharge) || 0) + (Number(parkingCharge) || 0) + (Number(finesCharge) || 0) + (Number(fuelCharge) || 0)) > 0 ? (
-          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
-            <span className="font-semibold">Total additional charges to report/collect:</span>
-            <strong className="font-bold text-sm text-brand">
-              ${(extraKmCharge + (Number(salikCharge) || 0) + (Number(parkingCharge) || 0) + (Number(finesCharge) || 0) + (Number(fuelCharge) || 0)).toFixed(2)}
-            </strong>
-          </div>
-        ) : (
-          <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-100 text-xs text-emerald-800 flex items-center gap-2">
-            <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
-            <span>Clean return: No extra mileage, fines, parking, salik, or fuel charges.</span>
+        {/* Settlement Banner */}
+        <div className={`p-4 rounded-xl border text-center transition-all ${
+          totalReturnCharges > 0
+            ? 'bg-red-50 border-red-200 text-brand'
+            : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+        }`}>
+          {totalReturnCharges > 0 ? (
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider block text-brand">
+                Additional Settlement Due from Client
+              </span>
+              <div className="mt-1 flex items-center justify-center gap-1.5 text-brand">
+                <span className="font-black text-2xl">+${totalReturnCharges.toFixed(2)}</span>
+              </div>
+              <p className="text-xs text-red-600 mt-1">
+                Collect the remaining balance for extra mileage and/or reported damages from the client.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider block text-emerald-800">
+                Clean Return — Zero Balance Due
+              </span>
+              <div className="mt-1 flex items-center justify-center gap-1.5 text-emerald-700">
+                <span className="font-black text-2xl">$0.00 Due</span>
+              </div>
+              <p className="text-xs text-emerald-700 mt-1">
+                No extra mileage or damage fees recorded. The car will be marked Available in fleet.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Payment Method Selector if extra fees are due */}
+        {totalReturnCharges > 0 && (
+          <div className="pt-2 border-t border-border/60">
+            <PaymentMethodSelector
+              value={returnPaymentMethod}
+              onChange={(val) => setReturnPaymentMethod(val)}
+              totalAmount={totalReturnCharges}
+              totalLabel="Return Charges Due"
+              label="Payment Method for Extra Charges (طريقة دفع الرسوم الإضافية)"
+            />
           </div>
         )}
+      </div>
+
+      {/* Cash & Settlement Documentation Photos */}
+      <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <DollarSign size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-text-primary">
+                  Return Charges &amp; Settlement Proof (توثيق استلام رسوم ومخالفات الإرجاع)
+                </h3>
+                {moneyPhotos.length > 0 && (
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">
+                Take or attach pictures of money collected for additional return charges, damages, fines, or deposit settlement upon return
+              </p>
+            </div>
+          </div>
+
+          {/* Mode Switcher: Camera vs Gallery */}
+          <div className="flex items-center p-1 bg-white rounded-xl border border-gray-200 text-xs font-semibold shadow-2xs self-start sm:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setMoneyUploadMode("camera")}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                moneyUploadMode === "camera"
+                  ? "bg-emerald-50 text-emerald-700 shadow-xs font-bold border border-emerald-200"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+              title="Camera Mode (التقاط بالكاميرا مباشرة)"
+            >
+              <Camera size={14} className={moneyUploadMode === "camera" ? "text-emerald-600" : "text-text-muted"} />
+              <span>Camera</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMoneyUploadMode("gallery")}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                moneyUploadMode === "gallery"
+                  ? "bg-emerald-50 text-emerald-700 shadow-xs font-bold border border-emerald-200"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+              title="Gallery Mode (رفع من المعرض)"
+            >
+              <ImageIcon size={14} className={moneyUploadMode === "gallery" ? "text-emerald-600" : "text-text-muted"} />
+              <span>Gallery</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          {moneyPhotos.map((url, idx) => (
+            <div 
+              key={idx} 
+              className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-xs bg-gray-100 cursor-pointer"
+              onClick={() => setPreviewPhotoUrl(url)}
+            >
+              <img src={url} alt={`Return Payment ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveMoneyPhoto(idx);
+                }}
+                className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Delete Photo"
+              >
+                <Trash2 size={12} />
+              </button>
+              <span className="absolute bottom-1 left-1.5 text-[9px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded backdrop-blur-xs">
+                #{idx + 1} Return Proof
+              </span>
+            </div>
+          ))}
+
+          {/* Upload Button Tile matching mode */}
+          <label className={`aspect-square rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group text-center p-2 ${
+            isUploadingMoneyPhoto 
+              ? "opacity-50 pointer-events-none border-gray-300 bg-gray-50" 
+              : "border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/60"
+          }`}>
+            <input
+              key={moneyUploadMode}
+              type="file"
+              accept="image/*"
+              capture={moneyUploadMode === "camera" ? "environment" : undefined}
+              multiple={moneyUploadMode === "gallery"}
+              className="hidden"
+              onClick={(e) => { e.currentTarget.value = ""; }}
+              onChange={handleMoneyPhotoUpload}
+              disabled={isUploadingMoneyPhoto}
+            />
+            {isUploadingMoneyPhoto ? (
+              <Loader2 size={20} className="animate-spin text-emerald-600" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                {moneyUploadMode === "camera" ? <Camera size={16} /> : <Plus size={16} />}
+              </div>
+            )}
+            <span className="text-[11px] font-bold text-emerald-700">
+              {isUploadingMoneyPhoto
+                ? "Uploading..."
+                : moneyUploadMode === "camera"
+                ? "+ Take Photo"
+                : "+ From Gallery"}
+            </span>
+          </label>
+        </div>
+
+        {moneyPhotos.length === 0 && (
+          <p className="text-center text-xs text-text-muted py-1">
+            No return payment proof photos attached yet. {moneyUploadMode === "camera" ? "Click '+ Take Photo' to capture evidence." : "Click '+ From Gallery' to upload evidence."}
+          </p>
+        )}
+      </div>
+
+      {/* Staff Return Remarks */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
+          <FileText size={15} className="text-brand" />
+          <span>Driver Return Remarks (ملاحظات السائق)</span>
+        </label>
+        <textarea
+          rows={2}
+          value={returnNotes}
+          onChange={(e) => setReturnNotes(e.target.value)}
+          placeholder="Any additional notes or settlement remarks regarding the vehicle return..."
+          className="w-full p-3 rounded-xl border border-border bg-white text-xs outline-none focus:ring-2 focus:ring-brand/20 resize-none font-medium"
+        />
       </div>
 
       {/* Mandatory Checkbox: Confirm Return Completion */}
@@ -1085,7 +1420,7 @@ export default function VehicleReturnPage() {
     if (currentStep === 1) return renderVehicleStep();
     if (currentStep === 2) return renderPhotosStep();
     if (currentStep === 3) return renderDamageStep();
-    if (currentStep === 4) return renderReviewStep();
+    if (currentStep === 4) return renderSettlementStep();
     return null;
   };
 
@@ -1244,6 +1579,40 @@ export default function VehicleReturnPage() {
           )}
         </div>
       </div>
+      {/* Lightbox Preview Modal */}
+      {previewPhotoUrl && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewPhotoUrl(null)}
+        >
+          <div 
+            className="relative max-w-2xl max-h-[85vh] w-full flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-2 text-white">
+              <span className="text-xs font-bold flex items-center gap-1.5">
+                <ImageIcon size={15} className="text-brand" />
+                <span>Photo Preview</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewPhotoUrl(null)}
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer transition-colors"
+                title="Close preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/20 shadow-2xl bg-black/50 max-h-[75vh]">
+              <img
+                src={previewPhotoUrl}
+                alt="Full Preview"
+                className="max-h-[75vh] w-auto max-w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

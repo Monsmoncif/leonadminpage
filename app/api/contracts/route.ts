@@ -95,6 +95,7 @@ export async function GET(req: Request) {
       rawEndDate: c.endDate,
       checkoutTime: c.checkoutTime || "08:00 AM",
       checkinTime: c.checkinTime || "",
+      returnedAt: c.returnedAt || null,
       startDate: new Date(c.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
       endDate: new Date(c.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
       deposit: `$${c.depositAmount || 0}`,

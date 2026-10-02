@@ -252,6 +252,10 @@ __decorate([
     __metadata("design:type", Array)
 ], Contract.prototype, "moneyPhotos", void 0);
 __decorate([
+    (0, mongoose_1.Prop)({ type: [String], default: [] }),
+    __metadata("design:type", Array)
+], Contract.prototype, "returnMoneyPhotos", void 0);
+__decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", String)
 ], Contract.prototype, "newDamages", void 0);

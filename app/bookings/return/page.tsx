@@ -132,6 +132,7 @@ function ReturnPageContent() {
   const [damageDescription, setDamageDescription] = useState<string>("");
   const [damageCost, setDamageCost] = useState<string>("0");
   const [damagePhotos, setDamagePhotos] = useState<string[]>([]);
+  const [damageUploadMode, setDamageUploadMode] = useState<"camera" | "gallery">("camera");
   const [isUploadingDamagePhoto, setIsUploadingDamagePhoto] = useState(false);
   const [moneyPhotos, setMoneyPhotos] = useState<string[]>([]);
   const [moneyUploadMode, setMoneyUploadMode] = useState<"camera" | "gallery">("camera");
@@ -249,7 +250,7 @@ function ReturnPageContent() {
       setDamageDescription("");
       setDamageCost("0");
       setDamagePhotos([]);
-      setMoneyPhotos(Array.isArray(selectedContract.moneyPhotos) ? selectedContract.moneyPhotos : []);
+      setMoneyPhotos(Array.isArray(selectedContract.returnMoneyPhotos) ? selectedContract.returnMoneyPhotos : []);
       setSalikCharge(String(selectedContract.salikFees || selectedContract.salikCharge || 0));
       setParkingCharge(String(selectedContract.parkingFees || selectedContract.parkingCharge || 0));
       setFinesCharge(String(selectedContract.finesFees || selectedContract.finesCharge || 0));
@@ -496,7 +497,8 @@ function ReturnPageContent() {
         }] : [],
         newDamages: hasDamages && damageDescription.trim() ? damageDescription.trim() : "None",
         damagePhotos: hasDamages ? damagePhotos : [],
-        moneyPhotos: moneyPhotos,
+        moneyPhotos: selectedContract.moneyPhotos || [],
+        returnMoneyPhotos: moneyPhotos,
         paymentMethod: returnPaymentMethod,
         paymentStatus: "Paid",
         returnAmountCollected: totalReturnCharges,
@@ -1148,16 +1150,48 @@ function ReturnPageContent() {
       {/* Damage Photos — only when damages found */}
       {hasDamages && (
         <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-              <Camera size={16} className="text-red-600" /> Damage Photos (صور توثيق الأضرار)
-              {damagePhotos.length > 0 && (
-                <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  {damagePhotos.length}
-                </span>
-              )}
-            </h3>
-            <span className="text-[11px] text-text-muted hidden sm:block">Clear close-up photos of each damaged area</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Camera size={16} className="text-red-600" /> Damage Photos (صور توثيق الأضرار)
+                {damagePhotos.length > 0 && (
+                  <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {damagePhotos.length}
+                  </span>
+                )}
+              </h3>
+              <span className="text-[11px] text-text-muted mt-0.5 block">Clear close-up photos of each damaged area</span>
+            </div>
+
+            {/* Mode Switcher: Camera vs Gallery */}
+            <div className="flex items-center p-1 bg-white rounded-xl border border-gray-200 text-xs font-semibold shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setDamageUploadMode("camera")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  damageUploadMode === "camera"
+                    ? "bg-red-50 text-red-700 shadow-xs font-bold border border-red-200"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+                title="Camera Mode (التقاط بالكاميرا مباشرة)"
+              >
+                <Camera size={14} className={damageUploadMode === "camera" ? "text-red-600" : "text-text-muted"} />
+                <span>Camera</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDamageUploadMode("gallery")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  damageUploadMode === "gallery"
+                    ? "bg-red-50 text-red-700 shadow-xs font-bold border border-red-200"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+                title="Gallery Mode (رفع من المعرض)"
+              >
+                <ImageIcon size={14} className={damageUploadMode === "gallery" ? "text-red-600" : "text-text-muted"} />
+                <span>Gallery</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
@@ -1191,10 +1225,13 @@ function ReturnPageContent() {
                 : "border-red-300 hover:border-red-500 bg-white hover:bg-red-50/50"
             }`}>
               <input
+                key={damageUploadMode}
                 type="file"
                 accept="image/*"
-                multiple
+                capture={damageUploadMode === "camera" ? "environment" : undefined}
+                multiple={damageUploadMode === "gallery"}
                 className="hidden"
+                onClick={(e) => { e.currentTarget.value = ""; }}
                 onChange={handleDamagePhotoUpload}
                 disabled={isUploadingDamagePhoto}
               />
@@ -1202,18 +1239,22 @@ function ReturnPageContent() {
                 <Loader2 size={20} className="animate-spin text-red-600" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Plus size={16} />
+                  {damageUploadMode === "camera" ? <Camera size={16} /> : <Plus size={16} />}
                 </div>
               )}
               <span className="text-[11px] font-bold text-red-700">
-                {isUploadingDamagePhoto ? "Uploading..." : "+ Add Photo"}
+                {isUploadingDamagePhoto 
+                  ? "Uploading..." 
+                  : damageUploadMode === "camera" 
+                    ? "Take Photo" 
+                    : "From Gallery"}
               </span>
             </label>
           </div>
 
           {damagePhotos.length === 0 && (
             <p className="text-center text-xs text-text-muted py-1">
-              No damage photos yet. Upload clear evidence photos.
+              No damage photos yet. {damageUploadMode === "camera" ? "Click 'Take Photo' to capture evidence." : "Click 'From Gallery' to upload evidence."}
             </p>
           )}
         </div>
@@ -1478,7 +1519,7 @@ function ReturnPageContent() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-text-primary">
-                    Cash &amp; Payment Documentation (توثيق النقود / الدفع)
+                    Return Charges &amp; Settlement Proof (توثيق استلام رسوم ومخالفات الإرجاع)
                   </h3>
                   {moneyPhotos.length > 0 && (
                     <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -1487,75 +1528,39 @@ function ReturnPageContent() {
                   )}
                 </div>
                 <p className="text-xs text-text-muted mt-0.5">
-                  Take or attach pictures of cash collected, refunded deposit, or payment receipts
+                  Take or attach pictures of money collected for additional return charges, damages, fines, or deposit settlement upon return
                 </p>
               </div>
             </div>
 
-            {/* Mode Switcher matching Vehicle Return Inspection */}
-            <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
-              {/* Mode Switcher Pill */}
-              <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setMoneyUploadMode("camera")}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    moneyUploadMode === "camera"
-                      ? "bg-white text-emerald-700 shadow-xs font-bold"
-                      : "text-text-muted hover:text-text-primary"
-                  }`}
-                  title="Camera Direct Mode"
-                >
-                  <Camera size={14} className={moneyUploadMode === "camera" ? "text-emerald-600" : "text-text-muted"} />
-                  <span>Camera</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMoneyUploadMode("gallery")}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    moneyUploadMode === "gallery"
-                      ? "bg-white text-emerald-700 shadow-xs font-bold"
-                      : "text-text-muted hover:text-text-primary"
-                  }`}
-                  title="Gallery Mode"
-                >
-                  <ImageIcon size={14} className={moneyUploadMode === "gallery" ? "text-emerald-600" : "text-text-muted"} />
-                  <span>Gallery</span>
-                </button>
-              </div>
-
-              {/* Action Trigger Button */}
-              <label className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-2xs ${
-                isUploadingMoneyPhoto
-                  ? "bg-gray-100 border-gray-200 text-gray-400 pointer-events-none"
-                  : "bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white shadow-xs"
-              }`}>
-                <input
-                  key={moneyUploadMode}
-                  type="file"
-                  accept="image/*"
-                  capture={moneyUploadMode === "camera" ? "environment" : undefined}
-                  multiple={moneyUploadMode === "gallery"}
-                  className="hidden"
-                  onClick={(e) => { e.currentTarget.value = ""; }}
-                  onChange={handleMoneyPhotoUpload}
-                  disabled={isUploadingMoneyPhoto}
-                />
-                {isUploadingMoneyPhoto ? (
-                  <Loader2 size={13} className="animate-spin text-white" />
-                ) : moneyUploadMode === "camera" ? (
-                  <Camera size={13} className="text-white" />
-                ) : (
-                  <ImageIcon size={13} className="text-white" />
-                )}
-                <span>
-                  {isUploadingMoneyPhoto
-                    ? "Uploading..."
-                    : moneyUploadMode === "camera"
-                    ? "Take Photo"
-                    : "Choose from Gallery"}
-                </span>
-              </label>
+            {/* Mode Switcher: Camera vs Gallery */}
+            <div className="flex items-center p-1 bg-white rounded-xl border border-gray-200 text-xs font-semibold shadow-2xs self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setMoneyUploadMode("camera")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  moneyUploadMode === "camera"
+                    ? "bg-emerald-50 text-emerald-700 shadow-xs font-bold border border-emerald-200"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+                title="Camera Mode (التقاط بالكاميرا مباشرة)"
+              >
+                <Camera size={14} className={moneyUploadMode === "camera" ? "text-emerald-600" : "text-text-muted"} />
+                <span>Camera</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMoneyUploadMode("gallery")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  moneyUploadMode === "gallery"
+                    ? "bg-emerald-50 text-emerald-700 shadow-xs font-bold border border-emerald-200"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+                title="Gallery Mode (رفع من المعرض)"
+              >
+                <ImageIcon size={14} className={moneyUploadMode === "gallery" ? "text-emerald-600" : "text-text-muted"} />
+                <span>Gallery</span>
+              </button>
             </div>
           </div>
 
@@ -1579,7 +1584,7 @@ function ReturnPageContent() {
                   <Trash2 size={12} />
                 </button>
                 <span className="absolute bottom-1 left-1.5 text-[9px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded backdrop-blur-xs">
-                  #{idx + 1} Cash
+                  #{idx + 1} Return Proof
                 </span>
               </div>
             ))}
@@ -1591,7 +1596,7 @@ function ReturnPageContent() {
                 : "border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/60"
             }`}>
               <input
-                key={`tile-${moneyUploadMode}`}
+                key={moneyUploadMode}
                 type="file"
                 accept="image/*"
                 capture={moneyUploadMode === "camera" ? "environment" : undefined}
@@ -1605,7 +1610,7 @@ function ReturnPageContent() {
                 <Loader2 size={20} className="animate-spin text-emerald-600" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  {moneyUploadMode === "camera" ? <Camera size={16} /> : <ImageIcon size={16} />}
+                  {moneyUploadMode === "camera" ? <Camera size={16} /> : <Plus size={16} />}
                 </div>
               )}
               <span className="text-[11px] font-bold text-emerald-700">
@@ -1613,13 +1618,16 @@ function ReturnPageContent() {
                   ? "Uploading..."
                   : moneyUploadMode === "camera"
                   ? "+ Take Photo"
-                  : "+ Open Gallery"}
-              </span>
-              <span className="text-[9px] text-text-muted">
-                {moneyUploadMode === "camera" ? "Camera Mode" : "Gallery Mode"}
+                  : "+ From Gallery"}
               </span>
             </label>
           </div>
+
+          {moneyPhotos.length === 0 && (
+            <p className="text-center text-xs text-text-muted py-1">
+              No return payment proof photos attached yet. {moneyUploadMode === "camera" ? "Click '+ Take Photo' to capture evidence." : "Click '+ From Gallery' to upload evidence."}
+            </p>
+          )}
         </div>
 
         {/* Staff Remarks */}

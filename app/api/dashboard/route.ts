@@ -6,6 +6,7 @@ import { Client } from "@/models/Client";
 import { Contract } from "@/models/Contract";
 import { User } from "@/models/User";
 import { Driver } from "@/models/Driver";
+import { syncUnitStatuses } from "@/lib/unit-status";
 
 const emptyResponse = {
   stats: {
@@ -39,6 +40,7 @@ const emptyResponse = {
 export async function GET(request: Request) {
   try {
     await connectDB();
+    await syncUnitStatuses();
 
     // Date calculations for changes (This month vs Last month)
     const { searchParams } = new URL(request.url);

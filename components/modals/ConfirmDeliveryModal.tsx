@@ -31,7 +31,8 @@ import {
   Search,
   Trash2,
   ShieldCheck,
-  Calendar
+  Calendar,
+  Plus
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
@@ -105,6 +106,57 @@ export const formatTimeDisplay = (rawTime?: string): string => {
   return trimmed;
 };
 
+// Fast client-side image compression for mobile camera photos
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = (event.target?.result as string) || "";
+      if (!result) return resolve("");
+      try {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            let width = img.width || 800;
+            let height = img.height || 600;
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width = Math.round((width * MAX_HEIGHT) / height);
+                height = MAX_HEIGHT;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL("image/jpeg", 0.8));
+              return;
+            }
+            resolve(result);
+          } catch {
+            resolve(result);
+          }
+        };
+        img.onerror = () => resolve(result);
+        img.src = result;
+      } catch {
+        resolve(result);
+      }
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+};
+
 interface ConfirmDeliveryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -116,6 +168,7 @@ interface ConfirmDeliveryModalProps {
     paymentMethod: string;
     paymentStatus: "Paid" | "Partial" | "Pending";
     notes?: string;
+    moneyPhotos?: string[];
     inspectionPhotos?: string[];
     customerSignature?: string | null;
     clientId?: string;
@@ -169,6 +222,9 @@ export default function ConfirmDeliveryModal({
   const [collectedRentalAmount, setCollectedRentalAmount] = useState<number>(0);
   const [isDepositConfirmed, setIsDepositConfirmed] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [moneyPhotos, setMoneyPhotos] = useState<string[]>([]);
+  const [isUploadingMoneyPhoto, setIsUploadingMoneyPhoto] = useState(false);
+  const [previewMoneyPhotoUrl, setPreviewMoneyPhotoUrl] = useState<string | null>(null);
 
   // Step 4: Inspection Photos
   const [inspectionPhotos, setInspectionPhotos] = useState<Record<string, string>>({});
@@ -267,6 +323,7 @@ export default function ConfirmDeliveryModal({
       // Photos & Signature
       setInspectionPhotos({});
       setPreviewPhotos({});
+      setMoneyPhotos(Array.isArray(contract.moneyPhotos) ? contract.moneyPhotos : []);
       setSignatureData(null);
       hasDrawnRef.current = false;
       setUploadMode("camera");
@@ -368,6 +425,46 @@ export default function ConfirmDeliveryModal({
       delete next[angle];
       return next;
     });
+  };
+
+  // Money photo uploader (Camera / Gallery)
+  const handleMoneyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingMoneyPhoto(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await compressImage(file);
+        if (!base64) continue;
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64, folder: "money_proof" }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            setMoneyPhotos((prev) => [...prev, data.url]);
+          }
+        }
+      }
+      toast.success("Money proof photo attached successfully.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload money photo.");
+    } finally {
+      setIsUploadingMoneyPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveMoneyPhoto = (index: number) => {
+    setMoneyPhotos((prev) => prev.filter((_, idx) => idx !== index));
+    toast.info("Money photo removed.");
   };
 
   // Touch & Mouse Signature Handlers
@@ -520,6 +617,7 @@ export default function ConfirmDeliveryModal({
       paymentMethod: paymentMethod || "Cash",
       paymentStatus: computedPaymentStatus,
       notes: deliveryNotes,
+      moneyPhotos,
       inspectionPhotos: VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
       customerSignature: signatureData,
       clientId: currentClient?._id || currentClient?.id,
@@ -1048,26 +1146,137 @@ export default function ConfirmDeliveryModal({
               </div>
 
               {/* Deposit Confirmation Checkbox */}
-              <label className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+              <div className={`p-3.5 rounded-xl border transition-all ${
                 isDepositConfirmed
                   ? "bg-emerald-50 border-emerald-300 text-emerald-950"
                   : "bg-amber-50 border-amber-300 text-amber-950"
               }`}>
-                <input
-                  type="checkbox"
-                  checked={isDepositConfirmed}
-                  onChange={(e) => setIsDepositConfirmed(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded text-brand focus:ring-brand cursor-pointer"
-                />
-                <div className="text-xs leading-relaxed">
-                  <span className="font-bold block">
-                    Confirm Get All Money (تأكيد استلام كامل المبلغ)
-                  </span>
-                  <span className="text-[11px] opacity-90">
-                    I confirm receiving all required money (Total: <strong>AED {(Number(collectedRentalAmount || 0) + Number(depositAmount || 0)).toLocaleString()}</strong>) from the client upon vehicle handover.
-                  </span>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isDepositConfirmed}
+                    onChange={(e) => setIsDepositConfirmed(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-brand focus:ring-brand cursor-pointer"
+                  />
+                  <div className="text-xs leading-relaxed">
+                    <span className="font-bold block">
+                      Confirm Get All Money (تأكيد استلام كامل المبلغ)
+                    </span>
+                    <span className="text-[11px] opacity-90">
+                      I confirm receiving all required money (Total: <strong>AED {(Number(collectedRentalAmount || 0) + Number(depositAmount || 0)).toLocaleString()}</strong>) from the client upon vehicle handover.
+                    </span>
+                  </div>
+                </label>
+
+                {/* Money Photo Proof in the space left */}
+                <div className="mt-3 pt-3 border-t border-amber-200/80">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Banknote size={14} className="text-amber-800" />
+                      <span className="text-xs font-bold text-amber-950">
+                        Money / Payment Proof (صورة استلام المبلغ)
+                      </span>
+                      {moneyPhotos.length > 0 && (
+                        <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                          {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {/* Direct Camera Button */}
+                      <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onClick={(e) => { e.currentTarget.value = ""; }}
+                          onChange={handleMoneyPhotoUpload}
+                          disabled={isUploadingMoneyPhoto}
+                        />
+                        <Camera size={13} className="text-amber-800" />
+                        <span>Take Photo</span>
+                      </label>
+
+                      {/* Upload Gallery Button */}
+                      <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onClick={(e) => { e.currentTarget.value = ""; }}
+                          onChange={handleMoneyPhotoUpload}
+                          disabled={isUploadingMoneyPhoto}
+                        />
+                        <ImageIcon size={13} className="text-amber-800" />
+                        <span>Gallery</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Uploading indicator */}
+                  {isUploadingMoneyPhoto && (
+                    <div className="flex items-center gap-2 p-2 bg-amber-100/60 rounded-lg text-amber-900 text-xs mb-2">
+                      <Loader2 size={14} className="animate-spin text-amber-800" />
+                      <span>Uploading money proof photo...</span>
+                    </div>
+                  )}
+
+                  {/* Photo thumbnails grid */}
+                  {moneyPhotos.length > 0 ? (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-1">
+                      {moneyPhotos.map((url, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setPreviewMoneyPhotoUrl(url)}
+                          className="relative group aspect-square rounded-lg overflow-hidden border border-amber-300 bg-white shadow-2xs cursor-pointer hover:border-amber-400 transition-all"
+                        >
+                          <img
+                            src={url}
+                            alt={`Money photo ${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveMoneyPhoto(idx);
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 text-white rounded-md shadow-xs opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
+                            title="Delete photo"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                          <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.2 rounded backdrop-blur-xs">
+                            #{idx + 1}
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Add more button tile */}
+                      <label className="aspect-square rounded-lg border border-dashed border-amber-300 hover:border-amber-400 bg-white/70 hover:bg-amber-100/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onClick={(e) => { e.currentTarget.value = ""; }}
+                          onChange={handleMoneyPhotoUpload}
+                          disabled={isUploadingMoneyPhoto}
+                        />
+                        <Plus size={14} className="text-amber-800" />
+                        <span className="text-[9px] font-bold text-amber-800">+ Add</span>
+                      </label>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-amber-800/80 italic pt-0.5">
+                      Optional: Driver can take a photo of the cash/payment received or upload receipt here.
+                    </p>
+                  )}
                 </div>
-              </label>
+              </div>
 
               {/* Delivery Notes */}
               <div>
@@ -1411,6 +1620,40 @@ export default function ConfirmDeliveryModal({
           }
         }}
       />
+      {/* Lightbox Preview Modal for Money Proof Photos */}
+      {previewMoneyPhotoUrl && (
+        <div 
+          className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewMoneyPhotoUrl(null)}
+        >
+          <div 
+            className="relative max-w-2xl max-h-[85vh] w-full flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-2 text-white">
+              <span className="text-xs font-bold flex items-center gap-1.5">
+                <Banknote size={15} className="text-amber-400" />
+                <span>Money / Payment Documentation Preview</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewMoneyPhotoUrl(null)}
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer transition-colors"
+                title="Close preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/20 shadow-2xl bg-black/50 max-h-[75vh]">
+              <img
+                src={previewMoneyPhotoUrl}
+                alt="Money Proof Full Preview"
+                className="max-h-[75vh] w-auto max-w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

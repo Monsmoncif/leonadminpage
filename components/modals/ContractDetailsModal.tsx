@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 import {
   X,
   Clock,
   DollarSign,
   User,
+  UserPlus,
   MapPin,
   Phone,
   CheckCircle,
@@ -25,7 +27,9 @@ import {
   Banknote,
   CreditCard,
   Coins,
-  Download
+  Download,
+  Building2,
+  XCircle
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import ExtendRentalModal from "@/components/modals/ExtendRentalModal";
@@ -40,6 +44,15 @@ const VEHICLE_ANGLES = [
   "Rear Interior",
   "Trunk / Boot"
 ];
+
+const matchDriverId = (field: any, targetId?: string): boolean => {
+  if (!field || !targetId) return false;
+  if (typeof field === "object") {
+    const id = field._id?.toString() || field.id?.toString() || "";
+    return id === targetId;
+  }
+  return String(field) === String(targetId);
+};
 
 const formatTimeDisplay = (rawTime?: string): string => {
   if (!rawTime || typeof rawTime !== "string") return "8:00 AM";
@@ -100,11 +113,27 @@ export default function ContractDetailsModal({
   contract,
   onEdit,
 }: ContractDetailsModalProps) {
+  const { data: session } = useSession();
+  const currentUserId = (session?.user as any)?.id;
+  const isDriver = (session?.user as any)?.role === "driver";
+
   const [activeTab, setActiveTab] = useState<"handoff" | "return">("handoff");
   const [contractData, setContractData] = useState<any>(contract);
   const [damages, setDamages] = useState<any[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isExtendOpen, setIsExtendOpen] = useState(false);
+  const contentContainerRef = useRef<HTMLDivElement>(null);
+  const overlayContainerRef = useRef<HTMLDivElement>(null);
+
+  // Automatically scroll to the top of the modal when activeTab changes or modal opens
+  useEffect(() => {
+    if (contentContainerRef.current) {
+      contentContainerRef.current.scrollTop = 0;
+    }
+    if (overlayContainerRef.current) {
+      overlayContainerRef.current.scrollTop = 0;
+    }
+  }, [activeTab, isOpen]);
 
   const refreshContractData = () => {
     const contractId = contractData._id || contractData.id || contract?._id || contract?.id;
@@ -181,7 +210,17 @@ export default function ContractDetailsModal({
   }, [contract, isOpen]);
 
   const isReturned = contractData ? (contractData.status === "Completed" || contractData.deliveryStatus === "Returned") : false;
-  const showReturnTab = Boolean(isReturned);
+  const hasReturnData = Boolean(
+    isReturned || 
+    contractData?.returnedAt || 
+    (contractData?.returnPhotos && contractData.returnPhotos.length > 0) ||
+    (contractData?.returnMoneyPhotos && contractData.returnMoneyPhotos.length > 0) ||
+    (contractData?.damagePhotos && contractData.damagePhotos.length > 0) ||
+    contractData?.returnOdometer ||
+    contractData?.newDamages ||
+    damages.length > 0
+  );
+  const showReturnTab = hasReturnData;
 
   useEffect(() => {
     if (!showReturnTab && activeTab === "return") {
@@ -197,7 +236,39 @@ export default function ContractDetailsModal({
   const customerName = contractData.customer || "Customer";
   const pickupLoc = contractData.pickupLocation || "Main Office";
   const dropoffLoc = contractData.dropoffLocation || contractData.pickupLocation || "Main Office";
-  const isDelivered = contractData.deliveryStatus === "Delivered";
+
+  // Real status resolution
+  const isCancelled = contractData.status === "Cancelled";
+  const isCompletedOrReturned = Boolean(
+    contractData.status === "Completed" || 
+    contractData.deliveryStatus === "Returned" || 
+    contractData.returnedAt
+  );
+
+  const isHandedOver = Boolean(
+    isCompletedOrReturned ||
+    contractData.deliveryStatus === "Delivered" ||
+    contractData.status === "Active" ||
+    (Array.isArray(contractData.inspectionPhotos) && contractData.inspectionPhotos.some(Boolean)) ||
+    Boolean(contractData.customerSignature || contractData.adminSignature)
+  );
+
+  const isDelivered = isHandedOver;
+
+  const isDriverDelivery = Boolean(
+    contractData.contractType === "Delivery" || 
+    (contractData.deliveryDriver && 
+     contractData.deliveryDriver !== "None" && 
+     !contractData.deliveryDriver.toLowerCase().includes("self-drive")) ||
+    (contractData.deliveryDriverId && contractData.deliveryDriverId !== "None")
+  );
+
+  const isDriverReturn = Boolean(
+    (contractData.returnDriver && 
+     contractData.returnDriver !== "None" && 
+     !contractData.returnDriver.toLowerCase().includes("self-drive")) ||
+    (contractData.returnDriverId && contractData.returnDriverId !== "None")
+  );
 
   const openGoogleMaps = (location: string) => {
     if (!location) return;
@@ -264,12 +335,20 @@ export default function ContractDetailsModal({
 
   const { adminNotes, driverNotes } = parseHandoverNotes(contractData.notes);
   const returnNotes = getReturnNotes(contractData.notes, contractData.returnNotes);
-  const inspectionPhotos: string[] = contractData.inspectionPhotos || [];
-  const returnPhotos: string[] = contractData.returnPhotos || [];
-  const moneyPhotos: string[] = contractData.moneyPhotos || [];
+  const inspectionPhotos: string[] = Array.isArray(contractData.inspectionPhotos) ? contractData.inspectionPhotos : [];
+  const returnPhotos: string[] = Array.isArray(contractData.returnPhotos) ? contractData.returnPhotos : [];
+  const moneyPhotos: string[] = Array.isArray(contractData.moneyPhotos) ? contractData.moneyPhotos : [];
+  const returnMoneyPhotos: string[] = Array.isArray(contractData.returnMoneyPhotos) ? contractData.returnMoneyPhotos : [];
+  const damagePhotos: string[] = Array.from(new Set([
+    ...(Array.isArray(contractData.damagePhotos) ? contractData.damagePhotos : []),
+    ...damages.flatMap((d: any) => Array.isArray(d.photos) ? d.photos : [])
+  ])).filter(Boolean);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+    <div 
+      ref={overlayContainerRef}
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+    >
       <div className="bg-card w-full max-w-2xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[90vh] my-auto border border-border/60">
         
         {/* ================= HEADER ================= */}
@@ -278,8 +357,8 @@ export default function ContractDetailsModal({
             <h2 className="text-base sm:text-lg font-bold text-text-primary truncate">
               Booking &amp; Handover Details
             </h2>
-            <span className="text-xs font-mono font-bold bg-brand/10 text-brand px-2.5 py-0.5 rounded-md border border-brand/20">
-              #{contractNum}
+            <span className="text-xs sm:text-sm font-sans font-extrabold tracking-tight tabular-nums bg-brand/10 text-brand px-2.5 py-0.5 rounded-md border border-brand/20 shadow-2xs">
+              {contractNum.startsWith("#") ? contractNum : `#${contractNum}`}
             </span>
           </div>
 
@@ -310,7 +389,11 @@ export default function ContractDetailsModal({
             <div className="bg-gray-100/80 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold border border-border/40 shadow-2xs w-full max-w-md">
               <button
                 type="button"
-                onClick={() => setActiveTab("handoff")}
+                onClick={() => {
+                  setActiveTab("handoff");
+                  if (contentContainerRef.current) contentContainerRef.current.scrollTop = 0;
+                  if (overlayContainerRef.current) overlayContainerRef.current.scrollTop = 0;
+                }}
                 className={`flex-1 py-2 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   activeTab === "handoff"
                     ? "bg-white text-brand shadow-xs font-bold"
@@ -323,7 +406,11 @@ export default function ContractDetailsModal({
 
               <button
                 type="button"
-                onClick={() => setActiveTab("return")}
+                onClick={() => {
+                  setActiveTab("return");
+                  if (contentContainerRef.current) contentContainerRef.current.scrollTop = 0;
+                  if (overlayContainerRef.current) overlayContainerRef.current.scrollTop = 0;
+                }}
                 className={`flex-1 py-2 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   activeTab === "return"
                     ? "bg-white text-red-600 shadow-xs font-bold ring-1 ring-red-100"
@@ -338,7 +425,10 @@ export default function ContractDetailsModal({
         )}
 
         {/* ================= CONTENT AREA ================= */}
-        <div className="p-3.5 sm:p-5 md:p-6 overflow-y-auto flex-1 custom-scrollbar overscroll-contain space-y-4 sm:space-y-5">
+        <div 
+          ref={contentContainerRef}
+          className="p-3.5 sm:p-5 md:p-6 overflow-y-auto flex-1 custom-scrollbar overscroll-contain space-y-4 sm:space-y-5"
+        >
 
           {/* ================= TAB 1: HAND-OFF (DELIVERY TO CLIENT) ================= */}
           {activeTab === "handoff" && (
@@ -348,21 +438,37 @@ export default function ContractDetailsModal({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/60">
                 <div>
                   <h3 className="text-base sm:text-lg font-bold text-text-primary">
-                    Hand-off &amp; Vehicle Delivery
+                    {isDriverDelivery ? "Hand-off & Vehicle Delivery" : "Hand-off & Vehicle Showroom Pickup"}
                   </h3>
                   <p className="text-xs sm:text-sm text-text-secondary mt-0.5">
-                    Dispatched handover details, driver delivery report, and proof of receipt.
+                    {isDriverDelivery 
+                      ? "Dispatched handover details, driver delivery report, and proof of receipt." 
+                      : "Direct showroom handover details, inspection report, and proof of receipt."}
                   </p>
                 </div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto flex items-center gap-1.5 ${
-                  isDelivered 
+                <span className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto flex items-center gap-1.5 shadow-2xs ${
+                  isCancelled
+                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                    : isCompletedOrReturned
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : isHandedOver 
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                     : 'bg-amber-50 text-amber-700 border-amber-200'
                 }`}>
-                  {isDelivered ? (
+                  {isCancelled ? (
+                    <>
+                      <XCircle size={13} className="text-rose-600" />
+                      <span>Cancelled</span>
+                    </>
+                  ) : isCompletedOrReturned ? (
                     <>
                       <CheckCircle2 size={13} className="text-emerald-600" />
-                      <span>Delivered</span>
+                      <span>{isDriverDelivery ? "Delivered • Returned" : "Handed Over • Returned"}</span>
+                    </>
+                  ) : isHandedOver ? (
+                    <>
+                      <CheckCircle2 size={13} className="text-emerald-600" />
+                      <span>{isDriverDelivery ? "Delivered" : "Handed Over"}</span>
                     </>
                   ) : (
                     <>
@@ -373,7 +479,7 @@ export default function ContractDetailsModal({
                 </span>
               </div>
 
-              {/* ================= SECTION 1: WHAT WAS GIVEN TO THE DRIVER ================= */}
+              {/* ================= SECTION 1: WHAT WAS GIVEN TO THE DRIVER / SHOWROOM ================= */}
               <div className="bg-gray-50/80 rounded-2xl border border-border p-3.5 sm:p-5 space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-border/70">
                   <div className="flex items-center gap-2">
@@ -382,33 +488,60 @@ export default function ContractDetailsModal({
                     </span>
                     <div>
                       <h4 className="text-sm sm:text-base font-bold text-text-primary">
-                        Dispatched to Driver
+                        {isDriverDelivery ? "Dispatched to Driver" : "In-Shop Handover (تسليم في المعرض)"}
                       </h4>
                       <p className="text-[11px] sm:text-xs text-text-muted">
-                        Instructions and logistics assigned to the driver for vehicle handover
+                        {isDriverDelivery 
+                          ? "Instructions and logistics assigned to the driver for vehicle handover"
+                          : "Showroom vehicle handover instructions and schedule for client pick up"}
                       </p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-semibold text-text-secondary bg-white px-2.5 py-1 rounded-lg border border-border/80 shadow-2xs">
-                    Dispatch Stage
+                  <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border shadow-2xs flex items-center gap-1.5 ${
+                    isDriverDelivery
+                      ? "text-blue-700 bg-blue-50 border-blue-200"
+                      : "text-emerald-700 bg-emerald-50 border-emerald-200"
+                  }`}>
+                    {isDriverDelivery ? (
+                      <>
+                        <Navigation size={11} className="text-blue-600 rotate-45" />
+                        <span>Driver Delivery</span>
+                      </>
+                    ) : (
+                      <>
+                        <Building2 size={12} className="text-emerald-600" />
+                        <span>In-Shop / Showroom</span>
+                      </>
+                    )}
                   </span>
                 </div>
 
                 {/* Driver Assignment & Client Snapshot */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  {/* Driver & Logistics */}
+                  {/* Driver / In-Shop Logistics */}
                   <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-border/70 space-y-2.5 shadow-2xs">
                     <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                      <UserCheck size={14} className="text-brand" />
-                      Assigned Driver
+                      {isDriverDelivery ? (
+                        <>
+                          <UserCheck size={14} className="text-brand" />
+                          <span>Assigned Driver</span>
+                        </>
+                      ) : (
+                        <>
+                          <Building2 size={14} className="text-brand" />
+                          <span>Handover Method</span>
+                        </>
+                      )}
                     </span>
                     <div className="text-xs space-y-1.5 pt-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-text-muted">Driver Name:</span>
+                        <span className="text-text-muted">
+                          {isDriverDelivery ? "Driver Name:" : "Handover Type:"}
+                        </span>
                         <strong className="text-text-primary font-semibold">
-                          {contractData.deliveryDriver && contractData.deliveryDriver !== "None" 
-                            ? contractData.deliveryDriver 
-                            : "Self-drive (Client Pick Up)"}
+                          {isDriverDelivery 
+                            ? (contractData.deliveryDriver || "Assigned Driver")
+                            : "In-Shop (Client Pick Up)"}
                         </strong>
                       </div>
                       <div className="flex items-center justify-between">
@@ -434,31 +567,45 @@ export default function ContractDetailsModal({
                       Client Profile
                     </span>
                     <div className="text-xs space-y-1.5 pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-text-muted">Client Name:</span>
-                        <strong className="text-text-primary font-semibold truncate max-w-[180px]">{customerName}</strong>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-text-muted">Phone Number:</span>
-                        {contractData.customerPhone ? (
-                          <a 
-                            href={`tel:${contractData.customerPhone.replace(/[^0-9+]/g, '')}`}
-                            className="inline-flex items-center gap-1 text-xs text-text-primary hover:underline font-semibold bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded border border-border/80 transition-all"
-                            title="Call Client"
-                          >
-                            <Phone size={11} className="text-emerald-600" />
-                            {contractData.customerPhone}
-                          </a>
-                        ) : (
-                          <span className="text-text-muted">—</span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-text-muted">ID / License No:</span>
-                        <strong className="font-semibold text-text-secondary">
-                          {contractData.customerLicense || "—"}
-                        </strong>
-                      </div>
+                      {(!contractData.clientId && (!contractData.customer || contractData.customer === "Customer" || contractData.customer === "Unknown")) ? (
+                        <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-lg text-xs space-y-1 text-amber-900 mb-2">
+                          <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                            <UserPlus size={13} className="text-amber-600" />
+                            <span>Client Registration Upon Handover</span>
+                          </div>
+                          <p className="text-[11px] text-amber-700">
+                            Client details, documents, and driving license will be registered by the driver upon vehicle delivery.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-muted">Client Name:</span>
+                            <strong className="text-text-primary font-semibold truncate max-w-[180px]">{customerName}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-muted">Phone Number:</span>
+                            {contractData.customerPhone ? (
+                              <a 
+                                href={`tel:${contractData.customerPhone.replace(/[^0-9+]/g, '')}`}
+                                className="inline-flex items-center gap-1 text-xs text-text-primary hover:underline font-semibold bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded border border-border/80 transition-all"
+                                title="Call Client"
+                              >
+                                <Phone size={11} className="text-emerald-600" />
+                                {contractData.customerPhone}
+                              </a>
+                            ) : (
+                              <span className="text-text-muted">—</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-muted">ID / License No:</span>
+                            <strong className="font-semibold text-text-secondary">
+                              {contractData.customerLicense || "—"}
+                            </strong>
+                          </div>
+                        </>
+                      )}
 
                       {contractData.additionalDriverName && (
                         <div className="pt-2 mt-2 border-t border-border/60">
@@ -491,7 +638,7 @@ export default function ContractDetailsModal({
                 <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-border/70 space-y-2 shadow-2xs">
                   <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                     <ExecutiveCarIcon size={14} className="text-brand" />
-                    Dispatched Vehicle Details
+                    {isDriverDelivery ? "Dispatched Vehicle Details" : "Handover Vehicle Details"}
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
                     <div className="p-2 bg-gray-50 rounded-lg border border-border/50">
@@ -618,7 +765,7 @@ export default function ContractDetailsModal({
                 <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-border/70 space-y-1.5 shadow-2xs">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-text-primary">
                     <FileText size={14} className="text-brand" />
-                    <span>Admin Instructions for Delivery:</span>
+                    <span>{isDriverDelivery ? "Admin Instructions for Delivery:" : "Admin Handover Remarks & Notes:"}</span>
                   </div>
                   {adminNotes ? (
                     <div className="text-xs text-text-secondary font-medium leading-relaxed whitespace-pre-wrap bg-gray-50/90 p-2.5 rounded-lg border border-border/50">
@@ -630,9 +777,37 @@ export default function ContractDetailsModal({
                     </p>
                   )}
                 </div>
+
+                {/* Admin Signature Card (if signed) */}
+                {contractData.adminSignature && (
+                  <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-border/70 space-y-2 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                        <PenTool size={14} className="text-brand" />
+                        Admin Signature &amp; Authorization (توقيع الإدارة)
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                        <CheckCircle2 size={11} className="text-emerald-600" />
+                        Authorized by Admin
+                      </span>
+                    </div>
+                    <div 
+                      onClick={() => setPreviewImage(contractData.adminSignature)}
+                      className="h-20 sm:h-24 bg-gray-50/60 rounded-xl border border-dashed border-border flex items-center justify-center p-2 cursor-pointer hover:border-brand/60 transition-colors"
+                      title="Click to view full signature"
+                    >
+                      <img 
+                        src={contractData.adminSignature} 
+                        alt="Admin Signature" 
+                        className="max-h-full max-w-full object-contain" 
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* ================= SECTION 2: WHAT DRIVER RETURNED UPON DELIVERY ================= */}
+              {/* ================= SECTION 2: WHAT DRIVER/SHOWROOM RETURNED UPON DELIVERY (SHOWN ONLY ONCE HANDED OVER) ================= */}
+              {isHandedOver && (
               <div className="bg-white rounded-2xl border border-border p-3.5 sm:p-5 space-y-4 shadow-2xs">
                 <div className="flex items-center justify-between pb-3 border-b border-border/70">
                   <div className="flex items-center gap-2">
@@ -641,19 +816,27 @@ export default function ContractDetailsModal({
                     </span>
                     <div>
                       <h4 className="text-sm sm:text-base font-bold text-text-primary">
-                        Handover Proof &amp; Driver Report
+                        {isDriverDelivery ? "Handover Proof & Driver Report" : "Showroom Handover Proof & Report"}
                       </h4>
                       <p className="text-[11px] sm:text-xs text-text-muted">
-                        Driver field remarks, collected deposit confirmation, inspection photos, and client e-signature
+                        {isDriverDelivery
+                          ? "Driver field remarks, collected deposit confirmation, inspection photos, and client e-signature"
+                          : "Showroom handover remarks, collected deposit confirmation, inspection photos, and client e-signature"}
                       </p>
                     </div>
                   </div>
                   <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border ${
-                    isDelivered 
+                    isCancelled
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : isHandedOver 
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                       : 'bg-gray-100 text-text-muted border-border'
                   }`}>
-                    {isDelivered ? 'Completed Report' : 'Awaiting Delivery'}
+                    {isCancelled
+                      ? 'Contract Cancelled'
+                      : isHandedOver 
+                      ? (isDriverDelivery ? 'Completed Delivery Report' : 'Handover Completed')
+                      : (isDriverDelivery ? 'Awaiting Delivery' : 'Awaiting Handover')}
                   </span>
                 </div>
 
@@ -661,17 +844,34 @@ export default function ContractDetailsModal({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 text-xs">
                   {/* Handover Confirmation Status */}
                   <div className="p-3 bg-gray-50/80 rounded-xl border border-border/60">
-                    <span className="text-text-muted block text-[11px] mb-1">Delivery Status:</span>
-                    <strong className={`font-bold flex items-center gap-1.5 ${isDelivered ? 'text-emerald-700' : 'text-amber-700'}`}>
-                      {isDelivered ? (
+                    <span className="text-text-muted block text-[11px] mb-1">
+                      {isDriverDelivery ? "Delivery Status:" : "Handover Status:"}
+                    </span>
+                    <strong className={`font-bold flex items-center gap-1.5 ${
+                      isCancelled 
+                        ? 'text-rose-700' 
+                        : isHandedOver 
+                        ? 'text-emerald-700' 
+                        : 'text-amber-700'
+                    }`}>
+                      {isCancelled ? (
+                        <>
+                          <XCircle size={14} className="text-rose-600" />
+                          <span>Cancelled</span>
+                        </>
+                      ) : isHandedOver ? (
                         <>
                           <CheckCircle size={14} className="text-emerald-600" />
-                          Delivered to Client
+                          <span>
+                            {isCompletedOrReturned
+                              ? (isDriverDelivery ? "Delivered & Returned" : "Handed Over & Returned")
+                              : (isDriverDelivery ? "Delivered to Client" : "Handed Over in Showroom")}
+                          </span>
                         </>
                       ) : (
                         <>
                           <Clock size={14} className="text-amber-600" />
-                          Pending Handover
+                          <span>{isDriverDelivery ? "Awaiting Delivery" : "Pending Handover"}</span>
                         </>
                       )}
                     </strong>
@@ -765,7 +965,7 @@ export default function ContractDetailsModal({
                   ) : (
                     <div className="bg-gray-50/80 p-4 rounded-xl border border-border/70 flex items-center gap-2 text-xs text-text-muted">
                       <Camera size={15} className="text-text-muted" />
-                      <span>{isDelivered ? "No inspection photos attached for this contract." : "Awaiting driver to capture 8 inspection photos upon vehicle handover."}</span>
+                      <span>{isHandedOver ? "No inspection photos attached for this contract." : (isDriverDelivery ? "Awaiting driver to capture 8 inspection photos upon vehicle delivery." : "Awaiting showroom inspection photos upon vehicle handover.")}</span>
                     </div>
                   )}
                 </div>
@@ -810,7 +1010,40 @@ export default function ContractDetailsModal({
                   )}
                 </div>
 
+                {/* Handover Cash & Payment Proof Photos */}
+                {moneyPhotos.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-border/60">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                        <DollarSign size={14} className="text-emerald-600" />
+                        Handover Cash &amp; Payment Proof ({moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"})
+                      </span>
+                      <span className="text-[11px] text-emerald-700 font-medium">Rental Handover Collection</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3.5">
+                      {moneyPhotos.map((photoUrl, index) => (
+                        <div 
+                          key={index}
+                          onClick={() => setPreviewImage(photoUrl)}
+                          className="relative h-[125px] sm:h-[145px] md:h-[165px] w-full rounded-xl sm:rounded-2xl border border-emerald-100 overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer"
+                          title="Click to enlarge"
+                        >
+                          <img src={photoUrl} alt={`Handover Cash Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <Maximize2 size={16} />
+                          </div>
+                          <div className="absolute bottom-1.5 left-2 bg-emerald-950/80 text-white text-[10px] font-semibold px-2 py-0.5 rounded border border-emerald-900/50">
+                            Handover Cash #{index + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
+              )}
 
             </div>
           )}
@@ -871,10 +1104,21 @@ export default function ContractDetailsModal({
 
                   {/* Return Driver */}
                   <div>
-                    <span className="text-text-muted block mb-0.5">Return Driver:</span>
+                    <span className="text-text-muted block mb-0.5">
+                      {isDriverReturn ? "Return Driver:" : "Return Method:"}
+                    </span>
                     <span className="font-semibold text-text-primary flex items-center gap-1">
-                      <UserCheck size={13} className="text-red-600 shrink-0" />
-                      {contractData.returnDriver && contractData.returnDriver !== "None" ? contractData.returnDriver : "Self-drive (Client Drop Off)"}
+                      {isDriverReturn ? (
+                        <>
+                          <UserCheck size={13} className="text-red-600 shrink-0" />
+                          <span>{contractData.returnDriver}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Building2 size={13} className="text-red-600 shrink-0" />
+                          <span>In-Shop Return (Client Drop Off)</span>
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -968,31 +1212,63 @@ export default function ContractDetailsModal({
                 )}
               </div>
 
-              {/* Money & Settlement Payment Photos */}
-              {moneyPhotos.length > 0 && (
+              {/* Return Settlement & Additional Charges Payment Photos */}
+              {returnMoneyPhotos.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
                       <DollarSign size={14} className="text-emerald-600" />
-                      Cash &amp; Payment Proof Photos ({moneyPhotos.length} photos)
+                      Return Charges &amp; Penalties Payment Proof ({returnMoneyPhotos.length} {returnMoneyPhotos.length === 1 ? "photo" : "photos"})
                     </span>
-                    <span className="text-[11px] text-emerald-700 font-medium">Settlement Records</span>
+                    <span className="text-[11px] text-emerald-700 font-medium">Return Settlement Records</span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3.5">
-                    {moneyPhotos.map((photoUrl, index) => (
+                    {returnMoneyPhotos.map((photoUrl, index) => (
                       <div 
                         key={index}
                         onClick={() => setPreviewImage(photoUrl)}
                         className="relative h-[125px] sm:h-[145px] md:h-[165px] w-full rounded-xl sm:rounded-2xl border border-emerald-100 overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer"
                         title="Click to enlarge"
                       >
-                        <img src={photoUrl} alt={`Money Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                        <img src={photoUrl} alt={`Return Proof Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                         <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
                           <Maximize2 size={16} />
                         </div>
                         <div className="absolute bottom-1.5 left-2 bg-emerald-950/80 text-white text-[10px] font-semibold px-2 py-0.5 rounded border border-emerald-900/50">
-                          Cash Proof #{index + 1}
+                          Return Proof #{index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Damage Documentation Photos */}
+              {damagePhotos.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-red-950 flex items-center gap-1.5">
+                      <Camera size={14} className="text-red-600" />
+                      Damage Photos (صور توثيق الأضرار) ({damagePhotos.length} photos)
+                    </span>
+                    <span className="text-[11px] text-red-700 font-medium">Recorded Damage Evidence</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3.5">
+                    {damagePhotos.map((photoUrl, index) => (
+                      <div 
+                        key={index}
+                        onClick={() => setPreviewImage(photoUrl)}
+                        className="relative h-[125px] sm:h-[145px] md:h-[165px] w-full rounded-xl sm:rounded-2xl border border-red-200 overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer"
+                        title="Click to enlarge"
+                      >
+                        <img src={photoUrl} alt={`Damage Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                          <Maximize2 size={16} />
+                        </div>
+                        <div className="absolute bottom-1.5 left-2 bg-red-950/80 text-white text-[10px] font-semibold px-2 py-0.5 rounded border border-red-900/50">
+                          Damage Proof #{index + 1}
                         </div>
                       </div>
                     ))}
@@ -1124,37 +1400,98 @@ export default function ContractDetailsModal({
         </div>
 
         {/* ================= FOOTER ================= */}
-        {contractData.status === "Active" && (
-          <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-border bg-gray-50/80 flex flex-wrap justify-end items-center gap-2 sm:gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => window.open(`/bookings/${contractData._id || contractData.id}/print`, "_blank")}
-              className="px-3.5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-white hover:bg-gray-100 active:scale-[0.98] text-text-primary border border-border text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Download size={15} className="text-brand" />
-              <span>Print PDF</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsExtendOpen(true)}
-              className="px-4 py-2.5 min-h-[42px] sm:min-h-[40px] bg-white hover:bg-gray-100 active:scale-[0.98] text-brand border border-brand/30 text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <CalendarPlus size={16} />
-              <span>Extend Rental (+Days)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                window.location.href = `/bookings/return?contractId=${contractData._id || contractData.id}`;
-              }}
-              className="px-5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <ArrowLeftRight size={16} />
-              <span>Process Return</span>
-            </button>
-          </div>
-        )}
+        {(contractData.status === "Active" || contractData.deliveryStatus === "Pending") && (() => {
+          const isDelivered = contractData.deliveryStatus === "Delivered";
+          const isPendingDelivery = !isDelivered;
+          const isDeliveryForMe = matchDriverId(contractData.deliveryDriverId, currentUserId) || (!contractData.deliveryDriverId && matchDriverId(contractData.driverId, currentUserId));
+          const isReturnForMe = matchDriverId(contractData.returnDriverId, currentUserId);
+
+          return (
+            <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-border bg-gray-50/80 flex flex-wrap justify-between items-center gap-2 sm:gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.open(`/bookings/${contractData._id || contractData.id}/print`, "_blank")}
+                  className="px-3.5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-white hover:bg-gray-100 active:scale-[0.98] text-text-primary border border-border text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Download size={15} className="text-brand" />
+                  <span>Print PDF</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2.5 min-h-[42px] sm:min-h-[40px] bg-white hover:bg-gray-100 active:scale-[0.98] text-text-primary border border-border text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-2xs cursor-pointer"
+                >
+                  Close
+                </button>
+
+                {/* Handover & Action Buttons: ONLY FOR ADMIN USERS! Drivers confirm handover from their dashboard card/table */}
+                {!isDriver && isPendingDelivery && (() => {
+                  const isShop = contractData.contractType === "Shop" || (!contractData.deliveryDriverId && !contractData.driverId && (!contractData.deliveryDriver || contractData.deliveryDriver === "None" || contractData.deliveryDriver === "Self-drive (Client Pick Up)"));
+
+                  if (isShop) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          onClose();
+                          try {
+                            const res = await fetch(`/api/contracts/${contractData._id || contractData.id}`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ deliveryStatus: "Delivered", status: "Active", notifyClient: true }),
+                            });
+                            if (res.ok) {
+                              refreshContractData();
+                            }
+                          } catch (err) {
+                            console.error("Failed to confirm shop handover:", err);
+                          }
+                        }}
+                        className="px-5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <CheckCircle2 size={16} />
+                        <span>Confirm Showroom Handover</span>
+                      </button>
+                    );
+                  }
+
+                  return null;
+                })()}
+
+                {/* Extend Rental: Admin only */}
+                {!isDriver && contractData.status === "Active" && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExtendOpen(true)}
+                    className="px-4 py-2.5 min-h-[42px] sm:min-h-[40px] bg-white hover:bg-gray-100 active:scale-[0.98] text-brand border border-brand/30 text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <CalendarPlus size={16} />
+                    <span>Extend Rental (+Days)</span>
+                  </button>
+                )}
+
+                {/* Process Return: Admin only in details modal */}
+                {!isDriver && isDelivered && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      window.location.href = `/bookings/return?contractId=${contractData._id || contractData.id}`;
+                    }}
+                    className="px-5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ArrowLeftRight size={16} />
+                    <span>Process Return</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
 

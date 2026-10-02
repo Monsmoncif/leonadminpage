@@ -60,11 +60,15 @@ export async function checkContractDateOverlap({
  * Synchronizes the status of one or all vehicles based on active contracts for TODAY.
  * Rule:
  * - If unit status is "Maintenance" or "Out of Service", DO NOT change it (remains Maintenance/Out of Service).
- * - A unit is "Rented" if and only if:
- *   There is a contract with status in ["Active", "Draft"], deliveryStatus !== "Returned",
- *   startDate <= nowEndOfDay AND (deliveryStatus === "Delivered" OR endDate >= nowStartOfDay).
- * - If no such active contract is running TODAY (even if there are future contracts starting tomorrow or next week),
- *   the unit's status is "Available".
+ * - A unit is "Rented" IF AND ONLY IF:
+ *   There is an active contract where the vehicle has ACTUALLY been handed over to the client:
+ *   1) deliveryStatus === "Delivered" (the driver or admin confirmed vehicle handover)
+ *   2) deliveryStatus !== "Returned" (vehicle has not been returned back)
+ *   3) status not in ["Completed", "Cancelled"]
+ *   4) startDate <= nowEndOfDay (start date has arrived)
+ * - CRITICAL: If a contract has deliveryStatus === "Pending" (e.g. driver delivery dispatched but not yet handed over,
+ *   or showroom booking before start date/handover), the car is NOT yet with the client.
+ *   It CANNOT be shown as "Rented". Its status is "Available" until handover is confirmed.
  */
 export async function syncUnitStatuses(targetUnitId?: string | mongoose.Types.ObjectId) {
   try {
@@ -72,18 +76,11 @@ export async function syncUnitStatuses(targetUnitId?: string | mongoose.Types.Ob
     const nowEndOfDay = new Date(now);
     nowEndOfDay.setHours(23, 59, 59, 999);
 
-    const nowStartOfDay = new Date(now);
-    nowStartOfDay.setHours(0, 0, 0, 0);
-
-    // 1. Find all active/draft contracts that are running TODAY or currently delivered
+    // 1. Find contracts where the vehicle is CURRENTLY HANDED OVER to the client
     const activeContractsFilter: any = {
-      status: { $in: ["Active", "Draft"] },
-      deliveryStatus: { $ne: "Returned" },
+      status: { $nin: ["Completed", "Cancelled"] },
+      deliveryStatus: "Delivered",
       startDate: { $lte: nowEndOfDay },
-      $or: [
-        { deliveryStatus: "Delivered" },
-        { endDate: { $gte: nowStartOfDay } }
-      ]
     };
 
     if (targetUnitId) {

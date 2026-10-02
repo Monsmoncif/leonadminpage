@@ -114,6 +114,7 @@ export default function DriverDashboard() {
   const [deliveryModalContract, setDeliveryModalContract] = useState<any | null>(null);
   const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
   const [activeTab, setActiveTab] = useState<"today" | "all">("today");
+  const [assignmentFilter, setAssignmentFilter] = useState<"all" | "mine">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [hasManuallyChangedView, setHasManuallyChangedView] = useState(false);
@@ -157,18 +158,11 @@ export default function DriverDashboard() {
     if (!session?.user?.id) return;
 
     try {
-      const driverId = (session.user as any).id;
-      const res = await fetch(`/api/contracts?driverId=${driverId}`, { cache: 'no-store' });
+      // Fetch all contracts so all drivers can see all orders
+      const res = await fetch(`/api/contracts`, { cache: 'no-store' });
       const data = await res.json();
 
       const rawContracts: any[] = data.contracts || [];
-
-      // Only include contracts where this driver is either the delivery driver or return driver
-      const myContracts: any[] = rawContracts.filter((contract: any) => {
-        const isDelivery = matchDriverId(contract.deliveryDriverId, driverId) || (!contract.deliveryDriverId && matchDriverId(contract.driverId, driverId));
-        const isReturn = matchDriverId(contract.returnDriverId, driverId);
-        return isDelivery || isReturn;
-      });
 
       let activeCount = 0;
       let endedCount = 0;
@@ -178,39 +172,31 @@ export default function DriverDashboard() {
       const activeTasksList: any[] = [];
       const historyList: any[] = [];
 
-      myContracts.forEach((contract: any) => {
-        const isDeliveryForMe = matchDriverId(contract.deliveryDriverId, driverId) || (!contract.deliveryDriverId && matchDriverId(contract.driverId, driverId));
-        const isReturnForMe = matchDriverId(contract.returnDriverId, driverId);
-
+      rawContracts.forEach((contract: any) => {
         const isDelivered = contract.deliveryStatus === "Delivered";
         const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned";
-        const isPendingDelivery = !isDelivered && !isReturned;
+        const isCancelled = contract.status === "Cancelled";
+        const isPendingDelivery = !isDelivered && !isReturned && !isCancelled;
 
         if (contract.status === "Active") activeCount++;
-        if (isReturned) endedCount++;
+        if (isReturned || contract.status === "Completed") endedCount++;
 
-        // 1. Pending Handover Delivery assigned to me (Active Task)
-        if (isPendingDelivery && isDeliveryForMe) {
+        // 1. Pending Handover Delivery (Active Task)
+        if (isPendingDelivery) {
           pendingDeliveriesCount++;
           activeTasksList.push(contract);
-        }
-
-        // 2. Return Pickup assigned to me by admin (Active Task)
-        if (isDelivered && !isReturned && isReturnForMe) {
+        } else if (!isReturned && !isCancelled) {
+          // 2. Active In-Field (with client, awaiting return)
           assignedReturnsCount++;
           activeTasksList.push(contract);
-        }
-
-        // 3. All History: Any contract where delivery is completed (car dropped off), or return is completed, or contract has ended
-        const deliveryCompletedByMe = isDeliveryForMe && isDelivered;
-        const returnCompletedByMe = isReturnForMe && isReturned;
-        if (deliveryCompletedByMe || returnCompletedByMe || contract.status === "Completed" || contract.status === "Cancelled") {
+        } else {
+          // 3. Completed, Returned, or Cancelled -> History
           historyList.push(contract);
         }
       });
 
       setStats({
-        total: myContracts.length,
+        total: rawContracts.length,
         active: activeCount,
         ended: endedCount,
         deliveriesToday: pendingDeliveriesCount,
@@ -238,6 +224,7 @@ export default function DriverDashboard() {
     paymentMethod: string;
     paymentStatus: "Paid" | "Partial" | "Pending";
     notes?: string;
+    moneyPhotos?: string[];
     inspectionPhotos?: string[];
     customerSignature?: string | null;
     clientId?: string;
@@ -320,6 +307,9 @@ export default function DriverDashboard() {
       if (data.customerSignature) {
         payload.customerSignature = data.customerSignature;
       }
+      if (data.moneyPhotos && data.moneyPhotos.length > 0) {
+        payload.moneyPhotos = data.moneyPhotos;
+      }
 
       const res = await fetch(`/api/contracts/${contractId}`, {
         method: "PUT",
@@ -366,6 +356,19 @@ export default function DriverDashboard() {
     };
   };
 
+  const getAssignedDriverName = (contract: any) => {
+    if (contract.contractType === "Shop") return "Showroom Handover";
+    if (typeof contract.deliveryDriverId === "object" && contract.deliveryDriverId?.name) {
+      return contract.deliveryDriverId.name;
+    }
+    if (typeof contract.driverId === "object" && contract.driverId?.name) {
+      return contract.driverId.name;
+    }
+    if (contract.deliveryDriver && contract.deliveryDriver !== "None") return contract.deliveryDriver;
+    if (contract.driver && contract.driver !== "None") return contract.driver;
+    return null;
+  };
+
   const getTaskTimeAndUrgency = (
     contract: any, 
     isPendingDelivery: boolean, 
@@ -376,16 +379,16 @@ export default function DriverDashboard() {
     const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned";
 
     // In History tab:
-    // - If return is completed AND this driver was the return driver, show return schedule
+    // - If return is completed, show return schedule
     // - Otherwise (completed delivery handover), show handover delivery schedule
     // In Active Tasks tab:
     // - If isPendingDelivery is true -> Handover schedule
-    // - If isReturnForMe and car is delivered -> Return pickup schedule
+    // - If car is delivered -> Return pickup schedule
     let isReturnSchedule = false;
     if (isHistoryTab) {
-      isReturnSchedule = isReturned && isReturnForMe;
+      isReturnSchedule = isReturned && (isReturnForMe || !!contract.returnDriverId);
     } else {
-      isReturnSchedule = !isPendingDelivery && isReturnForMe;
+      isReturnSchedule = !isPendingDelivery;
     }
 
     const rawDateStr = isReturnSchedule ? contract.rawEndDate : contract.rawStartDate;
@@ -499,7 +502,23 @@ export default function DriverDashboard() {
   };
 
   const baseList = activeTab === "today" ? todayDeliveries : historyContracts;
+
+  const myAssignmentsCount = baseList.filter((c) => {
+    const driverId = (session?.user as any)?.id;
+    const isDelivery = matchDriverId(c.deliveryDriverId, driverId) || (!c.deliveryDriverId && matchDriverId(c.driverId, driverId));
+    const isReturn = matchDriverId(c.returnDriverId, driverId);
+    return isDelivery || isReturn;
+  }).length;
+
   const filteredContracts = baseList.filter((c) => {
+    const driverId = (session?.user as any)?.id;
+    const isDeliveryForMe = matchDriverId(c.deliveryDriverId, driverId) || (!c.deliveryDriverId && matchDriverId(c.driverId, driverId));
+    const isReturnForMe = matchDriverId(c.returnDriverId, driverId);
+
+    if (assignmentFilter === "mine" && !(isDeliveryForMe || isReturnForMe)) {
+      return false;
+    }
+
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const customer = (c.customer || "").toLowerCase();
@@ -508,7 +527,8 @@ export default function DriverDashboard() {
     const plate = (c.vehiclePlate || "").toLowerCase();
     const id = (c.id || "").toLowerCase();
     const location = ((c.pickupLocation || "") + " " + (c.dropoffLocation || "")).toLowerCase();
-    return customer.includes(q) || phone.includes(q) || vehicle.includes(q) || plate.includes(q) || id.includes(q) || location.includes(q);
+    const assigned = (getAssignedDriverName(c) || "").toLowerCase();
+    return customer.includes(q) || phone.includes(q) || vehicle.includes(q) || plate.includes(q) || id.includes(q) || location.includes(q) || assigned.includes(q);
   });
 
   const totalPages = Math.ceil(filteredContracts.length / itemsPerPage);
@@ -623,7 +643,7 @@ export default function DriverDashboard() {
               )}
             </div>
 
-            {/* Controls: Filter Tabs + View Mode Switcher */}
+            {/* Controls: Filter Tabs + Assignment Filter + View Mode Switcher */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Filter Tabs */}
               <div className="bg-gray-100/80 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold shrink-0">
@@ -654,6 +674,39 @@ export default function DriverDashboard() {
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-700 font-bold">
                     {historyContracts.length}
                   </span>
+                </button>
+              </div>
+
+              {/* Assignment Filter */}
+              <div className="bg-gray-100/80 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setAssignmentFilter("all"); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    assignmentFilter === "all"
+                      ? "bg-white text-brand shadow-xs font-bold"
+                      : "text-text-muted hover:text-text-primary"
+                  }`}
+                  title="View all company orders"
+                >
+                  <span>All Orders</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAssignmentFilter("mine"); setCurrentPage(1); }}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    assignmentFilter === "mine"
+                      ? "bg-white text-brand shadow-xs font-bold"
+                      : "text-text-muted hover:text-text-primary"
+                  }`}
+                  title="Filter to tasks assigned to you"
+                >
+                  <span>Assigned to Me</span>
+                  {myAssignmentsCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-brand/10 text-brand font-bold">
+                      {myAssignmentsCount}
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -741,6 +794,7 @@ export default function DriverDashboard() {
 
                   const timeInfo = getTaskTimeAndUrgency(contract, isPendingDelivery, isReturnForMe, activeTab === "all");
                   const vehicleInfo = getVehicleDisplay(contract);
+                  const assignedDriverName = getAssignedDriverName(contract);
                   const isReturnTask = activeTab === "today" 
                     ? (!isPendingDelivery && isReturnForMe) 
                     : (isReturned && isReturnForMe);
@@ -758,9 +812,9 @@ export default function DriverDashboard() {
                       style={{ animationDelay: `${idx * 0.04 + 0.05}s` }}
                     >
                       <div className="space-y-3.5">
-                        {/* Top: Contract #, Task Type (no car icon), Time badge */}
+                        {/* Top: Contract #, Task Type, Time badge */}
                         <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-mono font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-md">
                               #{contract.id || contract._id?.substring(0,8).toUpperCase()}
                             </span>
@@ -784,6 +838,12 @@ export default function DriverDashboard() {
                             ) : (
                               <span className="text-[11px] font-semibold text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-md">
                                 Rental Active
+                              </span>
+                            )}
+
+                            {isPendingDelivery && isDeliveryForMe && (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/90 px-2 py-0.5 rounded-md">
+                                Assigned to You
                               </span>
                             )}
                           </div>
@@ -868,35 +928,41 @@ export default function DriverDashboard() {
                         </div>
                       </div>
 
-                      {/* Primary Action Button */}
-                      <div className="pt-2 border-t border-border/60">
+                      {/* Action Row: Primary Handover / Return */}
+                      <div className="pt-2 border-t border-border/60 flex items-center gap-2">
+
                         {isPendingDelivery && isDeliveryForMe ? (
                           <button
                             type="button"
                             onClick={() => router.push(`/driver/delivery?contractId=${contract._id || contract.id}`)}
-                            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer"
+                            className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer"
                             title="Confirm vehicle delivery to customer"
                           >
                             <CheckCircle2 size={15} />
                             <span>Confirm Handover</span>
                           </button>
+                        ) : isPendingDelivery ? (
+                          <div className="flex-1 py-2 px-3 bg-amber-50/90 text-amber-800 text-center rounded-xl text-xs font-semibold border border-amber-200/80 flex items-center justify-center gap-1.5 truncate" title={assignedDriverName ? `Assigned to ${assignedDriverName}` : "Pending Handover"}>
+                            <Clock size={13} className="text-amber-600 shrink-0" />
+                            <span className="truncate">{assignedDriverName ? `Assigned: ${assignedDriverName}` : "Pending Handover"}</span>
+                          </div>
                         ) : isDelivered && !isReturned && isReturnForMe && activeTab === "today" ? (
                           <button
                             type="button"
                             onClick={() => router.push(`/driver/return?contractId=${contract._id || contract.id}`)}
-                            className="w-full py-2.5 px-4 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer"
+                            className="flex-1 py-2.5 px-4 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer"
                             title="Admin assigned you to pick up this vehicle"
                           >
                             <ArrowLeftRight size={15} />
                             <span>Process Return</span>
                           </button>
                         ) : isDelivered && !isReturned ? (
-                          <div className="w-full py-2 bg-emerald-50 text-emerald-800 text-center rounded-xl text-xs font-semibold border border-emerald-200/80 flex items-center justify-center gap-1.5">
+                          <div className="flex-1 py-2 bg-emerald-50 text-emerald-800 text-center rounded-xl text-xs font-semibold border border-emerald-200/80 flex items-center justify-center gap-1.5">
                             <CheckCircle2 size={13} className="text-emerald-600" />
-                            <span>Delivered to Client</span>
+                            <span>Delivered • With Client</span>
                           </div>
                         ) : (
-                          <div className="w-full py-2 bg-emerald-50 text-emerald-800 text-center rounded-xl text-xs font-semibold border border-emerald-200 flex items-center justify-center gap-1.5">
+                          <div className="flex-1 py-2 bg-emerald-50 text-emerald-800 text-center rounded-xl text-xs font-semibold border border-emerald-200 flex items-center justify-center gap-1.5">
                             <CheckCircle2 size={13} />
                             <span>Completed</span>
                           </div>
@@ -973,6 +1039,7 @@ export default function DriverDashboard() {
 
                       const timeInfo = getTaskTimeAndUrgency(contract, isPendingDelivery, isReturnForMe, activeTab === "all");
                       const vehicleInfo = getVehicleDisplay(contract);
+                      const assignedDriverName = getAssignedDriverName(contract);
                       const isReturnTask = activeTab === "today" 
                         ? (!isPendingDelivery && isReturnForMe) 
                         : (isReturned && isReturnForMe);
@@ -991,7 +1058,7 @@ export default function DriverDashboard() {
                         >
                           {/* Task & Schedule */}
                           <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-mono font-bold text-text-primary text-xs">
                                 #{contract.id || contract._id?.substring(0,8).toUpperCase()}
                               </span>
@@ -1014,6 +1081,12 @@ export default function DriverDashboard() {
                               ) : (
                                 <span className="inline-flex items-center text-[11px] font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
                                   Rental Active
+                                </span>
+                              )}
+
+                              {isPendingDelivery && isDeliveryForMe && (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                  Assigned to You
                                 </span>
                               )}
                             </div>
@@ -1068,7 +1141,10 @@ export default function DriverDashboard() {
                               <span className="text-[10px] text-text-muted font-medium">{locationLabel}</span>
                               <button
                                 type="button"
-                                onClick={() => openGoogleMaps(locationText)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openGoogleMaps(locationText);
+                                }}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
                                 title={`Open ${locationLabel} in Google Maps: ${locationText}`}
                               >
@@ -1080,37 +1156,51 @@ export default function DriverDashboard() {
 
                           {/* Action */}
                           <td className="py-3.5 px-4 text-right">
-                            {isPendingDelivery && isDeliveryForMe ? (
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/driver/delivery?contractId=${contract._id || contract.id}`)}
-                                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs hover:shadow-md cursor-pointer"
-                                title="Confirm vehicle delivery to customer"
-                              >
-                                <CheckCircle2 size={13} />
-                                <span>Confirm Handover</span>
-                              </button>
-                            ) : isDelivered && !isReturned && isReturnForMe && activeTab === "today" ? (
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/driver/return?contractId=${contract._id || contract.id}`)}
-                                className="px-3.5 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs hover:shadow-md cursor-pointer"
-                                title="Admin assigned you to pick up this vehicle"
-                              >
-                                <ArrowLeftRight size={13} />
-                                <span>Process Return</span>
-                              </button>
-                            ) : isDelivered && !isReturned ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/80">
-                                <CheckCircle2 size={12} className="text-emerald-600" />
-                                <span>Delivered to Client</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60">
-                                <CheckCircle2 size={12} />
-                                <span>Completed</span>
-                              </span>
-                            )}
+                            <div className="flex items-center justify-end gap-2">
+
+                              {isPendingDelivery && isDeliveryForMe ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/driver/delivery?contractId=${contract._id || contract.id}`);
+                                  }}
+                                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                  title="Confirm vehicle delivery to customer"
+                                >
+                                  <CheckCircle2 size={13} />
+                                  <span>Confirm Handover</span>
+                                </button>
+                              ) : isPendingDelivery ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200/80 max-w-[170px] truncate" title={assignedDriverName ? `Assigned to ${assignedDriverName}` : "Pending Handover"}>
+                                  <Clock size={12} className="text-amber-600 shrink-0" />
+                                  <span className="truncate">{assignedDriverName ? `Assigned: ${assignedDriverName}` : "Pending Handover"}</span>
+                                </span>
+                              ) : isDelivered && !isReturned && isReturnForMe && activeTab === "today" ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/driver/return?contractId=${contract._id || contract.id}`);
+                                  }}
+                                  className="px-3.5 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs hover:shadow-md cursor-pointer"
+                                  title="Admin assigned you to pick up this vehicle"
+                                >
+                                  <ArrowLeftRight size={13} />
+                                  <span>Process Return</span>
+                                </button>
+                              ) : isDelivered && !isReturned ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/80">
+                                  <CheckCircle2 size={12} className="text-emerald-600" />
+                                  <span>Delivered • With Client</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60">
+                                  <CheckCircle2 size={12} />
+                                  <span>Completed</span>
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

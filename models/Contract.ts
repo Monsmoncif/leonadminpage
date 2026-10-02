@@ -64,6 +64,7 @@ export interface IContract extends Document {
   returnPhotos?: string[];
   damagePhotos?: string[];
   moneyPhotos?: string[];
+  returnMoneyPhotos?: string[];
   newDamages?: string;
   damageCharge?: number;
   salikCharge?: number;
@@ -168,6 +169,7 @@ const contractSchema = new Schema<IContract>(
     returnPhotos: { type: [String], required: false },
     damagePhotos: { type: [String], required: false },
     moneyPhotos: { type: [String], required: false, default: [] },
+    returnMoneyPhotos: { type: [String], required: false, default: [] },
     newDamages: { type: String, required: false },
     damageCharge: { type: Number, required: false, default: 0 },
     salikCharge: { type: Number, required: false, default: 0 },

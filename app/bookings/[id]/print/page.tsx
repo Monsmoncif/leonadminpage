@@ -37,23 +37,25 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
         ? String(contract.contractNumber)
         : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2000");
       document.title = contractNum;
-      const isNoPrint = window.location.search.includes('noprint=1');
-      const timer = setTimeout(() => {
-        if (!isNoPrint) window.print();
-      }, 400);
 
-      // Background prefetch the PDF into server memory cache so clicking Download is instant
-      if (!isNoPrint) {
-        const prefetchTimer = setTimeout(() => {
-          fetch(`/api/contracts/${id}/pdf`).catch(() => {});
-        }, 800);
-        return () => {
-          clearTimeout(timer);
-          clearTimeout(prefetchTimer);
-        };
+      // Only trigger print dialog if explicitly requested via `?autoprint=1`
+      const isAutoPrint = window.location.search.includes('autoprint=1');
+      let timer: NodeJS.Timeout | null = null;
+      if (isAutoPrint) {
+        timer = setTimeout(() => {
+          window.print();
+        }, 400);
       }
 
-      return () => clearTimeout(timer);
+      // Background prefetch the PDF into server memory cache so clicking Download is instant
+      const prefetchTimer = setTimeout(() => {
+        fetch(`/api/contracts/${id}/pdf`).catch(() => {});
+      }, 500);
+
+      return () => {
+        if (timer) clearTimeout(timer);
+        clearTimeout(prefetchTimer);
+      };
     }
   }, [contract, id]);
 

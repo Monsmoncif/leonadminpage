@@ -19,9 +19,12 @@ import {
   UserCheck,
   CheckCircle,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Eye,
+  Clock
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
+import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
 
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -35,6 +38,15 @@ const getInitials = (name: string) => {
         .substring(0, 2)
         .toUpperCase()
     : "?";
+};
+
+// Helper to check if a contract is a Shop/Showroom pickup contract vs Driver delivery
+const isShopContract = (c: any): boolean => {
+  if (c.contractType === "Shop") return true;
+  if (c.contractType === "Delivery") return false;
+  // Fallback for legacy contracts without contractType
+  const hasDriver = !!(c.deliveryDriverId || c.driverId || (c.deliveryDriver && c.deliveryDriver !== "None" && c.deliveryDriver !== "Self-drive (Client Pick Up)"));
+  return !hasDriver;
 };
 
 // Pastel avatar colors matching clients page
@@ -88,6 +100,7 @@ export default function ContractsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [selectedContractForDetails, setSelectedContractForDetails] = useState<any | null>(null);
 
   
   // Pagination (matches clients page UI/UX)
@@ -97,6 +110,11 @@ export default function ContractsPage() {
   const [deliveringContractId, setDeliveringContractId] = useState<string | null>(null);
 
   const handleConfirmDelivery = async (contract: any) => {
+    if (!isShopContract(contract)) {
+      toast.error("This order is assigned to a driver. Handover must be confirmed by the driver in the Driver Dashboard.");
+      return;
+    }
+
     const nowStartOfDay = new Date();
     nowStartOfDay.setHours(0, 0, 0, 0);
     const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
@@ -124,7 +142,7 @@ export default function ContractsPage() {
         throw new Error(errJson?.error || "Failed to confirm handover");
       }
       const contractNum = contract.contractNumber || contract.id || contract._id.slice(-6);
-      toast.success(`Handover confirmed! Contract #${contractNum} is now Active and notification sent to client.`);
+      toast.success(`Showroom handover confirmed! Contract #${contractNum} is now Active.`);
       fetchContracts();
     } catch (err: any) {
       toast.error(err.message || "Failed to confirm delivery");
@@ -495,7 +513,8 @@ export default function ContractsPage() {
                         return (
                           <tr 
                             key={contract._id} 
-                            className="border-b border-border/50 bg-white hover:bg-gray-50/50 transition-colors animate-fade-in-up"
+                            onClick={() => setSelectedContractForDetails(contract)}
+                            className="border-b border-border/50 bg-white hover:bg-gray-50/50 transition-colors animate-fade-in-up cursor-pointer"
                             style={{ animationDelay: `${idx * 0.05 + 0.1}s` }}
                           >
                             {/* Contract Column */}
@@ -570,6 +589,10 @@ export default function ContractsPage() {
                                   onChange={async (e) => {
                                     const newStatus = e.target.value;
                                     if (newStatus === "Active") {
+                                      if (!isShopContract(contract) && contract.deliveryStatus !== "Delivered") {
+                                        toast.error("This order is assigned to a driver. The driver must confirm vehicle handover in their dashboard to activate the contract.");
+                                        return;
+                                      }
                                       const nowStartOfDay = new Date();
                                       nowStartOfDay.setHours(0, 0, 0, 0);
                                       const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
@@ -623,6 +646,12 @@ export default function ContractsPage() {
                             <td className="py-3 px-4">
                               <div className="flex items-center justify-end gap-1.5 transition-opacity">
                                 {(contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
+                                  const isShop = isShopContract(contract);
+
+                                  if (!isShop) {
+                                    return null;
+                                  }
+
                                   const nowStartOfDay = new Date();
                                   nowStartOfDay.setHours(0, 0, 0, 0);
                                   const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
@@ -642,8 +671,8 @@ export default function ContractsPage() {
                                       disabled={deliveringContractId === contract._id}
                                       title={
                                         isFuture
-                                          ? `Scheduled for ${formattedStart} — Handover can be activated on start date`
-                                          : "Confirm Vehicle Handover & Activate Contract (تأكيد تسليم السيارة)"
+                                          ? `Scheduled for ${formattedStart} — Showroom Handover can be activated on start date`
+                                          : "Confirm Showroom Vehicle Handover & Activate Contract (تأكيد تسليم السيارة في المعرض)"
                                       }
                                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
                                         isFuture
@@ -662,6 +691,18 @@ export default function ContractsPage() {
                                     </button>
                                   );
                                 })()}
+
+                                <button 
+                                  type="button"
+                                  className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                  title="View Contract Details & Documentation (عرض تفاصيل العقد وتوثيق الأضرار والدفع)" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedContractForDetails(contract);
+                                  }}
+                                >
+                                  <Eye size={16} />
+                                </button>
 
                                 <Link 
                                   href={`/bookings/edit?contractId=${contract._id}`}
@@ -805,6 +846,15 @@ export default function ContractsPage() {
       )}
 
 
+
+      {selectedContractForDetails && (
+        <ContractDetailsModal
+          isOpen={Boolean(selectedContractForDetails)}
+          onClose={() => setSelectedContractForDetails(null)}
+          contract={selectedContractForDetails}
+          onEdit={() => fetchContracts()}
+        />
+      )}
 
     </div>
   );

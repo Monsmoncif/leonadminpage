@@ -321,7 +321,9 @@ export class ContractsService {
       console.error('Failed to create log', e);
     }
 
-    await this.unitModel.findByIdAndUpdate(body.unitId, { status: 'Rented' });
+    if (contract.deliveryStatus === 'Delivered') {
+      await this.unitModel.findByIdAndUpdate(body.unitId, { status: 'Rented' });
+    }
 
     const assignedDriverId = deliveryDriverId || body.driverId;
     if (assignedDriverId) {
@@ -416,7 +418,9 @@ export class ContractsService {
       if (existingContract.unitId) {
         await this.unitModel.findByIdAndUpdate(existingContract.unitId, { status: 'Available' });
       }
-      await this.unitModel.findByIdAndUpdate(body.unitId, { status: 'Rented' });
+      if (existingContract.deliveryStatus === 'Delivered') {
+        await this.unitModel.findByIdAndUpdate(body.unitId, { status: 'Rented' });
+      }
     }
 
     if (body.driverId !== undefined) updatedData.driverId = body.driverId || null;
@@ -514,7 +518,7 @@ export class ContractsService {
         }
 
         await this.unitModel.findByIdAndUpdate(existingContract.unitId, updateData);
-      } else if (body.status === 'Active') {
+      } else if (body.status === 'Active' && existingContract.deliveryStatus === 'Delivered') {
         await this.unitModel.findByIdAndUpdate(existingContract.unitId, { status: 'Rented' });
       }
     }

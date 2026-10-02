@@ -4,29 +4,19 @@ import { useState, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  X,
   Calendar as CalendarIcon,
-  Clock,
-  MapPin,
-  User,
   FileText,
-  ArrowUpRight,
-  ArrowDownLeft,
   Search,
-  Filter,
-  ChevronDown,
-  AlertCircle,
-  Loader2,
+  Plus,
+  Check,
   Eye,
-  Truck,
-  MoreHorizontal,
 } from "lucide-react";
 import Link from "next/link";
-import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
+import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-type SelectedBooking = {
+type BookingEvent = {
   id: string;
   contractId: string;
   displayId: string;
@@ -39,11 +29,19 @@ type SelectedBooking = {
   driver: string;
   type: "pickup" | "return";
   status: "Pending" | "Active" | "Completed";
+  isHandedOver: boolean;
+  isReturned: boolean;
+  isCompleted: boolean;
+  isOverdue?: boolean;
+  statusLabel: string;
+  chipClass: string;
+  dotClass: string;
   color: string;
   dateStr: string;
   notes: string;
   location: string;
-} | null;
+  rawContract?: any;
+};
 
 const getInitials = (name: string) => {
   if (!name) return "??";
@@ -64,17 +62,15 @@ const getAvatarColor = (name: string) => {
   return colors[charCode % colors.length];
 };
 
-// Normalize date to start of day
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-// Parse time string to a displayable format
 const parseTimeSlot = (timeStr: string) => {
   if (!timeStr) return "08:00 AM";
   return timeStr;
 };
 
 const formatShortTime = (timeStr: string) => {
-  if (!timeStr) return "8a";
+  if (!timeStr || !timeStr.trim()) return "";
   const t = timeStr.toLowerCase().replace(' ', '');
   if (t.includes('am') || t.includes('pm')) {
     return t.replace(':00', '').replace('am', 'a').replace('pm', 'p');
@@ -91,30 +87,55 @@ const formatShortTime = (timeStr: string) => {
   return timeStr;
 };
 
+const extractReturnTime = (c: any, isReturned: boolean) => {
+  if (!isReturned) return ""; // No return time until car is actually back
+
+  if (c.returnedAt) {
+    try {
+      const d = new Date(c.returnedAt);
+      if (!isNaN(d.getTime())) {
+        const hours = d.getHours();
+        const minutes = d.getMinutes();
+        const ampm = hours >= 12 ? 'p' : 'a';
+        let h = hours % 12;
+        if (h === 0) h = 12;
+        const m = minutes < 10 ? `0${minutes}` : `${minutes}`;
+        return minutes === 0 ? `${h}${ampm}` : `${h}:${m}${ampm}`;
+      }
+    } catch {}
+  }
+
+  if (c.checkinTime && c.checkinTime !== "Pending Return" && c.checkinTime !== "Pending Handover") {
+    return formatShortTime(c.checkinTime);
+  }
+
+  return "";
+};
+
 export default function CalendarPage() {
   const [filter, setFilter] = useState<"all" | "pickup" | "return" | "pending">("all");
-  const [selectedBooking, setSelectedBooking] = useState<SelectedBooking>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [selectedContractForDetails, setSelectedContractForDetails] = useState<any | null>(null);
+
+
 
   // Month calculation
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  
-  const startDay = startOfMonth.getDay(); 
-  const startDayIdx = startDay === 0 ? 6 : startDay - 1; // 0=Mon, 6=Sun
+  const startDayRaw = startOfMonth.getDay();
+  const startDayIdx = startDayRaw === 0 ? 6 : startDayRaw - 1;
 
-  const startDate = new Date(startOfMonth);
-  startDate.setDate(startDate.getDate() - startDayIdx);
+  const startDateCalc = new Date(startOfMonth);
+  startDateCalc.setDate(startDateCalc.getDate() - startDayIdx);
 
   const monthDates = Array.from({ length: 42 }).map((_, i) => {
-    const d = new Date(startDate);
+    const d = new Date(startDateCalc);
     d.setDate(d.getDate() + i);
     return d;
   });
-  
+
   const monthEnd = monthDates[41];
   monthEnd.setHours(23, 59, 59, 999);
 
@@ -128,19 +149,24 @@ export default function CalendarPage() {
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
         const mapped: any[] = [];
-        
+
         (data.contracts || []).forEach((c: any) => {
           if (!c.rawStartDate || !c.rawEndDate) return;
           if (c.status === "Cancelled") return;
-          
-          const contractStart = new Date(c.rawStartDate);
+
           const nowStartOfDay = new Date();
           nowStartOfDay.setHours(0, 0, 0, 0);
 
+          // Handover (Pickup completed): true when car has been delivered/handed over to client
+          const isHandedOver = c.deliveryStatus === "Delivered" || c.deliveryStatus === "Returned" || c.status === "Active" || c.status === "Completed";
+
+          // Car Back (Return completed): true when car has been returned back to agency
+          const isReturned = c.deliveryStatus === "Returned" || c.status === "Completed" || Boolean(c.returnedAt);
+
           let effectiveStatus: "Pending" | "Active" | "Completed" = "Pending";
-          if (c.deliveryStatus === "Returned" || c.status === "Completed") {
+          if (isReturned) {
             effectiveStatus = "Completed";
-          } else if (c.deliveryStatus === "Delivered" && c.status === "Active" && contractStart <= nowStartOfDay) {
+          } else if (isHandedOver) {
             effectiveStatus = "Active";
           } else {
             effectiveStatus = "Pending";
@@ -148,74 +174,105 @@ export default function CalendarPage() {
 
           const pickupDate = startOfDay(new Date(c.rawStartDate));
           const returnDate = startOfDay(new Date(c.rawEndDate));
-          
-          // Map pickup
+
           if (pickupDate >= monthDates[0] && pickupDate <= monthEnd) {
-             const pickupDriver = (c.deliveryDriver && c.deliveryDriver !== "None" && c.deliveryDriver.trim() !== "")
-               ? c.deliveryDriver
-               : (c.driver && c.driver !== "None" && c.driver.trim() !== "" ? c.driver : "");
-             const pickupNotes = (c.notes && c.notes.trim() && c.notes !== "No notes provided.") 
-               ? c.notes.trim() 
-               : "";
-             const pickupLocation = (c.pickupLocation && c.pickupLocation.trim()) 
-               ? c.pickupLocation.trim() 
-               : "";
+            const pickupDriver = (c.deliveryDriver && c.deliveryDriver !== "None" && c.deliveryDriver.trim() !== "")
+              ? c.deliveryDriver
+              : (c.driver && c.driver !== "None" && c.driver.trim() !== "" ? c.driver : "");
+            const pickupNotes = (c.notes && c.notes.trim() && c.notes !== "No notes provided.")
+              ? c.notes.trim() : "";
+            const pickupLocation = (c.pickupLocation && c.pickupLocation.trim())
+              ? c.pickupLocation.trim() : "";
 
-             mapped.push({
-               id: `${c.id}-pickup`,
-               contractId: c._id,
-               displayId: c.id,
-               time: parseTimeSlot(c.checkoutTime), 
-               shortTime: formatShortTime(c.checkoutTime),
-               date: pickupDate,
-               car: c.vehicle,
-               carImage: c.vehicleImage || null,
-               client: c.customer,
-               driver: pickupDriver,
-               type: "pickup",
-               status: effectiveStatus,
-               color: getAvatarColor(c.customer),
-               dateStr: pickupDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-               notes: pickupNotes,
-               location: pickupLocation
-             });
+            const chipClass = isHandedOver
+              ? "bg-blue-50/90 hover:bg-blue-100 text-blue-900 border-blue-200/80"
+              : "bg-amber-50/90 hover:bg-amber-100 text-amber-900 border-amber-200/80";
+            const dotClass = isHandedOver ? "bg-blue-500" : "bg-amber-500";
+            const statusLabel = isHandedOver ? "Handed Over" : "To Hand Over (Pending)";
+
+            mapped.push({
+              id: `${c.id}-pickup`,
+              contractId: c._id,
+              displayId: c.id,
+              time: parseTimeSlot(c.checkoutTime),
+              shortTime: formatShortTime(c.checkoutTime),
+              date: pickupDate,
+              car: c.vehicle,
+              carImage: c.vehicleImage || null,
+              client: c.customer,
+              driver: pickupDriver,
+              type: "pickup",
+              status: effectiveStatus,
+              isHandedOver,
+              isReturned,
+              isCompleted: isHandedOver,
+              statusLabel,
+              chipClass,
+              dotClass,
+              color: getAvatarColor(c.customer),
+              dateStr: pickupDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+              notes: pickupNotes,
+              location: pickupLocation,
+              rawContract: c,
+            });
           }
-          
-          // Map return
+
           if (returnDate >= monthDates[0] && returnDate <= monthEnd) {
-             const returnDriver = (c.returnDriver && c.returnDriver !== "None" && c.returnDriver.trim() !== "")
-               ? c.returnDriver
-               : (c.returnDriverId?.name && c.returnDriverId.name !== "None" ? c.returnDriverId.name : "");
-             const returnNotes = (c.returnNotes && c.returnNotes.trim() && c.returnNotes !== "No notes provided.") 
-               ? c.returnNotes.trim() 
-               : "";
+            const returnDriver = (c.returnDriver && c.returnDriver !== "None" && c.returnDriver.trim() !== "")
+              ? c.returnDriver
+              : (c.returnDriverId?.name && c.returnDriverId.name !== "None" ? c.returnDriverId.name : "");
+            const returnNotes = (c.returnNotes && c.returnNotes.trim() && c.returnNotes !== "No notes provided.")
+              ? c.returnNotes.trim() : "";
 
-             let returnLocation = "";
-             if (c.dropoffLocation && c.dropoffLocation.trim() !== "" && c.dropoffLocation !== "Main Office") {
-               const isAutoCloned = (c.dropoffLocation === c.pickupLocation) && !c.returnDriverId && !c.returnNotes && c.deliveryStatus !== "Returned";
-               if (!isAutoCloned) {
-                 returnLocation = c.dropoffLocation.trim();
-               }
-             }
+            let returnLocation = "";
+            if (c.dropoffLocation && c.dropoffLocation.trim() !== "" && c.dropoffLocation !== "Main Office") {
+              const isAutoCloned = (c.dropoffLocation === c.pickupLocation) && !c.returnDriverId && !c.returnNotes && c.deliveryStatus !== "Returned";
+              if (!isAutoCloned) {
+                returnLocation = c.dropoffLocation.trim();
+              }
+            }
 
-             mapped.push({
-               id: `${c.id}-return`,
-               contractId: c._id,
-               displayId: c.id,
-               time: parseTimeSlot(c.checkinTime), 
-               shortTime: formatShortTime(c.checkinTime),
-               date: returnDate,
-               car: c.vehicle,
-               carImage: c.vehicleImage || null,
-               client: c.customer,
-               driver: returnDriver,
-               type: "return",
-               status: effectiveStatus,
-               color: getAvatarColor(c.customer),
-               dateStr: returnDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-               notes: returnNotes,
-               location: returnLocation
-             });
+            const isOverdue = !isReturned && returnDate < nowStartOfDay;
+            let chipClass = "bg-purple-50/90 hover:bg-purple-100 text-purple-900 border-purple-200/80";
+            let dotClass = "bg-purple-500";
+            let statusLabel = "Car Out (Expected Return)";
+
+            if (isReturned) {
+              chipClass = "bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80";
+              dotClass = "bg-emerald-500";
+              statusLabel = "Car Back (Returned)";
+            } else if (isOverdue) {
+              chipClass = "bg-rose-50/90 hover:bg-rose-100 text-rose-900 border-rose-300";
+              dotClass = "bg-rose-500";
+              statusLabel = "Overdue Return (Late)";
+            }
+
+            mapped.push({
+              id: `${c.id}-return`,
+              contractId: c._id,
+              displayId: c.id,
+              time: isReturned ? (extractReturnTime(c, true) || "Returned") : "Pending Return",
+              shortTime: extractReturnTime(c, isReturned),
+              date: returnDate,
+              car: c.vehicle,
+              carImage: c.vehicleImage || null,
+              client: c.customer,
+              driver: returnDriver,
+              type: "return",
+              status: effectiveStatus,
+              isHandedOver,
+              isReturned,
+              isCompleted: isReturned,
+              isOverdue,
+              statusLabel,
+              chipClass,
+              dotClass,
+              color: getAvatarColor(c.customer),
+              dateStr: returnDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+              notes: returnNotes,
+              location: returnLocation,
+              rawContract: c,
+            });
           }
         });
         setBookings(mapped);
@@ -228,13 +285,12 @@ export default function CalendarPage() {
     fetchContracts();
   }, [currentDate]);
 
-  // Filtered bookings based on type filter AND search
   const filteredBookings = bookings.filter((b) => {
     const matchesType =
       filter === "all" ||
-      (filter === "pending" ? b.status === "Pending" : b.type === filter);
+      (filter === "pending" ? !b.isCompleted : b.type === filter);
     const query = searchQuery.toLowerCase();
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       (b.client && b.client.toLowerCase().includes(query)) ||
       (b.car && b.car.toLowerCase().includes(query)) ||
       (b.driver && b.driver.toLowerCase().includes(query)) ||
@@ -242,55 +298,27 @@ export default function CalendarPage() {
     return matchesType && matchesSearch;
   });
 
-  // Stats derived from bookings
-  const totalPickups = bookings.filter(b => b.type === "pickup").length;
-  const totalReturns = bookings.filter(b => b.type === "return").length;
-  const todayBookings = bookings.filter(b => b.date.toDateString() === new Date().toDateString()).length;
-  const pendingBookings = bookings.filter(b => b.status === "Pending").length;
-
   const prevMonth = () => {
-    const next = new Date(currentDate);
-    next.setMonth(currentDate.getMonth() - 1);
-    setCurrentDate(next);
-    setSelectedBooking(null);
+    setCurrentDate(prev => { const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d; });
   };
-
   const nextMonth = () => {
-    const next = new Date(currentDate);
-    next.setMonth(currentDate.getMonth() + 1);
-    setCurrentDate(next);
-    setSelectedBooking(null);
+    setCurrentDate(prev => { const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d; });
   };
-
   const goToday = () => {
     setCurrentDate(new Date());
-    setSelectedBooking(null);
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        {/* Header Skeleton */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+      <div className="space-y-4 animate-pulse">
+        <div className="flex items-end justify-between gap-4">
           <div className="space-y-2">
             <div className="h-8 w-48 bg-gray-200 rounded-lg"></div>
             <div className="h-4 w-64 bg-gray-200 rounded-lg"></div>
           </div>
         </div>
-
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white border border-gray-100 rounded-2xl h-[88px] p-4">
-              <div className="w-8 h-8 bg-gray-200 rounded-xl mb-2"></div>
-              <div className="w-16 h-5 bg-gray-200 rounded-md"></div>
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar Skeleton */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden h-[600px]">
-          <div className="p-4 border-b border-gray-100 flex justify-between bg-gray-50/30">
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden h-[700px]">
+          <div className="p-4 border-b border-gray-100 flex justify-between">
             <div className="h-10 w-64 bg-gray-200 rounded-xl"></div>
             <div className="h-10 w-24 bg-gray-200 rounded-xl"></div>
           </div>
@@ -299,437 +327,236 @@ export default function CalendarPage() {
     );
   }
 
-  // Today's upcoming events for the sidebar
-  const todayDate = new Date();
-  const todayStr = todayDate.toDateString();
-  const todaysEvents = filteredBookings.filter(b => b.date.toDateString() === todayStr);
-
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* ===== Page Header ===== */}
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">Calendar</h1>
-        <p className="text-xs text-text-muted mt-0.5">Track pickups, returns, and driver schedules across the fleet.</p>
-      </div>
+    <div className="space-y-5">
+      {/* ===== Dashboard-Style Welcome Header ===== */}
+      <div className="bg-card rounded-2xl border border-border p-5 sm:p-6 relative overflow-hidden shadow-xs">
+        {/* Decorative gradient blobs matching dashboard */}
+        <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-brand/5 via-orange-500/3 to-transparent rounded-full -translate-y-32 translate-x-20 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-500/5 to-transparent rounded-full translate-y-16 -translate-x-8 pointer-events-none" />
 
-      {/* ===== Quick Stats Row (Rental Data Inspired) ===== */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-100 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
-              <ArrowUpRight size={18} className="text-blue-600" />
-            </div>
-            <span className="text-2xl font-black text-text-primary">{totalPickups}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary mb-1">
+              Fleet Calendar
+            </h1>
+            <p className="text-xs sm:text-sm text-text-secondary">
+              {monthYearStr} • Track pickups, returns, and fleet handover schedules
+            </p>
           </div>
-          <span className="text-[11px] font-bold text-text-secondary block">Pickups This Month</span>
-        </div>
-        <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-100 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <ArrowDownLeft size={18} className="text-emerald-600" />
-            </div>
-            <span className="text-2xl font-black text-text-primary">{totalReturns}</span>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/bookings/new"
+              className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer"
+            >
+              <Plus size={16} />
+              <span>New Contract</span>
+            </Link>
           </div>
-          <span className="text-[11px] font-bold text-text-secondary block">Returns This Month</span>
-        </div>
-        <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-100 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
-              <Clock size={18} className="text-amber-600" />
-            </div>
-            <span className="text-2xl font-black text-text-primary">{todayBookings}</span>
-          </div>
-          <span className="text-[11px] font-bold text-text-secondary block">Today&apos;s Events</span>
-        </div>
-        <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-100 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
-              <AlertCircle size={18} className="text-orange-600" />
-            </div>
-            <span className="text-2xl font-black text-text-primary">{pendingBookings}</span>
-          </div>
-          <span className="text-[11px] font-bold text-text-secondary block">Pending Contracts</span>
         </div>
       </div>
 
-      {/* ===== Main Content: Calendar + Sidebar ===== */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        
-        {/* ===== Calendar Card (Left — 8 cols) ===== */}
-        <div className="xl:col-span-8">
-          <div className="bg-gray-50/60 rounded-2xl border border-gray-100 overflow-hidden">
-            {/* Calendar Toolbar */}
-            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/60 bg-white">
-              <div className="flex items-center gap-3">
-                {/* Month Navigation */}
-                <div className="flex items-center gap-1.5">
-                  <button onClick={prevMonth} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center text-text-secondary hover:bg-gray-50 hover:text-text-primary transition-colors bg-white shadow-xs cursor-pointer">
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button onClick={goToday} className="px-3 py-2 text-xs font-bold border border-border rounded-xl text-text-secondary hover:bg-gray-50 hover:text-text-primary transition-colors bg-white shadow-xs cursor-pointer">
-                    Today
-                  </button>
-                  <button onClick={nextMonth} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center text-text-secondary hover:bg-gray-50 hover:text-text-primary transition-colors bg-white shadow-xs cursor-pointer">
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-                <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5 whitespace-nowrap">
-                  <CalendarIcon size={15} className="text-brand" /> {monthYearStr}
-                </h2>
-              </div>
+      {/* ===== Full-Width Calendar (Dashboard Card Style) ===== */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
+        {/* Toolbar */}
+        <div className="px-4 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-border bg-gray-50/50">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-border shadow-xs">
+              <button 
+                onClick={prevMonth} 
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <button 
+                onClick={goToday} 
+                className="px-2.5 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Today
+              </button>
+              <button 
+                onClick={nextMonth} 
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+            <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+              <CalendarIcon size={15} className="text-brand" /> {monthYearStr}
+            </h2>
+          </div>
 
-              <div className="flex items-center gap-2">
-                {/* Search */}
-                <div className="relative max-w-[180px] w-full">
-                  <input 
-                    type="text" 
-                    placeholder="Search..." 
-                    className="w-full text-xs border border-border rounded-xl pl-8 pr-3 py-2 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs" 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Filter Pills (Dashboard style tabs) */}
+            <div className="flex items-center p-1 bg-white rounded-xl border border-border shadow-xs">
+              {([
+                { key: "all", label: "All" },
+                { key: "pickup", label: "Pickups" },
+                { key: "return", label: "Returns" },
+                { key: "pending", label: "Pending" },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setFilter(key)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filter === key
+                      ? "bg-brand text-white shadow-xs"
+                      : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            <div className="relative max-w-[170px] w-full">
+              <input
+                type="text"
+                placeholder="Search..."
+                className="w-full text-xs border border-border rounded-xl pl-7 pr-2.5 py-1.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+            </div>
+
+            {/* Legend inline */}
+            <div className="hidden xl:flex items-center gap-3 pl-1 text-[11px] font-semibold text-text-muted">
+              <span className="flex items-center gap-1.5" title="Car waiting to be handed over to client">
+                <span className="w-2 h-2 rounded-full bg-amber-500" /> To Hand Over
+              </span>
+              <span className="flex items-center gap-1.5" title="Car handed over / delivered to client">
+                <span className="w-2 h-2 rounded-full bg-blue-500" /> Handed Over
+              </span>
+              <span className="flex items-center gap-1.5" title="Car currently on rental with client">
+                <span className="w-2 h-2 rounded-full bg-purple-500" /> Car Out
+              </span>
+              <span className="flex items-center gap-1.5" title="Car returned back to fleet">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Car Back
+              </span>
+            </div>
+
+            <span className="text-[11px] font-bold text-text-muted hidden md:inline">
+              {filteredBookings.length} event{filteredBookings.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+
+        {/* Day Headers */}
+        <div className="grid grid-cols-7 bg-gray-50/70 border-b border-border">
+          {days.map((day) => (
+            <div key={day} className="py-2.5 text-[10px] font-black text-text-muted text-center uppercase tracking-wider border-l border-border first:border-l-0">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Grid — Full Height */}
+        <div className="grid grid-cols-7 grid-rows-6 bg-card" style={{ minHeight: 'calc(100vh - 270px)' }}>
+          {monthDates.map((date, idx) => {
+            const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+            const isToday = date.toDateString() === new Date().toDateString();
+
+            const dayBookings = filteredBookings.filter(
+              (b) => b.date.toDateString() === date.toDateString()
+            );
+
+            return (
+              <div
+                key={idx}
+                className={`p-1.5 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border transition-colors ${
+                  !isCurrentMonth ? 'bg-gray-50/40' : 'bg-card'
+                } ${isToday ? 'bg-brand/[0.03]' : ''}`}
+              >
+                {/* Date */}
+                <div className={`text-xs font-black mb-1 w-6 h-6 flex items-center justify-center rounded-lg mx-auto md:mx-0 ${
+                  isToday 
+                    ? 'bg-brand text-white shadow-xs' 
+                    : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'
+                }`}>
+                  {date.getDate()}
                 </div>
 
-                {/* Type Filter */}
-                <div className="relative">
-                  <button 
-                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                    className="text-xs border border-border rounded-xl px-3 py-2 text-text-secondary hover:bg-gray-50 flex items-center gap-1.5 font-bold transition-colors bg-white whitespace-nowrap shadow-xs cursor-pointer"
-                  >
-                    <Filter size={13} className="text-text-muted" /> 
-                    {filter === "all" ? "All" : filter === "pickup" ? "Pickups" : filter === "return" ? "Returns" : "Pending"}
-                    <ChevronDown size={12} className="text-text-muted" />
-                  </button>
-                  {isFilterDropdownOpen && (
-                    <div className="absolute top-full mt-2 right-0 w-36 bg-white border border-border rounded-xl shadow-lg z-20 py-1 overflow-hidden">
-                      {([
-                        { key: "all", label: "All Types" },
-                        { key: "pickup", label: "Pickups" },
-                        { key: "return", label: "Returns" },
-                        { key: "pending", label: "Pending" },
-                      ] as const).map(({ key, label }) => (
-                        <button
-                          key={key}
-                          onClick={() => {
-                            setFilter(key);
-                            setIsFilterDropdownOpen(false);
-                          }}
-                          className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors cursor-pointer ${filter === key ? "text-brand font-bold bg-brand/5" : "text-text-secondary"}`}
-                        >
-                          {label}
-                        </button>
-                      ))}
+                {/* Events */}
+                <div className="space-y-1 flex flex-col items-start overflow-hidden">
+                  {dayBookings.slice(0, 4).map((booking, bIdx) => (
+                    <div
+                      key={bIdx}
+                      className={`w-fit max-w-full inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-left transition-colors border shadow-2xs hover:shadow-xs group ${booking.chipClass}`}
+                    >
+                      <Link
+                        href={booking.contractId ? `/bookings/${booking.contractId}/print` : "/bookings"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Contract #${booking.displayId} • ${booking.client} (${booking.car})${booking.shortTime ? ` • ${booking.shortTime}` : ""} • ${booking.statusLabel} • Click to view PDF`}
+                        className="inline-flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${booking.dotClass}`} />
+                        {booking.shortTime ? (
+                          <span className="font-semibold text-[9px] opacity-75 whitespace-nowrap">
+                            {booking.shortTime}
+                          </span>
+                        ) : null}
+                        <span className="font-sans font-bold text-[11px] tracking-tight tabular-nums">
+                          {booking.displayId?.startsWith("#") ? booking.displayId : `#${booking.displayId}`}
+                        </span>
+                        {booking.isCompleted && (
+                          <Check size={10} className="shrink-0 text-current opacity-80" />
+                        )}
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedContractForDetails(booking.rawContract);
+                        }}
+                        title="View Full Contract Details, Damage & Payment Photos (عرض تفاصيل العقد وتوثيق الأضرار والدفع)"
+                        className="p-0.5 rounded hover:bg-black/10 active:scale-95 transition-all text-current opacity-70 hover:opacity-100 cursor-pointer flex items-center justify-center shrink-0 ml-0.5"
+                      >
+                        <Eye size={11} />
+                      </button>
                     </div>
+                  ))}
+                  {dayBookings.length > 4 && (
+                    <span className="text-[9px] font-bold text-brand pl-1">
+                      +{dayBookings.length - 4} more
+                    </span>
                   )}
                 </div>
               </div>
-            </div>
-
-            {/* Legend */}
-            <div className="flex items-center gap-4 px-4 py-2.5 border-b border-gray-200/40 bg-gray-50/40 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500" /> 
-                <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Pickup</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" /> 
-                <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Return</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500" /> 
-                <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Pending</span>
-              </div>
-              <div className="ml-auto text-[10px] text-text-muted font-bold">
-                {filteredBookings.length} event{filteredBookings.length !== 1 ? "s" : ""}
-              </div>
-            </div>
-
-            {/* Calendar Grid */}
-            <div className="overflow-hidden">
-              {/* Day Headers */}
-              <div className="grid grid-cols-7 bg-white border-b border-gray-200/60">
-                {days.map((day) => (
-                  <div key={day} className="py-2.5 text-[10px] font-black text-text-muted text-center uppercase tracking-widest border-l border-gray-100 first:border-l-0">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Calendar Days */}
-              <div className="grid grid-cols-7 grid-rows-6 min-h-[520px] bg-white">
-                {monthDates.map((date, idx) => {
-                  const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-                  const isToday = date.toDateString() === new Date().toDateString();
-                  
-                  const dayBookings = filteredBookings.filter(
-                    (b) => b.date.toDateString() === date.toDateString()
-                  );
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className={`p-1 md:p-1.5 border-b border-gray-100/80 [&:not(:nth-child(7n+1))]:border-l transition-all duration-150 ${!isCurrentMonth ? 'bg-gray-50/40' : 'bg-white hover:bg-blue-50/20'} ${isToday ? 'bg-brand/[0.04] ring-1 ring-inset ring-brand/10' : ''}`}
-                    >
-                      {/* Date Number */}
-                      <div className={`text-[11px] font-black mb-1 w-6 h-6 flex items-center justify-center rounded-lg ${isToday ? 'bg-brand text-white shadow-sm' : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'}`}>
-                        {date.getDate()}
-                      </div>
-                      
-                      {/* Events */}
-                      <div className="space-y-0.5 max-h-[72px] overflow-y-auto scrollbar-thin pr-0.5">
-                        {dayBookings.slice(0, 3).map((booking, bIdx) => {
-                          const isSelected = selectedBooking?.id === booking?.id;
-                          const isPending = booking.status === "Pending";
-                          return (
-                            <button
-                              key={bIdx}
-                              onClick={() => setSelectedBooking(booking as any)}
-                              className={`w-full px-1.5 py-1 rounded-lg text-left transition-all group border cursor-pointer ${
-                                isPending
-                                  ? 'bg-amber-50 hover:bg-amber-100/80 border-amber-200/60 text-amber-900'
-                                  : booking.type === 'pickup' 
-                                    ? 'bg-blue-50 hover:bg-blue-100/70 border-blue-200/60 text-blue-900' 
-                                    : 'bg-emerald-50 hover:bg-emerald-100/70 border-emerald-200/60 text-emerald-900'
-                              } ${isSelected ? "ring-2 ring-brand shadow-sm z-10 relative border-brand" : ""}`}
-                            >
-                              <div className="flex items-center gap-1 overflow-hidden">
-                                <span className={`w-1 h-3 rounded-full shrink-0 ${
-                                  isPending ? 'bg-amber-400' : booking.type === 'pickup' ? 'bg-blue-400' : 'bg-emerald-400'
-                                }`} />
-                                <span className="font-black text-[9px] whitespace-nowrap opacity-70">{booking.shortTime}</span>
-                                <span className="font-bold text-[10px] truncate">{booking.client}</span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                        {dayBookings.length > 3 && (
-                          <button 
-                            onClick={() => {
-                              if (dayBookings[3]) setSelectedBooking(dayBookings[3] as any);
-                            }}
-                            className="w-full text-center text-[9px] font-black text-brand hover:text-brand-dark cursor-pointer py-0.5"
-                          >
-                            +{dayBookings.length - 3} more
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Footer Navigation */}
-            <div className="p-3 border-t border-gray-200/60 flex items-center justify-between text-xs text-text-secondary bg-white">
-              <p className="text-text-muted">
-                <span className="font-bold text-text-primary">{filteredBookings.length}</span> event{filteredBookings.length !== 1 ? "s" : ""} · <span className="font-bold text-text-primary">{monthYearStr}</span>
-              </p>
-              <div className="flex items-center gap-1">
-                <button onClick={prevMonth} className="px-2.5 py-1.5 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-[11px] font-bold">← Prev</button>
-                <button className="px-2.5 py-1.5 bg-brand text-white rounded-lg font-bold cursor-pointer text-[11px]">{currentDate.toLocaleDateString("en-US", { month: "short" })}</button>
-                <button onClick={nextMonth} className="px-2.5 py-1.5 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-[11px] font-bold">Next →</button>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
 
-        {/* ===== Detail Sidebar (Right — 4 cols) ===== */}
-        <div className="xl:col-span-4">
-          <div className="space-y-4 sticky top-6">
-            
-            {/* Selected Event Detail Card */}
-            <div className="bg-gray-50/60 rounded-2xl border border-gray-100 overflow-hidden">
-              {/* Sidebar Header */}
-              <div className="bg-white px-5 py-3.5 border-b border-gray-200/60 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                  <Clock size={15} className="text-brand" /> Event Detail
-                </h3>
-                {selectedBooking && (
-                  <button 
-                    onClick={() => setSelectedBooking(null)} 
-                    className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors text-text-muted hover:text-text-primary cursor-pointer border border-gray-200/60"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-
-              {/* Sidebar Content */}
-              {selectedBooking ? (
-                <div className="animate-fade-in-up">
-                  {/* Profile Header Card */}
-                  <div className="p-5 border-b border-gray-200/40 bg-white">
-                    <div className="flex items-center gap-3.5">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-base font-black shadow-xs ${getAvatarColor(selectedBooking.client)}`}>
-                        {getInitials(selectedBooking.client)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-bold text-text-primary truncate">{selectedBooking.client}</h4>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className={`text-[9px] uppercase tracking-wider font-black px-2 py-0.5 rounded-md ${
-                            selectedBooking.type === 'pickup' 
-                              ? 'bg-blue-100 text-blue-700' 
-                              : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {selectedBooking.type === 'pickup' ? '↑ Pickup' : '↓ Return'}
-                          </span>
-                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${
-                            selectedBooking.status === 'Active'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : selectedBooking.status === 'Pending'
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}>
-                            {selectedBooking.status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Info Rows (Rental Data Style) */}
-                  <div className="p-4 space-y-3">
-                    {/* Time & Date */}
-                    <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <Clock size={13} className="text-brand" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Time & Date</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-base font-black text-text-primary">{selectedBooking.time}</span>
-                        <span className="text-xs font-bold text-text-secondary bg-gray-100 px-2.5 py-1 rounded-lg">{selectedBooking.dateStr}</span>
-                      </div>
-                    </div>
-
-                    {/* Vehicle */}
-                    <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <ExecutiveCarIcon size={13} className="text-brand" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Vehicle</span>
-                      </div>
-                      <span className="text-sm font-bold text-text-primary">{selectedBooking.car}</span>
-                    </div>
-
-                    {/* Contract ID */}
-                    <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <FileText size={13} className="text-brand" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Contract</span>
-                      </div>
-                      <span className="text-sm font-bold text-text-primary font-mono">{selectedBooking.displayId}</span>
-                    </div>
-
-                    {/* Driver (if exists) */}
-                    {selectedBooking.driver && selectedBooking.driver !== "None" && selectedBooking.driver.trim() !== "" && (
-                      <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Truck size={13} className="text-brand" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Driver</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-black ${getAvatarColor(selectedBooking.driver)}`}>
-                            {getInitials(selectedBooking.driver)}
-                          </div>
-                          <span className="text-sm font-bold text-text-primary">{selectedBooking.driver}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Location (if exists) */}
-                    {selectedBooking.location && selectedBooking.location.trim() !== "" && (
-                      <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-xs">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <MapPin size={13} className="text-emerald-600" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Location</span>
-                        </div>
-                        <span className="text-xs font-bold text-text-primary leading-relaxed">{selectedBooking.location}</span>
-                      </div>
-                    )}
-
-                    {/* Notes (if exists) */}
-                    {selectedBooking.notes && selectedBooking.notes.trim() !== "" && selectedBooking.notes !== "No notes provided." && (
-                      <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200/60">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <AlertCircle size={13} className="text-amber-600" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Notes</span>
-                        </div>
-                        <p className="text-xs text-amber-800 leading-relaxed">{selectedBooking.notes}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Footer */}
-                  <div className="bg-white px-4 py-3 border-t border-gray-200/60">
-                    <Link href={`/bookings`}>
-                      <button className="w-full bg-brand hover:bg-brand-dark text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md cursor-pointer flex items-center justify-center gap-2">
-                        <Eye size={14} /> View Full Contract
-                      </button>
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center text-center py-12 px-6 animate-fade-in-up bg-white">
-                  <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4 border border-gray-100">
-                    <CalendarIcon size={22} className="text-text-muted" />
-                  </div>
-                  <h4 className="text-sm font-bold text-text-primary mb-1">No Event Selected</h4>
-                  <p className="text-[11px] text-text-muted max-w-[200px] leading-relaxed">
-                    Click on a pickup or return event from the calendar to view its details here.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Today's Schedule Card */}
-            <div className="bg-gray-50/60 rounded-2xl border border-gray-100 overflow-hidden">
-              <div className="bg-white px-5 py-3.5 border-b border-gray-200/60 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                  <CalendarIcon size={15} className="text-brand" /> Today&apos;s Schedule
-                </h3>
-                <span className="text-[10px] font-black text-brand bg-brand/10 px-2 py-0.5 rounded-md">
-                  {todaysEvents.length} event{todaysEvents.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <div className="bg-white">
-                {todaysEvents.length > 0 ? (
-                  <div className="divide-y divide-gray-100/80">
-                    {todaysEvents.slice(0, 5).map((ev, i) => (
-                      <button 
-                        key={i}
-                        onClick={() => setSelectedBooking(ev as any)}
-                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50/60 transition-colors cursor-pointer text-left"
-                      >
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${
-                          ev.type === 'pickup' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                        }`}>
-                          {ev.type === 'pickup' ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-bold text-text-primary truncate">{ev.client}</span>
-                            <span className="text-[10px] font-black text-text-muted whitespace-nowrap">{ev.shortTime}</span>
-                          </div>
-                          <span className="text-[10px] text-text-muted truncate block">{ev.car}</span>
-                        </div>
-                      </button>
-                    ))}
-                    {todaysEvents.length > 5 && (
-                      <div className="px-4 py-2 text-center">
-                        <span className="text-[10px] font-bold text-brand">+{todaysEvents.length - 5} more events today</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="py-8 text-center">
-                    <p className="text-xs text-text-muted">No events scheduled for today</p>
-                  </div>
-                )}
-              </div>
-            </div>
+        {/* Footer */}
+        <div className="px-4 py-2.5 border-t border-border flex items-center justify-between text-xs text-text-muted bg-gray-50/50">
+          <span>
+            <span className="font-bold text-text-primary">{filteredBookings.length}</span> events · <span className="font-bold text-text-primary">{monthYearStr}</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={prevMonth} className="px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
+              ← Prev
+            </button>
+            <button onClick={goToday} className="px-2.5 py-1 bg-brand text-white rounded-lg font-bold cursor-pointer text-xs shadow-xs">
+              {currentDate.toLocaleDateString("en-US", { month: "short" })}
+            </button>
+            <button onClick={nextMonth} className="px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
+              Next →
+            </button>
           </div>
         </div>
       </div>
+
+      {selectedContractForDetails && (
+        <ContractDetailsModal
+          isOpen={Boolean(selectedContractForDetails)}
+          onClose={() => setSelectedContractForDetails(null)}
+          contract={selectedContractForDetails}
+        />
+      )}
     </div>
   );
 }
