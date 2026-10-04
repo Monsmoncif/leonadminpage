@@ -19,6 +19,7 @@ export interface IContract extends Document {
   totalDays: number;
   totalAmount: number;
   depositAmount: number;
+  advancePayment?: number;
   checkoutMileage?: number;
   checkoutFuelLevel?: number;
   extraKmCharge?: number;
@@ -57,6 +58,9 @@ export interface IContract extends Document {
   
   // Delivery tracking
   deliveryStatus: "Pending" | "Delivered" | "Returned";
+  isDispatched?: boolean;
+  dispatchedAt?: Date;
+  deliveredAt?: Date | string;
 
   // Return Data
   returnOdometer?: number;
@@ -113,6 +117,7 @@ const contractSchema = new Schema<IContract>(
     pricePerExtraKm: { type: Number, default: 0 },
     totalDays: { type: Number, required: true },
     totalAmount: { type: Number, required: true },
+    advancePayment: { type: Number, default: 0 },
     depositAmount: { type: Number, required: true },
     checkoutMileage: { type: Number, default: 0 },
     checkoutFuelLevel: { type: Number, default: 100 },
@@ -153,7 +158,7 @@ const contractSchema = new Schema<IContract>(
     },
     inspectionPhotos: [{ type: String }],
     customerSignature: { type: String },
-    adminSignature: { type: String },
+    adminSignature: { type: String, default: "/images/admin-signature.png" },
     signatureMetadata: {
       ipAddress: { type: String },
       gpsLocation: { type: String },
@@ -163,6 +168,18 @@ const contractSchema = new Schema<IContract>(
       type: String,
       enum: ["Pending", "Delivered", "Returned"],
       default: "Pending"
+    },
+    isDispatched: {
+      type: Boolean,
+      default: false
+    },
+    dispatchedAt: {
+      type: Date,
+      required: false
+    },
+    deliveredAt: {
+      type: Date,
+      required: false
     },
     returnOdometer: { type: Number, required: false },
     returnFuelLevel: { type: Number, required: false },

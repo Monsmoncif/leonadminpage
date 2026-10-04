@@ -23,13 +23,15 @@ import {
   Gauge,
   UserCheck,
   Fuel,
+  Calendar,
   CalendarPlus,
   Banknote,
   CreditCard,
   Coins,
   Download,
   Building2,
-  XCircle
+  XCircle,
+  ShieldCheck
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import ExtendRentalModal from "@/components/modals/ExtendRentalModal";
@@ -230,27 +232,46 @@ export default function ContractDetailsModal({
 
   if (!isOpen || !contractData) return null;
 
-  const contractNum = contractData.contractNumber ? String(contractData.contractNumber) : (contractData.id || contractData._id?.substring(0, 8)?.toUpperCase() || "N/A");
+  const contractNum = contractData.contractNumber ? String(contractData.contractNumber) : "Pending";
   const vehicleName = contractData.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || "Vehicle";
   const plateNumber = contractData.vehiclePlate || "";
   const customerName = contractData.customer || "Customer";
   const pickupLoc = contractData.pickupLocation || "Main Office";
   const dropoffLoc = contractData.dropoffLocation || contractData.pickupLocation || "Main Office";
 
+  // Pre-handover rental terms & financial calculations
+  const totalDays = contractData.totalDays || (contractData.startDate && contractData.endDate 
+    ? Math.max(1, Math.ceil((new Date(contractData.endDate).getTime() - new Date(contractData.startDate).getTime()) / (1000 * 3600 * 24)))
+    : 1);
+  const dailyRate = Number(contractData.dailyRate) || 0;
+  const totalAmount = Number(contractData.totalAmount || contractData.collectionAmount || (dailyRate * totalDays)) || 0;
+  const advancePaid = Number(contractData.advancePayment) || 0;
+  const balanceDue = Math.max(0, totalAmount - advancePaid);
+  const depositAmount = Number(contractData.depositAmount) || 0;
+
   // Real status resolution
   const isCancelled = contractData.status === "Cancelled";
   const isCompletedOrReturned = Boolean(
     contractData.status === "Completed" || 
     contractData.deliveryStatus === "Returned" || 
-    contractData.returnedAt
+    Boolean(contractData.returnedAt)
   );
 
+  // A contract is strictly handed over ONLY when:
+  // 1. It is already marked as Returned or Completed
+  // 2. OR deliveryStatus is explicitly "Delivered"
+  // 3. OR it has a confirmed delivery/handover timestamp (deliveredAt or handoverCompletedAt)
+  // 4. OR status is "Active" and deliveryStatus is neither "Pending" nor "Draft"
+  // If deliveryStatus is "Pending" or status is "Draft", the vehicle is strictly awaiting handover.
   const isHandedOver = Boolean(
-    isCompletedOrReturned ||
-    contractData.deliveryStatus === "Delivered" ||
-    contractData.status === "Active" ||
-    (Array.isArray(contractData.inspectionPhotos) && contractData.inspectionPhotos.some(Boolean)) ||
-    Boolean(contractData.customerSignature || contractData.adminSignature)
+    !isCancelled &&
+    contractData.deliveryStatus !== "Pending" &&
+    (
+      isCompletedOrReturned ||
+      contractData.deliveryStatus === "Delivered" ||
+      Boolean(contractData.deliveredAt || contractData.handoverCompletedAt) ||
+      (contractData.status === "Active" && contractData.deliveryStatus !== "Draft")
+    )
   );
 
   const isDelivered = isHandedOver;
@@ -358,20 +379,22 @@ export default function ContractDetailsModal({
               Booking &amp; Handover Details
             </h2>
             <span className="text-xs sm:text-sm font-sans font-extrabold tracking-tight tabular-nums bg-brand/10 text-brand px-2.5 py-0.5 rounded-md border border-brand/20 shadow-2xs">
-              {contractNum.startsWith("#") ? contractNum : `#${contractNum}`}
+              {contractNum === "Pending" ? "Pending Confirmation" : (contractNum.startsWith("#") ? contractNum : `#${contractNum}`)}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => window.open(`/bookings/${contractData._id || contractData.id}/print`, "_blank")}
-              className="px-2.5 py-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-brand bg-white hover:bg-brand/5 border border-brand/20 active:scale-95 rounded-xl transition-all cursor-pointer shadow-2xs"
-              title="Download / Print Contract PDF"
-            >
-              <Download size={14} />
-              <span className="hidden sm:inline">Print / PDF</span>
-            </button>
+            {isHandedOver && (
+              <button
+                type="button"
+                onClick={() => window.open(`/bookings/${contractData._id || contractData.id}/print`, "_blank")}
+                className="px-2.5 py-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-brand bg-white hover:bg-brand/5 border border-brand/20 active:scale-95 rounded-xl transition-all cursor-pointer shadow-2xs"
+                title="Download / Print Contract PDF"
+              >
+                <Download size={14} />
+                <span className="hidden sm:inline">Print / PDF</span>
+              </button>
+            )}
             <button 
               type="button"
               onClick={onClose}
@@ -438,12 +461,14 @@ export default function ContractDetailsModal({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/60">
                 <div>
                   <h3 className="text-base sm:text-lg font-bold text-text-primary">
-                    {isDriverDelivery ? "Hand-off & Vehicle Delivery" : "Hand-off & Vehicle Showroom Pickup"}
+                    {isHandedOver 
+                      ? (isDriverDelivery ? "Vehicle Delivery & Handover Report" : "Showroom Vehicle Handover Report")
+                      : (isDriverDelivery ? "Booking & Delivery Handover Details" : "Booking & Showroom Handover Details")}
                   </h3>
                   <p className="text-xs sm:text-sm text-text-secondary mt-0.5">
-                    {isDriverDelivery 
-                      ? "Dispatched handover details, driver delivery report, and proof of receipt." 
-                      : "Direct showroom handover details, inspection report, and proof of receipt."}
+                    {isHandedOver
+                      ? "Completed vehicle inspection report, odometer, fuel, and proof of receipt."
+                      : "Confirmed rental agreement details, schedule, pricing terms, and pending handover."}
                   </p>
                 </div>
                 <span className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto flex items-center gap-1.5 shadow-2xs ${
@@ -472,11 +497,161 @@ export default function ContractDetailsModal({
                     </>
                   ) : (
                     <>
-                      <Clock size={13} className="text-amber-600" />
-                      <span>Pending Handover</span>
+                      <Clock size={13} className="text-amber-600 animate-pulse" />
+                      <span>Pending Handover (معلق)</span>
                     </>
                   )}
                 </span>
+              </div>
+
+              {/* ================= AWAITING HANDOVER BANNER (SHOWN WHEN NOT HANDED OVER) ================= */}
+              {!isHandedOver && !isCancelled && (
+                <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
+                      <Clock size={20} className="animate-pulse" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-amber-950 flex items-center gap-1.5">
+                        <span>Awaiting Vehicle Handover</span>
+                        <span className="text-[11px] font-normal text-amber-800" dir="rtl">(بانتظار تسليم وفحص السيارة)</span>
+                      </h4>
+                      <p className="text-[11px] sm:text-xs text-amber-800/90 mt-0.5 leading-relaxed">
+                        {isDriverDelivery 
+                          ? `Assigned to driver (${contractData.deliveryDriver || "Driver"}). Handover photos, odometer, fuel, and client signature will be documented upon delivery.`
+                          : `Scheduled for in-shop handover on ${formatDisplayDate(contractData.startDate)} at ${contractData.checkoutTime ? formatTimeDisplay(contractData.checkoutTime) : "08:00 AM"}. Inspection and signature will be completed when handing the keys to the client.`}
+                      </p>
+                    </div>
+                  </div>
+                  {!isDriver && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        window.location.href = `/bookings/handover?contractId=${contractData._id || contractData.id}`;
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
+                    >
+                      <CheckCircle2 size={14} />
+                      <span>Confirm Handover (تسليم السيارة)</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* ================= CORE RENTAL & PRICING TERMS (CREATED BEFORE HANDOVER) ================= */}
+              <div className="bg-white rounded-2xl border border-border p-3.5 sm:p-5 space-y-3.5 shadow-2xs">
+                <div className="flex items-center justify-between pb-2.5 border-b border-border/70">
+                  <span className="text-xs sm:text-sm font-bold text-text-primary flex items-center gap-2">
+                    <Calendar size={15} className="text-brand" />
+                    <span>Rental Terms &amp; Pricing (بيانات مدة وقيمة الاستئجار)</span>
+                  </span>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-brand/10 text-brand border border-brand/20">
+                    {totalDays} {totalDays === 1 ? "Day" : "Days"} ({contractData.rentalType || (totalDays >= 30 ? "Monthly" : "Daily")})
+                  </span>
+                </div>
+
+                {/* 4-Column Grid for Dates & Duration */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                  <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60">
+                    <span className="text-[11px] text-text-muted block">Start Date (تاريخ البدء)</span>
+                    <strong className="text-text-primary font-bold block mt-0.5">
+                      {formatDisplayDate(contractData.startDate)}
+                    </strong>
+                    <span className="text-[10px] text-brand font-semibold block mt-0.5">
+                      {contractData.checkoutTime ? formatTimeDisplay(contractData.checkoutTime) : "08:00 AM"}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60">
+                    <span className="text-[11px] text-text-muted block">Expected End Date (تاريخ الانتهاء)</span>
+                    <strong className="text-text-primary font-bold block mt-0.5">
+                      {formatDisplayDate(contractData.endDate)}
+                    </strong>
+                    <span className="text-[10px] text-text-muted font-medium block mt-0.5">
+                      Scheduled End
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60">
+                    <span className="text-[11px] text-text-muted block">Daily Hire Rate (اليومي)</span>
+                    <strong className="text-text-primary font-bold block mt-0.5">
+                      ${dailyRate} / day
+                    </strong>
+                    <span className="text-[10px] text-text-muted font-medium block mt-0.5">
+                      Base Rate
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60">
+                    <span className="text-[11px] text-text-muted block">Total Rental Amount (الإجمالي)</span>
+                    <strong className="text-text-primary font-black text-sm block mt-0.5">
+                      ${totalAmount}
+                    </strong>
+                    <span className="text-[10px] text-text-muted font-medium block mt-0.5">
+                      ${dailyRate} × {totalDays}d
+                    </span>
+                  </div>
+                </div>
+
+                {/* Financial Summary Strip */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs pt-1">
+                  <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-semibold text-emerald-800 block">Advance Paid (العربون):</span>
+                      <strong className="text-emerald-700 font-bold text-sm">
+                        ${advancePaid}
+                      </strong>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                      {advancePaid > 0 ? "Prepaid" : "None"}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 bg-brand/5 border border-brand/20 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-semibold text-brand block">Balance Due on Handover (المستحق):</span>
+                      <strong className="text-brand font-black text-sm">
+                        ${balanceDue}
+                      </strong>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      contractData.paymentStatus === "Paid" 
+                        ? "bg-emerald-100 text-emerald-800" 
+                        : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {contractData.paymentStatus || "Pending"}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-semibold text-amber-900 block">Security Deposit (التأمين):</span>
+                      <strong className="text-amber-800 font-bold text-sm">
+                        ${depositAmount}
+                      </strong>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                      {isHandedOver ? "Collected" : "Required on Handover"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Additional services / extras if present */}
+                {(Number(contractData.babySeatFees || 0) > 0 || Number(contractData.deliveryCharges || 0) > 0 || Number(contractData.tintingFees || 0) > 0) && (
+                  <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60 flex items-center gap-4 text-xs text-text-secondary flex-wrap">
+                    <span className="font-bold text-text-primary text-[11px]">Included Extras:</span>
+                    {Number(contractData.babySeatFees || 0) > 0 && (
+                      <span className="flex items-center gap-1 font-medium">Baby Seat: <strong>${contractData.babySeatFees}</strong></span>
+                    )}
+                    {Number(contractData.deliveryCharges || 0) > 0 && (
+                      <span className="flex items-center gap-1 font-medium">Delivery: <strong>${contractData.deliveryCharges}</strong></span>
+                    )}
+                    {Number(contractData.tintingFees || 0) > 0 && (
+                      <span className="flex items-center gap-1 font-medium">Tinting: <strong>${contractData.tintingFees}</strong></span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* ================= SECTION 1: WHAT WAS GIVEN TO THE DRIVER / SHOWROOM ================= */}
@@ -708,6 +883,23 @@ export default function ContractDetailsModal({
                   </div>
                 </div>
 
+                {/* Advance Prepayment Notice Banner if prepaid */}
+                {Number(contractData.advancePayment || 0) > 0 && (
+                  <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3 flex items-center justify-between text-xs shadow-2xs">
+                    <div>
+                      <span className="text-[11px] font-bold text-emerald-850 uppercase tracking-wider block text-emerald-900">
+                        Prepaid Advance / العربون
+                      </span>
+                      <p className="text-[11px] text-emerald-700 mt-0.5">
+                        Paid upon booking. Remaining rental due on handover: ${Math.max(0, (Number(contractData.totalAmount) || 0) - Number(contractData.advancePayment))}
+                      </p>
+                    </div>
+                    <span className="text-base font-black text-emerald-700">
+                      ${contractData.advancePayment}
+                    </span>
+                  </div>
+                )}
+
                 {/* Payment Method & Mileage Terms Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   {/* Payment Method & Status */}
@@ -778,28 +970,28 @@ export default function ContractDetailsModal({
                   )}
                 </div>
 
-                {/* Admin Signature Card (if signed) */}
-                {contractData.adminSignature && (
+                {/* Admin Signature Card */}
+                {(contractData.adminSignature || true) && (
                   <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-border/70 space-y-2 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                        <PenTool size={14} className="text-brand" />
-                        Admin Signature &amp; Authorization (توقيع الإدارة)
+                        <ShieldCheck size={14} className="text-blue-600" />
+                        Admin Stamp &amp; Signature (ختم وتوقيع الإدارة المعتمد)
                       </span>
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                         <CheckCircle2 size={11} className="text-emerald-600" />
-                        Authorized by Admin
+                        Official Seal
                       </span>
                     </div>
                     <div 
-                      onClick={() => setPreviewImage(contractData.adminSignature)}
+                      onClick={() => setPreviewImage(contractData.adminSignature || "/images/admin-signature.png")}
                       className="h-20 sm:h-24 bg-gray-50/60 rounded-xl border border-dashed border-border flex items-center justify-center p-2 cursor-pointer hover:border-brand/60 transition-colors"
-                      title="Click to view full signature"
+                      title="Click to view full stamp & signature"
                     >
                       <img 
-                        src={contractData.adminSignature} 
+                        src={contractData.adminSignature || "/images/admin-signature.png"} 
                         alt="Admin Signature" 
-                        className="max-h-full max-w-full object-contain" 
+                        className="max-h-full max-w-full object-contain filter drop-shadow-xs" 
                       />
                     </div>
                   </div>
@@ -1400,23 +1592,23 @@ export default function ContractDetailsModal({
         </div>
 
         {/* ================= FOOTER ================= */}
-        {(contractData.status === "Active" || contractData.deliveryStatus === "Pending") && (() => {
-          const isDelivered = contractData.deliveryStatus === "Delivered";
+        {(() => {
+          const isDelivered = isHandedOver;
           const isPendingDelivery = !isDelivered;
-          const isDeliveryForMe = matchDriverId(contractData.deliveryDriverId, currentUserId) || (!contractData.deliveryDriverId && matchDriverId(contractData.driverId, currentUserId));
-          const isReturnForMe = matchDriverId(contractData.returnDriverId, currentUserId);
 
           return (
             <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-border bg-gray-50/80 flex flex-wrap justify-between items-center gap-2 sm:gap-3 shrink-0">
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => window.open(`/bookings/${contractData._id || contractData.id}/print`, "_blank")}
-                  className="px-3.5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-white hover:bg-gray-100 active:scale-[0.98] text-text-primary border border-border text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Download size={15} className="text-brand" />
-                  <span>Print PDF</span>
-                </button>
+                {isHandedOver && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(`/bookings/${contractData._id || contractData.id}/print`, "_blank")}
+                    className="px-3.5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-white hover:bg-gray-100 active:scale-[0.98] text-text-primary border border-border text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Download size={15} className="text-brand" />
+                    <span>Print PDF</span>
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -1428,42 +1620,8 @@ export default function ContractDetailsModal({
                   Close
                 </button>
 
-                {/* Handover & Action Buttons: ONLY FOR ADMIN USERS! Drivers confirm handover from their dashboard card/table */}
-                {!isDriver && isPendingDelivery && (() => {
-                  const isShop = contractData.contractType === "Shop" || (!contractData.deliveryDriverId && !contractData.driverId && (!contractData.deliveryDriver || contractData.deliveryDriver === "None" || contractData.deliveryDriver === "Self-drive (Client Pick Up)"));
-
-                  if (isShop) {
-                    return (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          onClose();
-                          try {
-                            const res = await fetch(`/api/contracts/${contractData._id || contractData.id}`, {
-                              method: "PUT",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ deliveryStatus: "Delivered", status: "Active", notifyClient: true }),
-                            });
-                            if (res.ok) {
-                              refreshContractData();
-                            }
-                          } catch (err) {
-                            console.error("Failed to confirm shop handover:", err);
-                          }
-                        }}
-                        className="px-5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>Confirm Showroom Handover</span>
-                      </button>
-                    );
-                  }
-
-                  return null;
-                })()}
-
-                {/* Extend Rental: Admin only */}
-                {!isDriver && contractData.status === "Active" && (
+                {/* Extend Rental: Admin only when delivered and not yet completed */}
+                {!isDriver && isDelivered && !isCompletedOrReturned && (
                   <button
                     type="button"
                     onClick={() => setIsExtendOpen(true)}
@@ -1474,8 +1632,8 @@ export default function ContractDetailsModal({
                   </button>
                 )}
 
-                {/* Process Return: Admin only in details modal */}
-                {!isDriver && isDelivered && (
+                {/* Process Return: Admin only when vehicle is delivered and not yet returned */}
+                {!isDriver && isDelivered && !isCompletedOrReturned && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1486,6 +1644,21 @@ export default function ContractDetailsModal({
                   >
                     <ArrowLeftRight size={16} />
                     <span>Process Return</span>
+                  </button>
+                )}
+
+                {/* Confirm Handover: Admin only in details modal when booking is pending handover */}
+                {!isDriver && isPendingDelivery && !isCancelled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      window.location.href = `/bookings/handover?contractId=${contractData._id || contractData.id}`;
+                    }}
+                    className="px-5 py-2.5 min-h-[42px] sm:min-h-[40px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>Confirm Handover (تسليم السيارة)</span>
                   </button>
                 )}
               </div>

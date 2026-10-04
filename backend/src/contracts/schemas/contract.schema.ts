@@ -53,6 +53,9 @@ export class Contract {
   @Prop({ required: true })
   totalAmount: number;
 
+  @Prop({ default: 0 })
+  advancePayment?: number;
+
   @Prop({ required: true })
   depositAmount: number;
 
@@ -156,7 +159,7 @@ export class Contract {
   @Prop()
   customerSignature?: string;
 
-  @Prop()
+  @Prop({ default: "/images/admin-signature.png" })
   adminSignature?: string;
 
   @Prop({ type: Object })
@@ -172,6 +175,15 @@ export class Contract {
     default: 'Pending',
   })
   deliveryStatus: 'Pending' | 'Delivered' | 'Returned';
+
+  @Prop({ type: Boolean, default: false })
+  isDispatched?: boolean;
+
+  @Prop({ type: Date, required: false })
+  dispatchedAt?: Date;
+
+  @Prop({ type: Date, required: false })
+  deliveredAt?: Date;
 
   @Prop()
   returnOdometer?: number;

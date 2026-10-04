@@ -36,7 +36,9 @@ import {
   Eye,
   ArrowRight,
   User,
-  X
+  X,
+  ShieldCheck,
+  Building2
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -299,6 +301,9 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
     { icon: Palette, label: "Color", value: unit.color || "N/A" },
     { icon: ExecutiveCarIcon, label: "Plate Number", value: unit.plate || "N/A", copyable: true },
     { icon: Hash, label: "VIN Number", value: unit.vin || "N/A", copyable: true },
+    ...(unit.owner ? [{ icon: Building2, label: "Owner", value: unit.owner }] : []),
+    ...(unit.registrationExpiry ? [{ icon: Calendar, label: "Registration Expiry", value: new Date(unit.registrationExpiry).toLocaleDateString() }] : []),
+    ...(unit.insuranceExpiry ? [{ icon: ShieldCheck, label: "Insurance Expiry", value: new Date(unit.insuranceExpiry).toLocaleDateString() }] : []),
   ];
 
   // Contracts & Rental History calculations
@@ -1085,15 +1090,17 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                           >
                             <Eye size={14} />
                           </button>
-                          <a
-                            href={`/bookings/${contract._id}/print`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Print / View Contract PDF"
-                            className="p-1.5 bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-text-primary rounded-lg transition-colors inline-block"
-                          >
-                            <Printer size={14} />
-                          </a>
+                          {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
+                            <a
+                              href={`/bookings/${contract._id}/print`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Print / View Contract PDF"
+                              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-text-primary rounded-lg transition-colors inline-block"
+                            >
+                              <Printer size={14} />
+                            </a>
+                          )}
                         </div>
                       </td>
                     </tr>

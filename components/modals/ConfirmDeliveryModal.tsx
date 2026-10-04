@@ -32,7 +32,8 @@ import {
   Trash2,
   ShieldCheck,
   Calendar,
-  Plus
+  Plus,
+  Gauge
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
@@ -163,6 +164,7 @@ interface ConfirmDeliveryModalProps {
   onConfirm: (data: { 
     checkoutTime: string; 
     checkoutFuelLevel?: number;
+    checkoutMileage?: number;
     depositAmount: number; 
     rentalAmountCollected?: number;
     paymentMethod: string;
@@ -197,6 +199,7 @@ export default function ConfirmDeliveryModal({
   // Step 1: Vehicle & Schedule
   const [checkoutTime, setCheckoutTime] = useState("");
   const [checkoutFuelLevel, setCheckoutFuelLevel] = useState<number>(100);
+  const [checkoutMileage, setCheckoutMileage] = useState<number>(0);
 
   // Step 2: Client & Second Driver
   const [allClients, setAllClients] = useState<any[]>([]);
@@ -267,7 +270,7 @@ export default function ConfirmDeliveryModal({
       setError(null);
       fetchClientsList();
 
-      // Schedule & Fuel
+      // Schedule & Fuel & Mileage
       const rawTime = contract.checkoutTime?.trim();
       setCheckoutTime(
         rawTime && rawTime.toLowerCase() !== "pending handover"
@@ -275,6 +278,10 @@ export default function ConfirmDeliveryModal({
           : getCurrentFormattedTime()
       );
       setCheckoutFuelLevel(contract.checkoutFuelLevel !== undefined ? Number(contract.checkoutFuelLevel) : 100);
+      const initialKm = contract.checkoutMileage !== undefined && Number(contract.checkoutMileage) > 0
+        ? Number(contract.checkoutMileage)
+        : Number(contract.unitMileage || contract.unitId?.mileage || 0);
+      setCheckoutMileage(initialKm);
 
       // Client Data
       const clientObj = contract.clientId && typeof contract.clientId === "object"
@@ -314,7 +321,8 @@ export default function ConfirmDeliveryModal({
 
       // Payment & Financials
       const totalDue = Number(contract.totalAmount) || 0;
-      setCollectedRentalAmount(totalDue);
+      const advancePaid = Number(contract.advancePayment) || 0;
+      setCollectedRentalAmount(Math.max(0, totalDue - advancePaid));
       setDepositAmount(Number(contract.depositAmount) || 0);
       setIsDepositConfirmed(false);
       setPaymentMethod(contract.paymentMethod || "Cash");
@@ -612,6 +620,7 @@ export default function ConfirmDeliveryModal({
     await onConfirm({
       checkoutTime: formatTimeDisplay(checkoutTime || getCurrentFormattedTime()),
       checkoutFuelLevel: Number(checkoutFuelLevel) || 100,
+      checkoutMileage: Number(checkoutMileage) || 0,
       depositAmount: Number(depositAmount) || 0,
       rentalAmountCollected: totalCollected,
       paymentMethod: paymentMethod || "Cash",
@@ -828,13 +837,47 @@ export default function ConfirmDeliveryModal({
                 </div>
               </div>
 
-              {/* Fuel Level Selector */}
-              <div className="bg-gray-50/70 p-4 rounded-xl border border-border">
-                <FuelLevelSelector
-                  value={checkoutFuelLevel}
-                  onChange={(val) => setCheckoutFuelLevel(val)}
-                  label="Handover Fuel Level (مستوى الوقود عند التسليم)"
-                />
+              {/* Odometer Kilometrage & Fuel Level Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Handover Kilometrage / Odometer */}
+                <div className="bg-gray-50/70 p-4 rounded-xl border border-border space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                        <Gauge size={14} className="text-brand" />
+                        <span>Odometer / Kilometrage (عداد الكيلومترات)</span>
+                        <span className="text-red-500">*</span>
+                      </label>
+                      {contract.unitMileage !== undefined && (
+                        <span className="text-[11px] text-text-muted font-medium">
+                          Prev: {contract.unitMileage} km
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={checkoutMileage === 0 ? "" : checkoutMileage}
+                        onChange={(e) => setCheckoutMileage(Number(e.target.value))}
+                        placeholder="e.g. 25000"
+                        className="w-full pl-3 pr-10 py-2 bg-white border border-border rounded-xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">
+                        KM
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-text-muted">Current vehicle odometer reading recorded at handover.</p>
+                </div>
+
+                {/* Fuel Level Selector */}
+                <div className="bg-gray-50/70 p-4 rounded-xl border border-border flex flex-col justify-between">
+                  <FuelLevelSelector
+                    value={checkoutFuelLevel}
+                    onChange={(val) => setCheckoutFuelLevel(val)}
+                    label="Handover Fuel Level (مستوى الوقود عند التسليم)"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1075,9 +1118,19 @@ export default function ConfirmDeliveryModal({
               {/* Total Financial Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200">
-                  <span className="text-[11px] font-bold text-gray-500 block uppercase">Rental Amount Due</span>
-                  <strong className="text-lg font-black text-gray-900">${contract.totalAmount || 0}</strong>
-                  <span className="text-[10px] text-gray-400 block mt-0.5">For {contract.totalDays || 1} rental days</span>
+                  <span className="text-[11px] font-bold text-gray-500 block uppercase">
+                    {Number(contract.advancePayment || 0) > 0 ? "Remaining Rental Due" : "Rental Amount Due"}
+                  </span>
+                  <strong className="text-lg font-black text-gray-900">
+                    ${Number(contract.advancePayment || 0) > 0 
+                      ? Math.max(0, (Number(contract.totalAmount) || 0) - Number(contract.advancePayment)) 
+                      : (contract.totalAmount || 0)}
+                  </strong>
+                  <span className="text-[10px] text-gray-500 block mt-0.5">
+                    {Number(contract.advancePayment || 0) > 0 
+                      ? `Total: $${contract.totalAmount} (Prepaid: -$${contract.advancePayment})`
+                      : `For ${contract.totalDays || 1} rental days`}
+                  </span>
                 </div>
                 <div className="bg-amber-50 p-3.5 rounded-xl border border-amber-200">
                   <span className="text-[11px] font-bold text-amber-800 block uppercase">Security Deposit</span>
@@ -1089,7 +1142,9 @@ export default function ConfirmDeliveryModal({
                   <strong className="text-lg font-black text-emerald-950">
                     ${(Number(collectedRentalAmount) || 0) + (Number(depositAmount) || 0)}
                   </strong>
-                  <span className="text-[10px] text-emerald-700/80 block mt-0.5">Rental + Security Deposit</span>
+                  <span className="text-[10px] text-emerald-700/80 block mt-0.5">
+                    {Number(contract.advancePayment || 0) > 0 ? "Remaining Rental + Deposit" : "Rental + Security Deposit"}
+                  </span>
                 </div>
               </div>
 
@@ -1098,8 +1153,8 @@ export default function ConfirmDeliveryModal({
                 <PaymentMethodSelector
                   value={paymentMethod}
                   onChange={(val) => setPaymentMethod(val)}
-                  totalAmount={Number(contract.totalAmount) || 0}
-                  totalLabel="Rental Amount Due"
+                  totalAmount={Number(collectedRentalAmount) || 0}
+                  totalLabel={Number(contract.advancePayment || 0) > 0 ? "Remaining Rental Due" : "Rental Amount Due"}
                   label="Rental Payment Method (طريقة دفع الإيجار)"
                 />
               </div>
@@ -1121,7 +1176,9 @@ export default function ConfirmDeliveryModal({
                     />
                   </div>
                   <span className="text-[10px] text-text-muted mt-0.5 block">
-                    Fixed by Admin (non-editable)
+                    {Number(contract.advancePayment || 0) > 0
+                      ? `Remaining balance ($${contract.advancePayment} prepaid booking advance)`
+                      : "Fixed by Admin (non-editable)"}
                   </span>
                 </div>
 
@@ -1431,7 +1488,9 @@ export default function ConfirmDeliveryModal({
                   <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs space-y-1">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Vehicle</span>
                     <strong className="text-sm font-bold text-gray-900 block truncate">{vehicleName}</strong>
-                    <p className="text-[11px] text-gray-500 font-mono">Plate: {plateNumber || "—"} • Fuel: {checkoutFuelLevel}%</p>
+                    <p className="text-[11px] text-gray-500 font-mono">
+                      Plate: {plateNumber || "—"} • Fuel: {checkoutFuelLevel}% {checkoutMileage > 0 ? `• ${checkoutMileage.toLocaleString()} km` : ""}
+                    </p>
                   </div>
 
                   {/* Customer */}

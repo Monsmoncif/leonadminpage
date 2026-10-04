@@ -70,8 +70,9 @@ export async function GET(req: Request) {
 
     const formattedContracts = contracts.map((c: any) => ({
       ...c,
-      id: c.contractNumber ? String(c.contractNumber) : c._id.toString().substring(0, 8).toUpperCase(), // Short ID for display
-      contractNumber: c.contractNumber,
+      id: c.contractNumber ? String(c.contractNumber) : "Pending",
+      contractNumber: c.contractNumber || null,
+      isDispatched: Boolean(c.isDispatched || c.contractNumber || c.status === "Active" || c.deliveryStatus === "Delivered"),
       _id: c._id.toString(), // Real ID
       clientId: c.clientId?._id?.toString() || c.clientId || "",
       unitId: c.unitId?._id?.toString() || c.unitId || "",
@@ -95,10 +96,12 @@ export async function GET(req: Request) {
       rawEndDate: c.endDate,
       checkoutTime: c.checkoutTime || "08:00 AM",
       checkinTime: c.checkinTime || "",
+      deliveredAt: c.deliveredAt || null,
       returnedAt: c.returnedAt || null,
       startDate: new Date(c.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
       endDate: new Date(c.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
       deposit: `$${c.depositAmount || 0}`,
+      advancePayment: c.advancePayment || 0,
       rentAmount: `$${c.totalAmount || 0}`,
       status: c.status,
       createdAt: c.createdAt,
@@ -208,36 +211,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "A delivery driver must be assigned for Delivery contracts." }, { status: 400 });
     }
 
-    const lastContract = await Contract.findOne({ contractNumber: { $exists: true, $ne: null } })
-      .sort({ contractNumber: -1 })
-      .select("contractNumber")
-      .lean();
-
-    const nextContractNumber =
-      lastContract && typeof (lastContract as any).contractNumber === "number" && (lastContract as any).contractNumber >= 2000
-        ? (lastContract as any).contractNumber + 1
-        : 2000;
-
-    // If contract start date is in the future, it is strictly Pending / Draft.
-    // Car can ONLY be marked Delivered/Active if startDate is today or in the past AND it is a Shop contract.
-    const nowStartOfDay = new Date();
-    nowStartOfDay.setHours(0, 0, 0, 0);
-    const contractStartDate = new Date(body.startDate);
-    const isFutureStartDate = contractStartDate > nowStartOfDay;
-
-    const initialStatus = isFutureStartDate
-      ? "Draft"
-      : (contractType === "Shop" ? (body.status || "Active") : (body.status || "Draft"));
-
-    const initialDeliveryStatus = isFutureStartDate
-      ? "Pending"
-      : (body.deliveryStatus || (contractType === "Shop" ? "Delivered" : "Pending"));
+    // Contracts are created unconfirmed without a contract number or dispatch notifications.
+    // Sequential contract numbers are ONLY assigned upon Handover confirmation (Shop or Driver).
+    const initialStatus = "Draft";
+    const initialDeliveryStatus = "Pending";
 
     const contract = await Contract.create({
-      contractNumber: nextContractNumber,
+      contractNumber: undefined,
       clientId: body.clientId || null,
       unitId: body.unitId,
       contractType: contractType,
+      isDispatched: false,
       rentalType: body.rentalType || (days >= 30 ? "Monthly" : "Daily"),
       customerType: body.customerType || "B2C",
       driverId: mainDriverId,
@@ -252,6 +236,7 @@ export async function POST(req: Request) {
       pricePerExtraKm: body.pricePerExtraKm || 0,
       totalDays: days,
       totalAmount: totalAmount,
+      advancePayment: Number(body.advancePayment) || 0,
       depositAmount: body.depositAmount || 0,
       pickupLocation: body.pickupLocation || body.deliveryLocation || body.location || "Main Office",
       dropoffLocation: body.dropoffLocation || body.returnLocation || "",
@@ -266,11 +251,11 @@ export async function POST(req: Request) {
       salikFees,
       cleaningFees,
       customerSignature: body.customerSignature,
-      adminSignature: body.adminSignature,
+      adminSignature: body.adminSignature || "/images/admin-signature.png",
       inspectionPhotos: body.inspectionPhotos || [],
       deliveryStatus: initialDeliveryStatus,
       paymentMethod: body.paymentMethod || "Cash",
-      paymentStatus: body.paymentStatus || "Pending",
+      paymentStatus: body.paymentStatus || (Number(body.advancePayment) >= totalAmount ? "Paid" : (Number(body.advancePayment) > 0 ? "Partial" : "Pending")),
       additionalDriverName: body.additionalDriverName || "",
       additionalDriverLicense: body.additionalDriverLicense || "",
       additionalDriverNationality: body.additionalDriverNationality || "",
@@ -335,21 +320,8 @@ export async function POST(req: Request) {
     // Synchronize vehicle status: if contract starts today or in past, it becomes Rented; if it starts in the future, it stays Available until the start date arrives
     await syncUnitStatuses(body.unitId);
 
-    // 1. Send contract PDF/details to client in background ONLY if getting the car right now (Shop contract)
-    // Non-blocking so contract creation responds immediately (<200ms) to user and redirects
-    if (contractType === "Shop" && contract.clientId) {
-      sendClientContractNotification(contract._id.toString(), "initial").catch((clientErr) => {
-        console.error("Failed to notify client on shop contract handover (background):", clientErr);
-      });
-    }
-
-    // 2. Notify driver via WhatsApp + Gmail if assigned (background non-blocking)
-    const assignedDriverId = deliveryDriverId || body.driverId;
-    if (assignedDriverId) {
-      sendDriverTaskNotification(assignedDriverId, contract._id.toString(), "delivery_assigned").catch((driverErr) => {
-        console.error("Failed to notify driver on contract creation (background):", driverErr);
-      });
-    }
+    // Notice: PDF creation and official contract numbers are NOT sent on creation.
+    // They are triggered when Handover is confirmed (by Admin in Shop or Driver on Delivery).
 
 
     return NextResponse.json(contract, { status: 201 });

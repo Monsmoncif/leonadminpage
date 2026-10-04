@@ -375,16 +375,26 @@ export default function UnitsPage() {
                         <td className="py-4 px-5">
                           <div>
                             <p className="font-semibold text-text-primary">Plate: {unit.plate || "N/A"}</p>
-                            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                               <span className="text-[11px] text-text-muted">
                                 Year: {unit.year || new Date().getFullYear()}
                               </span>
+                              {unit.registrationExpiry && (
+                                <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                                  Reg: {new Date(unit.registrationExpiry).toLocaleDateString()}
+                                </span>
+                              )}
                               {unit.insuranceExpiry && (
                                 <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
                                   Ins: {new Date(unit.insuranceExpiry).toLocaleDateString()}
                                 </span>
                               )}
                             </div>
+                            {unit.owner && (
+                              <p className="text-[10px] text-text-muted mt-0.5 line-clamp-1" title={unit.owner}>
+                                Owner: {unit.owner}
+                              </p>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4">

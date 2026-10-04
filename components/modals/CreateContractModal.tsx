@@ -23,7 +23,8 @@ import {
   AlertCircle,
   UserPlus,
   Camera,
-  Gauge
+  Gauge,
+  ShieldCheck
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -34,13 +35,14 @@ import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
+import { areDatesOverlapping } from "@/lib/date-overlap";
+import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
 const STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
   { id: 2, title: "Client", icon: User },
   { id: 3, title: "Rental Data", icon: FileText },
-  { id: 4, title: "Inspection", icon: Camera },
-  { id: 5, title: "Review & Sign", icon: CheckCircle },
+  { id: 4, title: "Review & Create", icon: CheckCircle },
 ];
 
 interface CreateContractModalProps {
@@ -91,9 +93,9 @@ export default function CreateContractModal({
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  // Signature canvas (Admin / Company)
+  // Signature canvas (Admin / Company) - Defaults to official stamp & signature
   const adminCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [adminSignatureData, setAdminSignatureData] = useState<string | null>(null);
+  const [adminSignatureData, setAdminSignatureData] = useState<string | null>(DEFAULT_ADMIN_SIGNATURE);
   const [isDrawingAdmin, setIsDrawingAdmin] = useState(false);
 
   // Data arrays
@@ -123,6 +125,7 @@ export default function CreateContractModal({
     startDate: new Date().toISOString().split("T")[0],
     endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     collectionAmount: 595, // Price driver or admin will collect for the rental
+    advancePayment: 0, // Prepaid advance / عربون حجز السيارة
     dailyRate: 85,
     dailyKmLimit: 0,
     pricePerExtraKm: 0,
@@ -253,7 +256,7 @@ export default function CreateContractModal({
         const editCollectionAmount = contractToEdit.totalAmount || (editDailyRate * editDays);
 
         setSignatureData(contractToEdit.customerSignature || null);
-        setAdminSignatureData(contractToEdit.adminSignature || null);
+        setAdminSignatureData(contractToEdit.adminSignature || DEFAULT_ADMIN_SIGNATURE);
         setFormData({
           unitId: editUnitId,
           clientId: editClientId,
@@ -266,6 +269,7 @@ export default function CreateContractModal({
           startDate: formatDateToInput(contractToEdit.startDate),
           endDate: formatDateToInput(contractToEdit.endDate),
           collectionAmount: editCollectionAmount,
+          advancePayment: contractToEdit.advancePayment || 0,
           dailyRate: editDailyRate,
           dailyKmLimit: contractToEdit.dailyKmLimit || 0,
           pricePerExtraKm: contractToEdit.pricePerExtraKm || 0,
@@ -327,6 +331,7 @@ export default function CreateContractModal({
           startDate: new Date().toISOString().split("T")[0],
           endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
           collectionAmount: 595,
+          advancePayment: 0,
           dailyRate: 85,
           dailyKmLimit: 0,
           pricePerExtraKm: 0,
@@ -382,12 +387,7 @@ export default function CreateContractModal({
         if (currentContractId && (booking.contractId === currentContractId || booking._id === currentContractId)) {
           continue;
         }
-        const bStart = new Date(booking.startDate);
-        bStart.setHours(0, 0, 0, 0);
-        const bEnd = new Date(booking.endDate);
-        bEnd.setHours(23, 59, 59, 999);
-
-        if (bStart <= end && bEnd >= start) {
+        if (areDatesOverlapping(booking.startDate, booking.endDate, startStr, endStr)) {
           return {
             reason: "Booked",
             startDate: booking.startDate,
@@ -642,10 +642,16 @@ export default function CreateContractModal({
 
       const orderedInspectionPhotos = VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || "");
 
+      const advancePaid = Number(formData.advancePayment || 0);
+      const determinedPaymentStatus = formData.paymentStatus !== "Pending"
+        ? formData.paymentStatus
+        : (advancePaid >= calculatedTotal ? "Paid" : (advancePaid > 0 ? "Partial" : "Pending"));
       const determinedContractType = formData.deliveryDriverId ? "Delivery" : "Shop";
 
       const payload = {
         ...formData,
+        advancePayment: advancePaid,
+        paymentStatus: determinedPaymentStatus,
         checkoutMileage: Number(formData.checkoutMileage) >= 0 ? Number(formData.checkoutMileage) : 0,
         contractType: determinedContractType,
         dailyRate: calculatedDailyRate,
@@ -653,8 +659,11 @@ export default function CreateContractModal({
         totalAmount: calculatedTotal,
         inspectionPhotos: orderedInspectionPhotos,
         customerSignature: signatureData,
-        adminSignature: adminSignatureData,
-        ...(!contractToEdit && { status: isDriverRole ? "Active" : "Draft" })
+        adminSignature: adminSignatureData || DEFAULT_ADMIN_SIGNATURE,
+        ...(!contractToEdit && { 
+          status: "Draft",
+          deliveryStatus: "Pending" 
+        })
       };
 
       const res = await fetch(url, {
@@ -1424,7 +1433,7 @@ export default function CreateContractModal({
                         <DollarSign size={16} className="text-brand" /> Collection Amount &amp; Deposit (مبلغ التحصيل والتأمين)
                       </h3>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div>
                           <label className="text-xs font-semibold text-text-secondary block mb-1">
                             Daily Rate ($/day) / السعر اليومي
@@ -1456,7 +1465,7 @@ export default function CreateContractModal({
 
                         <div>
                           <label className="text-xs font-semibold text-text-secondary block mb-1">
-                            Collection Amount ($) / مبلغ التحصيل <span className="text-red-500">*</span>
+                            Collection Amount ($) / إجمالي التحصيل <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
@@ -1480,6 +1489,34 @@ export default function CreateContractModal({
                           </div>
                           <span className="text-[11px] text-text-muted mt-0.5 block">
                             Calculated: ${formData.dailyRate || 0} × {Math.max(1, Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 3600 * 24)))}d (editable)
+                          </span>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-emerald-800 block mb-1">
+                            Advance ($) / العربون
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-xs">$</span>
+                            <input 
+                              type="number" 
+                              value={formData.advancePayment === 0 ? "" : formData.advancePayment} 
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                const extraCharges = (Number(formData.babySeatFees) || 0) + (Number(formData.deliveryCharges) || 0);
+                                const totalRent = Number(formData.collectionAmount || 0) + extraCharges;
+                                setFormData(prev => ({ 
+                                  ...prev, 
+                                  advancePayment: val,
+                                  paymentStatus: val >= totalRent ? "Paid" : (val > 0 ? "Partial" : "Pending")
+                                }));
+                              }} 
+                              placeholder="0"
+                              className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
+                            />
+                          </div>
+                          <span className="text-[11px] text-emerald-700/80 mt-0.5 block">
+                            Paid upfront now (يُخصم من إجمالي التحصيل عند الاستلام)
                           </span>
                         </div>
 
@@ -1509,22 +1546,37 @@ export default function CreateContractModal({
                       </div>
 
                       {/* Total Handover Collection Card */}
-                      <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div>
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
-                            Total to Collect on Handover (إجمالي المبلغ المطلوب تحصيله)
-                          </span>
-                          <p className="text-xs text-text-muted mt-0.5">
-                            Collection Price (${formData.collectionAmount || 0})
-                            {formData.deliveryCharges > 0 ? ` + Delivery Fee ($${formData.deliveryCharges})` : ""}
-                          </p>
-                        </div>
-                        <div className="text-left sm:text-right">
-                          <span className="text-2xl font-black text-brand">
-                            ${Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)}
-                          </span>
-                        </div>
-                      </div>
+                      {(() => {
+                        const extraCharges = (Number(formData.babySeatFees) || 0) + (Number(formData.deliveryCharges) || 0);
+                        const totalCharges = Number(formData.collectionAmount || 0) + extraCharges;
+                        const advancePaid = Number(formData.advancePayment || 0);
+                        const remainingToCollect = Math.max(0, totalCharges - advancePaid);
+                        return (
+                          <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div>
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
+                                Remaining to Collect on Handover (المتبقي للتحصيل عند التسليم)
+                              </span>
+                              <p className="text-xs text-text-muted mt-0.5">
+                                Total Charges: ${totalCharges}
+                                {advancePaid > 0 ? ` - Prepaid Advance: $${advancePaid}` : ""}
+                                {formData.deliveryCharges > 0 ? ` (inc. Delivery $${formData.deliveryCharges})` : ""}
+                                {formData.babySeatFees > 0 ? ` (inc. Baby Seat $${formData.babySeatFees})` : ""}
+                              </p>
+                            </div>
+                            <div className="text-left sm:text-right">
+                              <span className="text-2xl font-black text-brand">
+                                ${remainingToCollect}
+                              </span>
+                              {advancePaid > 0 && (
+                                <span className="text-xs font-bold text-emerald-700 block">
+                                  ✓ Prepaid Advance (عربون مدفوع): ${advancePaid}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -1596,46 +1648,15 @@ export default function CreateContractModal({
                 </div>
               )}
 
-              {/* ==================== STEP 4: VEHICLE INSPECTION PHOTOS ==================== */}
+              {/* ==================== STEP 4: REVIEW & FINALIZE ==================== */}
               {currentStep === 4 && (
                 <div className="space-y-6 animate-fade-in-up">
                   <div>
                     <h2 className="text-lg font-bold text-text-primary">
-                      Step 4: Pre-Handover Vehicle Inspection Photos
+                      {contractToEdit ? "Step 4: Review Contract Terms & Save" : "Step 4: Review Booking & Confirm"}
                     </h2>
                     <p className="text-xs text-text-muted mt-0.5">
-                      Capture or upload 8 standard angles to document vehicle condition before handing over to the client
-                    </p>
-                  </div>
-
-                  {/* Fuel Level at Checkout */}
-                  <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
-                    <FuelLevelSelector
-                      value={formData.checkoutFuelLevel}
-                      onChange={(val) => setFormData({ ...formData, checkoutFuelLevel: val })}
-                      label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
-                    />
-                  </div>
-
-                  <VehicleInspectionPhotoCapture
-                    photos={inspectionPhotos}
-                    onChange={setInspectionPhotos}
-                    title="Vehicle Inspection Photos (صور فحص تسليم السيارة)"
-                    subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
-                    badgeLabel="Pre-Handover"
-                  />
-                </div>
-              )}
-
-              {/* ==================== STEP 5: REVIEW & FINALIZE ==================== */}
-              {currentStep === 5 && (
-                <div className="space-y-6 animate-fade-in-up">
-                  <div>
-                    <h2 className="text-lg font-bold text-text-primary">
-                      {contractToEdit ? "Step 5: Review Contract Terms & Save" : "Step 5: Review Booking & Sign"}
-                    </h2>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      {contractToEdit ? "Verify agreement details, inspection photos, and customer signature" : "Confirm agreement details and sign before activating"}
+                      {contractToEdit ? "Verify agreement details and update terms" : "Confirm agreement details and sign before creating booking"}
                     </p>
                   </div>
 
@@ -1719,7 +1740,7 @@ export default function CreateContractModal({
                           <span className="font-bold text-text-primary flex items-center gap-1.5">
                             <span className="text-emerald-600">{formData.checkoutFuelLevel || 100}% Fuel</span>
                             {formData.checkoutMileage > 0 && (
-                              <span className="text-gray-500 font-mono text-[11px]">({formData.checkoutMileage.toLocaleString()} km)</span>
+                              <span className="text-gray-500">({formData.checkoutMileage.toLocaleString()} km)</span>
                             )}
                           </span>
                         </div>
@@ -1741,13 +1762,27 @@ export default function CreateContractModal({
                             ${formData.depositAmount} {formData.deliveryDriverId || formData.deliveryCharges > 0 ? "(Collected upon delivery)" : "(Collected at shop)"}
                           </span>
                         </div>
+                        {Number(formData.advancePayment || 0) > 0 && (
+                          <div className="flex justify-between py-1 border-b border-gray-100 bg-emerald-50/50 px-2 rounded-lg items-center">
+                            <span className="text-emerald-800 font-bold text-xs">Prepaid Advance / العربون المدفوع مسبقاً:</span>
+                            <span className="font-black text-emerald-700 text-xs">-${formData.advancePayment}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
                           <div>
-                            <span className="font-bold text-brand block">Total Handover Collection (إجمالي التحصيل):</span>
-                            <span className="text-[10px] text-text-muted">Collection Price {formData.deliveryCharges > 0 ? "+ Delivery" : ""}</span>
+                            <span className="font-bold text-brand block">
+                              {Number(formData.advancePayment || 0) > 0 
+                                ? "Remaining Handover Collection (المتبقي للتحصيل عند التسليم):" 
+                                : "Total Handover Collection (إجمالي التحصيل):"}
+                            </span>
+                            <span className="text-[10px] text-text-muted">
+                              {Number(formData.advancePayment || 0) > 0 
+                                ? `Total $${Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)} - Advance $${formData.advancePayment}`
+                                : `Collection Price ${formData.deliveryCharges > 0 ? "+ Delivery" : ""}`}
+                            </span>
                           </div>
                           <span className="text-base font-black text-brand">
-                            ${Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)}
+                            ${Math.max(0, (Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)) - Number(formData.advancePayment || 0))}
                           </span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100 items-center">
@@ -1757,6 +1792,15 @@ export default function CreateContractModal({
                             {formData.paymentMethod?.includes("Card") && <CreditCard size={14} className="text-blue-600 shrink-0" />}
                             {formData.paymentMethod?.includes("Cash") && <Banknote size={14} className="text-emerald-600 shrink-0" />}
                             <span>{formData.paymentMethod}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ml-1 ${
+                              formData.paymentStatus === "Paid" 
+                                ? "bg-emerald-100 text-emerald-800" 
+                                : formData.paymentStatus === "Partial" || Number(formData.advancePayment || 0) > 0
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}>
+                              {formData.paymentStatus === "Paid" ? "Paid" : (Number(formData.advancePayment || 0) > 0 ? "Advance Paid (Partial)" : "Pending")}
+                            </span>
                           </span>
                         </div>
                         <div className="flex justify-between py-1">
@@ -1778,136 +1822,54 @@ export default function CreateContractModal({
                       </div>
                     </div>
 
-                    {/* Pre-Handover Photos Preview Strip */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
-                      <div className="flex items-center justify-between">
+                    {/* Existing Inspection Photos in Edit Mode */}
+                    {contractToEdit && Array.isArray(contractToEdit?.inspectionPhotos) && contractToEdit.inspectionPhotos.some(Boolean) && (
+                      <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
                         <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                           <Camera size={14} className="text-brand" />
-                          Pre-Handover Inspection Photos ({Object.values(inspectionPhotos).filter(Boolean).length}/8 photos captured)
+                          Handover Vehicle Inspection ({contractToEdit.inspectionPhotos.filter(Boolean).length}/8 photos)
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setCurrentStep(4)}
-                          className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
-                        >
-                          Edit Photos
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                        {VEHICLE_ANGLES.map((angle, idx) => {
-                          const url = inspectionPhotos[angle];
-                          return (
-                            <div key={angle} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1">
+                        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                          {contractToEdit.inspectionPhotos.map((url: string, idx: number) => (
+                            <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1">
                               {url ? (
-                                <img src={url} alt={angle} className="w-full h-full object-cover" />
+                                <img src={url} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
                               ) : (
-                                <span className="text-[9px] text-text-muted font-medium leading-tight">#{idx + 1}<br/>{angle.split(' ')[0]}</span>
+                                <span className="text-[9px] text-text-muted font-medium leading-tight">#{idx + 1}</span>
                               )}
                             </div>
-                          );
-                        })}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Two Signature Boxes: Customer & Admin */}
+                    {/* Signatures */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* 1. Customer Signature Box */}
-                      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs space-y-2">
-                        <div className="flex items-center justify-between">
+                      {/* Show existing customer signature in edit mode if present */}
+                      {contractToEdit?.customerSignature && (
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs space-y-2">
                           <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                             <PenTool size={14} className="text-brand" />
-                            Customer Signature (توقيع العميل)
+                            Customer Signature (توقيع العميل المسجل)
                           </label>
-                          {signatureData && (
-                            <button
-                              type="button"
-                              onClick={clearSignature}
-                              className="text-[11px] text-red-600 hover:underline font-semibold cursor-pointer"
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="border-2 border-border rounded-xl overflow-hidden bg-white relative shadow-inner group h-32">
-                          <div className="absolute inset-0 pointer-events-none flex flex-col justify-end p-3 pb-4 z-0 opacity-40">
-                            <div className="border-b border-dashed border-gray-300 w-full mb-1"></div>
-                            <span className="text-gray-400 text-[9px] font-semibold uppercase tracking-widest text-center">
-                              Customer signs here (touch or mouse)
-                            </span>
-                          </div>
-
-                          {signatureData && !isDrawing && signatureData.startsWith("data:image") ? (
-                            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-white/40">
-                              <img src={signatureData} alt="Client Signature" className="max-h-full max-w-full object-contain" />
-                            </div>
-                          ) : null}
-
-                          <canvas
-                            ref={canvasRef}
-                            onMouseDown={startDrawing}
-                            onMouseMove={draw}
-                            onMouseUp={stopDrawing}
-                            onMouseLeave={stopDrawing}
-                            onTouchStart={startDrawing}
-                            onTouchMove={draw}
-                            onTouchEnd={stopDrawing}
-                            className="w-full h-full cursor-crosshair relative z-20"
-                          />
-                        </div>
-                      </div>
-
-                      {/* 2. Admin / Company Signature Box */}
-                      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                            <PenTool size={14} className="text-emerald-600" />
-                            Admin / Company Signature (توقيع الإدارة)
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={autoSignAdmin}
-                              className="text-[11px] text-brand hover:underline font-semibold cursor-pointer"
-                            >
-                              Auto Sign
-                            </button>
-                            {adminSignatureData && (
-                              <button
-                                type="button"
-                                onClick={clearAdminSignature}
-                                className="text-[11px] text-red-600 hover:underline font-semibold cursor-pointer"
-                              >
-                                Clear
-                              </button>
-                            )}
+                          <div className="h-32 border border-gray-200 rounded-xl p-2 bg-gray-50 flex items-center justify-center">
+                            <img src={contractToEdit.customerSignature} alt="Customer Signature" className="max-h-full max-w-full object-contain" />
                           </div>
                         </div>
+                      )}
 
-                        <div className="border-2 border-border rounded-xl overflow-hidden bg-white relative shadow-inner group h-32">
-                          <div className="absolute inset-0 pointer-events-none flex flex-col justify-end p-3 pb-4 z-0 opacity-40">
-                            <div className="border-b border-dashed border-gray-300 w-full mb-1"></div>
-                            <span className="text-gray-400 text-[9px] font-semibold uppercase tracking-widest text-center">
-                              Admin / Agent signs here
-                            </span>
-                          </div>
+                      {/* Admin / Company Official Stamp & Signature Box */}
+                      <div className={`bg-white p-4 rounded-xl border border-gray-100 shadow-2xs space-y-2 ${!contractToEdit?.customerSignature ? "md:col-span-2" : ""}`}>
+                        <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                          <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+                          <span>Company Stamp &amp; Signature (الختم والتوقيع الرسمي للإدارة)</span>
+                        </label>
 
-                          {adminSignatureData && !isDrawingAdmin && adminSignatureData.startsWith("data:image") ? (
-                            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-white/40">
-                              <img src={adminSignatureData} alt="Admin Signature" className="max-h-full max-w-full object-contain" />
-                            </div>
-                          ) : null}
-
-                          <canvas
-                            ref={adminCanvasRef}
-                            onMouseDown={startDrawingAdmin}
-                            onMouseMove={drawAdmin}
-                            onMouseUp={stopDrawingAdmin}
-                            onMouseLeave={stopDrawingAdmin}
-                            onTouchStart={startDrawingAdmin}
-                            onTouchMove={drawAdmin}
-                            onTouchEnd={stopDrawingAdmin}
-                            className="w-full h-full cursor-crosshair relative z-20"
+                        <div className="border-2 border-dashed border-gray-200 rounded-xl overflow-hidden bg-gradient-to-b from-gray-50/70 to-white flex items-center justify-center p-3 h-36 relative shadow-inner">
+                          <img 
+                            src={adminSignatureData || "/images/admin-signature.png"} 
+                            alt="Leon Car Rental Official Stamp & Signature" 
+                            className="max-h-full max-w-full object-contain filter drop-shadow-sm select-none" 
                           />
                         </div>
                       </div>

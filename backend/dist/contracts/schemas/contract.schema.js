@@ -80,6 +80,10 @@ __decorate([
     __metadata("design:type", Number)
 ], Contract.prototype, "totalAmount", void 0);
 __decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Contract.prototype, "advancePayment", void 0);
+__decorate([
     (0, mongoose_1.Prop)({ required: true }),
     __metadata("design:type", Number)
 ], Contract.prototype, "depositAmount", void 0);
@@ -216,7 +220,7 @@ __decorate([
     __metadata("design:type", String)
 ], Contract.prototype, "customerSignature", void 0);
 __decorate([
-    (0, mongoose_1.Prop)(),
+    (0, mongoose_1.Prop)({ default: "/images/admin-signature.png" }),
     __metadata("design:type", String)
 ], Contract.prototype, "adminSignature", void 0);
 __decorate([
@@ -231,6 +235,18 @@ __decorate([
     }),
     __metadata("design:type", String)
 ], Contract.prototype, "deliveryStatus", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Boolean, default: false }),
+    __metadata("design:type", Boolean)
+], Contract.prototype, "isDispatched", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Date, required: false }),
+    __metadata("design:type", Date)
+], Contract.prototype, "dispatchedAt", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Date, required: false }),
+    __metadata("design:type", Date)
+], Contract.prototype, "deliveredAt", void 0);
 __decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", Number)

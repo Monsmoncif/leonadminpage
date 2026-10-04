@@ -14,6 +14,7 @@ import { Damage, DamageDocument } from '../damages/schemas/damage.schema';
 import { Inspection, InspectionDocument } from '../inspections/schemas/inspection.schema';
 import { Notification, NotificationDocument } from '../notifications/schemas/notification.schema';
 import { Log, LogDocument } from '../logs/schemas/log.schema';
+import { areDatesOverlapping } from '../common/date-overlap';
 
 @Injectable()
 export class ContractsService {
@@ -88,8 +89,9 @@ export class ContractsService {
 
     const formattedContracts = contracts.map((c: any) => ({
       ...c,
-      id: c.contractNumber ? String(c.contractNumber) : c._id.toString().substring(0, 8).toUpperCase(),
-      contractNumber: c.contractNumber,
+      id: c.contractNumber ? String(c.contractNumber) : 'Pending',
+      contractNumber: c.contractNumber || null,
+      isDispatched: Boolean(c.isDispatched || c.contractNumber || c.status === 'Active' || c.deliveryStatus === 'Delivered'),
       _id: c._id.toString(),
       clientId: c.clientId?._id?.toString() || c.clientId || '',
       unitId: c.unitId?._id?.toString() || c.unitId || '',
@@ -201,23 +203,27 @@ export class ContractsService {
       throw new NotFoundException('Selected vehicle not found.');
     }
 
-    if (unitDoc.status?.toLowerCase() !== 'available') {
+    if (unitDoc.status === 'Maintenance' || unitDoc.status === 'Out of Service') {
       throw new BadRequestException(
-        `Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is currently ${unitDoc.status} and cannot be booked.`,
+        `Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is currently in ${unitDoc.status} and cannot be booked.`,
       );
     }
 
-    const existingActiveContract = await this.contractModel.findOne({
+    const candidateContracts = await this.contractModel.find({
       unitId: body.unitId,
       status: { $in: ['Active', 'Draft'] },
+      deliveryStatus: { $ne: 'Returned' },
     });
-    if (existingActiveContract) {
-      throw new BadRequestException(
-        `Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is currently out on contract #${existingActiveContract._id
-          .toString()
-          .substring(0, 8)
-          .toUpperCase()} and cannot be booked.`,
-      );
+
+    for (const existing of candidateContracts) {
+      if (areDatesOverlapping(existing.startDate, existing.endDate, body.startDate, body.endDate)) {
+        const conflictStart = new Date(existing.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const conflictEnd = new Date(existing.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const conflictNumber = existing.contractNumber || existing._id.toString().substring(0, 8).toUpperCase();
+        throw new BadRequestException(
+          `Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflictNumber}). Please select different dates or choose another car.`,
+        );
+      }
     }
 
     const checkoutMileage = unitDoc.mileage || 0;
@@ -235,22 +241,14 @@ export class ContractsService {
       throw new BadRequestException('A delivery driver must be assigned for Delivery contracts.');
     }
 
-    const lastContract = await this.contractModel
-      .findOne({ contractNumber: { $exists: true, $ne: null } })
-      .sort({ contractNumber: -1 })
-      .select('contractNumber')
-      .lean();
-
-    const nextContractNumber =
-      lastContract && typeof (lastContract as any).contractNumber === 'number' && (lastContract as any).contractNumber >= 2000
-        ? (lastContract as any).contractNumber + 1
-        : 2000;
-
+    // Contracts are created unconfirmed without a contract number or dispatch notifications.
+    // Sequential contract numbers are only assigned upon Handover (Shop) or Dispatch (Driver).
     const contract = await this.contractModel.create({
-      contractNumber: nextContractNumber,
+      contractNumber: undefined,
       clientId: body.clientId || null,
       unitId: body.unitId,
       contractType,
+      isDispatched: false,
       driverId: mainDriverId,
       deliveryDriverId,
       returnDriverId,
@@ -266,7 +264,7 @@ export class ContractsService {
       depositAmount: body.depositAmount || 0,
       pickupLocation: body.pickupLocation || 'Main Office',
       dropoffLocation: body.dropoffLocation || '',
-      status: contractType === 'Shop' ? 'Active' : (body.status || 'Draft'),
+      status: 'Draft',
       notes: body.notes || '',
       returnNotes: body.returnNotes || '',
       checkoutTime: body.checkoutTime || '08:00 AM',
@@ -285,7 +283,7 @@ export class ContractsService {
       cleaningFees,
       customerSignature: body.customerSignature,
       inspectionPhotos: body.inspectionPhotos || [],
-      deliveryStatus: contractType === 'Shop' ? 'Delivered' : body.deliveryStatus || 'Pending',
+      deliveryStatus: 'Pending',
       paymentMethod: body.paymentMethod || 'Cash',
       paymentStatus: body.paymentStatus || 'Pending',
       additionalDriverName: body.additionalDriverName || '',
@@ -299,7 +297,7 @@ export class ContractsService {
     try {
       await this.notificationModel.create({
         title: 'New Contract Created',
-        message: `Contract #${contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase()} was created.`,
+        message: `Contract #${contract._id.toString().substring(0, 8).toUpperCase()} was created (Draft / Pending Confirmation).`,
         type: 'contract',
       });
     } catch (e) {
@@ -313,25 +311,12 @@ export class ContractsService {
         user: userName,
         role: userRole,
         action: 'Contract Created',
-        description: `Contract #${contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase()} generated.`,
+        description: `Contract draft #${contract._id.toString().substring(0, 8).toUpperCase()} created.`,
         type: 'create',
         ip: '127.0.0.1',
       });
     } catch (e) {
       console.error('Failed to create log', e);
-    }
-
-    if (contract.deliveryStatus === 'Delivered') {
-      await this.unitModel.findByIdAndUpdate(body.unitId, { status: 'Rented' });
-    }
-
-    const assignedDriverId = deliveryDriverId || body.driverId;
-    if (assignedDriverId) {
-      this.notifyDriver({
-        driverId: assignedDriverId.toString(),
-        contractId: contract._id.toString(),
-        type: 'delivery_assigned',
-      }).catch((err) => console.error('Driver notification error:', err));
     }
 
     return contract;
@@ -397,23 +382,25 @@ export class ContractsService {
       if (!newUnitDoc) {
         throw new NotFoundException('Selected replacement vehicle not found.');
       }
-      if (newUnitDoc.status?.toLowerCase() !== 'available') {
+      if (newUnitDoc.status === 'Maintenance' || newUnitDoc.status === 'Out of Service') {
         throw new BadRequestException(
           `Vehicle (${newUnitDoc.make} ${newUnitDoc.model} - ${newUnitDoc.plate}) is currently ${newUnitDoc.status} and cannot be assigned.`,
         );
       }
-      const conflictingContract = await this.contractModel.findOne({
+      const targetStart = body.startDate || existingContract.startDate;
+      const targetEnd = body.endDate || existingContract.endDate;
+      const conflictingContracts = await this.contractModel.find({
         _id: { $ne: id },
         unitId: body.unitId,
         status: { $in: ['Active', 'Draft'] },
+        deliveryStatus: { $ne: 'Returned' },
       });
-      if (conflictingContract) {
-        throw new BadRequestException(
-          `Vehicle (${newUnitDoc.make} ${newUnitDoc.model} - ${newUnitDoc.plate}) is already assigned to active contract #${conflictingContract._id
-            .toString()
-            .substring(0, 8)
-            .toUpperCase()}.`,
-        );
+      for (const conflicting of conflictingContracts) {
+        if (areDatesOverlapping(conflicting.startDate, conflicting.endDate, targetStart, targetEnd)) {
+          throw new BadRequestException(
+            `Vehicle (${newUnitDoc.make} ${newUnitDoc.model} - ${newUnitDoc.plate}) is already booked for overlapping dates (Contract #${conflicting.contractNumber || conflicting._id.toString().substring(0, 8).toUpperCase()}).`,
+          );
+        }
       }
       if (existingContract.unitId) {
         await this.unitModel.findByIdAndUpdate(existingContract.unitId, { status: 'Available' });
@@ -438,6 +425,7 @@ export class ContractsService {
       if (existingContract.status === 'Draft') {
         updatedData.status = 'Active';
       }
+      updatedData.deliveredAt = new Date();
       await this.unitModel.findByIdAndUpdate(existingContract.unitId, { status: 'Rented' });
 
       try {
@@ -467,6 +455,33 @@ export class ContractsService {
       this.sendClient({ contractId: existingContract._id.toString(), type: 'initial' }).catch((err) =>
         console.error('Client send failed:', err),
       );
+    }
+
+    // Assign sequential contract number ONLY when contract handover is confirmed (Delivered / Active)
+    const isHandoverConfirmed = 
+      (body.deliveryStatus === 'Delivered' && existingContract.deliveryStatus !== 'Delivered') ||
+      (body.status === 'Active' && existingContract.status !== 'Active');
+
+    if (isHandoverConfirmed && !existingContract.contractNumber && !updatedData.contractNumber) {
+      const lastContract = await this.contractModel
+        .findOne({ contractNumber: { $exists: true, $ne: null } })
+        .sort({ contractNumber: -1 })
+        .select('contractNumber')
+        .lean();
+
+      const nextContractNumber =
+        lastContract && typeof (lastContract as any).contractNumber === 'number' && (lastContract as any).contractNumber >= 2000
+          ? (lastContract as any).contractNumber + 1
+          : 2000;
+
+      updatedData.contractNumber = nextContractNumber;
+    }
+
+    if (body.isDispatched !== undefined || body.dispatch !== undefined) {
+      updatedData.isDispatched = Boolean(body.isDispatched || body.dispatch);
+      if (updatedData.isDispatched && !existingContract.dispatchedAt) {
+        updatedData.dispatchedAt = new Date();
+      }
     }
 
     const updatedContract = await this.contractModel.findByIdAndUpdate(id, updatedData, {
@@ -964,5 +979,42 @@ export class ContractsService {
     }
 
     return { success: true, message: 'WhatsApp message triggered successfully' };
+  }
+
+  async dispatch(id: string, currentUser?: any) {
+    let contract: any = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      contract = await this.contractModel.findById(id);
+    }
+    if (!contract && !isNaN(Number(id))) {
+      contract = await this.contractModel.findOne({ contractNumber: Number(id) });
+    }
+
+    if (!contract) {
+      throw new NotFoundException('Contract not found');
+    }
+
+    const assignedDriverId = contract.deliveryDriverId || contract.driverId;
+    if (!assignedDriverId) {
+      throw new BadRequestException('A delivery driver must be assigned before dispatching this contract.');
+    }
+
+    contract.isDispatched = true;
+    contract.dispatchedAt = new Date();
+    await contract.save();
+
+    this.notifyDriver({
+      driverId: assignedDriverId.toString(),
+      contractId: contract._id.toString(),
+      type: 'delivery_assigned',
+    }).catch((err) => console.error('Driver notification error on dispatch:', err));
+
+    const contractIdentifier = contract.contractNumber ? `#${contract.contractNumber}` : `#${contract._id.toString().substring(0, 8).toUpperCase()}`;
+
+    return {
+      success: true,
+      message: `Contract ${contractIdentifier} dispatched successfully`,
+      contract,
+    };
   }
 }

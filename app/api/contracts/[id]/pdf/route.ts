@@ -18,9 +18,22 @@ export async function GET(
     }
 
     await connectDB();
-    const contract = await Contract.findById(id).select("contractNumber updatedAt").lean() as any;
+    const contract = await Contract.findById(id).select("contractNumber status deliveryStatus updatedAt").lean() as any;
     if (!contract) {
       return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+    }
+
+    const isHandedOver = Boolean(
+      contract.deliveryStatus === "Delivered" ||
+      contract.status === "Active" ||
+      contract.status === "Completed"
+    );
+
+    if (!isHandedOver) {
+      return NextResponse.json(
+        { error: "Contract PDF is not available yet. Vehicle handover must be completed first." },
+        { status: 403 }
+      );
     }
 
     const contractNum = contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase();

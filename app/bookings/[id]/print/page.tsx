@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { CONTRACT_TERMS } from "@/lib/contractTerms";
 
 export default function PrintContractPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,10 +33,18 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (contract) {
+      const isHandedOver = Boolean(
+        contract.deliveryStatus === "Delivered" ||
+        contract.status === "Active" ||
+        contract.status === "Completed"
+      );
+
       const contractNum = contract.contractNumber
         ? String(contract.contractNumber)
         : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2000");
       document.title = contractNum;
+
+      if (!isHandedOver) return;
 
       // Only trigger print dialog if explicitly requested via `?autoprint=1`
       const isAutoPrint = window.location.search.includes('autoprint=1');
@@ -76,6 +84,35 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
         <button onClick={() => window.location.reload()} className="px-4 py-2 bg-brand text-white rounded-lg text-xs font-semibold">
           Retry
         </button>
+      </div>
+    );
+  }
+
+  const isHandedOver = Boolean(
+    contract.deliveryStatus === "Delivered" ||
+    contract.status === "Active" ||
+    contract.status === "Completed"
+  );
+
+  if (!isHandedOver) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+        <div className="bg-white rounded-2xl border border-amber-200 p-8 max-w-md w-full text-center shadow-lg">
+          <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200">
+            <AlertCircle size={28} />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Handover Pending</h2>
+          <p className="text-xs text-amber-700 font-semibold mb-3">تأكيد تسليم السيارة معلق</p>
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+            This contract has not been handed over yet. The official contract PDF will only be available once the vehicle handover is confirmed by the admin (Shop) or by the driver.
+          </p>
+          <button
+            onClick={() => window.close()}
+            className="w-full py-2.5 bg-brand text-white font-semibold rounded-xl text-sm hover:bg-brand-dark transition-all cursor-pointer shadow-sm"
+          >
+            Close Window
+          </button>
+        </div>
       </div>
     );
   }
@@ -454,12 +491,12 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               </div>
 
               <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Check Out Date / تاريخ الخروج</span>
-                <span className="font-bold truncate">{formatDate(contract.startDate)}</span>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Handover Date / تاريخ التسليم</span>
+                <span className="font-bold truncate">{formatDate(contract.deliveredAt || contract.startDate)}</span>
               </div>
               <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Check Out Time / وقت الخروج</span>
-                <span className="font-bold truncate">{contract.checkoutTime || "07:00 AM"}</span>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Handover Time / وقت التسليم</span>
+                <span className="font-bold truncate">{contract.checkoutTime || "08:00 AM"}</span>
               </div>
               <div className="px-1 py-[1.5px] border-b border-black flex flex-col justify-between">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Out KM / عداد الخروج</span>
@@ -469,42 +506,30 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Expected End Date / تاريخ الانتهاء المتوقع */}
-              <div className={`px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${isReturned ? "border-b border-black" : ""}`}>
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Date / تاريخ النهاية</span>
-                <span className="font-bold truncate">{formatDate(contract.endDate)}</span>
+              <div className="col-span-2 px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Date / تاريخ الانتهاء المتوقع</span>
+                <span className="font-bold truncate text-black">
+                  {contract.endDate ? formatDate(contract.endDate) : "N/A"}
+                </span>
               </div>
-              <div className={`px-1 py-[1.5px] border-r border-black flex flex-col justify-between ${isReturned ? "border-b border-black" : ""}`}>
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected Time / وقت النهاية</span>
-                <span className="font-bold truncate">{isReturned ? getReturnTimeDisplay() : ""}</span>
+              <div className="px-1 py-[1.5px] border-b border-black flex flex-col justify-between">
+                <span className="text-[6px] text-gray-500 font-bold uppercase">In KM / عداد الإرجاع</span>
+                <span className={`font-bold truncate ${isReturned ? "text-emerald-950 font-black" : "text-gray-600"}`}>
+                  {isReturned ? getReturnMileageDisplay() : ""}
+                </span>
               </div>
-              <div className={`px-1 py-[1.5px] flex flex-col justify-between ${isReturned ? "border-b border-black" : ""}`}>
+
+              {/* Fuel */}
+              <div className="px-1 py-[1.5px] border-r border-black flex flex-col justify-between">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Out Fuel / وقود الخروج</span>
                 <span className="font-bold text-emerald-700 truncate">{contract.checkoutFuelLevel || 100}%</span>
               </div>
-
-              {/* Date of Return / تاريخ الإرجاع الفعلي (يظهر تلقائياً عند إرجاع السيارة) */}
-              {isReturned && (
-                <>
-                  <div className="px-1 py-[1.5px] border-r border-black flex flex-col justify-between bg-emerald-50/60">
-                    <span className="text-[6px] text-emerald-800 font-bold uppercase">Return Date / تاريخ الإرجاع</span>
-                    <span className="font-black text-emerald-950 truncate">
-                      {formatDate(contract.returnedAt || contract.updatedAt)}
-                    </span>
-                  </div>
-                  <div className="px-1 py-[1.5px] border-r border-black flex flex-col justify-between bg-emerald-50/60">
-                    <span className="text-[6px] text-emerald-800 font-bold uppercase">Return Time / وقت الإرجاع</span>
-                    <span className="font-black text-emerald-950 truncate">
-                      {getReturnTimeDisplay() || "N/A"}
-                    </span>
-                  </div>
-                  <div className="px-1 py-[1.5px] flex flex-col justify-between bg-emerald-50/60">
-                    <span className="text-[6px] text-emerald-800 font-bold uppercase">In KM / عداد الإرجاع</span>
-                    <span className="font-black text-emerald-950 truncate">
-                      {getReturnMileageDisplay()}
-                    </span>
-                  </div>
-                </>
-              )}
+              <div className="col-span-2 px-1 py-[1.5px] flex flex-col justify-between">
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Return Fuel / وقود الإرجاع</span>
+                <span className="font-bold text-emerald-700 truncate">
+                  {isReturned && contract.returnFuelLevel !== undefined ? `${contract.returnFuelLevel}%` : ""}
+                </span>
+              </div>
             </div>
 
             {/* HIRE INFORMATION */}
@@ -513,45 +538,78 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               <span className="font-bold text-[7.5px]">معلومات الاستئجار</span>
             </div>
 
-            <div className="grid grid-cols-3 border-b border-black text-[6.5px]">
+            <div className="grid grid-cols-4 border-b border-black text-[6.5px]">
               <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Rental Period / مدة الإيجار</span>
-                <span className="font-bold text-[8px] truncate">{contract.totalDays} Days</span>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Rental Duration / مدة الاستئجار</span>
+                <span className="font-bold text-[8px] truncate">
+                  {(() => {
+                    if (isReturned && (contract.returnedAt || contract.updatedAt)) {
+                      const s = new Date(contract.deliveredAt || contract.startDate).getTime();
+                      const e = new Date(contract.returnedAt || contract.updatedAt).getTime();
+                      const diff = Math.ceil((e - s) / (1000 * 3600 * 24));
+                      const actualDays = Math.max(1, diff);
+                      return `${actualDays} Days (Actual / الفعلي)`;
+                    }
+                    return `Daily Rate (${contract.rentalType || "Daily"})`;
+                  })()}
+                </span>
               </div>
               <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Hire Rate 24H (AED) / الإيجار اليومي</span>
                 <span className="font-bold text-[8px] truncate">AED {contract.dailyRate || 0}</span>
               </div>
-              <div className="px-1 py-[1.5px] flex flex-col">
+              <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Deposit Amount / التأمين</span>
                 <span className="font-extrabold text-[8px] text-emerald-600 truncate">AED {contract.depositAmount || 0}</span>
               </div>
-              <div className="px-1 py-[1.5px] border-r border-t border-black flex flex-col">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Extra Mileage per KM / كم زائد</span>
+              <div className="px-1 py-[1.5px] flex flex-col">
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Extra KM / كم زائد</span>
                 <span className="font-bold text-[8px] truncate">AED {contract.pricePerExtraKm || 0}</span>
               </div>
+
               <div className="px-1 py-[1.5px] border-r border-t border-black flex flex-col">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Total Amount / المبلغ الإجمالي</span>
+                <span className="text-[6px] text-gray-500 font-bold uppercase">Total Charges / الإجمالي</span>
                 <span className="font-black text-[8.5px] text-black truncate">
                   AED {(() => {
-                    const days = Number(contract.totalDays) || 1;
                     const rate = Number(contract.dailyRate) || 0;
+                    if (isReturned && (contract.returnedAt || contract.updatedAt)) {
+                      const s = new Date(contract.deliveredAt || contract.startDate).getTime();
+                      const e = new Date(contract.returnedAt || contract.updatedAt).getTime();
+                      const diff = Math.ceil((e - s) / (1000 * 3600 * 24));
+                      const actualDays = Math.max(1, diff);
+                      return (actualDays * rate).toFixed(2);
+                    }
+                    const days = Number(contract.totalDays) || 1;
                     return (days * rate).toFixed(2);
                   })()}
                 </span>
               </div>
-              <div className="px-1 py-[1.5px] border-t border-black flex flex-col bg-brand/5">
-                <span className="text-[6px] text-brand font-extrabold uppercase">Amount Due / المستحق</span>
+              <div className="px-1 py-[1.5px] border-r border-t border-black flex flex-col bg-emerald-50/50">
+                <span className="text-[6px] text-emerald-800 font-bold uppercase">Prepaid Advance / العربون</span>
+                <span className="font-extrabold text-[8.5px] text-emerald-700 truncate">
+                  AED {Number(contract.advancePayment || 0).toFixed(2)}
+                </span>
+              </div>
+              <div className="col-span-2 px-1 py-[1.5px] border-t border-black flex flex-col bg-brand/5">
+                <span className="text-[6px] text-brand font-extrabold uppercase">Balance Due / المستحق</span>
                 <span className="font-black text-[8.5px] text-brand truncate">
                   AED {(() => {
-                    const days = Number(contract.totalDays) || 1;
                     const rate = Number(contract.dailyRate) || 0;
+                    let days = Number(contract.totalDays) || 1;
+                    if (isReturned && (contract.returnedAt || contract.updatedAt)) {
+                      const s = new Date(contract.deliveredAt || contract.startDate).getTime();
+                      const e = new Date(contract.returnedAt || contract.updatedAt).getTime();
+                      const diff = Math.ceil((e - s) / (1000 * 3600 * 24));
+                      days = Math.max(1, diff);
+                    }
                     const totalRent = days * rate;
                     const salik = Number(contract.salikCharge || contract.salikFees) || 0;
                     const parking = Number(contract.parkingCharge || contract.parkingFees) || 0;
                     const fines = Number(contract.finesCharge || contract.finesFees) || 0;
                     const fuel = Number(contract.fuelCharge || contract.fuelFees) || 0;
-                    return (totalRent + salik + parking + fines + fuel).toFixed(2);
+                    const advancePaid = Number(contract.advancePayment) || 0;
+                    const total = totalRent + salik + parking + fines + fuel;
+                    return Math.max(0, total - advancePaid).toFixed(2);
                   })()}
                 </span>
               </div>
@@ -865,15 +923,15 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
             {/* 1. Staff Sign (Left) */}
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="font-bold text-[8.5px] text-black shrink-0 whitespace-nowrap">Staff Sign:</span>
-              <div className="flex-1 relative flex items-center justify-center min-w-[50px] overflow-hidden h-6">
-                <span className="w-full text-black font-bold text-[8px] tracking-[1.5px] select-none truncate text-center">
+              <div className="flex-1 relative flex items-center justify-center min-w-[50px] overflow-hidden h-10">
+                <span className="w-full text-black font-bold text-[8px] tracking-[1.5px] select-none truncate text-center opacity-30">
                   ...................................................................................
                 </span>
-                {contract.adminSignature && (
+                {(contract.adminSignature || "/images/admin-signature.png") && (
                   <img 
-                    src={contract.adminSignature} 
+                    src={contract.adminSignature || "/images/admin-signature.png"} 
                     alt="Staff Sign" 
-                    className="absolute inset-0 m-auto max-h-7 max-w-[85%] object-contain mix-blend-multiply pointer-events-none" 
+                    className="absolute inset-0 m-auto max-h-10 max-w-[85%] object-contain mix-blend-multiply pointer-events-none" 
                   />
                 )}
               </div>
@@ -883,15 +941,15 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
             {/* 2. Hirer Sign (Right) */}
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="font-bold text-[8.5px] text-black shrink-0 whitespace-nowrap">Hirer Sign:</span>
-              <div className="flex-1 relative flex items-center justify-center min-w-[50px] overflow-hidden h-6">
-                <span className="w-full text-black font-bold text-[8px] tracking-[1.5px] select-none truncate text-center">
+              <div className="flex-1 relative flex items-center justify-center min-w-[50px] overflow-hidden h-10">
+                <span className="w-full text-black font-bold text-[8px] tracking-[1.5px] select-none truncate text-center opacity-30">
                   ...................................................................................
                 </span>
                 {contract.customerSignature && (
                   <img 
                     src={contract.customerSignature} 
                     alt="Hirer Sign" 
-                    className="absolute inset-0 m-auto max-h-7 max-w-[85%] object-contain mix-blend-multiply pointer-events-none" 
+                    className="absolute inset-0 m-auto max-h-10 max-w-[85%] object-contain mix-blend-multiply pointer-events-none" 
                   />
                 )}
               </div>

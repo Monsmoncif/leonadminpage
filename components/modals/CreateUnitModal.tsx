@@ -11,7 +11,12 @@ import {
   Image as ImageIcon,
   CheckCircle2, 
   CreditCard, 
-  Settings2 
+  Settings2,
+  ScanLine,
+  Sparkles,
+  FileText,
+  Building2,
+  Calendar
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
@@ -28,14 +33,24 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Vehicle Card OCR Scanner State
+  const [scanningCard, setScanningCard] = useState(false);
+  const [cardScannedSuccess, setCardScannedSuccess] = useState(false);
+  const [cardScanSummary, setCardScanSummary] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<string[]>([]);
+  const [cardUploadMode, setCardUploadMode] = useState<"camera" | "gallery">("camera");
+  const scanCardFileInputRef = useRef<HTMLInputElement | null>(null);
+  const scanCardCameraInputRef = useRef<HTMLInputElement | null>(null);
+
   // Vehicle pictures (supports live capture & gallery, multiple angles)
   const [photos, setPhotos] = useState<string[]>([]);
-  const [uploadMode, setUploadMode] = useState<"camera" | "gallery">("camera");
+  const [photoUploadMode, setPhotoUploadMode] = useState<"camera" | "gallery">("camera");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // Live Webcam Viewfinder State
   const [isWebcamOpen, setIsWebcamOpen] = useState(false);
+  const [webcamTarget, setWebcamTarget] = useState<"photo" | "card">("photo");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -58,7 +73,9 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
     transmission: "Automatic",
     capacity: 5,
     fuelType: "Petrol",
-    insuranceExpiry: ""
+    insuranceExpiry: "",
+    registrationExpiry: "",
+    owner: ""
   });
 
   const formatDateForInput = (d: any) => {
@@ -88,7 +105,9 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
           transmission: unitToEdit.transmission || "Automatic",
           capacity: unitToEdit.capacity ?? 5,
           fuelType: unitToEdit.fuelType || "Petrol",
-          insuranceExpiry: formatDateForInput(unitToEdit.insuranceExpiry)
+          insuranceExpiry: formatDateForInput(unitToEdit.insuranceExpiry),
+          registrationExpiry: formatDateForInput(unitToEdit.registrationExpiry),
+          owner: unitToEdit.owner || ""
         });
         
         let loadedPhotos: string[] = [];
@@ -98,6 +117,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
           loadedPhotos = [unitToEdit.image];
         }
         setPhotos(loadedPhotos);
+        setDocuments(Array.isArray(unitToEdit.documents) ? unitToEdit.documents : []);
       } else {
         resetForm();
       }
@@ -136,16 +156,24 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
       transmission: "Automatic",
       capacity: 5,
       fuelType: "Petrol",
-      insuranceExpiry: ""
+      insuranceExpiry: "",
+      registrationExpiry: "",
+      owner: ""
     });
     setPhotos([]);
+    setDocuments([]);
+    setCardScannedSuccess(false);
+    setCardScanSummary(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
+    if (scanCardFileInputRef.current) scanCardFileInputRef.current.value = "";
+    if (scanCardCameraInputRef.current) scanCardCameraInputRef.current.value = "";
     stopWebcam();
   };
 
-  const startWebcam = async () => {
+  const startWebcam = async (target: "photo" | "card" = "photo") => {
     setCameraError(null);
+    setWebcamTarget(target);
     setIsWebcamOpen(true);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -179,7 +207,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
     setCameraError(null);
   };
 
-  const captureWebcamPhoto = () => {
+  const captureWebcamPhoto = async () => {
     if (!videoRef.current) return;
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
@@ -190,9 +218,14 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const base64 = canvas.toDataURL("image/jpeg", 0.85);
 
-    setPhotos((prev) => [...prev, base64].slice(0, 8));
     stopWebcam();
-    toast.success("Live photo captured successfully! ✓");
+
+    if (webcamTarget === "card") {
+      await processCardScanBase64([base64]);
+    } else {
+      setPhotos((prev) => [...prev, base64].slice(0, 8));
+      toast.success("Live photo captured successfully! ✓");
+    }
   };
 
   const compressImage = (file: File): Promise<string> => {
@@ -228,6 +261,109 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const processCardScanBase64 = async (base64Images: string[]) => {
+    if (base64Images.length === 0) return;
+    setScanningCard(true);
+    setError(null);
+
+    try {
+      toast.success("Analyzing vehicle license with AI... (جارٍ قراءة بطاقة رخصة المركبة)");
+
+      // Store in documents preview
+      setDocuments((prev) => {
+        const combined = [...prev];
+        base64Images.forEach((img) => {
+          if (!combined.includes(img)) combined.push(img);
+        });
+        return combined;
+      });
+
+      const res = await fetch("/api/ocr/scan-vehicle-card", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: base64Images }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to scan vehicle license card.");
+      }
+
+      const { data } = resData;
+
+      setFormData((prev) => ({
+        ...prev,
+        plate: data.plate || prev.plate,
+        owner: data.owner || prev.owner,
+        make: data.make || prev.make,
+        model: data.model || prev.model,
+        year: Number(data.year) || prev.year,
+        color: data.color || prev.color,
+        vin: data.vin || prev.vin,
+        capacity: Number(data.capacity) || prev.capacity,
+        registrationExpiry: data.registrationExpiry || prev.registrationExpiry,
+        insuranceExpiry: data.insuranceExpiry || prev.insuranceExpiry,
+      }));
+
+      setCardScannedSuccess(true);
+      const summaryParts = [
+        data.make && data.model ? `${data.make} ${data.model} ${data.year || ""}`.trim() : "",
+        data.plate ? `Plate: ${data.plate}` : "",
+        data.vin ? `VIN: ${data.vin}` : "",
+        data.capacity ? `Seats: ${data.capacity}` : "",
+        data.owner ? `Owner: ${data.owner}` : "",
+        data.registrationExpiry ? `Reg. Exp: ${data.registrationExpiry}` : "",
+        data.insuranceExpiry ? `Ins. Exp: ${data.insuranceExpiry}` : "",
+      ].filter(Boolean);
+
+      setCardScanSummary(summaryParts.join(" • "));
+      toast.success("✓ Vehicle license extracted successfully! (تم استخراج بيانات رخصة السيارة بنجاح)");
+    } catch (err: any) {
+      console.error("Vehicle card scan error:", err);
+      setError(err.message || "Failed to extract vehicle license details.");
+      toast.error(err.message || "Failed to extract vehicle license details.");
+    } finally {
+      setScanningCard(false);
+    }
+  };
+
+  const scanUploadedCard = async (imagesToScan?: string[]) => {
+    const targets = imagesToScan || documents;
+    if (!targets || targets.length === 0) {
+      toast.error("Please upload or take a picture of the vehicle card first.");
+      return;
+    }
+    await processCardScanBase64(targets);
+  };
+
+  const handleVehicleCardFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const base64List: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const b64 = await compressImage(files[i]);
+      if (b64) base64List.push(b64);
+    }
+
+    if (e.target) e.target.value = "";
+    if (base64List.length > 0) {
+      setDocuments((prev) => {
+        const combined = [...prev];
+        base64List.forEach((img) => {
+          if (!combined.includes(img)) combined.push(img);
+        });
+        return combined.slice(0, 3);
+      });
+      await processCardScanBase64(base64List);
+    }
+  };
+
+  const removeDocument = (index: number) => {
+    setDocuments((prev) => prev.filter((_, i) => i !== index));
+    toast.info("Vehicle license document removed");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -291,7 +427,24 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
         }
       }
 
-      // 2. Submit vehicle data
+      // 2. Upload vehicle license documents if in base64
+      const finalDocUrls: string[] = [];
+      for (const doc of documents) {
+        if (doc.startsWith("data:image") || doc.startsWith("data:application/pdf")) {
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: doc, folder: "vehicle_documents" }),
+          });
+          if (!res.ok) throw new Error("Vehicle document upload failed");
+          const data = await res.json();
+          if (data.url) finalDocUrls.push(data.url);
+        } else if (doc.startsWith("http") || doc.startsWith("/")) {
+          finalDocUrls.push(doc);
+        }
+      }
+
+      // 3. Submit vehicle data
       const method = unitToEdit ? "PUT" : "POST";
       const url = unitToEdit ? `/api/units/${unitToEdit._id}` : "/api/units";
 
@@ -307,7 +460,8 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
           dailyKmLimit: Number(formData.dailyKmLimit),
           pricePerExtraKm: Number(formData.pricePerExtraKm),
           capacity: Number(formData.capacity),
-          images: finalImageUrls
+          images: finalImageUrls,
+          documents: finalDocUrls
         }),
       });
 
@@ -360,6 +514,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
         </div>
 
         {/* Form Body */}
+        {/* Form Body */}
         <div className="p-2.5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-3 sm:space-y-6">
           <form id="create-unit-form" onSubmit={handleSubmit} className="space-y-3 sm:space-y-6">
             
@@ -381,95 +536,263 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
               capture="environment"
               className="hidden"
             />
+            {/* Hidden Inputs for Vehicle License / Mulkiya OCR Scan */}
+            <input
+              type="file"
+              ref={scanCardFileInputRef}
+              onChange={handleVehicleCardFileChange}
+              accept="image/*"
+              multiple
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={scanCardCameraInputRef}
+              onChange={handleVehicleCardFileChange}
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+            />
 
-            {/* SECTION 1: VEHICLE PHOTO (Matching Step 4 Inspection Photos with Camera/Gallery toggle) */}
-            <div className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 tracking-wide uppercase flex items-center gap-1.5 sm:gap-2">
-                    <Camera size={15} className="text-brand shrink-0" />
-                    <span>Vehicle Photos</span>
-                  </h3>
-                  <p className="text-[10px] sm:text-xs text-text-secondary mt-0.5">
-                    Take live photo with camera or upload from gallery (up to 8 photos)
-                  </p>
+            {/* SECTION 1: VEHICLE LICENSE CARD (MULKIYA / CARTE GRISE) & AI SCANNING */}
+            <div className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
+                <div className="flex items-center justify-between w-full sm:w-auto">
+                  <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <FileText size={15} className="text-brand shrink-0" />
+                    <span>Vehicle License Card (بطاقة ملكية المركبة / Carte Grise)</span>
+                    <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
+                      {documents.length}/3
+                    </span>
+                  </label>
+                  {cardScannedSuccess && (
+                    <span className="sm:hidden text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 size={10} /> Auto-Filled
+                    </span>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-2 sm:gap-3">
-                  {/* Mode Switcher: Camera vs Gallery (exact match to user screenshot) */}
+                <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
+                  {cardScannedSuccess && (
+                    <span className="hidden sm:flex text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full items-center gap-1">
+                      <CheckCircle2 size={11} /> Auto-Filled by AI
+                    </span>
+                  )}
+
+                  {/* Mode Switcher: Camera vs Gallery (like Add New Driver) */}
                   <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold shrink-0">
                     <button
                       type="button"
-                      onClick={() => setUploadMode("camera")}
-                      className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
-                        uploadMode === "camera"
+                      onClick={() => setCardUploadMode("camera")}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                        cardUploadMode === "camera"
                           ? "bg-white text-brand shadow-xs font-bold"
                           : "text-text-muted hover:text-text-primary"
                       }`}
-                      title="Camera Direct Mode (التقاط بالكاميرا)"
+                      title="Camera Mode (التقاط بالكاميرا)"
                     >
-                      <Camera size={13} className={uploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                      <Camera size={12} className={cardUploadMode === "camera" ? "text-brand" : "text-text-muted"} />
                       <span>Camera</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setUploadMode("gallery")}
-                      className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
-                        uploadMode === "gallery"
+                      onClick={() => setCardUploadMode("gallery")}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                        cardUploadMode === "gallery"
                           ? "bg-white text-brand shadow-xs font-bold"
                           : "text-text-muted hover:text-text-primary"
                       }`}
-                      title="Gallery Mode (رفع من المعرض)"
+                      title="Gallery / Files Mode (رفع من الملفات)"
                     >
-                      <ImageIcon size={13} className={uploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                      <ImageIcon size={12} className={cardUploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
                       <span>Gallery</span>
                     </button>
                   </div>
 
-                  {photos.length > 0 && (
-                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full flex items-center gap-1 shrink-0">
-                      <CheckCircle2 size={10} /> {photos.length} Photo{photos.length > 1 ? "s" : ""}
-                    </span>
+                  {documents.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={scanningCard || submitting}
+                      onClick={() => scanUploadedCard()}
+                      className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
+                    >
+                      {scanningCard ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>Scanning...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ScanLine size={12} />
+                          <span>Scan License (مسح الملكية)</span>
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
               </div>
 
+              {/* Card Previews Grid */}
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                {documents.map((doc, idx) => (
+                  <div
+                    key={idx}
+                    className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs shrink-0"
+                  >
+                    <img
+                      src={doc}
+                      alt={`Vehicle License ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeDocument(idx)}
+                      className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
+                      title="Remove Document"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Single Contextual Trigger Button matching active cardUploadMode */}
+                {documents.length < 3 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (cardUploadMode === "camera") {
+                        if (typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function") {
+                          startWebcam("card");
+                        } else {
+                          scanCardCameraInputRef.current?.click();
+                        }
+                      } else {
+                        scanCardFileInputRef.current?.click();
+                      }
+                    }}
+                    className={`w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
+                      cardUploadMode === "camera"
+                        ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
+                        : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
+                    }`}
+                    title={cardUploadMode === "camera" ? "Take Photo with Camera (التقاط بالكاميرا)" : "Upload File (رفع ملف)"}
+                  >
+                    {cardUploadMode === "camera" ? (
+                      <>
+                        <Camera size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-brand" />
+                        <span className="text-[9px] sm:text-[10px] font-bold text-brand leading-tight">Take Photo</span>
+                        <span className="text-[7px] sm:text-[8px] opacity-70">Camera</span>
+                      </>
+                    ) : (
+                      <>
+                        <ImagePlus size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
+                        <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 group-hover:text-brand leading-tight">Upload</span>
+                        <span className="text-[7px] sm:text-[8px] opacity-70">Card Image</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+
+              <p className="text-[10px] sm:text-xs text-gray-500">
+                Supported formats: PNG, JPG, WebP. Take picture or upload vehicle registration card (Mulkiya / Carte Grise) to auto-extract plate, owner, VIN, make, model & dates.
+              </p>
+            </div>
+
+            {/* SECTION 2: VEHICLE PHOTOS */}
+            <div className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
+                <div className="flex items-center justify-between w-full sm:w-auto">
+                  <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <Camera size={15} className="text-brand shrink-0" />
+                    <span>Vehicle Photos (صور المركبة)</span>
+                    <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
+                      {photos.length}/8
+                    </span>
+                  </label>
+                  {photos.length > 0 && (
+                    <span className="sm:hidden text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 size={10} /> {photos.length} Photo{photos.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
+                  {photos.length > 0 && (
+                    <span className="hidden sm:flex text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full items-center gap-1">
+                      <CheckCircle2 size={11} /> {photos.length} Photo{photos.length > 1 ? "s" : ""} attached
+                    </span>
+                  )}
+
+                  {/* Mode Switcher: Camera vs Gallery (like Add New Driver) */}
+                  <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setPhotoUploadMode("camera")}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                        photoUploadMode === "camera"
+                          ? "bg-white text-brand shadow-xs font-bold"
+                          : "text-text-muted hover:text-text-primary"
+                      }`}
+                      title="Camera Mode (التقاط بالكاميرا)"
+                    >
+                      <Camera size={12} className={photoUploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                      <span>Camera</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoUploadMode("gallery")}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                        photoUploadMode === "gallery"
+                          ? "bg-white text-brand shadow-xs font-bold"
+                          : "text-text-muted hover:text-text-primary"
+                      }`}
+                      title="Gallery / Files Mode (رفع من الملفات)"
+                    >
+                      <ImageIcon size={12} className={photoUploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                      <span>Gallery</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Photos Grid */}
-              <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
+              <div className="flex flex-wrap gap-2 sm:gap-3">
                 {photos.map((item, index) => (
                   <div
                     key={index}
-                    className="relative w-32 h-24 sm:w-44 sm:h-32 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs bg-gray-50 flex items-center justify-center shrink-0"
+                    className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs shrink-0"
                   >
                     <img
                       src={item}
                       alt={`Vehicle preview ${index + 1}`}
-                      className="w-full h-full object-contain p-1.5 sm:p-2"
+                      className="w-full h-full object-cover"
                     />
 
                     {/* Primary Badge for index 0 */}
                     {index === 0 && (
-                      <span className="absolute top-1.5 left-1.5 z-10 text-[8px] sm:text-[9px] font-bold bg-brand text-white px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
+                      <span className="absolute top-1 left-1 z-10 text-[8px] font-bold bg-brand text-white px-1.5 py-0.2 rounded shadow-xs">
                         Primary
                       </span>
                     )}
 
                     {/* Overlay Action Buttons */}
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-1.5 sm:gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                       {index !== 0 && (
                         <button
                           type="button"
                           onClick={() => setAsPrimaryPhoto(index)}
-                          className="px-2 py-1 bg-white/90 text-gray-800 text-[9px] sm:text-[10px] font-bold rounded hover:bg-white transition-colors cursor-pointer"
+                          className="px-1.5 py-0.5 bg-white/90 text-gray-800 text-[8px] font-bold rounded hover:bg-white transition-colors cursor-pointer"
                           title="Set as Primary Photo"
                         >
-                          Make Primary
+                          Primary
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={() => removePhoto(index)}
-                        className="p-1 sm:p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
+                        className="p-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
                         title="Delete Photo"
                       >
                         <Trash2 size={14} />
@@ -478,56 +801,48 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                   </div>
                 ))}
 
-                {/* Add Photo Trigger Button */}
+                {/* Contextual Trigger Button */}
                 {photos.length < 8 && (
                   <button
                     type="button"
                     onClick={() => {
-                      if (uploadMode === "camera") {
-                        startWebcam();
+                      if (photoUploadMode === "camera") {
+                        if (typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function") {
+                          startWebcam("photo");
+                        } else {
+                          cameraInputRef.current?.click();
+                        }
                       } else {
                         fileInputRef.current?.click();
                       }
                     }}
-                    className={`w-32 h-24 sm:w-44 sm:h-32 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
-                      uploadMode === "camera"
-                        ? "border-brand/40 bg-brand/[0.03] text-brand hover:border-brand hover:bg-brand/10"
+                    className={`w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
+                      photoUploadMode === "camera"
+                        ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
                         : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
                     }`}
+                    title={photoUploadMode === "camera" ? "Take Photo of Vehicle (التقاط صورة)" : "Upload Vehicle Photos (رفع صور)"}
                   >
-                    {uploadMode === "camera" ? (
+                    {photoUploadMode === "camera" ? (
                       <>
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand mb-1 sm:mb-2 group-hover:scale-110 transition-transform">
-                          <Camera size={16} />
-                        </div>
-                        <span className="text-[10px] sm:text-xs font-bold text-brand">Take Live Photo</span>
-                        <span className="text-[8px] sm:text-[10px] text-text-muted mt-0.5">Camera / Webcam</span>
+                        <Camera size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-brand" />
+                        <span className="text-[9px] sm:text-[10px] font-bold text-brand leading-tight">Take Photo</span>
+                        <span className="text-[7px] sm:text-[8px] opacity-70">Camera</span>
                       </>
                     ) : (
                       <>
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:text-brand group-hover:bg-brand/10 mb-1 sm:mb-2 group-hover:scale-110 transition-transform">
-                          <ImageIcon size={16} />
-                        </div>
-                        <span className="text-[10px] sm:text-xs font-bold text-gray-700 group-hover:text-brand">Upload Photos</span>
-                        <span className="text-[8px] sm:text-[10px] text-text-muted mt-0.5">From Gallery / Device</span>
+                        <ImagePlus size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
+                        <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 group-hover:text-brand leading-tight">Upload</span>
+                        <span className="text-[7px] sm:text-[8px] opacity-70">Gallery</span>
                       </>
                     )}
                   </button>
                 )}
               </div>
 
-              <div className="flex items-center justify-between text-xs text-text-muted pt-1">
-                <span>The primary photo is displayed on fleet cards, bookings, and customer contracts.</span>
-                {uploadMode === "camera" && (
-                  <button
-                    type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="text-brand hover:underline font-medium text-[11px] cursor-pointer"
-                  >
-                    Or open device camera file dialog →
-                  </button>
-                )}
-              </div>
+              <p className="text-[10px] sm:text-xs text-gray-500">
+                The primary photo is displayed on fleet cards, bookings, and customer contracts.
+              </p>
             </div>
 
             {/* SECTION 2: IDENTIFICATION & GENERAL DETAILS */}
@@ -634,6 +949,30 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                     className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white uppercase font-mono"
                     value={formData.vin}
                     onChange={(e) => setFormData({...formData, vin: e.target.value.toUpperCase()})}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                    Owner / Company (المالك)
+                  </label>
+                  <input 
+                    placeholder="e.g. Neon Drive Car Rental" 
+                    className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                    value={formData.owner}
+                    onChange={(e) => setFormData({...formData, owner: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                    Registration Expiry (انتهاء الملكية)
+                  </label>
+                  <input 
+                    type="date"
+                    className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                    value={formData.registrationExpiry}
+                    onChange={(e) => setFormData({...formData, registrationExpiry: e.target.value})}
                   />
                 </div>
 
@@ -870,7 +1209,11 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
             <div className="px-5 py-3.5 bg-gray-900/90 border-b border-gray-800 flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
                 <Camera size={18} className="text-red-500 animate-pulse" />
-                <h3 className="text-sm font-bold">Live Vehicle Camera (التقاط صورة المركبة)</h3>
+                <h3 className="text-sm font-bold">
+                  {webcamTarget === "card"
+                    ? "Live Vehicle License Camera (مسح رخصة المركبة / الملكية)"
+                    : "Live Vehicle Camera (التقاط صورة المركبة)"}
+                </h3>
               </div>
               <button
                 type="button"
@@ -912,7 +1255,11 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                     type="button"
                     onClick={() => {
                       stopWebcam();
-                      cameraInputRef.current?.click();
+                      if (webcamTarget === "card") {
+                        scanCardFileInputRef.current?.click();
+                      } else {
+                        cameraInputRef.current?.click();
+                      }
                     }}
                     className="px-4 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors cursor-pointer"
                   >
@@ -928,7 +1275,11 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                 type="button"
                 onClick={() => {
                   stopWebcam();
-                  cameraInputRef.current?.click();
+                  if (webcamTarget === "card") {
+                    scanCardFileInputRef.current?.click();
+                  } else {
+                    cameraInputRef.current?.click();
+                  }
                 }}
                 className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer"
               >
@@ -942,7 +1293,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                 className="flex items-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95 cursor-pointer"
               >
                 <Camera size={18} />
-                <span>Capture Photo</span>
+                <span>{webcamTarget === "card" ? "Scan License Card" : "Capture Photo"}</span>
               </button>
 
               <button

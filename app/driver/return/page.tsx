@@ -25,6 +25,7 @@ import {
   RotateCcw,
   Coins,
   DollarSign,
+  Banknote,
   Image as ImageIcon,
   FileText
 } from "lucide-react";
@@ -137,6 +138,7 @@ export default function VehicleReturnPage() {
 
   // Final confirmation checkbox
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isAllMoneyConfirmed, setIsAllMoneyConfirmed] = useState(false);
 
   const getCurrentFormattedTime = () => {
     return new Intl.DateTimeFormat("en-US", {
@@ -246,6 +248,7 @@ export default function VehicleReturnPage() {
       }
       setReturnPhotos(initialPhotos);
       setIsConfirmed(false);
+      setIsAllMoneyConfirmed(false);
       setError(null);
     }
   }, [selectedContract, selectedContractData]);
@@ -265,6 +268,7 @@ export default function VehicleReturnPage() {
   const vehicleColor = selectedContractData?.vehicleColor || selectedContractData?.unitId?.color || "";
   const vehicleFuel = selectedContractData?.vehicleFuel || selectedContractData?.unitId?.fuelType || "Petrol";
   const vehicleImage = selectedContractData?.vehicleImage || selectedContractData?.unitId?.images?.[0] || "";
+  const checkoutFuelLevel = selectedContractData?.checkoutFuelLevel !== undefined ? Number(selectedContractData.checkoutFuelLevel) : 100;
   const dailyKmLimit = Number(selectedContractData?.dailyKmLimit || 0);
   const pricePerExtraKm = Number(selectedContractData?.pricePerExtraKm || 0);
   const totalDays = Number(selectedContractData?.totalDays || 1);
@@ -277,6 +281,29 @@ export default function VehicleReturnPage() {
   const finesChargeNum = Number(finesCharge) || 0;
   const fuelChargeNum = Number(fuelCharge) || 0;
   const totalReturnCharges = extraKmCharge + damageChargeNum + salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum;
+
+  // Breakdown of money collected (Rental collection + deposit + return charges)
+  const contractTotalRent = Number(selectedContractData?.totalAmount || 0);
+  const contractAdvance = Number(selectedContractData?.advancePayment || 0);
+  const contractRentalCollection = Math.max(0, contractTotalRent - contractAdvance);
+  const contractDeposit = Number(selectedContractData?.depositAmount) || (selectedContractData?.deposit ? Number(String(selectedContractData.deposit).replace(/[^0-9.]/g, '')) : 0);
+
+  const moneyBreakdownParts: string[] = [];
+  if (contractRentalCollection > 0) {
+    moneyBreakdownParts.push(`Rental Collection of AED ${contractRentalCollection.toLocaleString()}`);
+  }
+  if (contractDeposit > 0) {
+    moneyBreakdownParts.push(`Deposit of AED ${contractDeposit.toLocaleString()}`);
+  }
+  if (totalReturnCharges > 0) {
+    moneyBreakdownParts.push(`Return Charges of AED ${totalReturnCharges.toLocaleString()}`);
+  }
+
+  const grandTotalMoney = contractRentalCollection + contractDeposit + totalReturnCharges;
+
+  const moneyBreakdownText = moneyBreakdownParts.length > 0
+    ? `${moneyBreakdownParts.join(" + ")} = Total AED ${grandTotalMoney.toLocaleString()}`
+    : `Total AED 0`;
 
   // Damage photo uploader
   const handleDamagePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -414,6 +441,12 @@ export default function VehicleReturnPage() {
       setError("Please describe the new damages before finalizing return.");
       toast.error("Damage description is required.");
       setCurrentStep(3);
+      return;
+    }
+
+    if (!isAllMoneyConfirmed) {
+      setError("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before finalizing return.");
+      toast.error("Confirm Get All Money is required.");
       return;
     }
 
@@ -756,6 +789,29 @@ export default function VehicleReturnPage() {
               </div>
             </div>
           </div>
+
+          {/* Return Fuel Level */}
+          <div className="bg-white rounded-2xl border border-border p-5 space-y-3 shadow-2xs">
+            <FuelLevelSelector
+              value={returnFuelLevel}
+              onChange={(lvl) => setReturnFuelLevel(lvl)}
+              label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
+              sublabel={`Handover Baseline: ${checkoutFuelLevel}%`}
+              required
+              className="p-0 border-0 bg-transparent"
+            />
+            {returnFuelLevel < checkoutFuelLevel && (
+              <div className="flex items-center justify-between text-xs p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Fuel size={14} className="text-amber-700 shrink-0" />
+                  Fuel is lower than checkout baseline ({checkoutFuelLevel}% → {returnFuelLevel}%).
+                </span>
+                <span className="font-bold text-amber-800 shrink-0">
+                  -{checkoutFuelLevel - returnFuelLevel}%
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -771,16 +827,6 @@ export default function VehicleReturnPage() {
             Capture or upload 8 standard angles to document vehicle condition upon client return
           </p>
         </div>
-      </div>
-
-      {/* Return Fuel Level */}
-      <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
-        <FuelLevelSelector
-          value={returnFuelLevel}
-          onChange={(val) => setReturnFuelLevel(val)}
-          label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
-          sublabel={`Handover baseline was ${selectedContractData?.checkoutFuelLevel !== undefined ? selectedContractData.checkoutFuelLevel : 100}%. Select current tank percentage.`}
-        />
       </div>
 
       <VehicleInspectionPhotoCapture
@@ -1257,125 +1303,133 @@ export default function VehicleReturnPage() {
         )}
       </div>
 
-      {/* Cash & Settlement Documentation Photos */}
-      <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <DollarSign size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-text-primary">
-                  Return Charges &amp; Settlement Proof (توثيق استلام رسوم ومخالفات الإرجاع)
-                </h3>
-                {moneyPhotos.length > 0 && (
-                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-text-muted mt-0.5">
-                Take or attach pictures of money collected for additional return charges, damages, fines, or deposit settlement upon return
-              </p>
-            </div>
-          </div>
-
-          {/* Mode Switcher: Camera vs Gallery */}
-          <div className="flex items-center p-1 bg-white rounded-xl border border-gray-200 text-xs font-semibold shadow-2xs self-start sm:self-auto shrink-0">
-            <button
-              type="button"
-              onClick={() => setMoneyUploadMode("camera")}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                moneyUploadMode === "camera"
-                  ? "bg-emerald-50 text-emerald-700 shadow-xs font-bold border border-emerald-200"
-                  : "text-text-muted hover:text-text-primary"
-              }`}
-              title="Camera Mode (التقاط بالكاميرا مباشرة)"
-            >
-              <Camera size={14} className={moneyUploadMode === "camera" ? "text-emerald-600" : "text-text-muted"} />
-              <span>Camera</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMoneyUploadMode("gallery")}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                moneyUploadMode === "gallery"
-                  ? "bg-emerald-50 text-emerald-700 shadow-xs font-bold border border-emerald-200"
-                  : "text-text-muted hover:text-text-primary"
-              }`}
-              title="Gallery Mode (رفع من المعرض)"
-            >
-              <ImageIcon size={14} className={moneyUploadMode === "gallery" ? "text-emerald-600" : "text-text-muted"} />
-              <span>Gallery</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-          {moneyPhotos.map((url, idx) => (
-            <div 
-              key={idx} 
-              className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-xs bg-gray-100 cursor-pointer"
-              onClick={() => setPreviewPhotoUrl(url)}
-            >
-              <img src={url} alt={`Return Payment ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveMoneyPhoto(idx);
-                }}
-                className="absolute top-1.5 right-1.5 p-1 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Delete Photo"
-              >
-                <Trash2 size={12} />
-              </button>
-              <span className="absolute bottom-1 left-1.5 text-[9px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded backdrop-blur-xs">
-                #{idx + 1} Return Proof
-              </span>
-            </div>
-          ))}
-
-          {/* Upload Button Tile matching mode */}
-          <label className={`aspect-square rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group text-center p-2 ${
-            isUploadingMoneyPhoto 
-              ? "opacity-50 pointer-events-none border-gray-300 bg-gray-50" 
-              : "border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/60"
-          }`}>
-            <input
-              key={moneyUploadMode}
-              type="file"
-              accept="image/*"
-              capture={moneyUploadMode === "camera" ? "environment" : undefined}
-              multiple={moneyUploadMode === "gallery"}
-              className="hidden"
-              onClick={(e) => { e.currentTarget.value = ""; }}
-              onChange={handleMoneyPhotoUpload}
-              disabled={isUploadingMoneyPhoto}
-            />
-            {isUploadingMoneyPhoto ? (
-              <Loader2 size={20} className="animate-spin text-emerald-600" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                {moneyUploadMode === "camera" ? <Camera size={16} /> : <Plus size={16} />}
-              </div>
-            )}
-            <span className="text-[11px] font-bold text-emerald-700">
-              {isUploadingMoneyPhoto
-                ? "Uploading..."
-                : moneyUploadMode === "camera"
-                ? "+ Take Photo"
-                : "+ From Gallery"}
+      {/* Mandatory Checkbox: Confirm Get All Money & Proof */}
+      <div className="p-3.5 sm:p-4 bg-amber-50/80 rounded-xl border border-amber-200 shadow-2xs">
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isAllMoneyConfirmed}
+            onChange={(e) => setIsAllMoneyConfirmed(e.target.checked)}
+            className="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
+          />
+          <div className="text-xs">
+            <span className="font-bold text-amber-950 block">
+              Confirm Get All Money (تأكيد استلام كامل المبلغ) *
             </span>
-          </label>
-        </div>
+            <span className="text-[11px] text-amber-800 mt-0.5 block font-medium">
+              I certify that all required money ({moneyBreakdownText}) has been received from the customer.
+            </span>
+          </div>
+        </label>
 
-        {moneyPhotos.length === 0 && (
-          <p className="text-center text-xs text-text-muted py-1">
-            No return payment proof photos attached yet. {moneyUploadMode === "camera" ? "Click '+ Take Photo' to capture evidence." : "Click '+ From Gallery' to upload evidence."}
-          </p>
-        )}
+        {/* Money Photo Proof Upload */}
+        <div className="mt-3 pt-3 border-t border-amber-200/80">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5">
+              <Banknote size={15} className="text-amber-800" />
+              <span className="text-xs font-bold text-amber-950">
+                Money / Payment Proof (صورة استلام المبلغ)
+              </span>
+              {moneyPhotos.length > 0 && (
+                <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {/* Direct Camera Button */}
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onClick={(e) => { e.currentTarget.value = ""; }}
+                  onChange={handleMoneyPhotoUpload}
+                  disabled={isUploadingMoneyPhoto}
+                />
+                <Camera size={14} className="text-amber-800" />
+                <span>Camera</span>
+              </label>
+
+              {/* Upload Gallery Button */}
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onClick={(e) => { e.currentTarget.value = ""; }}
+                  onChange={handleMoneyPhotoUpload}
+                  disabled={isUploadingMoneyPhoto}
+                />
+                <ImageIcon size={14} className="text-amber-800" />
+                <span>Gallery</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Uploading indicator */}
+          {isUploadingMoneyPhoto && (
+            <div className="flex items-center gap-2 p-2 bg-amber-100/60 rounded-lg text-amber-900 text-xs mb-2">
+              <Loader2 size={14} className="animate-spin text-amber-800" />
+              <span>Uploading payment proof photo...</span>
+            </div>
+          )}
+
+          {/* Photo thumbnails grid */}
+          {moneyPhotos.length > 0 ? (
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-1">
+              {moneyPhotos.map((url, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => setPreviewPhotoUrl(url)}
+                  className="relative group aspect-square rounded-lg overflow-hidden border border-amber-300 bg-white shadow-2xs cursor-pointer hover:border-amber-400 transition-all"
+                >
+                  <img
+                    src={url}
+                    alt={`Money proof ${idx + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveMoneyPhoto(idx);
+                    }}
+                    className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 text-white rounded-md shadow-xs opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
+                    title="Delete photo"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                  <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.2 rounded backdrop-blur-xs">
+                    #{idx + 1}
+                  </span>
+                </div>
+              ))}
+
+              {/* Add more button tile */}
+              <label className="aspect-square rounded-lg border border-dashed border-amber-300 hover:border-amber-400 bg-white/70 hover:bg-amber-100/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onClick={(e) => { e.currentTarget.value = ""; }}
+                  onChange={handleMoneyPhotoUpload}
+                  disabled={isUploadingMoneyPhoto}
+                />
+                <Plus size={14} className="text-amber-800" />
+                <span className="text-[9px] font-bold text-amber-800">+ Add</span>
+              </label>
+            </div>
+          ) : (
+            <p className="text-[11px] text-amber-800/80 italic pt-0.5">
+              Optional: Take a photo of the cash/payment received or upload receipt here.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Staff Return Remarks */}

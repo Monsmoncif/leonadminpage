@@ -66,6 +66,15 @@ export class Unit {
 
   @Prop({ default: '' })
   description: string;
+
+  @Prop({ type: Date, required: false })
+  insuranceExpiry?: Date;
+
+  @Prop({ type: Date, required: false })
+  registrationExpiry?: Date;
+
+  @Prop({ default: '' })
+  owner?: string;
 }
 
 export const UnitSchema = SchemaFactory.createForClass(Unit);

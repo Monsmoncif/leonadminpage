@@ -28,7 +28,8 @@ import {
   Camera,
   PenTool,
   RotateCcw,
-  Gauge
+  Gauge,
+  ShieldCheck
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -38,7 +39,9 @@ import AdditionalDriverModal from "@/components/modals/AdditionalDriverModal";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
+import { areDatesOverlapping } from "@/lib/date-overlap";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
+import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
 const formatDateToInput = (dateStr: string) => {
   try {
@@ -56,16 +59,16 @@ const formatDateToInput = (dateStr: string) => {
 // Dynamic steps based on contract type (Car is first step; Contract Type is chosen via header toggle)
 const DELIVERY_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Rental Data & Driver", icon: Truck },
-  { id: 3, title: "Review & Dispatch", icon: CheckCircle },
+  { id: 2, title: "Client", icon: User },
+  { id: 3, title: "Rental Data & Driver", icon: Truck },
+  { id: 4, title: "Review & Dispatch", icon: CheckCircle },
 ];
 
 const SHOP_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
   { id: 2, title: "Client", icon: User },
   { id: 3, title: "Rental Data", icon: FileText },
-  { id: 4, title: "Inspection Photos", icon: Camera },
-  { id: 5, title: "Sign & Review", icon: PenTool },
+  { id: 4, title: "Review & Create", icon: CheckCircle },
 ];
 
 export function NewRentalAdminPageContent() {
@@ -171,6 +174,7 @@ export function NewRentalAdminPageContent() {
     checkoutTime: "10:00 AM",
     checkinTime: "",
     collectionAmount: 595, // Price driver or admin will collect for the rental
+    advancePayment: 0, // Prepaid advance / عربون حجز السيارة
     dailyRate: 85,
     dailyKmLimit: 0,
     pricePerExtraKm: 0,
@@ -261,9 +265,9 @@ export function NewRentalAdminPageContent() {
     }
   };
 
-  // Admin / Company Signature Canvas State
+  // Admin / Company Signature State (Defaults to Official Seal & Signature)
   const adminCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [adminSignatureData, setAdminSignatureData] = useState<string | null>(null);
+  const [adminSignatureData, setAdminSignatureData] = useState<string | null>(DEFAULT_ADMIN_SIGNATURE);
   const [isDrawingAdmin, setIsDrawingAdmin] = useState(false);
 
   const startDrawingAdmin = (e: React.MouseEvent | React.TouchEvent) => {
@@ -366,9 +370,9 @@ export function NewRentalAdminPageContent() {
     toast.success(`Admin signature applied (${adminName})`);
   };
 
-  // Canvas DPI initialization when reaching Review Step
+  // Canvas DPI initialization when reaching Review Step (Step 4)
   useEffect(() => {
-    const isReviewStep = (contractType === "Shop" && currentStep === 5) || (contractType === "Delivery" && currentStep === 3);
+    const isReviewStep = currentStep === 4;
     if (isReviewStep) {
       const timer = setTimeout(() => {
         // Customer canvas (Shop only)
@@ -527,6 +531,7 @@ export function NewRentalAdminPageContent() {
         checkoutTime: c.checkoutTime || "10:00 AM",
         checkinTime: c.checkinTime || "",
         collectionAmount: editCollectionAmount,
+        advancePayment: c.advancePayment || 0,
         dailyRate: editDailyRate,
         dailyKmLimit: c.dailyKmLimit || 0,
         pricePerExtraKm: c.pricePerExtraKm || 0,
@@ -580,6 +585,8 @@ export function NewRentalAdminPageContent() {
       }
       if (c.adminSignature) {
         setAdminSignatureData(c.adminSignature);
+      } else {
+        setAdminSignatureData(DEFAULT_ADMIN_SIGNATURE);
       }
     } catch (err: any) {
       console.error("Failed to load contract:", err);
@@ -623,12 +630,7 @@ export function NewRentalAdminPageContent() {
           continue;
         }
 
-        const bStart = new Date(booking.startDate);
-        bStart.setHours(0, 0, 0, 0);
-        const bEnd = new Date(booking.endDate);
-        bEnd.setHours(23, 59, 59, 999);
-
-        if (bStart <= end && bEnd >= start) {
+        if (areDatesOverlapping(booking.startDate, booking.endDate, startStr, endStr)) {
           return {
             reason: "Booked",
             startDate: booking.startDate,
@@ -661,7 +663,7 @@ export function NewRentalAdminPageContent() {
       }
     }
 
-    // Shop: Step 2 is Client
+    // Step 2: Client selection (required for Shop)
     if (contractType === "Shop" && currentStep === 2) {
       if (!selectedClient) {
         toast.error("Please select a client first.");
@@ -669,23 +671,19 @@ export function NewRentalAdminPageContent() {
       }
     }
 
-    // Validate dates conflict when leaving Rental Data step
-    const isRentalDataStep = (contractType === "Delivery" && currentStep === 2) || (contractType === "Shop" && currentStep === 3);
-    if (isRentalDataStep) {
+    // Step 3: Rental Data & Driver validation
+    if (currentStep === 3) {
+      if (contractType === "Delivery" && !rentalData.deliveryDriverId) {
+        toast.error("Please assign a delivery driver for this contract.");
+        return;
+      }
+
       const vehicle = units.find(u => u._id === selectedVehicle);
       const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
       if (conflict && conflict.reason === "Booked") {
         const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
         const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
         toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please choose different dates.`);
-        return;
-      }
-    }
-
-    // Delivery: Step 2 is Rental Data & Driver
-    if (contractType === "Delivery" && currentStep === 2) {
-      if (!rentalData.deliveryDriverId) {
-        toast.error("Please assign a delivery driver for this contract.");
         return;
       }
     }
@@ -727,13 +725,7 @@ export function NewRentalAdminPageContent() {
         return;
       }
 
-      // Admin signature is strictly required
-      if (!adminSignatureData) {
-        toast.error("Admin Signature is required. Please sign before creating the booking. (توقيع الإدارة مطلوب)");
-        setIsLoading(false);
-        document.getElementById("admin-signature-box")?.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
+      const finalAdminSignature = adminSignatureData || DEFAULT_ADMIN_SIGNATURE;
 
       const vehicle = units.find(u => u._id === selectedVehicle);
       const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
@@ -756,6 +748,10 @@ export function NewRentalAdminPageContent() {
       const calculatedDailyRate = totalDays > 0 ? Math.round((collectionPrice / totalDays) * 100) / 100 : collectionPrice;
       const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
       const totalAmount = collectionPrice + extraFees;
+      const advancePaid = Number(rentalData.advancePayment || 0);
+      const determinedPaymentStatus = rentalData.paymentStatus !== "Pending" 
+        ? rentalData.paymentStatus 
+        : (advancePaid >= totalAmount ? "Paid" : (advancePaid > 0 ? "Partial" : "Pending"));
 
       const contractPayload: any = {
         unitId: selectedVehicle,
@@ -768,6 +764,7 @@ export function NewRentalAdminPageContent() {
         dailyKmLimit: Number(rentalData.dailyKmLimit),
         pricePerExtraKm: Number(rentalData.pricePerExtraKm),
         depositAmount: Number(rentalData.depositAmount),
+        advancePayment: advancePaid,
         pickupLocation: rentalData.pickupLocation,
         dropoffLocation: rentalData.dropoffLocation || "",
         checkoutTime: rentalData.checkoutTime || "Pending Handover",
@@ -779,12 +776,14 @@ export function NewRentalAdminPageContent() {
         tintingFees: Number(rentalData.tintingFees || 0),
         cleaningFees: Number(rentalData.cleaningFees || 0),
         checkoutFuelLevel: Number(rentalData.checkoutFuelLevel || 100),
-        checkoutMileage: Number(rentalData.checkoutMileage || 0),
+        checkoutMileage: Number(rentalData.checkoutMileage || units.find(u => u._id === selectedVehicle)?.mileage || 0),
         paymentMethod: rentalData.paymentMethod,
-        paymentStatus: rentalData.paymentStatus,
-        customerSignature: signatureData || null,
-        adminSignature: adminSignatureData || null,
-        inspectionPhotos: VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
+        paymentStatus: determinedPaymentStatus,
+        customerSignature: (isEditMode && editingContract?.customerSignature) ? editingContract.customerSignature : (signatureData || null),
+        adminSignature: finalAdminSignature,
+        inspectionPhotos: (isEditMode && Array.isArray(editingContract?.inspectionPhotos) && editingContract.inspectionPhotos.length > 0)
+          ? editingContract.inspectionPhotos
+          : VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
         totalAmount,
         additionalDriverName: additionalDriver.name.trim(),
         additionalDriverLicense: additionalDriver.license.trim(),
@@ -805,8 +804,8 @@ export function NewRentalAdminPageContent() {
       } else {
         contractPayload.clientId = selectedClient;
         if (!isEditMode) {
-          contractPayload.deliveryStatus = "Delivered";
-          contractPayload.status = "Active";
+          contractPayload.deliveryStatus = "Pending";
+          contractPayload.status = "Draft";
         }
       }
 
@@ -829,9 +828,9 @@ export function NewRentalAdminPageContent() {
       if (isEditMode) {
         toast.success("Contract updated successfully! (تم حفظ التعديلات بنجاح)");
       } else if (contractType === "Delivery") {
-        toast.success("Delivery Booking Created & Dispatched! Driver will register the client and deliver the car.");
+        toast.success("Delivery Booking Created! Click 'Dispatch' in the contracts table to assign number and send to driver.");
       } else {
-        toast.success("Shop Booking Created! Contract is ready — client is at the shop.");
+        toast.success("Shop Booking Created! Click 'Hand Over' in the contracts table when handing the car to the client. (تم إنشاء الحجز بنجاح! اضغط على 'تسليم' عند تسليم السيارة للعميل)");
       }
       router.push("/bookings");
     } catch (error) {
@@ -1452,32 +1451,19 @@ export function NewRentalAdminPageContent() {
               />
             </div>
 
-            {/* Kilometrage & Fuel Level */}
-            <div className="pt-2 border-t border-gray-200/70 space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <Gauge size={13} className="text-brand" />
-                    <span>Kilometrage / Odometer (عداد الكيلومترات عند التسليم)</span>
-                  </span>
-                  {selectedVehicle && (
-                    <span className="text-[11px] text-text-muted">
-                      Vehicle registered: {units.find(u => u._id === selectedVehicle)?.mileage || 0} km
-                    </span>
-                  )}
-                </label>
-                <div className="relative">
-                  <input 
-                    type="number" 
-                    value={rentalData.checkoutMileage === 0 ? "" : rentalData.checkoutMileage} 
-                    onChange={e => setRentalData({...rentalData, checkoutMileage: Number(e.target.value)})} 
-                    placeholder="e.g. 15000"
-                    className="w-full p-2.5 pr-12 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
-                    KM
-                  </span>
-                </div>
+            {/* Vehicle Mileage Reference */}
+            <div className="pt-2 border-t border-gray-200/70">
+              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-text-muted">
+                <span className="flex items-center gap-1.5 font-medium text-text-secondary">
+                  <Gauge size={14} className="text-brand" />
+                  <span>Vehicle Current Mileage:</span>
+                  <strong className="text-text-primary">
+                    {selectedVehicle ? (units.find(u => u._id === selectedVehicle)?.mileage || 0).toLocaleString() : 0} km
+                  </strong>
+                </span>
+                <span className="text-[11px] text-brand font-semibold">
+                  Handover Odometer &amp; Fuel Level are recorded at vehicle delivery
+                </span>
               </div>
             </div>
           </div>
@@ -1488,7 +1474,7 @@ export function NewRentalAdminPageContent() {
               <DollarSign size={16} className="text-brand" /> Collection Amount &amp; Deposit (مبلغ التحصيل والتأمين)
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1">
                   Daily Rate ($/day) / السعر اليومي
@@ -1517,7 +1503,7 @@ export function NewRentalAdminPageContent() {
 
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Collection Amount ($) / مبلغ التحصيل <span className="text-red-500">*</span>
+                  Collection Amount ($) / إجمالي التحصيل <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
@@ -1538,6 +1524,34 @@ export function NewRentalAdminPageContent() {
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block">
                   Calculated: ${rentalData.dailyRate || 0} × {totalDays}d (editable)
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-emerald-800 block mb-1">
+                  Advance ($) / العربون
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-xs">$</span>
+                  <input 
+                    type="number" 
+                    value={rentalData.advancePayment === 0 ? "" : rentalData.advancePayment} 
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
+                      const totalRent = Number(rentalData.collectionAmount || 0) + extraFees;
+                      setRentalData(prev => ({ 
+                        ...prev, 
+                        advancePayment: val,
+                        paymentStatus: val >= totalRent ? "Paid" : (val > 0 ? "Partial" : "Pending")
+                      }));
+                    }} 
+                    placeholder="0"
+                    className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
+                  />
+                </div>
+                <span className="text-[11px] text-emerald-700/80 mt-0.5 block">
+                  Paid upfront now (يُخصم من إجمالي التحصيل عند الاستلام)
                 </span>
               </div>
 
@@ -1569,23 +1583,31 @@ export function NewRentalAdminPageContent() {
             {/* Total Handover Collection Card */}
             {(() => {
               const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
-              const totalHandover = Number(rentalData.collectionAmount || 0) + extraFees;
+              const totalCharges = Number(rentalData.collectionAmount || 0) + extraFees;
+              const advancePaid = Number(rentalData.advancePayment || 0);
+              const remainingToCollect = Math.max(0, totalCharges - advancePaid);
               return (
                 <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
-                      Total to Collect on Handover (إجمالي المبلغ المطلوب تحصيله)
+                      Remaining to Collect on Handover (المتبقي للتحصيل عند التسليم)
                     </span>
                     <p className="text-xs text-text-muted mt-0.5">
-                      Collection Price (${rentalData.collectionAmount || 0})
-                      {rentalData.deliveryFee > 0 ? ` + Delivery Fee ($${rentalData.deliveryFee})` : ""}
-                      {rentalData.babySeatFee > 0 ? ` + Baby Seat ($${rentalData.babySeatFee})` : ""}
+                      Total Charges: ${totalCharges}
+                      {advancePaid > 0 ? ` - Prepaid Advance: $${advancePaid}` : ""}
+                      {rentalData.deliveryFee > 0 ? ` (inc. Delivery $${rentalData.deliveryFee})` : ""}
+                      {rentalData.babySeatFee > 0 ? ` (inc. Baby Seat $${rentalData.babySeatFee})` : ""}
                     </p>
                   </div>
                   <div className="text-left sm:text-right">
                     <span className="text-2xl font-black text-brand">
-                      ${totalHandover}
+                      ${remainingToCollect}
                     </span>
+                    {advancePaid > 0 && (
+                      <span className="text-xs font-bold text-emerald-700 block">
+                        ✓ Prepaid Advance (عربون مدفوع): ${advancePaid}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -1798,7 +1820,7 @@ export function NewRentalAdminPageContent() {
                 <span className="font-bold text-text-primary flex items-center gap-1.5">
                   <span className="text-emerald-600">{rentalData.checkoutFuelLevel || 100}% Fuel</span>
                   {rentalData.checkoutMileage > 0 && (
-                    <span className="text-gray-500 font-mono text-[11px]">({rentalData.checkoutMileage.toLocaleString()} km)</span>
+                    <span className="text-gray-500">({rentalData.checkoutMileage.toLocaleString()} km)</span>
                   )}
                 </span>
               </div>
@@ -1814,179 +1836,100 @@ export function NewRentalAdminPageContent() {
                   ${rentalData.depositAmount} {contractType === "Delivery" ? "(Collected by driver)" : "(Collected at shop)"}
                 </span>
               </div>
+              {Number(rentalData.advancePayment || 0) > 0 && (
+                <div className="flex justify-between py-1 border-b border-gray-100 bg-emerald-50/50 px-2 rounded-lg items-center">
+                  <span className="text-emerald-800 font-bold text-xs">Prepaid Advance / العربون المدفوع مسبقاً:</span>
+                  <span className="font-black text-emerald-700 text-xs">-${rentalData.advancePayment}</span>
+                </div>
+              )}
               <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
                 <div>
-                  <span className="font-bold text-brand block">Total Handover Collection (إجمالي التحصيل):</span>
-                  <span className="text-[10px] text-text-muted">Collection Price {rentalData.deliveryFee > 0 ? "+ Delivery" : ""}</span>
+                  <span className="font-bold text-brand block">
+                    {Number(rentalData.advancePayment || 0) > 0 
+                      ? "Remaining Handover Collection (المتبقي للتحصيل عند التسليم):" 
+                      : "Total Handover Collection (إجمالي التحصيل):"}
+                  </span>
+                  <span className="text-[10px] text-text-muted">
+                    {Number(rentalData.advancePayment || 0) > 0 
+                      ? `Total $${Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)} - Advance $${rentalData.advancePayment}`
+                      : `Collection Price ${rentalData.deliveryFee > 0 ? "+ Delivery" : ""}`}
+                  </span>
                 </div>
                 <span className="text-base font-black text-brand">
-                  ${Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)}
+                  ${Math.max(0, (Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)) - Number(rentalData.advancePayment || 0))}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100 items-center">
-                <span className="text-text-muted">Payment Method:</span>
+                <span className="text-text-muted">Payment Method &amp; Status:</span>
                 <span className="font-semibold text-text-primary flex items-center gap-1.5">
                   {rentalData.paymentMethod.includes("Crypto") && <Coins size={14} className="text-amber-600" />}
                   {rentalData.paymentMethod.includes("Card") && <CreditCard size={14} className="text-blue-600" />}
                   {rentalData.paymentMethod.includes("Cash") && <Banknote size={14} className="text-emerald-600" />}
                   <span>{rentalData.paymentMethod}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ml-1 ${
+                    rentalData.paymentStatus === "Paid" 
+                      ? "bg-emerald-100 text-emerald-800" 
+                      : rentalData.paymentStatus === "Partial" || Number(rentalData.advancePayment || 0) > 0
+                      ? "bg-blue-100 text-blue-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}>
+                    {rentalData.paymentStatus === "Paid" ? "Paid" : (Number(rentalData.advancePayment || 0) > 0 ? "Advance Paid (Partial)" : "Pending")}
+                  </span>
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Shop Inspection Photos Summary */}
-          {contractType === "Shop" && (
+          {/* Existing Inspection Photos in Edit Mode */}
+          {isEditMode && Array.isArray(editingContract?.inspectionPhotos) && editingContract.inspectionPhotos.some(Boolean) && (
             <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                  <Camera size={14} className="text-brand" />
-                  Pre-Handover Vehicle Inspection ({Object.values(inspectionPhotos).filter(Boolean).length}/8 photos captured)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(4)}
-                  className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
-                >
-                  Edit Photos
-                </button>
-              </div>
+              <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <Camera size={14} className="text-brand" />
+                Handover Vehicle Inspection ({editingContract.inspectionPhotos.filter(Boolean).length}/8 photos)
+              </span>
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                {VEHICLE_ANGLES.map((angle, idx) => {
-                  const url = inspectionPhotos[angle];
-                  return (
-                    <div key={angle} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1">
-                      {url ? (
-                        <img src={url} alt={angle} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-[9px] text-text-muted font-medium leading-tight">#{idx + 1}<br/>{angle.split(' ')[0]}</span>
-                      )}
-                    </div>
-                  );
-                })}
+                {editingContract.inspectionPhotos.map((url: string, idx: number) => (
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1">
+                    {url ? (
+                      <img src={url} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[9px] text-text-muted font-medium leading-tight">#{idx + 1}</span>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Two Signature Boxes: Customer (Shop) & Admin / Company */}
+          {/* Signature Box */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Customer Signature Box for Shop Contracts */}
-            {contractType === "Shop" && (
-              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-                      <PenTool size={16} className="text-brand" />
-                      Customer E-Signature (توقيع العميل)
-                    </label>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      Client signs to confirm receipt and agreement terms.
-                    </p>
-                  </div>
-                  {signatureData && (
-                    <button
-                      type="button"
-                      onClick={clearSignature}
-                      className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
-                    >
-                      <RotateCcw size={12} /> Clear
-                    </button>
-                  )}
+            {/* Show existing customer signature in edit mode if already present */}
+            {isEditMode && editingContract?.customerSignature && (
+              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-2">
+                <label className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+                  <PenTool size={16} className="text-brand" />
+                  Customer Signature (توقيع العميل المسجل)
+                </label>
+                <div className="h-40 border border-gray-200 rounded-xl p-2 bg-gray-50 flex items-center justify-center">
+                  <img src={editingContract.customerSignature} alt="Customer Signature" className="max-h-full max-w-full object-contain" />
                 </div>
-
-                <div className="border-2 border-border rounded-2xl overflow-hidden bg-white relative shadow-inner group h-44 sm:h-48">
-                  <div className="absolute inset-0 pointer-events-none flex flex-col justify-end p-4 pb-6 z-0 opacity-40">
-                    <div className="border-b-2 border-dashed border-gray-300 w-full mb-1"></div>
-                    <span className="text-gray-400 text-[10px] font-semibold uppercase tracking-widest text-center">
-                      Customer Signs Here (وقع هنا)
-                    </span>
-                  </div>
-                  {signatureData && !isDrawing && (signatureData.startsWith("data:image") || signatureData.startsWith("http") || signatureData.startsWith("/")) && (
-                    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-white/40">
-                      <img src={signatureData} alt="Client Signature" className="max-h-full max-w-full object-contain" />
-                    </div>
-                  )}
-                  <canvas
-                    ref={canvasRef}
-                    className="w-full h-full cursor-crosshair bg-transparent touch-none relative z-20"
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
-                  />
-                </div>
-
-                {signatureData && (
-                  <div className="flex items-center justify-end pt-1 text-xs">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                      <CheckCircle2 size={13} className="text-emerald-600" /> Signature Captured
-                    </span>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Admin / Company Signature Box */}
-            <div id="admin-signature-box" className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3 ${contractType !== "Shop" ? "md:col-span-2" : ""}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-                    <PenTool size={16} className="text-text-primary" />
-                    <span>Admin Signature (توقيع الإدارة / الشركة)</span>
-                    <span className="text-red-500 font-bold">*</span>
-                  </label>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    Authorized company signature &amp; stamp.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {adminSignatureData && (
-                    <button
-                      type="button"
-                      onClick={clearAdminSignature}
-                      className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
-                    >
-                      <RotateCcw size={12} /> Clear
-                    </button>
-                  )}
-                </div>
-              </div>
+            {/* Admin / Company Official Stamp & Signature Box */}
+            <div id="admin-signature-box" className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3 ${(!isEditMode || !editingContract?.customerSignature) ? "md:col-span-2" : ""}`}>
+              <label className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <ShieldCheck size={18} className="text-blue-600 shrink-0" />
+                <span>Company Stamp &amp; Signature (الختم والتوقيع الرسمي للإدارة)</span>
+              </label>
 
-              <div className="border-2 border-border rounded-2xl overflow-hidden bg-white relative shadow-inner group h-44 sm:h-48">
-                <div className="absolute inset-0 pointer-events-none flex flex-col justify-end p-4 pb-6 z-0 opacity-40">
-                  <div className="border-b-2 border-dashed border-gray-300 w-full mb-1"></div>
-                  <span className="text-gray-400 text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-center">
-                    Authorized Company Sign Here
-                  </span>
-                </div>
-                {adminSignatureData && !isDrawingAdmin && (adminSignatureData.startsWith("data:image") || adminSignatureData.startsWith("http") || adminSignatureData.startsWith("/")) && (
-                  <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-white/40">
-                    <img src={adminSignatureData} alt="Admin Signature" className="max-h-full max-w-full object-contain" />
-                  </div>
-                )}
-                <canvas
-                  ref={adminCanvasRef}
-                  className="w-full h-full cursor-crosshair bg-transparent touch-none relative z-20"
-                  onMouseDown={startDrawingAdmin}
-                  onMouseMove={drawAdmin}
-                  onMouseUp={stopDrawingAdmin}
-                  onMouseLeave={stopDrawingAdmin}
-                  onTouchStart={startDrawingAdmin}
-                  onTouchMove={drawAdmin}
-                  onTouchEnd={stopDrawingAdmin}
+              <div className="border-2 border-dashed border-gray-200 rounded-2xl overflow-hidden bg-gradient-to-b from-gray-50/70 to-white flex items-center justify-center p-4 h-44 relative shadow-inner">
+                <img 
+                  src={adminSignatureData || "/images/admin-signature.png"} 
+                  alt="Leon Car Rental Official Stamp & Signature" 
+                  className="max-h-full max-w-full object-contain filter drop-shadow-sm select-none"
                 />
               </div>
-
-              {adminSignatureData && (
-                <div className="flex items-center justify-end pt-1 text-xs">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                    <CheckCircle2 size={13} className="text-emerald-600" /> Admin Signature Recorded
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -2027,20 +1970,11 @@ export function NewRentalAdminPageContent() {
   // ===================== DETERMINE WHAT TO RENDER =====================
 
   const renderStepContent = () => {
-    if (contractType === "Delivery") {
-      // Delivery: Car(1) → RentalData&Driver(2) → Review(3)
-      if (currentStep === 1) return renderVehicleSelector();
-      if (currentStep === 2) return renderRentalData();
-      if (currentStep === 3) return renderReview();
-    } else {
-      // Shop: Car(1) → Client(2) → RentalData(3) → Inspection(4) → Review(5)
-      if (currentStep === 1) return renderVehicleSelector();
-      if (currentStep === 2) return renderClientSelector();
-      if (currentStep === 3) return renderRentalData();
-      if (currentStep === 4) return renderInspectionPhotos();
-      if (currentStep === 5) return renderReview();
-    }
-
+    // 4 Clean Steps: Car (1) → Client (2) → Rental Data (3) → Review & Confirm (4)
+    if (currentStep === 1) return renderVehicleSelector();
+    if (currentStep === 2) return renderClientSelector();
+    if (currentStep === 3) return renderRentalData();
+    if (currentStep === 4) return renderReview();
     return null;
   };
 
@@ -2087,7 +2021,7 @@ export function NewRentalAdminPageContent() {
             type="button"
             onClick={() => {
               setContractType("Shop");
-              if (currentStep > 5) setCurrentStep(5);
+              if (currentStep > 4) setCurrentStep(4);
             }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               contractType === "Shop"
@@ -2101,7 +2035,7 @@ export function NewRentalAdminPageContent() {
             type="button"
             onClick={() => {
               setContractType("Delivery");
-              if (currentStep > 3) setCurrentStep(3);
+              if (currentStep > 4) setCurrentStep(4);
             }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               contractType === "Delivery"

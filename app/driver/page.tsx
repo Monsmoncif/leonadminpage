@@ -176,6 +176,18 @@ export default function DriverDashboard() {
         const isDelivered = contract.deliveryStatus === "Delivered";
         const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned";
         const isCancelled = contract.status === "Cancelled";
+
+        // Unconfirmed / Undispatched contracts must NOT appear in Driver Dashboard
+        const isDispatched = Boolean(contract.isDispatched || contract.contractNumber || contract.deliveryStatus === "Delivered" || contract.status === "Active");
+        if (!isDispatched && !isDelivered) {
+          return;
+        }
+
+        // Shop contracts are handled in-store by admin
+        if (contract.contractType === "Shop" && !isDelivered && !contract.deliveryDriverId && !contract.driverId) {
+          return;
+        }
+
         const isPendingDelivery = !isDelivered && !isReturned && !isCancelled;
 
         if (contract.status === "Active") activeCount++;
@@ -219,6 +231,7 @@ export default function DriverDashboard() {
   const handleConfirmDelivery = async (data: { 
     checkoutTime: string; 
     checkoutFuelLevel?: number;
+    checkoutMileage?: number;
     depositAmount: number; 
     rentalAmountCollected?: number;
     paymentMethod: string;
@@ -300,6 +313,9 @@ export default function DriverDashboard() {
       }
       if (data.checkoutFuelLevel !== undefined) {
         payload.checkoutFuelLevel = data.checkoutFuelLevel;
+      }
+      if (data.checkoutMileage !== undefined) {
+        payload.checkoutMileage = data.checkoutMileage;
       }
       if (data.inspectionPhotos && data.inspectionPhotos.length > 0) {
         payload.inspectionPhotos = data.inspectionPhotos;

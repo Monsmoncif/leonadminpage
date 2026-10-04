@@ -20,8 +20,10 @@ type BookingEvent = {
   id: string;
   contractId: string;
   displayId: string;
+  displayNum: string;
+  contractNumber?: string | number;
   time: string;
-  shortTime: string;
+  formattedHour: string;
   date: Date;
   car: string;
   carImage: string | null;
@@ -29,11 +31,16 @@ type BookingEvent = {
   driver: string;
   type: "pickup" | "return";
   status: "Pending" | "Active" | "Completed";
+  isPreContract: boolean;
   isHandedOver: boolean;
   isReturned: boolean;
   isCompleted: boolean;
   isOverdue?: boolean;
   statusLabel: string;
+  typeBadge: string;
+  badgeClass: string;
+  contractPill: string;
+  tooltipText: string;
   chipClass: string;
   dotClass: string;
   color: string;
@@ -64,56 +71,32 @@ const getAvatarColor = (name: string) => {
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-const parseTimeSlot = (timeStr: string) => {
-  if (!timeStr) return "08:00 AM";
-  return timeStr;
-};
-
-const formatShortTime = (timeStr: string) => {
-  if (!timeStr || !timeStr.trim()) return "";
-  const t = timeStr.toLowerCase().replace(' ', '');
-  if (t.includes('am') || t.includes('pm')) {
-    return t.replace(':00', '').replace('am', 'a').replace('pm', 'p');
+const formatEventHour = (timeStr?: string, defaultFallback: string = "08:00 AM") => {
+  if (!timeStr || !timeStr.trim() || timeStr.toLowerCase().includes("pending")) {
+    return defaultFallback;
   }
-  const parts = timeStr.split(':');
-  if (parts.length === 2) {
+  const clean = timeStr.trim();
+  // Check if 12h format e.g. "08:00 AM" or "8:00 PM"
+  if (/^\d{1,2}:\d{2}\s*(am|pm)$/i.test(clean)) {
+    return clean.toUpperCase();
+  }
+  // Check 24h format e.g. "14:30"
+  const parts = clean.split(":");
+  if (parts.length >= 2) {
     let h = parseInt(parts[0], 10);
-    const m = parts[1];
-    const ampm = h >= 12 ? 'p' : 'a';
-    if (h > 12) h -= 12;
-    if (h === 0) h = 12;
-    return m === '00' ? `${h}${ampm}` : `${h}:${m}${ampm}`;
+    const m = parts[1].substring(0, 2);
+    if (!isNaN(h)) {
+      const ampm = h >= 12 ? "PM" : "AM";
+      if (h > 12) h -= 12;
+      if (h === 0) h = 12;
+      return `${h}:${m} ${ampm}`;
+    }
   }
-  return timeStr;
-};
-
-const extractReturnTime = (c: any, isReturned: boolean) => {
-  if (!isReturned) return ""; // No return time until car is actually back
-
-  if (c.returnedAt) {
-    try {
-      const d = new Date(c.returnedAt);
-      if (!isNaN(d.getTime())) {
-        const hours = d.getHours();
-        const minutes = d.getMinutes();
-        const ampm = hours >= 12 ? 'p' : 'a';
-        let h = hours % 12;
-        if (h === 0) h = 12;
-        const m = minutes < 10 ? `0${minutes}` : `${minutes}`;
-        return minutes === 0 ? `${h}${ampm}` : `${h}:${m}${ampm}`;
-      }
-    } catch {}
-  }
-
-  if (c.checkinTime && c.checkinTime !== "Pending Return" && c.checkinTime !== "Pending Handover") {
-    return formatShortTime(c.checkinTime);
-  }
-
-  return "";
+  return clean;
 };
 
 export default function CalendarPage() {
-  const [filter, setFilter] = useState<"all" | "pickup" | "return" | "pending">("all");
+  const [filter, setFilter] = useState<"all" | "pickup" | "return" | "precontract" | "contract">("all");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -157,11 +140,25 @@ export default function CalendarPage() {
           const nowStartOfDay = new Date();
           nowStartOfDay.setHours(0, 0, 0, 0);
 
-          // Handover (Pickup completed): true when car has been delivered/handed over to client
-          const isHandedOver = c.deliveryStatus === "Delivered" || c.deliveryStatus === "Returned" || c.status === "Active" || c.status === "Completed";
+          // Return completed: true when car has been returned back to agency
+          const isReturned = Boolean(
+            c.deliveryStatus === "Returned" ||
+            c.status === "Completed" ||
+            Boolean(c.returnedAt)
+          );
 
-          // Car Back (Return completed): true when car has been returned back to agency
-          const isReturned = c.deliveryStatus === "Returned" || c.status === "Completed" || Boolean(c.returnedAt);
+          // Handover completed: true when car has been delivered/handed over to client
+          const isHandedOver = Boolean(
+            c.deliveryStatus !== "Pending" &&
+            (
+              isReturned ||
+              c.deliveryStatus === "Delivered" ||
+              Boolean(c.deliveredAt || c.handoverCompletedAt) ||
+              (c.status === "Active" && c.deliveryStatus !== "Draft")
+            )
+          );
+
+          const isPreContract = !isHandedOver;
 
           let effectiveStatus: "Pending" | "Active" | "Completed" = "Pending";
           if (isReturned) {
@@ -172,10 +169,14 @@ export default function CalendarPage() {
             effectiveStatus = "Pending";
           }
 
-          const pickupDate = startOfDay(new Date(c.rawStartDate));
-          const returnDate = startOfDay(new Date(c.rawEndDate));
+          const contractNum = c.contractNumber ? String(c.contractNumber) : (c.id || "Pending");
+          const displayNum = contractNum.startsWith("#") ? contractNum : `#${contractNum}`;
 
-          if (pickupDate >= monthDates[0] && pickupDate <= monthEnd) {
+          // 1. Handover / Pickup Start Date & Hour
+          const startDate = startOfDay(new Date(c.rawStartDate));
+          const startHour = formatEventHour(c.checkoutTime, "08:00 AM");
+
+          if (startDate >= monthDates[0] && startDate <= monthEnd) {
             const pickupDriver = (c.deliveryDriver && c.deliveryDriver !== "None" && c.deliveryDriver.trim() !== "")
               ? c.deliveryDriver
               : (c.driver && c.driver !== "None" && c.driver.trim() !== "" ? c.driver : "");
@@ -184,91 +185,166 @@ export default function CalendarPage() {
             const pickupLocation = (c.pickupLocation && c.pickupLocation.trim())
               ? c.pickupLocation.trim() : "";
 
-            const chipClass = isHandedOver
-              ? "bg-blue-50/90 hover:bg-blue-100 text-blue-900 border-blue-200/80"
-              : "bg-amber-50/90 hover:bg-amber-100 text-amber-900 border-amber-200/80";
-            const dotClass = isHandedOver ? "bg-blue-500" : "bg-amber-500";
-            const statusLabel = isHandedOver ? "Handed Over" : "To Hand Over (Pending)";
+            let chipClass = "";
+            let dotClass = "";
+            let badgeClass = "";
+            let typeBadge = "Start";
+            let statusLabel = "";
+            let contractPill = "";
+
+            if (isPreContract) {
+              chipClass = "bg-amber-50/95 hover:bg-amber-100/90 text-amber-950 border-amber-200/90";
+              dotClass = "bg-amber-500 animate-pulse";
+              badgeClass = "bg-amber-100 text-amber-800 border-amber-300/80";
+              typeBadge = "Start";
+              statusLabel = "Pre-Contract • Awaiting Handover";
+              contractPill = `Pre-${displayNum}`;
+            } else if (isReturned) {
+              chipClass = "bg-blue-50/90 hover:bg-blue-100 text-blue-950 border-blue-200/80";
+              dotClass = "bg-blue-500";
+              badgeClass = "bg-blue-100 text-blue-800 border-blue-300/80";
+              typeBadge = "Start";
+              statusLabel = "Contract Handed Over (Past)";
+              contractPill = `CON ${displayNum}`;
+            } else {
+              chipClass = "bg-blue-50/95 hover:bg-blue-100 text-blue-950 border-blue-200/90";
+              dotClass = "bg-blue-600";
+              badgeClass = "bg-blue-100 text-blue-800 border-blue-300/80";
+              typeBadge = "Start";
+              statusLabel = "Contract Handover (Active Rental)";
+              contractPill = `CON ${displayNum}`;
+            }
 
             mapped.push({
-              id: `${c.id}-pickup`,
+              id: `${c.id || c._id}-start`,
               contractId: c._id,
-              displayId: c.id,
-              time: parseTimeSlot(c.checkoutTime),
-              shortTime: formatShortTime(c.checkoutTime),
-              date: pickupDate,
-              car: c.vehicle,
+              displayId: c.id || "Booking",
+              displayNum,
+              contractNumber: c.contractNumber,
+              time: startHour,
+              formattedHour: startHour,
+              date: startDate,
+              car: c.vehicle || "Vehicle",
               carImage: c.vehicleImage || null,
-              client: c.customer,
+              client: c.customer || "Client",
               driver: pickupDriver,
               type: "pickup",
               status: effectiveStatus,
+              isPreContract,
               isHandedOver,
               isReturned,
               isCompleted: isHandedOver,
+              isOverdue: false,
               statusLabel,
+              typeBadge,
+              badgeClass,
+              contractPill,
+              tooltipText: `${isPreContract ? "Pre-Contract" : "Contract"} ${displayNum} • Start / Handover at ${startHour} • Client: ${c.customer} (${c.vehicle})`,
               chipClass,
               dotClass,
               color: getAvatarColor(c.customer),
-              dateStr: pickupDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+              dateStr: startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
               notes: pickupNotes,
               location: pickupLocation,
               rawContract: c,
             });
           }
 
-          if (returnDate >= monthDates[0] && returnDate <= monthEnd) {
+          // 2. Expected Return / End Date & Hour
+          const endDate = (isReturned && c.returnedAt)
+            ? startOfDay(new Date(c.returnedAt))
+            : startOfDay(new Date(c.rawEndDate));
+
+          let endHour = "";
+          if (isReturned && c.returnedAt) {
+            try {
+              const d = new Date(c.returnedAt);
+              if (!isNaN(d.getTime())) {
+                endHour = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+              }
+            } catch {}
+          }
+          if (!endHour) {
+            endHour = formatEventHour(c.checkinTime || c.checkoutTime, "08:00 PM");
+          }
+
+          const isOverdue = !isReturned && isHandedOver && c.rawEndDate && startOfDay(new Date(c.rawEndDate)) < nowStartOfDay;
+
+          if (endDate >= monthDates[0] && endDate <= monthEnd) {
             const returnDriver = (c.returnDriver && c.returnDriver !== "None" && c.returnDriver.trim() !== "")
               ? c.returnDriver
               : (c.returnDriverId?.name && c.returnDriverId.name !== "None" ? c.returnDriverId.name : "");
             const returnNotes = (c.returnNotes && c.returnNotes.trim() && c.returnNotes !== "No notes provided.")
               ? c.returnNotes.trim() : "";
+            const returnLocation = (c.dropoffLocation && c.dropoffLocation.trim())
+              ? c.dropoffLocation.trim() : "";
 
-            let returnLocation = "";
-            if (c.dropoffLocation && c.dropoffLocation.trim() !== "" && c.dropoffLocation !== "Main Office") {
-              const isAutoCloned = (c.dropoffLocation === c.pickupLocation) && !c.returnDriverId && !c.returnNotes && c.deliveryStatus !== "Returned";
-              if (!isAutoCloned) {
-                returnLocation = c.dropoffLocation.trim();
-              }
-            }
-
-            const isOverdue = !isReturned && returnDate < nowStartOfDay;
-            let chipClass = "bg-purple-50/90 hover:bg-purple-100 text-purple-900 border-purple-200/80";
-            let dotClass = "bg-purple-500";
-            let statusLabel = "Car Out (Expected Return)";
+            let chipClass = "";
+            let dotClass = "";
+            let badgeClass = "";
+            let typeBadge = "Exp. End";
+            let statusLabel = "";
+            let contractPill = "";
 
             if (isReturned) {
-              chipClass = "bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80";
+              chipClass = "bg-emerald-50/95 hover:bg-emerald-100 text-emerald-950 border-emerald-200/90";
               dotClass = "bg-emerald-500";
+              badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-300/80";
+              typeBadge = "Returned";
               statusLabel = "Car Back (Returned)";
+              contractPill = `CON ${displayNum}`;
             } else if (isOverdue) {
-              chipClass = "bg-rose-50/90 hover:bg-rose-100 text-rose-900 border-rose-300";
-              dotClass = "bg-rose-500";
-              statusLabel = "Overdue Return (Late)";
+              chipClass = "bg-rose-50/95 hover:bg-rose-100 text-rose-950 border-rose-300";
+              dotClass = "bg-rose-500 animate-ping";
+              badgeClass = "bg-rose-100 text-rose-800 border-rose-300";
+              typeBadge = "Overdue";
+              statusLabel = "Overdue Return (متأخر)";
+              contractPill = `CON ${displayNum}`;
+            } else if (isPreContract) {
+              chipClass = "bg-orange-50/95 hover:bg-orange-100 text-orange-950 border-orange-200/90";
+              dotClass = "bg-orange-500";
+              badgeClass = "bg-orange-100 text-orange-800 border-orange-300/80";
+              typeBadge = "Exp. End";
+              statusLabel = "Pre-Contract • Scheduled Return";
+              contractPill = `Pre-${displayNum}`;
+            } else {
+              chipClass = "bg-purple-50/95 hover:bg-purple-100 text-purple-950 border-purple-200/90";
+              dotClass = "bg-purple-500";
+              badgeClass = "bg-purple-100 text-purple-800 border-purple-300/80";
+              typeBadge = "Exp. End";
+              statusLabel = "Active Contract • Expected Return";
+              contractPill = `CON ${displayNum}`;
             }
 
             mapped.push({
-              id: `${c.id}-return`,
+              id: `${c.id || c._id}-end`,
               contractId: c._id,
-              displayId: c.id,
-              time: isReturned ? (extractReturnTime(c, true) || "Returned") : "Pending Return",
-              shortTime: extractReturnTime(c, isReturned),
-              date: returnDate,
-              car: c.vehicle,
+              displayId: c.id || "Booking",
+              displayNum,
+              contractNumber: c.contractNumber,
+              time: endHour,
+              formattedHour: endHour,
+              date: endDate,
+              car: c.vehicle || "Vehicle",
               carImage: c.vehicleImage || null,
-              client: c.customer,
+              client: c.customer || "Client",
               driver: returnDriver,
               type: "return",
               status: effectiveStatus,
+              isPreContract,
               isHandedOver,
               isReturned,
               isCompleted: isReturned,
               isOverdue,
               statusLabel,
+              typeBadge,
+              badgeClass,
+              contractPill,
+              tooltipText: `${isPreContract ? "Pre-Contract" : "Contract"} ${displayNum} • ${isReturned ? "Returned at" : "Expected End at"} ${endHour} • Client: ${c.customer} (${c.vehicle})`,
               chipClass,
               dotClass,
               color: getAvatarColor(c.customer),
-              dateStr: returnDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+              dateStr: endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
               notes: returnNotes,
               location: returnLocation,
               rawContract: c,
@@ -286,15 +362,20 @@ export default function CalendarPage() {
   }, [currentDate]);
 
   const filteredBookings = bookings.filter((b) => {
-    const matchesType =
-      filter === "all" ||
-      (filter === "pending" ? !b.isCompleted : b.type === filter);
+    let matchesType = true;
+    if (filter === "pickup") matchesType = b.type === "pickup";
+    else if (filter === "return") matchesType = b.type === "return";
+    else if (filter === "precontract") matchesType = b.isPreContract;
+    else if (filter === "contract") matchesType = !b.isPreContract;
+
     const query = searchQuery.toLowerCase();
     const matchesSearch = !query ||
       (b.client && b.client.toLowerCase().includes(query)) ||
       (b.car && b.car.toLowerCase().includes(query)) ||
       (b.driver && b.driver.toLowerCase().includes(query)) ||
-      (b.displayId && b.displayId.toLowerCase().includes(query));
+      (b.displayId && b.displayId.toLowerCase().includes(query)) ||
+      (b.contractNumber && String(b.contractNumber).toLowerCase().includes(query)) ||
+      (b.contractPill && b.contractPill.toLowerCase().includes(query));
     return matchesType && matchesSearch;
   });
 
@@ -358,89 +439,121 @@ export default function CalendarPage() {
 
       {/* ===== Full-Width Calendar (Dashboard Card Style) ===== */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
-        {/* Toolbar */}
-        <div className="px-4 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-border bg-gray-50/50">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-border shadow-xs">
+        {/* ===== Toolbar (Clean 2-Row Layout — Zero Overflow) ===== */}
+        
+        {/* Row 1: Controls (Month Nav, Filters, Search) */}
+        <div className="px-4 py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 border-b border-border bg-gray-50/60">
+          
+          {/* Left: Navigation, Month Title & Events Count Badge */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-xl border border-border shadow-2xs">
               <button 
                 onClick={prevMonth} 
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Previous Month"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
               >
                 <ChevronLeft size={15} />
               </button>
               <button 
                 onClick={goToday} 
-                className="px-2.5 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Jump to Today"
+                className="px-2.5 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
               >
                 Today
               </button>
               <button 
                 onClick={nextMonth} 
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Next Month"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
               >
                 <ChevronRight size={15} />
               </button>
             </div>
-            <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-              <CalendarIcon size={15} className="text-brand" /> {monthYearStr}
-            </h2>
+            
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm sm:text-base font-extrabold text-text-primary flex items-center gap-1.5 whitespace-nowrap tracking-tight">
+                <CalendarIcon size={16} className="text-brand shrink-0" />
+                <span>{monthYearStr}</span>
+              </h2>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 tabular-nums whitespace-nowrap shadow-2xs">
+                {filteredBookings.length} {filteredBookings.length === 1 ? "event" : "events"}
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Filter Pills (Dashboard style tabs) */}
-            <div className="flex items-center p-1 bg-white rounded-xl border border-border shadow-xs">
-              {([
-                { key: "all", label: "All" },
-                { key: "pickup", label: "Pickups" },
-                { key: "return", label: "Returns" },
-                { key: "pending", label: "Pending" },
-              ] as const).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    filter === key
-                      ? "bg-brand text-white shadow-xs"
-                      : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+          {/* Center: Segmented Filter Tabs */}
+          <div className="flex items-center p-0.5 bg-white rounded-xl border border-border shadow-2xs shrink-0 overflow-x-auto">
+            {([
+              { key: "all", label: "All" },
+              { key: "pickup", label: "Pickups (Start)" },
+              { key: "return", label: "Returns (End)" },
+              { key: "precontract", label: "Pre-Contracts" },
+              { key: "contract", label: "Contracts" },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none ${
+                  filter === key
+                    ? "bg-brand text-white shadow-xs"
+                    : "text-text-secondary hover:text-text-primary hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-            {/* Search */}
-            <div className="relative max-w-[170px] w-full">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full text-xs border border-border rounded-xl pl-7 pr-2.5 py-1.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-            </div>
+          {/* Right: Search Input */}
+          <div className="relative w-full sm:w-44 lg:w-48 shrink-0">
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-full text-xs border border-border rounded-xl pl-7 pr-2.5 py-1.5 bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-2xs"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+          </div>
 
-            {/* Legend inline */}
-            <div className="hidden xl:flex items-center gap-3 pl-1 text-[11px] font-semibold text-text-muted">
-              <span className="flex items-center gap-1.5" title="Car waiting to be handed over to client">
-                <span className="w-2 h-2 rounded-full bg-amber-500" /> To Hand Over
-              </span>
-              <span className="flex items-center gap-1.5" title="Car handed over / delivered to client">
-                <span className="w-2 h-2 rounded-full bg-blue-500" /> Handed Over
-              </span>
-              <span className="flex items-center gap-1.5" title="Car currently on rental with client">
-                <span className="w-2 h-2 rounded-full bg-purple-500" /> Car Out
-              </span>
-              <span className="flex items-center gap-1.5" title="Car returned back to fleet">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Car Back
-              </span>
-            </div>
+        </div>
 
-            <span className="text-[11px] font-bold text-text-muted hidden md:inline">
-              {filteredBookings.length} event{filteredBookings.length !== 1 ? "s" : ""}
+        {/* Row 2: Status Legend & Hint (Spacious & Clean, Zero Overflow) */}
+        <div className="px-4 py-2 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-white text-xs">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] font-semibold text-text-secondary">
+            <span className="text-text-muted font-bold uppercase tracking-wider text-[10px] mr-1">
+              Legend:
+            </span>
+            <span className="flex items-center gap-1.5" title="Pre-contract awaiting handover (Start)">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <span>Pre-CON (Start)</span>
+            </span>
+            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
+            <span className="flex items-center gap-1.5" title="Pre-contract scheduled end date (End)">
+              <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+              <span>Pre-CON (End)</span>
+            </span>
+            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
+            <span className="flex items-center gap-1.5" title="Active contract vehicle handed over (Start)">
+              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+              <span>CON (Start)</span>
+            </span>
+            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
+            <span className="flex items-center gap-1.5" title="Active contract expected return date">
+              <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+              <span>CON (Exp. End)</span>
+            </span>
+            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
+            <span className="flex items-center gap-1.5" title="Car returned back to fleet">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span>Returned</span>
             </span>
           </div>
+
+          <span className="text-[11px] text-text-muted hidden md:flex items-center gap-1 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 inline-block" />
+            Click any event to open booking &amp; handover details
+          </span>
         </div>
 
         {/* Day Headers */}
@@ -479,50 +592,29 @@ export default function CalendarPage() {
                 </div>
 
                 {/* Events */}
-                <div className="space-y-1 flex flex-col items-start overflow-hidden">
-                  {dayBookings.slice(0, 4).map((booking, bIdx) => (
-                    <div
+                <div className="space-y-1 flex flex-col items-start overflow-hidden w-full">
+                  {dayBookings.slice(0, 5).map((booking, bIdx) => (
+                    <button
                       key={bIdx}
-                      className={`w-fit max-w-full inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-left transition-colors border shadow-2xs hover:shadow-xs group ${booking.chipClass}`}
+                      type="button"
+                      onClick={() => setSelectedContractForDetails(booking.rawContract)}
+                      title={`${booking.tooltipText} • Click to view full details`}
+                      className={`w-full max-w-full text-left px-2 py-1 rounded-lg transition-all border shadow-2xs hover:shadow-xs hover:scale-[1.01] active:scale-[0.99] flex items-center justify-between gap-1.5 cursor-pointer select-none group ${booking.chipClass}`}
                     >
-                      <Link
-                        href={booking.contractId ? `/bookings/${booking.contractId}/print` : "/bookings"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Contract #${booking.displayId} • ${booking.client} (${booking.car})${booking.shortTime ? ` • ${booking.shortTime}` : ""} • ${booking.statusLabel} • Click to view PDF`}
-                        className="inline-flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-                      >
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${booking.dotClass}`} />
-                        {booking.shortTime ? (
-                          <span className="font-semibold text-[9px] opacity-75 whitespace-nowrap">
-                            {booking.shortTime}
-                          </span>
-                        ) : null}
-                        <span className="font-sans font-bold text-[11px] tracking-tight tabular-nums">
-                          {booking.displayId?.startsWith("#") ? booking.displayId : `#${booking.displayId}`}
+                        <span className="font-sans font-bold text-[11px] tracking-tight tabular-nums truncate text-text-primary">
+                          {booking.displayNum}
                         </span>
-                        {booking.isCompleted && (
-                          <Check size={10} className="shrink-0 text-current opacity-80" />
-                        )}
-                      </Link>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setSelectedContractForDetails(booking.rawContract);
-                        }}
-                        title="View Full Contract Details, Damage & Payment Photos (عرض تفاصيل العقد وتوثيق الأضرار والدفع)"
-                        className="p-0.5 rounded hover:bg-black/10 active:scale-95 transition-all text-current opacity-70 hover:opacity-100 cursor-pointer flex items-center justify-center shrink-0 ml-0.5"
-                      >
-                        <Eye size={11} />
-                      </button>
-                    </div>
+                      </div>
+                      <span className="text-[10px] font-bold tracking-tight tabular-nums text-text-secondary shrink-0 opacity-80">
+                        {booking.formattedHour}
+                      </span>
+                    </button>
                   ))}
-                  {dayBookings.length > 4 && (
+                  {dayBookings.length > 5 && (
                     <span className="text-[9px] font-bold text-brand pl-1">
-                      +{dayBookings.length - 4} more
+                      +{dayBookings.length - 5} more
                     </span>
                   )}
                 </div>

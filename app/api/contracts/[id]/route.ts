@@ -121,6 +121,7 @@ export async function PUT(
       parkingCharge: parkingFees,
       finesCharge: finesFees,
       fuelCharge: fuelFees,
+      advancePayment: body.advancePayment !== undefined ? (Number(body.advancePayment) || 0) : (existingContract.advancePayment || 0),
     };
 
     // Validate target vehicle and date conflicts
@@ -225,6 +226,7 @@ export async function PUT(
       if (existingContract.status === "Draft") {
         updatedData.status = "Active";
       }
+      updatedData.deliveredAt = new Date();
       await Unit.findByIdAndUpdate(existingContract.unitId, { status: "Rented" });
 
       try {
@@ -257,6 +259,32 @@ export async function PUT(
           body: JSON.stringify({ contractId: existingContract._id.toString(), type: "vehicle_delivered" }),
         }).catch(err => console.error("Failed to notify admin on delivery:", err));
       } catch (e) { console.error("Admin notify trigger failed:", e); }
+    }
+
+    // Assign sequential contract number ONLY when vehicle handover is confirmed (Handover completed by Driver or Admin)
+    const isHandoverConfirmed = 
+      (body.deliveryStatus === "Delivered" && existingContract.deliveryStatus !== "Delivered") ||
+      (body.status === "Active" && existingContract.status !== "Active");
+
+    if (isHandoverConfirmed && !existingContract.contractNumber && !updatedData.contractNumber) {
+      const lastContract = await Contract.findOne({ contractNumber: { $exists: true, $ne: null } })
+        .sort({ contractNumber: -1 })
+        .select("contractNumber")
+        .lean();
+
+      const nextContractNumber =
+        lastContract && typeof (lastContract as any).contractNumber === "number" && (lastContract as any).contractNumber >= 2000
+          ? (lastContract as any).contractNumber + 1
+          : 2000;
+
+      updatedData.contractNumber = nextContractNumber;
+    }
+
+    if (body.isDispatched !== undefined || body.dispatch !== undefined) {
+      updatedData.isDispatched = Boolean(body.isDispatched || body.dispatch);
+      if (updatedData.isDispatched && !existingContract.dispatchedAt) {
+        updatedData.dispatchedAt = new Date();
+      }
     }
 
     const updatedContract = await Contract.findByIdAndUpdate(

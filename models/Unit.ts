@@ -20,6 +20,8 @@ export interface IUnit {
   features: string[];
   description: string;
   insuranceExpiry?: Date | string;
+  registrationExpiry?: Date | string;
+  owner?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +51,8 @@ const unitSchema = new Schema<IUnit>(
     features: [{ type: String }],
     description: { type: String, default: "" },
     insuranceExpiry: { type: Date, required: false },
+    registrationExpiry: { type: Date, required: false },
+    owner: { type: String, default: "" },
   },
   { timestamps: true }
 );

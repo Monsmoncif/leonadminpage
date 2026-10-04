@@ -1,15 +1,18 @@
 import mongoose from "mongoose";
 import { Unit } from "@/models/Unit";
 import { Contract } from "@/models/Contract";
+import { areDatesOverlapping } from "./date-overlap";
+
+export { areDatesOverlapping };
 
 /**
  * Checks if there is an overlapping contract for a vehicle within the specified date range.
- * Contracts that count as conflicts:
+ * Rules:
  * - Same unitId
  * - status in ["Active", "Draft"]
  * - deliveryStatus !== "Returned"
- * - Overlapping dates: existing.startDate <= requestedEndDate AND existing.endDate >= requestedStartDate
- * - If excludeContractId is passed, that contract is excluded (useful when editing a contract)
+ * - A new contract CAN start on the finish day of an existing contract (turnover day).
+ * - If excludeContractId is passed, that contract is excluded (useful when editing a contract).
  */
 export async function checkContractDateOverlap({
   unitId,
@@ -48,12 +51,18 @@ export async function checkContractDateOverlap({
     query._id = { $ne: new mongoose.Types.ObjectId(excludeContractId.toString()) };
   }
 
-  const conflict = await Contract.findOne(query)
+  const candidateContracts = await Contract.find(query)
     .populate({ path: "unitId", select: "make model plate" })
     .populate({ path: "clientId", select: "name phone" })
     .lean();
 
-  return conflict;
+  for (const candidate of candidateContracts) {
+    if (areDatesOverlapping(candidate.startDate, candidate.endDate, startDate, endDate)) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -66,9 +75,10 @@ export async function checkContractDateOverlap({
  *   2) deliveryStatus !== "Returned" (vehicle has not been returned back)
  *   3) status not in ["Completed", "Cancelled"]
  *   4) startDate <= nowEndOfDay (start date has arrived)
- * - CRITICAL: If a contract has deliveryStatus === "Pending" (e.g. driver delivery dispatched but not yet handed over,
- *   or showroom booking before start date/handover), the car is NOT yet with the client.
- *   It CANNOT be shown as "Rented". Its status is "Available" until handover is confirmed.
+ *   5) endDate > nowEndOfDay (the contract has NOT reached its finish day yet)
+ * - CRITICAL: On the finish day of a contract (endDate <= nowEndOfDay) or when it finishes,
+ *   the car is available for pickup / hand over / new contract.
+ * - If a contract has deliveryStatus === "Pending", car is NOT yet with the client -> "Available".
  */
 export async function syncUnitStatuses(targetUnitId?: string | mongoose.Types.ObjectId) {
   try {
@@ -76,11 +86,12 @@ export async function syncUnitStatuses(targetUnitId?: string | mongoose.Types.Ob
     const nowEndOfDay = new Date(now);
     nowEndOfDay.setHours(23, 59, 59, 999);
 
-    // 1. Find contracts where the vehicle is CURRENTLY HANDED OVER to the client
+    // 1. Find contracts where the vehicle is CURRENTLY HANDED OVER and has not yet reached its finish day
     const activeContractsFilter: any = {
       status: { $nin: ["Completed", "Cancelled"] },
       deliveryStatus: "Delivered",
       startDate: { $lte: nowEndOfDay },
+      endDate: { $gt: nowEndOfDay },
     };
 
     if (targetUnitId) {

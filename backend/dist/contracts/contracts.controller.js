@@ -43,6 +43,9 @@ let ContractsController = class ContractsController {
     async findOne(id) {
         return this.contractsService.findById(id);
     }
+    async dispatch(id, req) {
+        return this.contractsService.dispatch(id, req.user);
+    }
     async update(id, body, req) {
         return this.contractsService.update(id, body, req.user);
     }
@@ -111,6 +114,14 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], ContractsController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.Post)(':id/dispatch'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], ContractsController.prototype, "dispatch", null);
 __decorate([
     (0, common_1.Put)(':id'),
     __param(0, (0, common_1.Param)('id')),

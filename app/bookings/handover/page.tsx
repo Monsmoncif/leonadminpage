@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { 
   User, 
   FileText, 
@@ -11,33 +12,23 @@ import {
   ArrowRight, 
   ArrowLeft, 
   Calendar, 
-  MapPin, 
-  DollarSign, 
   Clock, 
   UserCheck, 
   CheckCircle2, 
   Loader2, 
   Banknote, 
-  CreditCard, 
-  Coins, 
   AlertCircle, 
-  Truck, 
-  Check, 
-  UserPlus, 
-  X, 
   Camera, 
   PenTool, 
   RotateCcw,
-  Edit,
   ShieldCheck,
-  Navigation,
-  Trash2,
-  Sparkles,
   Image as ImageIcon,
-  Plus
+  Plus,
+  DollarSign,
+  X,
+  RefreshCw
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
-import StatusBadge from "@/components/ui/StatusBadge";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
@@ -45,7 +36,7 @@ import CreateClientModal from "@/components/modals/CreateClientModal";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import { useToast } from "@/components/providers/ToastProvider";
 
-// EXACT same 5 steps as Admin Create New Booking (Shop Contract)
+// EXACT same 5 steps as Driver Handover (Car -> Client -> Inspection Photos -> Rental Data -> Sign & Review)
 const STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
   { id: 2, title: "Client", icon: User },
@@ -143,7 +134,7 @@ const compressImage = (file: File): Promise<string> => {
   });
 };
 
-export default function ConfirmDeliveryPage() {
+function ConfirmHandoverPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
@@ -153,16 +144,19 @@ export default function ConfirmDeliveryPage() {
   const [isLoadingContract, setIsLoadingContract] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [contract, setContract] = useState<any | null>(null);
+  const [contractsList, setContractsList] = useState<any[]>([]);
+  const [isSwitchingContract, setIsSwitchingContract] = useState(false);
+  const [contractSearchQuery, setContractSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Client list and selection (Matching Admin Step 2)
+  // Client list and selection (Matching Driver Step 2)
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<any | null>(null);
 
-  // Second driver state (Matching Admin Step 2)
+  // Second driver state (Matching Driver Step 2)
   const [isSelectSecondDriverModalOpen, setIsSelectSecondDriverModalOpen] = useState(false);
   const [secondDriverClient, setSecondDriverClient] = useState<any | null>(null);
   const [isAddingForSecondDriver, setIsAddingForSecondDriver] = useState(false);
@@ -175,7 +169,7 @@ export default function ConfirmDeliveryPage() {
     issuedAt: "",
   });
 
-  // Rental Data state (Matching Admin Step 3)
+  // Rental Data state (Matching Driver Step 4)
   const [rentalData, setRentalData] = useState({
     rentalType: "Daily" as "Daily" | "Monthly",
     customerType: "B2C" as "B2C" | "B2B",
@@ -195,6 +189,7 @@ export default function ConfirmDeliveryPage() {
     babySeatFee: 0,
     deliveryFee: 0,
     checkoutFuelLevel: 100,
+    checkoutMileage: 0,
     paymentMethod: "Cash" as string,
     paymentStatus: "Pending" as "Pending" | "Partial" | "Paid"
   });
@@ -206,10 +201,10 @@ export default function ConfirmDeliveryPage() {
   const [isUploadingMoneyPhoto, setIsUploadingMoneyPhoto] = useState(false);
   const [previewMoneyPhotoUrl, setPreviewMoneyPhotoUrl] = useState<string | null>(null);
 
-  // Step 4: Vehicle Inspection Photos (Matching Admin Step 4)
+  // Step 3: Vehicle Inspection Photos
   const [inspectionPhotos, setInspectionPhotos] = useState<Record<string, string>>({});
 
-  // Step 5: Customer Signature Canvas (Matching Admin Step 5)
+  // Step 5: Customer Signature Canvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -229,53 +224,54 @@ export default function ConfirmDeliveryPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
     if (typeof document !== "undefined") {
       document.documentElement?.scrollTo({ top: 0, behavior: "smooth" });
+      document.body?.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
-  // Fetch contract and client list on mount
+  // Fetch contract and client list on mount or searchParams change
   useEffect(() => {
     const contractId = searchParams.get("contractId") || searchParams.get("id");
-    if (!contractId) {
-      setError("No contract ID provided in the URL.");
-      setIsLoadingContract(false);
-      return;
-    }
 
     const loadData = async () => {
       try {
         setIsLoadingContract(true);
         setError(null);
 
-        // Fetch contract
-        const res = await fetch(`/api/contracts/${contractId}`, { cache: "no-store" });
+        // Fetch all contracts for switching/lookup
+        let allContracts: any[] = [];
+        try {
+          const listRes = await fetch("/api/contracts", { cache: "no-store" });
+          if (listRes.ok) {
+            const listData = await listRes.json();
+            allContracts = listData.contracts || [];
+            setContractsList(allContracts);
+          }
+        } catch (lErr) {
+          console.warn("Could not load contracts list:", lErr);
+        }
+
+        let targetContractId = contractId;
+        if (!targetContractId) {
+          const pending = allContracts.find((c: any) => c.deliveryStatus !== "Delivered" && c.status !== "Completed" && c.status !== "Cancelled");
+          if (pending) {
+            targetContractId = pending._id || pending.id;
+          } else if (allContracts.length > 0) {
+            targetContractId = allContracts[0]._id || allContracts[0].id;
+          }
+        }
+
+        if (!targetContractId) {
+          setError("No booking ID found or no pending contracts available.");
+          setIsLoadingContract(false);
+          return;
+        }
+
+        // Fetch target contract
+        const res = await fetch(`/api/contracts/${targetContractId}`, { cache: "no-store" });
         if (!res.ok) {
           throw new Error("Failed to load contract details. Contract may not exist.");
         }
         const contractData = await res.json();
-
-        // Authorization check: Only assigned driver or admin can perform handover
-        const currentUserId = (session?.user as any)?.id;
-        const userRole = (session?.user as any)?.role;
-        if (userRole !== "admin" && currentUserId) {
-          const isDeliveryAssigned = 
-            (contractData.deliveryDriverId && (
-              contractData.deliveryDriverId._id === currentUserId ||
-              contractData.deliveryDriverId.id === currentUserId ||
-              String(contractData.deliveryDriverId) === String(currentUserId)
-            )) ||
-            (!contractData.deliveryDriverId && contractData.driverId && (
-              contractData.driverId._id === currentUserId ||
-              contractData.driverId.id === currentUserId ||
-              String(contractData.driverId) === String(currentUserId)
-            ));
-
-          if (!isDeliveryAssigned) {
-            setError("You are not authorized to perform the vehicle handover. This order is assigned to another driver.");
-            setIsLoadingContract(false);
-            return;
-          }
-        }
-
         setContract(contractData);
 
         // Fetch all clients
@@ -318,6 +314,10 @@ export default function ConfirmDeliveryPage() {
           ? Number(contractData.collectionAmount)
           : (contractData.totalAmount !== undefined ? Number(contractData.totalAmount) : 0);
 
+        const initialMileage = contractData.checkoutMileage !== undefined && Number(contractData.checkoutMileage) > 0
+          ? Number(contractData.checkoutMileage)
+          : Number(contractData.unitMileage || contractData.unitId?.mileage || 0);
+
         setRentalData({
           rentalType: contractData.rentalType || "Daily",
           customerType: contractData.customerType || "B2C",
@@ -337,6 +337,7 @@ export default function ConfirmDeliveryPage() {
           babySeatFee: Number(contractData.babySeatFees) || 0,
           deliveryFee: Number(contractData.deliveryCharges) || 0,
           checkoutFuelLevel: Number(contractData.checkoutFuelLevel) || 100,
+          checkoutMileage: initialMileage,
           paymentMethod: contractData.paymentMethod || "Cash",
           paymentStatus: contractData.paymentStatus || "Pending",
         });
@@ -352,17 +353,13 @@ export default function ConfirmDeliveryPage() {
           setInspectionPhotos(photoMap);
         }
 
-        // Initialize existing money documentation photos
+        // Initialize money proof photos
         if (Array.isArray(contractData.moneyPhotos) && contractData.moneyPhotos.length > 0) {
           setMoneyPhotos(contractData.moneyPhotos);
         }
-
-        if (contractData.customerSignature) {
-          setSignatureData(contractData.customerSignature);
-        }
       } catch (err: any) {
-        console.error("Error loading handover contract:", err);
-        setError(err.message || "Failed to load contract");
+        console.error("Contract loading error:", err);
+        setError(err.message || "Failed to load contract details.");
       } finally {
         setIsLoadingContract(false);
       }
@@ -370,52 +367,99 @@ export default function ConfirmDeliveryPage() {
 
     loadData();
   }, [searchParams]);
-  // Canvas initialization with Retina DPI scaling for iPads and Phones
-  const initCanvas = useCallback(() => {
+
+  // Scroll to top on step changes
+  useEffect(() => {
+    scrollToTop();
+  }, [currentStep]);
+
+  // Canvas DPI initialization when reaching Review Step (Step 5)
+  useEffect(() => {
+    const isReviewStep = currentStep === 5;
+    if (isReviewStep) {
+      const timer = setTimeout(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.scale(dpr, dpr);
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.strokeStyle = "#0f172a";
+
+          if (signatureData) {
+            const img = new Image();
+            img.onload = () => {
+              ctx.drawImage(img, 0, 0, rect.width, rect.height);
+            };
+            img.src = signatureData;
+          }
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep]);
+
+  // Canvas drawing handlers
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    setIsDrawing(true);
+    hasDrawnRef.current = true;
     const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    const dpr = window.devicePixelRatio || 1;
-    const targetWidth = Math.round(rect.width * dpr);
-    const targetHeight = Math.round(rect.height * dpr);
+    const x = "touches" in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = "touches" in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
 
-    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-      const prevSig = signatureData;
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.scale(dpr, dpr);
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = "#0f172a";
-        if (prevSig && prevSig.startsWith("data:image")) {
-          const img = new Image();
-          img.onload = () => {
-            ctx.drawImage(img, 0, 0, rect.width, rect.height);
-          };
-          img.src = prevSig;
-        }
-      }
-    }
-  }, [signatureData]);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
 
-  useEffect(() => {
-    if (currentStep === 5) {
-      const timer1 = setTimeout(initCanvas, 50);
-      const timer2 = setTimeout(initCanvas, 250);
-      window.addEventListener("resize", initCanvas);
-      return () => {
-        clearTimeout(timer1);
-        clearTimeout(timer2);
-        window.removeEventListener("resize", initCanvas);
-      };
-    }
-  }, [currentStep, initCanvas]);
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  // Handle Client Selection & Modal Handlers
+    const rect = canvas.getBoundingClientRect();
+    const x = "touches" in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = "touches" in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setSignatureData(canvas.toDataURL("image/png"));
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    hasDrawnRef.current = false;
+    setSignatureData(null);
+  };
+
+  // Second Driver Selection Handler
   const handleSelectSecondDriver = (client: any) => {
     if (!client) return;
     setSecondDriverClient(client);
@@ -427,7 +471,8 @@ export default function ConfirmDeliveryPage() {
       expiry: client.licenseExpiry ? new Date(client.licenseExpiry).toISOString().split("T")[0] : "",
       issuedAt: client.address || "Dubai",
     });
-    toast.success(`Selected "${client.name}" as Second Driver.`);
+    setIsSelectSecondDriverModalOpen(false);
+    toast.success(`Selected "${client.name}" as Authorized 2nd Driver!`);
   };
 
   const handleRemoveSecondDriver = () => {
@@ -443,117 +488,71 @@ export default function ConfirmDeliveryPage() {
     toast.info("Second driver removed.");
   };
 
-  const handleClientModalSuccess = (savedClient?: any) => {
-    if (savedClient) {
-      setClients((prev) => {
-        const idx = prev.findIndex((c) => c._id === savedClient._id);
-        if (idx >= 0) {
-          const copy = [...prev];
-          copy[idx] = savedClient;
-          return copy;
-        }
-        return [savedClient, ...prev];
-      });
-
-      if (isAddingForSecondDriver) {
-        handleSelectSecondDriver(savedClient);
-        setIsAddingForSecondDriver(false);
-        toast.success(`Registered "${savedClient.name}" and selected as Second Driver!`);
-      } else {
-        setSelectedClient(savedClient._id || savedClient.id);
-        setClientToEdit(savedClient);
-        toast.success(`Client "${savedClient.name}" updated successfully!`);
-      }
-    }
+  // Client Modal Success Handler
+  const handleClientModalSuccess = (savedClient: any) => {
     setIsClientModalOpen(false);
-  };
+    if (!savedClient) return;
 
-  // Canvas Drawing Handlers - Customer Signature
-  const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    let clientX = 0;
-    let clientY = 0;
-    if ("touches" in e) {
-      if (e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      } else if ("changedTouches" in e && (e as any).changedTouches.length > 0) {
-        clientX = (e as any).changedTouches[0].clientX;
-        clientY = (e as any).changedTouches[0].clientY;
+    setClients((prev) => {
+      const idx = prev.findIndex((c) => c._id === savedClient._id);
+      if (idx !== -1) {
+        const next = [...prev];
+        next[idx] = savedClient;
+        return next;
       }
+      return [savedClient, ...prev];
+    });
+
+    if (isAddingForSecondDriver) {
+      handleSelectSecondDriver(savedClient);
+      setIsAddingForSecondDriver(false);
     } else {
-      clientX = (e as React.MouseEvent).clientX;
-      clientY = (e as React.MouseEvent).clientY;
-    }
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
-  };
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if ("touches" in e && e.cancelable) {
-      e.preventDefault();
-    }
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    if (canvas.width === 0 || canvas.height === 0) {
-      initCanvas();
-    }
-
-    setIsDrawing(true);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const { x, y } = getCoordinates(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    if ("touches" in e && e.cancelable) {
-      e.preventDefault();
-    }
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const { x, y } = getCoordinates(e);
-    ctx.strokeStyle = "#0f172a";
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    hasDrawnRef.current = true;
-  };
-
-  const stopDrawing = () => {
-    if (!isDrawing) return;
-    setIsDrawing(false);
-    const canvas = canvasRef.current;
-    if (canvas && hasDrawnRef.current) {
-      setSignatureData(canvas.toDataURL("image/png"));
+      setSelectedClient(String(savedClient._id));
+      setClientToEdit(savedClient);
+      toast.success(`Client "${savedClient.name}" updated successfully!`);
     }
   };
 
-  const clearSignature = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    hasDrawnRef.current = false;
-    setSignatureData(null);
+  // Step Validation & Navigation
+  const handleNext = () => {
+    setError(null);
+
+    // Validation for Step 1: Car
+    if (currentStep === 1) {
+      if (!rentalData.checkoutTime.trim()) {
+        setError("Please enter handover checkout time.");
+        toast.error("Please enter handover checkout time.");
+        return;
+      }
+    }
+
+    // Validation for Step 2: Client
+    if (currentStep === 2) {
+      if (!selectedClient) {
+        setError("Please select or register a primary customer.");
+        toast.error("Please select a customer before proceeding.");
+        return;
+      }
+    }
+
+    // Validation for Step 4: Rental Data & Payment
+    if (currentStep === 4) {
+      if (!isDepositConfirmed) {
+        setError("Please confirm receipt of money by checking 'Confirm Get All Money'.");
+        toast.error("Please check 'Confirm Get All Money' before proceeding.");
+        return;
+      }
+    }
+
+    setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
   };
 
-  // Money photo uploader (Camera / Gallery)
+  const handleBack = () => {
+    setError(null);
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  // Money photo uploader
   const handleMoneyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -568,20 +567,18 @@ export default function ConfirmDeliveryPage() {
         const res = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: base64, folder: "money_proof" }),
+          body: JSON.stringify({ image: base64 }),
         });
 
         if (res.ok) {
           const data = await res.json();
-          if (data.url) {
-            setMoneyPhotos((prev) => [...prev, data.url]);
-          }
+          setMoneyPhotos((prev) => [...prev, data.url]);
         }
       }
-      toast.success("Money proof photo attached successfully.");
+      toast.success("Payment proof photo uploaded successfully!");
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to upload money photo.");
+      console.error("Failed to upload money photo:", err);
+      toast.error("Failed to upload payment proof photo.");
     } finally {
       setIsUploadingMoneyPhoto(false);
       e.target.value = "";
@@ -590,73 +587,13 @@ export default function ConfirmDeliveryPage() {
 
   const handleRemoveMoneyPhoto = (index: number) => {
     setMoneyPhotos((prev) => prev.filter((_, idx) => idx !== index));
-    toast.info("Money photo removed.");
   };
 
-  // Navigation Validation
-  const handleNext = () => {
-    setError(null);
-
-    if (currentStep === 1) {
-      if (!rentalData.checkoutTime.trim()) {
-        setError("Please enter the checkout handover time.");
-        toast.error("Checkout handover time is required.");
-        return;
-      }
-    }
-
-    if (currentStep === 2) {
-      if (!selectedClient) {
-        setError("Please select or register the primary customer.");
-        toast.error("A customer is strictly required before handover.");
-        return;
-      }
-    }
-
-    if (currentStep === 3) {
-      const photoCount = Object.values(inspectionPhotos).filter(Boolean).length;
-      if (photoCount < 8) {
-        toast.info(`Note: ${photoCount}/8 inspection photos captured. You can proceed or add remaining angles.`);
-      }
-    }
-
-    if (currentStep === 4) {
-      if (!isDepositConfirmed) {
-        setError("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' to confirm collection of rental and deposit funds.");
-        toast.error("Please confirm collection of all due money before proceeding.");
-        return;
-      }
-    }
-
-    if (currentStep < totalSteps) {
-      setCurrentStep((prev) => prev + 1);
-      scrollToTop();
-    }
-  };
-
-  const handleBack = () => {
-    setError(null);
-    if (currentStep > 1) {
-      setCurrentStep((prev) => prev - 1);
-      scrollToTop();
-    }
-  };
-
-  // Final Handover Submission
+  // Final Submission to API
   const handleConfirmHandover = async () => {
-    if (!contract) return;
-    setError(null);
-
-    if (!selectedClient) {
-      setError("Please select or register the primary customer.");
-      toast.error("A customer must be linked to the contract.");
-      setCurrentStep(2);
-      return;
-    }
-
     if (!isDepositConfirmed) {
-      setError("Please confirm collection of all due funds before completing handover.");
-      toast.error("Confirm Get All Money is required.");
+      setError("Please check 'Confirm Get All Money' in Step 4 before activating the contract.");
+      toast.error("Please confirm payment in Step 4.");
       setCurrentStep(4);
       return;
     }
@@ -697,6 +634,7 @@ export default function ConfirmDeliveryPage() {
         status: "Active",
         checkoutTime: formattedCheckoutTime,
         checkoutFuelLevel: rentalData.checkoutFuelLevel,
+        checkoutMileage: Number(rentalData.checkoutMileage) || 0,
         clientId: selectedClient,
         additionalDriverName: additionalDriver.name.trim(),
         additionalDriverLicense: additionalDriver.license.trim(),
@@ -713,7 +651,7 @@ export default function ConfirmDeliveryPage() {
         adminSignature: contract.adminSignature || null,
         inspectionPhotos: inspectionArray,
         handoverCompletedAt: new Date().toISOString(),
-        deliveredBy: (session?.user as any)?.name || "Driver",
+        deliveredBy: (session?.user as any)?.name || "Admin",
       };
 
       const res = await fetch(`/api/contracts/${contractId}`, {
@@ -728,7 +666,7 @@ export default function ConfirmDeliveryPage() {
       }
 
       toast.success("Vehicle handover completed and contract activated successfully! ✓");
-      router.push("/driver");
+      router.push("/bookings");
     } catch (err: any) {
       console.error("Handover submit error:", err);
       setError(err.message || "Failed to complete vehicle handover.");
@@ -738,7 +676,7 @@ export default function ConfirmDeliveryPage() {
     }
   };
 
-  // Filter Clients (Matching Admin Step 2)
+  // Filter Clients (Matching Driver Step 2)
   const filteredClients = clientSearchQuery
     ? clients.filter(
         (c) =>
@@ -795,10 +733,10 @@ export default function ConfirmDeliveryPage() {
         <h2 className="text-xl font-bold text-text-primary mb-2">Contract Handover Error</h2>
         <p className="text-sm text-text-secondary mb-6">{error}</p>
         <button
-          onClick={() => router.push("/driver")}
+          onClick={() => router.push("/bookings")}
           className="px-6 py-2.5 bg-brand text-white text-xs font-bold rounded-xl transition-all shadow-sm hover:shadow-md cursor-pointer"
         >
-          Back to Driver Dashboard
+          Back to Bookings
         </button>
       </div>
     );
@@ -840,7 +778,7 @@ export default function ConfirmDeliveryPage() {
   const secondDriverName = secondDriverClient?.name || additionalDriver.name;
   const secondDriverLicense = secondDriverClient?.licenseNumber || additionalDriver.license;
 
-  // ===================== STEP 1: CAR =====================
+  // ===================== STEP 1: CAR (Matching Driver renderCarStep) =====================
   const renderCarStep = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -853,7 +791,7 @@ export default function ConfirmDeliveryPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left: Vehicle Profile Card (Matching Admin Car Card Style) */}
+        {/* Left: Vehicle Profile Card */}
         <div className="bg-card rounded-2xl border border-brand bg-brand-light/10 ring-2 ring-brand/30 p-5 space-y-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
@@ -898,7 +836,7 @@ export default function ConfirmDeliveryPage() {
             <div className="bg-white p-3 rounded-xl border border-border/80">
               <span className="text-text-muted text-[11px] block">Checkout Mileage</span>
               <span className="font-bold text-text-primary text-sm">
-                {contract.checkoutMileage ? `${contract.checkoutMileage.toLocaleString()} km` : "Recorded in Fleet"}
+                {rentalData.checkoutMileage > 0 ? `${rentalData.checkoutMileage.toLocaleString()} km` : "Recorded in Fleet"}
               </span>
             </div>
             <div className="bg-white p-3 rounded-xl border border-border/80">
@@ -919,76 +857,70 @@ export default function ConfirmDeliveryPage() {
               <span>Handover Schedule &amp; Destination</span>
             </h3>
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Handover Checkout Time (وقت تسليم السيارة للعميل) <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Clock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
-                    <input
-                      type="text"
-                      value={rentalData.checkoutTime}
-                      onChange={(e) => setRentalData({ ...rentalData, checkoutTime: e.target.value })}
-                      placeholder="e.g. 10:30 AM"
-                      className="w-full pl-9 pr-3.5 py-2.5 bg-gray-50 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setRentalData({ ...rentalData, checkoutTime: getCurrentFormattedTime() })}
-                    className="px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-secondary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0"
-                    title="Set to Current Time"
-                  >
-                    Now
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Handover Location (مكان التسليم)
-                </label>
-                <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-xl border border-border/80">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <MapPin size={15} className="text-brand shrink-0" />
-                    <span className="text-xs font-semibold text-text-primary truncate">{pickupLoc}</span>
-                  </div>
-                  {pickupLoc && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.open(
-                          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pickupLoc)}`,
-                          "_blank"
-                        )
-                      }
-                      className="px-2.5 py-1 bg-white hover:bg-brand/10 text-brand border border-brand/20 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shrink-0 transition-all cursor-pointer shadow-2xs"
-                    >
-                      <Navigation size={12} />
-                      <span>Open Maps</span>
-                    </button>
-                  )}
-                </div>
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
+                <span>Handover Checkout Time (وقت استلام السيارة)</span>
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={rentalData.checkoutTime}
+                  onChange={(e) => setRentalData({ ...rentalData, checkoutTime: e.target.value })}
+                  placeholder="e.g. 10:00 AM"
+                  className="w-full p-2.5 pl-8 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
+                />
+                <Clock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
               </div>
             </div>
-          </div>
 
-          {/* Checkout Fuel Level */}
-          <div className="bg-white rounded-2xl border border-border p-5 space-y-3 shadow-2xs">
-            <FuelLevelSelector
-              value={rentalData.checkoutFuelLevel}
-              onChange={(lvl) => setRentalData({ ...rentalData, checkoutFuelLevel: lvl })}
-              label="Checkout Fuel Level (مستوى الوقود عند التسليم)"
-            />
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">Handover Mileage (عداد الكيلومترات)</label>
+              <input
+                type="number"
+                value={rentalData.checkoutMileage || ""}
+                onChange={(e) => setRentalData({ ...rentalData, checkoutMileage: Number(e.target.value) })}
+                placeholder="Current odometer KM"
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">Handover Location (مكان التسليم)</label>
+              <input
+                type="text"
+                value={rentalData.pickupLocation}
+                onChange={(e) => setRentalData({ ...rentalData, pickupLocation: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+              />
+            </div>
+
+            {/* Fuel Level Selector */}
+            <div className="pt-2 border-t border-gray-100">
+              <FuelLevelSelector
+                value={rentalData.checkoutFuelLevel}
+                onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
+                label="Handover Fuel Level (مستوى الوقود عند التسليم)"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">Handover Notes (ملاحظات التسليم)</label>
+              <textarea
+                rows={2}
+                value={rentalData.notes}
+                onChange={(e) => setRentalData({ ...rentalData, notes: e.target.value })}
+                placeholder="Any special handover instructions or remarks..."
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none resize-none"
+              />
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 
-  // ===================== STEP 2: CLIENT (Matching Admin renderClientSelector) =====================
+  // ===================== STEP 2: CLIENT (Matching Driver renderClientStep) =====================
   const renderClientStep = () => (
     <div className="space-y-5 animate-fade-in-up">
       {/* Step Header */}
@@ -1132,11 +1064,9 @@ export default function ConfirmDeliveryPage() {
                 onClick={() => {
                   setError(null);
                   if (selectedClient && String(selectedClient) === String(client._id)) {
-                    // Clicked again on selected client -> Deselect
                     setSelectedClient(null);
                     setClientToEdit(null);
                   } else {
-                    // Select client
                     setSelectedClient(String(client._id));
                     setClientToEdit(client);
                   }
@@ -1176,7 +1106,29 @@ export default function ConfirmDeliveryPage() {
     </div>
   );
 
-  // ===================== STEP 3: RENTAL DATA (Matching Admin renderRentalData) =====================
+  // ===================== STEP 3: INSPECTION PHOTOS (Matching Driver renderInspectionStep) =====================
+  const renderInspectionStep = () => (
+    <div className="space-y-6 animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">Step 3: Pre-Handover Vehicle Inspection Photos</h2>
+          <p className="text-xs text-text-muted mt-0.5">
+            Take or upload 8 standard angles to document vehicle condition before client handover
+          </p>
+        </div>
+      </div>
+
+      <VehicleInspectionPhotoCapture
+        photos={inspectionPhotos}
+        onChange={setInspectionPhotos}
+        title="Vehicle Handover Inspection (فحص تسليم السيارة)"
+        subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
+        badgeLabel="Handover Inspection"
+      />
+    </div>
+  );
+
+  // ===================== STEP 4: RENTAL DATA (Matching Driver renderRentalDataStep) =====================
   const renderRentalDataStep = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div>
@@ -1188,7 +1140,6 @@ export default function ConfirmDeliveryPage() {
 
       {/* Rental Plan & Customer Type Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/70 p-4 rounded-2xl border border-gray-200/80">
-        {/* Rental Type: Daily vs Monthly (Fixed by Admin) */}
         <div>
           <span className="text-xs font-bold text-text-primary block mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
@@ -1209,7 +1160,6 @@ export default function ConfirmDeliveryPage() {
           </div>
         </div>
 
-        {/* Customer Type: B2C vs B2B (Fixed by Admin) */}
         <div>
           <span className="text-xs font-bold text-text-primary block mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
@@ -1291,7 +1241,6 @@ export default function ConfirmDeliveryPage() {
             />
           </div>
 
-          {/* Fuel Level Percentage */}
           <div className="pt-2 border-t border-gray-200/70">
             <FuelLevelSelector
               value={rentalData.checkoutFuelLevel}
@@ -1312,14 +1261,14 @@ export default function ConfirmDeliveryPage() {
           </div>
         </div>
 
-        {/* Financial Terms & Payment Method (Locked & Non-Editable by Driver) */}
+        {/* Financial Terms & Payment Method */}
         <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
               <DollarSign size={16} className="text-brand" /> Financial Terms &amp; Payment
             </h3>
-            <span className="text-[10px] font-bold text-text-muted bg-gray-200/80 px-2 py-0.5 rounded">
-              Fixed by Admin
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+              Admin Verified
             </span>
           </div>
 
@@ -1331,17 +1280,16 @@ export default function ConfirmDeliveryPage() {
               <div className="relative">
                 <input
                   type="number"
-                  value={collectionTotal === 0 ? "" : collectionTotal}
-                  readOnly
-                  disabled
+                  value={rentalData.collectionAmount === 0 ? "" : rentalData.collectionAmount}
+                  onChange={(e) => setRentalData({ ...rentalData, collectionAmount: Number(e.target.value) })}
                   placeholder="0"
-                  className="w-full p-2.5 rounded-xl border border-border bg-gray-100/90 text-text-primary text-sm font-bold cursor-not-allowed outline-none select-none"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-text-primary text-sm font-bold focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                 />
               </div>
               <span className="text-[10px] text-text-muted mt-0.5 block">
                 {advancePaid > 0
                   ? `Remaining balance (AED ${advancePaid} prepaid advance)`
-                  : "Fixed by Admin (non-editable)"}
+                  : "Rental total amount"}
               </span>
             </div>
 
@@ -1353,16 +1301,16 @@ export default function ConfirmDeliveryPage() {
                 <input
                   type="number"
                   value={rentalData.depositAmount === 0 ? "" : rentalData.depositAmount}
-                  readOnly
-                  disabled
+                  onChange={(e) => setRentalData({ ...rentalData, depositAmount: Number(e.target.value) })}
                   placeholder="0"
-                  className="w-full p-2.5 rounded-xl border border-border bg-gray-100/90 text-text-primary text-sm font-bold cursor-not-allowed outline-none select-none"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-text-primary text-sm font-bold focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                 />
               </div>
+              <span className="text-[10px] text-text-muted mt-0.5 block">Refundable upon return</span>
             </div>
           </div>
 
-          {/* Payment Method Selector (Cash, Card, Crypto, Multi-Split) */}
+          {/* Payment Method Selector */}
           <div className="pt-2">
             <PaymentMethodSelector
               value={rentalData.paymentMethod}
@@ -1400,7 +1348,7 @@ export default function ConfirmDeliveryPage() {
               </div>
             </label>
 
-            {/* Money Photo Proof Upload in the space left */}
+            {/* Money Photo Proof Upload */}
             <div className="mt-3 pt-3 border-t border-amber-200/80">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-1.5">
@@ -1416,7 +1364,6 @@ export default function ConfirmDeliveryPage() {
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  {/* Direct Camera Button */}
                   <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
                     <input
                       type="file"
@@ -1428,10 +1375,9 @@ export default function ConfirmDeliveryPage() {
                       disabled={isUploadingMoneyPhoto}
                     />
                     <Camera size={13} className="text-amber-800" />
-                    <span>Take Photo</span>
+                    <span>Camera</span>
                   </label>
 
-                  {/* Upload Gallery Button */}
                   <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
                     <input
                       type="file"
@@ -1448,64 +1394,37 @@ export default function ConfirmDeliveryPage() {
                 </div>
               </div>
 
-              {/* Uploading indicator */}
               {isUploadingMoneyPhoto && (
-                <div className="flex items-center gap-2 p-2 bg-amber-100/60 rounded-lg text-amber-900 text-xs mb-2">
-                  <Loader2 size={14} className="animate-spin text-amber-800" />
-                  <span>Uploading money proof photo...</span>
+                <div className="flex items-center gap-2 text-xs text-amber-800 py-1">
+                  <Loader2 size={13} className="animate-spin text-amber-700" />
+                  <span>Processing payment proof photo...</span>
                 </div>
               )}
 
-              {/* Photo thumbnails grid */}
-              {moneyPhotos.length > 0 ? (
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-1">
+              {moneyPhotos.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1">
                   {moneyPhotos.map((url, idx) => (
                     <div
                       key={idx}
-                      onClick={() => setPreviewMoneyPhotoUrl(url)}
-                      className="relative group aspect-square rounded-lg overflow-hidden border border-amber-300 bg-white shadow-2xs cursor-pointer hover:border-amber-400 transition-all"
+                      className="relative aspect-square rounded-lg overflow-hidden border border-amber-200 bg-white group shadow-2xs"
                     >
                       <img
                         src={url}
-                        alt={`Money photo ${idx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        alt={`Payment proof ${idx + 1}`}
+                        className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setPreviewMoneyPhotoUrl(url)}
                       />
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveMoneyPhoto(idx);
-                        }}
-                        className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 text-white rounded-md shadow-xs opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
-                        title="Delete photo"
+                        onClick={() => handleRemoveMoneyPhoto(idx)}
+                        className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                        title="Remove photo"
                       >
-                        <Trash2 size={11} />
+                        <X size={11} />
                       </button>
-                      <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.2 rounded backdrop-blur-xs">
-                        #{idx + 1}
-                      </span>
                     </div>
                   ))}
-
-                  {/* Add more button tile */}
-                  <label className="aspect-square rounded-lg border border-dashed border-amber-300 hover:border-amber-400 bg-white/70 hover:bg-amber-100/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onClick={(e) => { e.currentTarget.value = ""; }}
-                      onChange={handleMoneyPhotoUpload}
-                      disabled={isUploadingMoneyPhoto}
-                    />
-                    <Plus size={14} className="text-amber-800" />
-                    <span className="text-[9px] font-bold text-amber-800">+ Add</span>
-                  </label>
                 </div>
-              ) : (
-                <p className="text-[11px] text-amber-800/80 italic pt-0.5">
-                  Optional: Driver can take a photo of the cash/payment received or upload receipt here.
-                </p>
               )}
             </div>
           </div>
@@ -1514,29 +1433,7 @@ export default function ConfirmDeliveryPage() {
     </div>
   );
 
-  // ===================== STEP 4: INSPECTION PHOTOS (Matching Admin renderInspectionPhotos) =====================
-  const renderInspectionStep = () => (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 4: Pre-Handover Vehicle Inspection Photos</h2>
-          <p className="text-xs text-text-muted mt-0.5">
-            Take or upload 8 standard angles to document vehicle condition before client handover
-          </p>
-        </div>
-      </div>
-
-      <VehicleInspectionPhotoCapture
-        photos={inspectionPhotos}
-        onChange={setInspectionPhotos}
-        title="Vehicle Handover Inspection (فحص تسليم السيارة)"
-        subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
-        badgeLabel="Handover Inspection"
-      />
-    </div>
-  );
-
-  // ===================== STEP 5: SIGN & REVIEW (Matching Admin renderReview) =====================
+  // ===================== STEP 5: SIGN & REVIEW (Matching Driver renderReviewStep) =====================
   const renderReviewStep = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1548,7 +1445,7 @@ export default function ConfirmDeliveryPage() {
         </div>
       </div>
 
-      {/* Summary Profile Grid (Matching Admin Profile Cards) */}
+      {/* Summary Profile Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
           <span className="text-text-muted text-xs block mb-1">Customer</span>
@@ -1598,162 +1495,87 @@ export default function ConfirmDeliveryPage() {
               {rentalData.startDate} to {rentalData.endDate} ({totalDays} days)
             </span>
           </div>
-          <div className="flex justify-between py-1 border-b border-gray-100 items-center">
-            <span className="text-text-muted">Rental &amp; Customer Type:</span>
-            <span className="font-semibold text-text-primary flex items-center gap-1.5">
-              <span
-                className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                  rentalData.rentalType === "Monthly" ? "bg-purple-100 text-purple-700" : "bg-amber-100 text-amber-800"
-                }`}
-              >
-                {rentalData.rentalType}
-              </span>
-              <span
-                className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                  rentalData.customerType === "B2B" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
-                }`}
-              >
-                {rentalData.customerType}
-              </span>
-            </span>
+          <div className="flex justify-between py-1 border-b border-gray-100">
+            <span className="text-text-muted">Daily Rate:</span>
+            <span className="font-semibold text-text-primary">AED {rentalData.dailyRate || 0} / day</span>
           </div>
           <div className="flex justify-between py-1 border-b border-gray-100">
-            <span className="text-text-muted">Handover Checkout Time:</span>
-            <span className="font-semibold text-brand">{formatTimeDisplay(rentalData.checkoutTime)}</span>
+            <span className="text-text-muted">Total Rental Amount:</span>
+            <span className="font-semibold text-text-primary">AED {rawCollectionTotal}</span>
           </div>
+          {advancePaid > 0 && (
+            <div className="flex justify-between py-1 border-b border-gray-100 text-emerald-700 bg-emerald-50/50 px-2 rounded">
+              <span className="font-medium">Prepaid Advance Payment (عربون مدفوع):</span>
+              <span className="font-bold">- AED {advancePaid}</span>
+            </div>
+          )}
           <div className="flex justify-between py-1 border-b border-gray-100">
-            <span className="text-text-muted">
-              {advancePaid > 0 ? "Remaining Rental Collection:" : "Rental Collection Amount:"}
-            </span>
-            <span className="font-bold text-text-primary text-right">
-              AED {collectionTotal.toLocaleString()}
-              {advancePaid > 0 && (
-                <span className="text-[11px] font-normal text-emerald-600 block">
-                  (Prepaid Advance: AED {advancePaid.toLocaleString()})
-                </span>
-              )}
-            </span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-gray-100">
-            <span className="text-text-muted">Initial Fuel Level:</span>
-            <span className="font-bold text-emerald-600">{rentalData.checkoutFuelLevel || 100}%</span>
+            <span className="text-text-muted font-semibold">Remaining Handover Collection:</span>
+            <span className="font-bold text-brand">AED {collectionTotal}</span>
           </div>
           <div className="flex justify-between py-1 border-b border-gray-100">
             <span className="text-text-muted">Security Deposit:</span>
-            <span className="font-bold text-emerald-600">AED {depositTotal.toLocaleString()} (Collected)</span>
+            <span className="font-semibold text-text-primary">AED {depositTotal}</span>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
-            <div>
-              <span className="font-bold text-brand block">Total Handover Collection (إجمالي التحصيل):</span>
-              <span className="text-[10px] text-text-muted">Collection Price + Deposit</span>
-            </div>
-            <span className="text-base font-black text-brand">AED {grandTotal.toLocaleString()}</span>
+          <div className="flex justify-between py-1.5 border-b border-gray-100 bg-gray-50/80 px-2 rounded-lg font-bold text-xs">
+            <span className="text-text-primary">Total Handover Cash / Card Collected:</span>
+            <span className="text-brand text-sm font-black">AED {grandTotal.toLocaleString()}</span>
           </div>
           <div className="flex justify-between py-1 border-b border-gray-100 items-center">
             <span className="text-text-muted">Payment Method:</span>
-            <span className="font-semibold text-text-primary flex items-center gap-1.5">
-              {rentalData.paymentMethod.includes("Crypto") && <Coins size={14} className="text-amber-600" />}
-              {rentalData.paymentMethod.includes("Card") && <CreditCard size={14} className="text-blue-600" />}
-              {rentalData.paymentMethod.includes("Cash") && <Banknote size={14} className="text-emerald-600" />}
-              <span>{rentalData.paymentMethod}</span>
+            <span className="font-semibold text-text-primary">{rentalData.paymentMethod}</span>
+          </div>
+          <div className="flex justify-between py-1 items-center">
+            <span className="text-text-muted">Payment Status:</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+              <CheckCircle2 size={12} />
+              {collectionTotal === 0 && advancePaid > 0 ? "Paid in Advance" : "Collected & Confirmed"}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Inspection Photos Summary */}
-      <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
+      {/* Inspection Photos Strip Preview */}
+      {Object.keys(inspectionPhotos).some((k) => inspectionPhotos[k]) && (
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
           <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
             <Camera size={14} className="text-brand" />
-            Pre-Handover Vehicle Inspection ({Object.values(inspectionPhotos).filter(Boolean).length}/8 photos captured)
+            Handover Vehicle Inspection ({Object.values(inspectionPhotos).filter(Boolean).length}/8 photos)
           </span>
-          <button
-            type="button"
-            onClick={() => setCurrentStep(3)}
-            className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
-          >
-            Edit Photos
-          </button>
-        </div>
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-          {VEHICLE_ANGLES.map((angle, idx) => {
-            const url = inspectionPhotos[angle];
-            return (
-              <div
-                key={angle}
-                className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
-              >
-                {url ? (
-                  <img src={url} alt={angle} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-[9px] text-text-muted font-medium leading-tight">
-                    #{idx + 1}
-                    <br />
-                    {angle.split(" ")[0]}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Money & Payment Proof Photos in Review */}
-      {moneyPhotos.length > 0 && (
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-              <Banknote size={14} className="text-emerald-600" />
-              <span>Money &amp; Payment Proof Photos ({moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"})</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(4)}
-              className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
-            >
-              Edit Photos
-            </button>
-          </div>
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-            {moneyPhotos.map((url, idx) => (
-              <div
-                key={idx}
-                onClick={() => setPreviewMoneyPhotoUrl(url)}
-                className="relative aspect-square rounded-lg overflow-hidden border border-emerald-200 bg-gray-50 shadow-2xs cursor-pointer group hover:border-emerald-400 transition-all"
-              >
-                <img
-                  src={url}
-                  alt={`Money photo ${idx + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                />
-                <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.2 rounded backdrop-blur-xs">
-                  #{idx + 1}
-                </span>
-              </div>
-            ))}
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+            {VEHICLE_ANGLES.map((angle, idx) => {
+              const url = inspectionPhotos[angle];
+              return (
+                <div
+                  key={idx}
+                  className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
+                >
+                  {url ? (
+                    <img src={url} alt={angle} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[9px] text-text-muted font-medium leading-tight">{angle.split(" ")[0]}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Customer Signature Box (Only Hirer Signature Required) */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
+      {/* Customer Signature Canvas Card */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <label className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-              <PenTool size={16} className="text-brand" />
-              <span>Customer Signature (توقيع العميل)</span>
-              <span className="text-red-500 font-bold">*</span>
-            </label>
-            <p className="text-xs text-text-muted mt-0.5">Customer signature acknowledging vehicle handover, inspection condition, and contract terms.</p>
-          </div>
+          <label className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <PenTool size={16} className="text-brand" />
+            <span>Customer Signature (توقيع العميل المستأجر عند الاستلام)</span>
+          </label>
           {signatureData && (
             <button
               type="button"
               onClick={clearSignature}
-              className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+              className="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline flex items-center gap-1 cursor-pointer"
             >
-              <RotateCcw size={12} /> Clear
+              <RotateCcw size={12} /> Clear Signature
             </button>
           )}
         </div>
@@ -1768,13 +1590,12 @@ export default function ConfirmDeliveryPage() {
             onTouchStart={startDrawing}
             onTouchMove={draw}
             onTouchEnd={stopDrawing}
-            className="w-full h-48 sm:h-56 cursor-crosshair bg-white block"
+            className="w-full h-44 cursor-crosshair block"
           />
-          {!signatureData && !isDrawing && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1.5 select-none">
-              <PenTool size={26} className="opacity-40" />
-              <span className="text-xs font-semibold">Please draw customer signature here (finger or stylus)</span>
-              <span className="text-[11px] text-gray-400/80 font-medium" dir="rtl">يرجى توقيع العميل هنا باليد أو القلم</span>
+          {!signatureData && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1">
+              <PenTool size={26} className="opacity-30" />
+              <span className="text-xs font-medium">Customer signs here (finger, mouse, or stylus)</span>
             </div>
           )}
           <div className="absolute bottom-3 left-4 right-4 pointer-events-none flex items-center justify-between border-t border-dashed border-gray-200 pt-1 text-[10px] text-gray-400 uppercase tracking-widest font-semibold select-none">
@@ -1796,6 +1617,22 @@ export default function ConfirmDeliveryPage() {
           )}
         </div>
       </div>
+
+      {/* Admin / Company Official Stamp & Signature Box (Clean, without redundant badges) */}
+      <div id="admin-signature-box" className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
+        <label className="text-sm font-bold text-text-primary flex items-center gap-2">
+          <ShieldCheck size={18} className="text-blue-600 shrink-0" />
+          <span>Company Stamp &amp; Signature (الختم والتوقيع الرسمي للإدارة)</span>
+        </label>
+
+        <div className="border-2 border-dashed border-gray-200 rounded-2xl overflow-hidden bg-gradient-to-b from-gray-50/70 to-white flex items-center justify-center p-4 h-40 relative shadow-inner">
+          <img 
+            src="/images/admin-signature.png" 
+            alt="Leon Car Rental Official Stamp & Signature" 
+            className="max-h-full max-w-full object-contain filter drop-shadow-sm select-none"
+          />
+        </div>
+      </div>
     </div>
   );
 
@@ -1809,16 +1646,20 @@ export default function ConfirmDeliveryPage() {
     return null;
   };
 
+  const pendingCount = contractsList.filter(
+    (c: any) => c.deliveryStatus !== "Delivered" && c.status !== "Completed" && c.status !== "Cancelled"
+  ).length;
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
-      {/* Header (Matching Admin Header Exactly) */}
+      {/* Header (Matching Driver Handover Exactly) */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
         <div>
           <button
-            onClick={() => router.push("/driver")}
+            onClick={() => router.push("/bookings")}
             className="text-xs text-text-muted hover:text-text-primary flex items-center gap-1 mb-2 transition-colors cursor-pointer"
           >
-            <ArrowLeft size={14} /> Back to Driver Dashboard
+            <ArrowLeft size={14} /> Back to Bookings
           </button>
           <h1 className="text-2xl font-bold text-text-primary">Confirm Vehicle Handover</h1>
           <p className="text-sm text-text-secondary mt-1">
@@ -1826,18 +1667,80 @@ export default function ConfirmDeliveryPage() {
           </p>
         </div>
 
-        {/* Contract Info Pill (Matching Admin Header Pill) */}
-        <div className="bg-gray-100 p-1.5 rounded-2xl flex items-center gap-2 border border-gray-200/80 shadow-2xs self-start md:self-auto shrink-0">
-          <span className="px-3 py-1.5 bg-white rounded-xl text-xs font-bold text-brand shadow-xs">
-            Contract #{contractNum}
-          </span>
-          <span className="px-3 py-1.5 text-xs font-semibold text-text-secondary">
-            {vehicleName}
-          </span>
+        {/* Contract Info Pill & Switcher */}
+        <div className="flex items-center gap-2 self-start md:self-auto shrink-0 relative">
+          <div className="bg-gray-100 p-1.5 rounded-2xl flex items-center gap-2 border border-gray-200/80 shadow-2xs">
+            <span className="px-3 py-1.5 bg-white rounded-xl text-xs font-bold text-brand shadow-xs">
+              Contract #{contractNum}
+            </span>
+            <span className="px-3 py-1.5 text-xs font-semibold text-text-secondary">
+              {vehicleName}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsSwitchingContract(!isSwitchingContract)}
+            className="p-2.5 rounded-2xl border border-border bg-white hover:bg-gray-50 text-text-secondary transition-all shadow-2xs cursor-pointer"
+            title="Switch Booking"
+          >
+            <RefreshCw size={15} className="text-brand" />
+          </button>
+
+          {isSwitchingContract && (
+            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-border shadow-xl z-50 p-3 space-y-2 animate-fade-in-up">
+              <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+                <span className="text-xs font-bold text-text-primary">Switch Booking ({pendingCount} Pending)</span>
+                <button
+                  type="button"
+                  onClick={() => setIsSwitchingContract(false)}
+                  className="p-1 rounded-md text-text-muted hover:text-text-primary"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="Search contracts..."
+                value={contractSearchQuery}
+                onChange={(e) => setContractSearchQuery(e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-border text-xs focus:outline-none focus:ring-1 focus:ring-brand"
+              />
+              <div className="max-h-60 overflow-y-auto space-y-1.5 custom-scrollbar">
+                {contractsList
+                  .filter((c: any) => {
+                    if (!contractSearchQuery.trim()) return true;
+                    const q = contractSearchQuery.toLowerCase();
+                    return (
+                      String(c.contractNumber || c.id || c._id || "").toLowerCase().includes(q) ||
+                      String(c.customer || c.clientName || "").toLowerCase().includes(q) ||
+                      String(c.vehicle || "").toLowerCase().includes(q)
+                    );
+                  })
+                  .slice(0, 10)
+                  .map((c: any) => (
+                    <button
+                      key={c._id}
+                      type="button"
+                      onClick={() => {
+                        setIsSwitchingContract(false);
+                        router.push(`/bookings/handover?contractId=${c._id}`);
+                      }}
+                      className={`w-full p-2 rounded-lg text-left transition-colors flex flex-col gap-0.5 ${
+                        c._id === contract._id ? "bg-brand/5 border border-brand/20 text-brand" : "hover:bg-gray-50 text-text-primary"
+                      }`}
+                    >
+                      <span className="text-xs font-bold truncate">#{c.contractNumber || c.id || c._id?.substring(0, 8)} - {c.vehicle}</span>
+                      <span className="text-[10px] text-text-muted truncate">{c.customer || c.clientName} • {c.startDate}</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Stepper Header (100% IDENTICAL to Admin Create New Booking) */}
+      {/* Stepper Header (100% IDENTICAL to Driver Handover) */}
       <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-6 animate-fade-in-up stagger-1">
         <div className="relative w-full max-w-4xl mx-auto px-2 sm:px-4">
           {/* Background Track Line */}
@@ -1901,7 +1804,7 @@ export default function ConfirmDeliveryPage() {
         </div>
       </div>
 
-      {/* Wizard Step Content (Matching Admin Container & Inner Buttons) */}
+      {/* Wizard Step Content (Matching Driver Handover Container & Navigation) */}
       <div className="bg-card rounded-2xl border border-border shadow-sm p-6 sm:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-xs text-red-700 animate-shake">
@@ -1912,7 +1815,7 @@ export default function ConfirmDeliveryPage() {
 
         {renderStepContent()}
 
-        {/* Step Navigation Buttons (Matching Admin Inner Navigation Footer) */}
+        {/* Step Navigation Buttons (Matching Driver Handover Footer) */}
         <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
           {currentStep > 1 ? (
             <button
@@ -1962,7 +1865,7 @@ export default function ConfirmDeliveryPage() {
         </div>
       </div>
 
-      {/* Modals for Client Registration/Editing and Second Driver (Matching Admin) */}
+      {/* Modals for Client Registration/Editing and Second Driver */}
       {isClientModalOpen && (
         <CreateClientModal
           isOpen={isClientModalOpen}
@@ -1987,6 +1890,7 @@ export default function ConfirmDeliveryPage() {
           }}
         />
       )}
+
       {/* Lightbox Preview Modal for Money Proof Photos */}
       {previewMoneyPhotoUrl && (
         <div 
@@ -2022,5 +1926,18 @@ export default function ConfirmDeliveryPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ConfirmHandoverPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-5xl mx-auto space-y-6 pb-20 animate-pulse">
+        <div className="h-8 w-64 bg-gray-200 rounded-lg"></div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 min-h-[400px]"></div>
+      </div>
+    }>
+      <ConfirmHandoverPageContent />
+    </Suspense>
   );
 }

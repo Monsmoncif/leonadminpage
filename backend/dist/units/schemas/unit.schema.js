@@ -94,6 +94,18 @@ __decorate([
     (0, mongoose_1.Prop)({ default: '' }),
     __metadata("design:type", String)
 ], Unit.prototype, "description", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Date, required: false }),
+    __metadata("design:type", Date)
+], Unit.prototype, "insuranceExpiry", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Date, required: false }),
+    __metadata("design:type", Date)
+], Unit.prototype, "registrationExpiry", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: '' }),
+    __metadata("design:type", String)
+], Unit.prototype, "owner", void 0);
 exports.Unit = Unit = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], Unit);

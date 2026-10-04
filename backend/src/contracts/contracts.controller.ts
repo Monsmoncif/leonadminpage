@@ -56,6 +56,11 @@ export class ContractsController {
     return this.contractsService.findById(id);
   }
 
+  @Post(':id/dispatch')
+  async dispatch(@Param('id') id: string, @Req() req: any) {
+    return this.contractsService.dispatch(id, req.user);
+  }
+
   @Put(':id')
   async update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     return this.contractsService.update(id, body, req.user);

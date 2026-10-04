@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { 
   Search, 
   Filter, 
@@ -21,7 +22,8 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
-  Clock
+  Clock,
+  Send
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
@@ -106,12 +108,14 @@ export default function ContractsPage() {
   // Pagination (matches clients page UI/UX)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const router = useRouter();
   const toast = useToast();
   const [deliveringContractId, setDeliveringContractId] = useState<string | null>(null);
+  const [dispatchingContractId, setDispatchingContractId] = useState<string | null>(null);
 
-  const handleConfirmDelivery = async (contract: any) => {
+  const handleOpenHandoverPage = (contract: any) => {
     if (!isShopContract(contract)) {
-      toast.error("This order is assigned to a driver. Handover must be confirmed by the driver in the Driver Dashboard.");
+      toast.error("This order is assigned to a driver. Handover must be confirmed by the driver in the Driver Dashboard. (هذا الحجز مخصص لسائق، يتم التسليم من لوحة تحكم السائق)");
       return;
     }
 
@@ -126,28 +130,34 @@ export default function ContractsPage() {
         day: "numeric",
         year: "numeric"
       });
-      toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
+      toast.error(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
       return;
     }
 
+    router.push(`/bookings/handover?contractId=${contract._id}`);
+  };
+
+
+
+  const handleDispatchContract = async (contract: any) => {
     try {
-      setDeliveringContractId(contract._id);
-      const res = await fetch(`/api/contracts/${contract._id}`, {
-        method: "PUT",
+      setDispatchingContractId(contract._id);
+      const res = await fetch(`/api/contracts/${contract._id}/dispatch`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveryStatus: "Delivered", status: "Active", notifyClient: true }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.error || "Failed to confirm handover");
+        throw new Error(data.error || "Failed to dispatch contract");
       }
-      const contractNum = contract.contractNumber || contract.id || contract._id.slice(-6);
-      toast.success(`Showroom handover confirmed! Contract #${contractNum} is now Active.`);
+      const contractNum = data.contract?.contractNumber || contract.contractNumber || "Dispatched";
+      const driverName = contract.deliveryDriver || contract.driver || "driver";
+      toast.success(`Contract #${contractNum} dispatched to ${driverName}! Task sent to driver.`);
       fetchContracts();
     } catch (err: any) {
-      toast.error(err.message || "Failed to confirm delivery");
+      toast.error(err.message || "Failed to dispatch contract");
     } finally {
-      setDeliveringContractId(null);
+      setDispatchingContractId(null);
     }
   };
 
@@ -271,13 +281,6 @@ export default function ContractsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/bookings/return"
-            className="flex items-center gap-2 bg-white border border-border hover:bg-gray-50 text-text-primary px-4 py-2.5 rounded-xl font-semibold text-sm shadow-2xs hover:border-gray-300 transition-all cursor-pointer"
-          >
-            <ArrowLeftRight size={16} className="text-brand" />
-            <span>Return Vehicle</span>
-          </Link>
           <Link
             href="/bookings/new"
             className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer"
@@ -519,9 +522,19 @@ export default function ContractsPage() {
                           >
                             {/* Contract Column */}
                             <td className="py-3 px-4">
-                              <span className="font-semibold text-text-primary">
-                                {contract.id}
-                              </span>
+                              {contract.contractNumber ? (
+                                <span className="font-bold text-text-primary text-sm tabular-nums">
+                                  #{contract.contractNumber}
+                                </span>
+                              ) : (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs whitespace-nowrap"
+                                  title="Unconfirmed Contract: Contract number will be assigned upon Handover confirmation"
+                                >
+                                  <Clock size={11} className="text-amber-600 animate-pulse shrink-0" />
+                                  <span>Pending #Handover</span>
+                                </span>
+                              )}
                             </td>
 
                             {/* Customer / Driver Column (Only customer name & driver name) */}
@@ -648,48 +661,76 @@ export default function ContractsPage() {
                                 {(contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
                                   const isShop = isShopContract(contract);
 
-                                  if (!isShop) {
-                                    return null;
+                                  // 1. Shop Contract: Handover in showroom
+                                  if (isShop) {
+                                    const nowStartOfDay = new Date();
+                                    nowStartOfDay.setHours(0, 0, 0, 0);
+                                    const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
+                                    contractStartDate.setHours(0, 0, 0, 0);
+                                    const isFuture = contractStartDate > nowStartOfDay;
+                                    const formattedStart = contractStartDate.toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric"
+                                    });
+
+                                    return (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenHandoverPage(contract);
+                                        }}
+                                        title={
+                                          isFuture
+                                            ? `Scheduled for ${formattedStart} — Showroom Handover can be activated on start date`
+                                            : "Confirm Showroom Vehicle Handover & Activate Contract (تأكيد تسليم السيارة في المعرض وتوليد العقد)"
+                                        }
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
+                                          isFuture
+                                            ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300"
+                                            : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
+                                        }`}
+                                      >
+                                        <CheckCircle2 size={13} className={isFuture ? "text-amber-600" : "text-white"} />
+                                        <span className="hidden sm:inline">
+                                          {isFuture ? `Starts ${formattedStart}` : "Hand Over"}
+                                        </span>
+                                      </button>
+                                    );
                                   }
 
-                                  const nowStartOfDay = new Date();
-                                  nowStartOfDay.setHours(0, 0, 0, 0);
-                                  const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
-                                  contractStartDate.setHours(0, 0, 0, 0);
-                                  const isFuture = contractStartDate > nowStartOfDay;
-                                  const formattedStart = contractStartDate.toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric"
-                                  });
+                                  // 2. Driver Delivery Contract: Dispatch to driver
+                                  const isAlreadyDispatched = Boolean(contract.isDispatched || contract.contractNumber);
 
-                                  return (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleConfirmDelivery(contract);
-                                      }}
-                                      disabled={deliveringContractId === contract._id}
-                                      title={
-                                        isFuture
-                                          ? `Scheduled for ${formattedStart} — Showroom Handover can be activated on start date`
-                                          : "Confirm Showroom Vehicle Handover & Activate Contract (تأكيد تسليم السيارة في المعرض)"
-                                      }
-                                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
-                                        isFuture
-                                          ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300"
-                                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                      }`}
-                                    >
-                                      {deliveringContractId === contract._id ? (
-                                        <Loader2 size={12} className="animate-spin" />
-                                      ) : (
-                                        <CheckCircle2 size={13} className={isFuture ? "text-amber-600" : "text-white"} />
-                                      )}
-                                      <span className="hidden sm:inline">
-                                        {isFuture ? `Starts ${formattedStart}` : "Confirm Handover"}
+                                  if (!isAlreadyDispatched) {
+                                    return (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDispatchContract(contract);
+                                        }}
+                                        disabled={dispatchingContractId === contract._id}
+                                        title="Confirm & Dispatch to Driver (إرسال الطلب للسائق وتعيين رقم العقد)"
+                                        className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer bg-brand hover:bg-brand-dark text-white active:scale-95"
+                                      >
+                                        {dispatchingContractId === contract._id ? (
+                                          <Loader2 size={12} className="animate-spin" />
+                                        ) : (
+                                          <Send size={12} />
+                                        )}
+                                        <span className="hidden sm:inline">Dispatch</span>
+                                      </button>
+                                    );
+                                  } else {
+                                    return (
+                                      <span 
+                                        className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
+                                        title="Dispatched to Driver — Waiting for driver delivery handover"
+                                      >
+                                        <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                                        <span className="hidden sm:inline">Dispatched</span>
                                       </span>
-                                    </button>
-                                  );
+                                    );
+                                  }
                                 })()}
 
                                 <button 
@@ -712,7 +753,7 @@ export default function ContractsPage() {
                                 >
                                   <Edit size={16} />
                                 </Link>
-                                {contract.status === "Active" && (
+                                {contract.status === "Active" && contract.deliveryStatus === "Delivered" && (
                                   <Link 
                                     href={`/bookings/return?contractId=${contract._id}`}
                                     className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
@@ -722,16 +763,18 @@ export default function ContractsPage() {
                                     <ArrowLeftRight size={16} />
                                   </Link>
                                 )}
-                                <button 
-                                  className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
-                                  title="Print Contract PDF" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(`/bookings/${contract._id}/print`, '_blank');
-                                  }}
-                                >
-                                  <Download size={16} />
-                                </button>
+                                {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
+                                  <button 
+                                    className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
+                                    title="Print Contract PDF" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(`/bookings/${contract._id}/print`, '_blank');
+                                    }}
+                                  >
+                                    <Download size={16} />
+                                  </button>
+                                )}
                                 <div className="w-px h-5 bg-border mx-1" />
                                 <button 
                                   className="p-2 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
@@ -855,6 +898,8 @@ export default function ContractsPage() {
           onEdit={() => fetchContracts()}
         />
       )}
+
+
 
     </div>
   );
