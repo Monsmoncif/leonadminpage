@@ -1236,14 +1236,17 @@ export default function CreateContractModal({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* 1. Dates & Drivers */}
-                    <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+                    <div className="space-y-4 bg-gray-50/60 p-4 sm:p-5 rounded-2xl border border-gray-100">
                       <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                        <Calendar size={16} className="text-brand" /> Dates &amp; Logistics
+                        <Calendar size={16} className="text-brand" /> Dates &amp; Logistics (المواعيد واللوجستيات)
                       </h3>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">Start Date</label>
+                          <label className="text-xs font-semibold text-text-secondary flex items-center justify-between mb-1">
+                            <span>Start Date</span>
+                            <span className="text-[11px] text-text-muted font-normal">تاريخ البداية</span>
+                          </label>
                           <input 
                             type="date" 
                             value={formData.startDate} 
@@ -1259,12 +1262,13 @@ export default function CreateContractModal({
                                 collectionAmount: rate * days,
                               }));
                             }} 
-                            className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none" 
+                            className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium" 
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">
-                            Expected End Date (تاريخ الانتهاء المتوقع)
+                          <label className="text-xs font-semibold text-text-secondary flex items-center justify-between mb-1">
+                            <span>Expected End Date</span>
+                            <span className="text-[11px] text-text-muted font-normal">تاريخ الانتهاء</span>
                           </label>
                           <input 
                             type="date" 
@@ -1281,7 +1285,7 @@ export default function CreateContractModal({
                                 collectionAmount: rate * days,
                               }));
                             }} 
-                            className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none" 
+                            className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium" 
                           />
                         </div>
                       </div>
@@ -1293,12 +1297,17 @@ export default function CreateContractModal({
                         const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
                         const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
                         return (
-                          <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in">
-                            <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-600" />
-                            <div>
-                              <p className="font-bold">Date Conflict Detected (تعارض في التواريخ):</p>
-                              <p className="mt-0.5">
-                                This car ({selectedVehicleObj.make} {selectedVehicleObj.model} - {selectedVehicleObj.plate}) is already booked from <span className="font-semibold">{conflictStart}</span> to <span className="font-semibold">{conflictEnd}</span> (Contract #{conflict.contractNumber}). Please choose different dates or pick another vehicle.
+                          <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in shadow-2xs">
+                            <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-600" />
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5 font-bold text-red-800 text-xs">
+                                <span>Date Conflict Detected</span>
+                                <span className="text-[11px] font-normal text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                                  تعارض في التواريخ
+                                </span>
+                              </div>
+                              <p className="text-[11px] sm:text-xs text-red-700 leading-relaxed">
+                                This car (<strong className="font-semibold">{selectedVehicleObj.make} {selectedVehicleObj.model} - {selectedVehicleObj.plate}</strong>) is already booked from <span className="font-semibold underline">{conflictStart}</span> to <span className="font-semibold underline">{conflictEnd}</span> (Contract #{conflict.contractNumber}). Please choose different dates or pick another vehicle.
                               </p>
                             </div>
                           </div>
@@ -1306,21 +1315,16 @@ export default function CreateContractModal({
                       })()}
 
                       <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-xs font-semibold text-text-secondary flex items-center gap-1">
-                            <Clock size={13} className="text-brand" />
-                            <span>Delivery / Handover Time (وقت تسليم السيارة للسائق)</span>
+                        <label className="text-xs font-semibold text-text-secondary flex items-center justify-between mb-1">
+                          <span className="flex items-center gap-1">
+                            <Clock size={13} className="text-brand shrink-0" />
+                            <span>Delivery / Handover Time</span>
                             <span className="text-red-500">*</span>
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
-                            className="text-xs text-brand hover:text-brand-dark font-bold hover:underline cursor-pointer flex items-center gap-1"
-                          >
-                            <Clock size={12} />
-                            <span>Set time now</span>
-                          </button>
-                        </div>
+                          </span>
+                          <span className="text-[11px] text-text-muted font-normal">
+                            (وقت تسليم السيارة للسائق)
+                          </span>
+                        </label>
                         <div className="flex items-center gap-2">
                           <div className="relative flex-1">
                             <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -1335,10 +1339,10 @@ export default function CreateContractModal({
                           <button
                             type="button"
                             onClick={() => setFormData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
-                            className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-secondary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 shadow-2xs flex items-center gap-1.5"
-                            title="Set time now"
+                            className="px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1.5 shadow-2xs"
+                            title="Set current time"
                           >
-                            <Clock size={14} className="text-brand" />
+                            <Clock size={13} />
                             <span>Now</span>
                           </button>
                         </div>
