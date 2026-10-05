@@ -73,7 +73,6 @@ export default function DriversPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
-  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -140,35 +139,6 @@ export default function DriversPage() {
       }
       toast.success(`${deleteTarget.name} deleted successfully.`);
       setDeleteTarget(null);
-      await fetchDrivers();
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleDeleteAllConfirm = async () => {
-    try {
-      setDeleting(true);
-      const res = await fetch("/api/drivers/all", {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const resJson = await res.json();
-        throw new Error(resJson.error || "Failed to delete all drivers");
-      }
-
-      setData({
-        drivers: [],
-        stats: {
-          ...data?.stats,
-          totalDrivers: 0,
-          activeNow: 0,
-        },
-      });
-      toast.success("All drivers deleted successfully.");
-      setIsDeleteAllOpen(false);
       await fetchDrivers();
     } catch (err: any) {
       toast.error(err.message);
@@ -254,14 +224,6 @@ export default function DriversPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {drivers.length > 0 && (
-            <button
-              onClick={() => setIsDeleteAllOpen(true)}
-              className="border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              <Trash2 size={16} /> Delete All Drivers
-            </button>
-          )}
           <button
             onClick={() => {
               setEditTarget(null);
@@ -622,44 +584,6 @@ export default function DriversPage() {
                   <Trash2 size={16} />
                 )}{" "}
                 Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete All Confirmation Modal */}
-      {isDeleteAllOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-card w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-border p-8 text-center bg-white transform transition-all scale-100">
-            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-red-100">
-              <AlertCircle size={28} className="text-red-500" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
-              Delete All Drivers
-            </h3>
-            <p className="text-sm text-gray-500 mb-8 leading-relaxed">
-              Are you sure you want to delete <strong className="text-gray-900 font-bold">all drivers</strong>? This will permanently remove all driver profiles and credentials. This action cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => setIsDeleteAllOpen(false)}
-                disabled={deleting}
-                className="px-5 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-gray-900 cursor-pointer transition-colors w-full bg-white shadow-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteAllConfirm}
-                disabled={deleting}
-                className="px-5 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-2 w-full disabled:opacity-50 shadow-sm shadow-red-600/20"
-              >
-                {deleting ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Trash2 size={16} />
-                )}{" "}
-                Delete All
               </button>
             </div>
           </div>
