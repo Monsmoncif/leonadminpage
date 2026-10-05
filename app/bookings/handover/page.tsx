@@ -1241,14 +1241,6 @@ function ConfirmHandoverPageContent() {
             />
           </div>
 
-          <div className="pt-2 border-t border-gray-200/70">
-            <FuelLevelSelector
-              value={rentalData.checkoutFuelLevel}
-              onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
-              label="Handover Fuel Level (مستوى الوقود عند التسليم)"
-            />
-          </div>
-
           <div>
             <label className="text-xs font-semibold text-text-secondary block mb-1">Handover Notes</label>
             <textarea
