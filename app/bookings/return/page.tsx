@@ -1080,9 +1080,8 @@ function ReturnPageContent() {
       <VehicleInspectionPhotoCapture
         photos={returnPhotos}
         onChange={setReturnPhotos}
-        title="Vehicle Return Inspection (فحص استرجاع السيارة بالمحل)"
+        title="Vehicle Return Inspection"
         subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
-        badgeLabel="Return Condition"
       />
     </div>
   );
