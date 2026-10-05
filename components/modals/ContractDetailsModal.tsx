@@ -564,7 +564,7 @@ export default function ContractDetailsModal({
                   </div>
 
                   <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60">
-                    <span className="text-[11px] text-text-muted block">Expected End Date (تاريخ الانتهاء)</span>
+                    <span className="text-[11px] text-text-muted block">Expected End Date</span>
                     <strong className="text-text-primary font-bold block mt-0.5">
                       {formatDisplayDate(contractData.endDate)}
                     </strong>

@@ -1311,9 +1311,8 @@ export function NewRentalAdminPageContent() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between mb-1">
-                  <span>Start Date</span>
-                  <span className="text-[11px] text-text-muted font-normal">تاريخ البداية</span>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">
+                  Start Date
                 </label>
                 <input 
                   type="date" 
@@ -1334,9 +1333,8 @@ export function NewRentalAdminPageContent() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between mb-1">
-                  <span>Expected End Date</span>
-                  <span className="text-[11px] text-text-muted font-normal">تاريخ الانتهاء</span>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">
+                  Expected End Date
                 </label>
                 <input 
                   type="date" 
