@@ -499,7 +499,7 @@ export default function CreateClientModal({
         if (data.lastName) updated.lastName = data.lastName;
         if (data.name) updated.name = data.name;
         if (data.gender) updated.gender = data.gender;
-        if (data.dateOfBirth) updated.dateOfBirth = data.dateOfBirth;
+        if (data.dateOfBirth) updated.dateOfBirth = formatDateForInput(data.dateOfBirth);
         if (data.nationality) updated.nationality = data.nationality;
 
         // Passport
@@ -522,13 +522,16 @@ export default function CreateClientModal({
 
         // Visa
         if (data.visaNumber) updated.visaNumber = data.visaNumber;
-        if (data.visaExpiry) updated.visaExpiry = data.visaExpiry;
+        if (data.visaExpiry) updated.visaExpiry = formatDateForInput(data.visaExpiry);
 
         // Standard / Common
         if (data.idNumber) updated.idNumber = data.idNumber;
         if (data.idIssuedBy) updated.idIssuedBy = data.idIssuedBy;
         if (data.idIssuedDate) updated.idIssuedDate = formatDateForInput(data.idIssuedDate);
         if (data.idExpiry) updated.idExpiry = formatDateForInput(data.idExpiry);
+        if (!updated.idIssuedBy && updated.idNumber?.startsWith("784")) {
+          updated.idIssuedBy = "ICP / UAE";
+        }
         if (data.address) updated.address = data.address;
         if (data.phone) updated.phone = data.phone;
         if (data.email) updated.email = data.email;
@@ -615,7 +618,7 @@ export default function CreateClientModal({
         if (data.lastName) updated.lastName = data.lastName;
         if (data.name) updated.name = data.name;
         if (data.gender) updated.gender = data.gender;
-        if (data.dateOfBirth) updated.dateOfBirth = data.dateOfBirth;
+        if (data.dateOfBirth) updated.dateOfBirth = formatDateForInput(data.dateOfBirth);
         if (data.nationality) updated.nationality = data.nationality;
 
         // Passport
@@ -638,13 +641,16 @@ export default function CreateClientModal({
 
         // Visa
         if (data.visaNumber) updated.visaNumber = data.visaNumber;
-        if (data.visaExpiry) updated.visaExpiry = data.visaExpiry;
+        if (data.visaExpiry) updated.visaExpiry = formatDateForInput(data.visaExpiry);
 
         // Standard / Common
         if (data.idNumber) updated.idNumber = data.idNumber;
         if (data.idIssuedBy) updated.idIssuedBy = data.idIssuedBy;
         if (data.idIssuedDate) updated.idIssuedDate = formatDateForInput(data.idIssuedDate);
         if (data.idExpiry) updated.idExpiry = formatDateForInput(data.idExpiry);
+        if (!updated.idIssuedBy && updated.idNumber?.startsWith("784")) {
+          updated.idIssuedBy = "ICP / UAE";
+        }
         if (data.address) updated.address = data.address;
         if (data.phone) updated.phone = data.phone;
         if (data.email) updated.email = data.email;

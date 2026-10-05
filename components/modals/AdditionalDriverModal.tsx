@@ -122,6 +122,41 @@ export default function AdditionalDriverModal({
     });
   };
 
+  const formatDateForInput = (d: any) => {
+    if (!d) return "";
+    const str = String(d).trim();
+    if (!str) return "";
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      return str;
+    }
+
+    const dmy = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+    if (dmy) {
+      const day = dmy[1].padStart(2, "0");
+      const month = dmy[2].padStart(2, "0");
+      const year = dmy[3];
+      return `${year}-${month}-${day}`;
+    }
+
+    const ymd = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (ymd) {
+      const year = ymd[1];
+      const month = ymd[2].padStart(2, "0");
+      const day = ymd[3].padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    try {
+      const parsed = new Date(str);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().split("T")[0];
+      }
+    } catch {}
+
+    return "";
+  };
+
   // OCR Scan document
   // Scan all currently uploaded driver document images with AI
   const scanUploadedDocs = async (imagesToScan?: string[]) => {
@@ -154,9 +189,9 @@ export default function AdditionalDriverModal({
         ...prev,
         name: data.name || prev.name,
         license: data.licenseNumber || data.idNumber || prev.license,
-        expiry: data.licenseExpiry || prev.expiry,
+        expiry: formatDateForInput(data.licenseExpiry || data.idExpiry) || prev.expiry,
         nationality: data.nationality || prev.nationality,
-        issuedAt: data.address || prev.issuedAt,
+        issuedAt: data.address || data.licenseIssuedBy || prev.issuedAt,
       }));
 
       toast.success("تم استخراج بيانات السائق من كافة الصور بنجاح! ✓");

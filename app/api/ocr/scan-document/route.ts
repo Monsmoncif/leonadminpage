@@ -4,6 +4,50 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 
+// Date normalization helper to guarantee standard YYYY-MM-DD output for HTML date inputs
+function normalizeDateToISO(rawDate: any): string {
+  if (!rawDate || typeof rawDate !== "string") return "";
+  let str = rawDate.trim();
+  if (!str) return "";
+
+  // Convert Arabic & Persian digits to ASCII digits
+  str = str.replace(/[٠-٩]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1632 + 48));
+  str = str.replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1776 + 48));
+
+  // Remove ordinal suffixes (1st, 2nd, 3rd, 14th)
+  str = str.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
+
+  // Format 1: YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+  const ymdMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, "0");
+    const day = ymdMatch[3].padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  // Format 2: DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, "0");
+    const month = dmyMatch[2].padStart(2, "0");
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // Format 3: Parse standard textual date string e.g. "14 May 2028"
+  try {
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().split("T")[0];
+    }
+  } catch {
+    // ignore
+  }
+
+  return "";
+}
+
 // Cooldown tracker to skip failing or decommissioned AI providers instead of waiting on repeated timeouts
 const providerCooldown = new Map<string, number>();
 
@@ -153,35 +197,44 @@ Extract the relevant fields and return STRICTLY a JSON object matching this sche
   "address": "Address if visible",
   "phone": "Phone number if visible",
   "email": "Email address if visible",
-  "documentType": "passport" | "license" | "license_front" | "license_back" | "id_card" | "tourist_bundle" | "unknown"
+  "documentType": "passport" | "license" | "license_front" | "license_back" | "emirates_id" | "id_card" | "tourist_bundle" | "unknown"
 }
 
 Extraction Guidelines:
 1. If a field is not visible, set its value to "" (empty string).
 2. For dates, always convert to YYYY-MM-DD format (e.g., 2028-05-14).
 3. If both passport and driving licence are present, ensure passport fields are placed in passportNumber/passportExpiry/etc., and licence fields in licenseNumber/licenseExpiry/etc.
-4. For UAE documents: The Emirates ID (784-XXXX-XXXXXXX-X or بطاقة الهوية) maps to idNumber, issuing authority to idIssuedBy (e.g. ICP / UAE), issue date to idIssuedDate, and expiry date to idExpiry. UAE driving licence number (رخصة القيادة) maps to licenseNumber, issuing authority to licenseIssuedBy (e.g. RTA Dubai), issue date to licenseIssuedDate, and expiry to licenseExpiry.
-5. Return ONLY valid JSON. Do not include markdown code block backticks.`;
+4. For UAE Emirates ID (بطاقة الهوية الإماراتية):
+   - idNumber: 15-digit number formatted as 784-XXXX-XXXXXXX-X.
+   - idIssuedBy: Issuing authority. For any UAE Emirates ID, output "ICP / UAE".
+   - idIssuedDate: Look for Issue Date / تاريخ الإصدار (often printed on back or front) converted to YYYY-MM-DD.
+   - idExpiry: Look for Expiry Date / تاريخ الانتهاء / Valid Until (often on back or front) converted to YYYY-MM-DD.
+5. For UAE Driving Licence (رخصة القيادة الإماراتية):
+   - licenseNumber: Licence number / رقم الرخصة (e.g., 5031657).
+   - licenseIssuedBy: Issuing authority / جهة الإصدار (e.g., Dubai, Abu Dhabi, Sharjah, RTA).
+   - licenseIssuedDate: Issue date in YYYY-MM-DD.
+   - licenseExpiry: Expiry date in YYYY-MM-DD.
+6. Return ONLY valid JSON. Do not include markdown code block backticks.`;
 
     const errors: string[] = [];
 
     // Helper to scan a batch of images through AI providers
-    // Helper to scan a batch of images through AI providers
     async function scanImagesBatch(imagesToProcess: any[]): Promise<any> {
       let ext: any = null;
 
-      // Priority 1: Groq AI (Free + Fast)
+      // Priority 1: Groq AI (Free + Fast Vision)
       if (groqKey && isProviderAvailable("groq")) {
         try {
           ext = await callGroqVision(groqKey, systemPrompt, imagesToProcess);
         } catch (groqErr: any) {
-          markProviderFailed("groq", 60000);
+          // Short cooldown (5s) for transient network hiccups rather than 60s
+          markProviderFailed("groq", 5000);
           console.error("Groq OCR error:", groqErr?.message || groqErr);
           errors.push(`Groq: ${groqErr?.message || groqErr}`);
         }
       }
 
-      // Priority 2: Gemini AI (Free Fallback)
+      // Priority 2: Gemini AI (Fallback)
       if (!ext && geminiKey && isProviderAvailable("gemini")) {
         try {
           ext = await callGeminiVision(geminiKey, systemPrompt, imagesToProcess);
@@ -192,14 +245,24 @@ Extraction Guidelines:
         }
       }
 
-      // Priority 3: OpenAI (Paid Fallback)
+      // Priority 3: OpenAI (Fallback)
       if (!ext && openaiKey && isProviderAvailable("openai")) {
         try {
           ext = await callOpenAIVision(openaiKey, systemPrompt, imagesToProcess);
         } catch (openaiErr: any) {
-          markProviderFailed("openai", 15000);
+          markProviderFailed("openai", 60000);
           console.error("OpenAI OCR error:", openaiErr?.message || openaiErr);
           errors.push(`OpenAI: ${openaiErr?.message || openaiErr}`);
+        }
+      }
+
+      // Final fallback: if other providers failed or were unavailable and Groq had a temporary error, retry Groq once
+      if (!ext && groqKey && errors.length > 0) {
+        try {
+          console.log("[OCR] Retrying Groq vision as last-resort fallback...");
+          ext = await callGroqVision(groqKey, systemPrompt, imagesToProcess);
+        } catch (retryErr: any) {
+          console.error("Groq OCR fallback retry error:", retryErr?.message || retryErr);
         }
       }
 
@@ -266,8 +329,32 @@ Extraction Guidelines:
     const resolvedName =
       extracted.name || (fullNameParts.length > 0 ? fullNameParts.join(" ") : "");
 
-    const resolvedIdNumber =
-      extracted.idNumber || extracted.passportNumber || "";
+    // Clean identification numbers
+    const rawId = (extracted.idNumber || "").trim();
+    let rawPassport = (extracted.passportNumber || "").trim();
+
+    let resolvedIdNumber = rawId;
+    let resolvedPassportNumber = rawPassport;
+
+    // Determine normalized document type
+    let docType = (extracted.documentType || "unknown").toLowerCase();
+    if (resolvedIdNumber.startsWith("784") || docType.includes("emirates") || docType.includes("id_card")) {
+      docType = "emirates_id";
+    } else if (docType.includes("tourist")) {
+      docType = "tourist_bundle";
+    } else if (docType.includes("passport")) {
+      docType = "passport";
+      if (!resolvedIdNumber && resolvedPassportNumber) {
+        resolvedIdNumber = resolvedPassportNumber;
+      }
+    } else if (docType.includes("license")) {
+      docType = "license";
+    }
+
+    // Safety: Emirates ID should NEVER be set as passportNumber
+    if (resolvedPassportNumber.startsWith("784") || (resolvedPassportNumber === resolvedIdNumber && docType === "emirates_id")) {
+      resolvedPassportNumber = "";
+    }
 
     const allImageUrls = parsedImages.map((p) => p.resolvedUrl);
 
@@ -279,37 +366,41 @@ Extraction Guidelines:
         middleName: extracted.middleName || "",
         lastName: extracted.lastName || "",
         gender: extracted.gender || "",
-        dateOfBirth: extracted.dateOfBirth || "",
+        dateOfBirth: normalizeDateToISO(extracted.dateOfBirth),
         nationality: extracted.nationality || "",
 
         // Tourist Passport Fields
-        passportNumber: extracted.passportNumber || resolvedIdNumber || "",
+        passportNumber: resolvedPassportNumber,
         passportIssuedBy: extracted.passportIssuedBy || "",
-        passportIssuedDate: extracted.passportIssuedDate || "",
-        passportExpiry: extracted.passportExpiry || "",
+        passportIssuedDate: normalizeDateToISO(extracted.passportIssuedDate),
+        passportExpiry: normalizeDateToISO(extracted.passportExpiry),
 
         // Driving License Fields
         licenseNumber: extracted.licenseNumber || "",
         licenseIssuedBy: extracted.licenseIssuedBy || "",
-        licenseIssuedDate: extracted.licenseIssuedDate || "",
-        licenseExpiry: extracted.licenseExpiry || "",
+        licenseIssuedDate: normalizeDateToISO(extracted.licenseIssuedDate),
+        licenseExpiry: normalizeDateToISO(extracted.licenseExpiry),
 
         // International Driving License Fields
         internationalLicenseNumber: extracted.internationalLicenseNumber || "",
         internationalLicenseIssuedBy: extracted.internationalLicenseIssuedBy || "",
-        internationalLicenseIssuedDate: extracted.internationalLicenseIssuedDate || "",
-        internationalLicenseExpiry: extracted.internationalLicenseExpiry || "",
+        internationalLicenseIssuedDate: normalizeDateToISO(extracted.internationalLicenseIssuedDate),
+        internationalLicenseExpiry: normalizeDateToISO(extracted.internationalLicenseExpiry),
 
         // Visa Fields
         visaNumber: extracted.visaNumber || "",
-        visaExpiry: extracted.visaExpiry || "",
+        visaExpiry: normalizeDateToISO(extracted.visaExpiry),
 
-        // Standard Fields
+        // Standard / Emirates ID Fields
         idNumber: resolvedIdNumber,
+        idIssuedBy: extracted.idIssuedBy?.trim() || (resolvedIdNumber.startsWith("784") || docType === "emirates_id" ? "ICP / UAE" : ""),
+        idIssuedDate: normalizeDateToISO(extracted.idIssuedDate),
+        idExpiry: normalizeDateToISO(extracted.idExpiry),
+
         address: extracted.address || "",
         phone: extracted.phone || "",
         email: extracted.email || "",
-        documentType: extracted.documentType || "unknown",
+        documentType: docType,
       },
       imageUrl: allImageUrls[0] || null,
       imageUrls: allImageUrls,
@@ -422,7 +513,7 @@ async function callGroqVision(groqKey: string, systemPrompt: string, parsedImage
       Authorization: `Bearer ${groqKey}`,
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(45000),
   });
 
   if (!aiRes.ok) {

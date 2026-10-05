@@ -101,6 +101,41 @@ export default function CreateDriverModal({
     }));
   };
 
+  const formatDateForInput = (d: any) => {
+    if (!d) return "";
+    const str = String(d).trim();
+    if (!str) return "";
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      return str;
+    }
+
+    const dmy = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+    if (dmy) {
+      const day = dmy[1].padStart(2, "0");
+      const month = dmy[2].padStart(2, "0");
+      const year = dmy[3];
+      return `${year}-${month}-${day}`;
+    }
+
+    const ymd = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (ymd) {
+      const year = ymd[1];
+      const month = ymd[2].padStart(2, "0");
+      const day = ymd[3].padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    try {
+      const parsed = new Date(str);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().split("T")[0];
+      }
+    } catch {}
+
+    return "";
+  };
+
   const processFile = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const isPdf = file.type === "application/pdf";
@@ -203,13 +238,14 @@ export default function CreateDriverModal({
       const { data } = resData;
 
       // Auto-fill driver fields strictly from extracted data without touching or duplicating doc previews
+      const rawExpiry = data.licenseExpiry || data.idExpiry;
+      const formattedExpiry = formatDateForInput(rawExpiry);
+
       setFormData((prev) => ({
         ...prev,
         name: data.name || prev.name,
         license: data.licenseNumber || data.idNumber || prev.license,
-        licenseExpiry: data.licenseExpiry
-          ? new Date(data.licenseExpiry).toISOString().split("T")[0]
-          : prev.licenseExpiry,
+        licenseExpiry: formattedExpiry || prev.licenseExpiry,
         driverId: prev.driverId || data.idNumber || `DRV-${Math.floor(100 + Math.random() * 900)}`,
         phone: data.phone || prev.phone,
         email: data.email || prev.email,
