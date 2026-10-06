@@ -26,7 +26,8 @@ import {
   Plus,
   DollarSign,
   X,
-  RefreshCw
+  RefreshCw,
+  Gauge
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
@@ -886,14 +887,30 @@ function ConfirmHandoverPageContent() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-text-secondary block mb-1">Handover Mileage (عداد الكيلومترات)</label>
-              <input
-                type="number"
-                value={rentalData.checkoutMileage || ""}
-                onChange={(e) => setRentalData({ ...rentalData, checkoutMileage: Number(e.target.value) })}
-                placeholder="Current odometer KM"
-                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-text-secondary flex items-center gap-1.5">
+                  <Gauge size={13} className="text-brand shrink-0" />
+                  <span>Handover Mileage (عداد الكيلومترات عند التسليم)</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                {(contract.unitMileage || contract.unitId?.mileage) && (
+                  <span className="text-[10px] text-text-muted bg-gray-100 px-2 py-0.5 rounded font-medium">
+                    Fleet: {(contract.unitMileage || contract.unitId?.mileage).toLocaleString()} km
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <Gauge size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                <input
+                  type="number"
+                  value={rentalData.checkoutMileage === 0 ? "" : rentalData.checkoutMileage}
+                  onChange={(e) => setRentalData({ ...rentalData, checkoutMileage: Number(e.target.value) })}
+                  placeholder="e.g. 15300"
+                  className="w-full pl-9 pr-12 py-2.5 bg-gray-50 border border-border rounded-xl text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                />
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">KM</span>
+              </div>
+              <p className="text-[10px] text-text-muted mt-1">Current vehicle odometer reading recorded at handover to client.</p>
             </div>
 
             <div>
@@ -1488,6 +1505,12 @@ function ConfirmHandoverPageContent() {
           <div className="flex justify-between py-1 border-b border-gray-100">
             <span className="text-text-muted">Total Rental Amount:</span>
             <span className="font-semibold text-text-primary">AED {rawCollectionTotal}</span>
+          </div>
+          <div className="flex justify-between py-1 border-b border-gray-100">
+            <span className="text-text-muted">Checkout Mileage (عداد الاستلام):</span>
+            <span className="font-semibold text-text-primary">
+              {rentalData.checkoutMileage > 0 ? `${Number(rentalData.checkoutMileage).toLocaleString()} km` : "Recorded in Fleet"}
+            </span>
           </div>
           {advancePaid > 0 && (
             <div className="flex justify-between py-1 border-b border-gray-100 text-emerald-700 bg-emerald-50/50 px-2 rounded">

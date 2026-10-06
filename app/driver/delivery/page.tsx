@@ -905,7 +905,7 @@ export default function ConfirmDeliveryPage() {
           <div className="grid grid-cols-2 gap-3 text-xs pt-1">
             <div className="bg-white p-3 rounded-xl border border-border/80">
               <span className="text-text-muted text-[11px] block">Checkout Mileage</span>
-              <span className="font-bold text-text-primary text-sm font-mono">
+              <span className="font-bold text-text-primary text-sm">
                 {rentalData.checkoutMileage > 0 
                   ? `${rentalData.checkoutMileage.toLocaleString()} km` 
                   : (contract.checkoutMileage ? `${contract.checkoutMileage.toLocaleString()} km` : "Recorded in Fleet")}
@@ -965,7 +965,7 @@ export default function ConfirmDeliveryPage() {
                     <span className="text-red-500">*</span>
                   </label>
                   {(contract.unitMileage || contract.unitId?.mileage) && (
-                    <span className="text-[10px] text-text-muted bg-gray-100 px-2 py-0.5 rounded font-mono">
+                    <span className="text-[10px] text-text-muted bg-gray-100 px-2 py-0.5 rounded font-medium">
                       Fleet: {(contract.unitMileage || contract.unitId?.mileage).toLocaleString()} km
                     </span>
                   )}
@@ -977,7 +977,7 @@ export default function ConfirmDeliveryPage() {
                     value={rentalData.checkoutMileage === 0 ? "" : rentalData.checkoutMileage}
                     onChange={(e) => setRentalData({ ...rentalData, checkoutMileage: Number(e.target.value) })}
                     placeholder="Current odometer KM"
-                    className="w-full pl-9 pr-12 py-2.5 bg-gray-50 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-mono"
+                    className="w-full pl-9 pr-12 py-2.5 bg-gray-50 border border-border rounded-xl text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                   />
                   <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">KM</span>
                 </div>
@@ -1652,7 +1652,7 @@ export default function ConfirmDeliveryPage() {
           </div>
           <div className="flex justify-between py-1 border-b border-gray-100">
             <span className="text-text-muted">Checkout Mileage (عداد الاستلام):</span>
-            <span className="font-bold text-text-primary font-mono">
+            <span className="font-bold text-text-primary">
               {rentalData.checkoutMileage > 0 ? `${Number(rentalData.checkoutMileage).toLocaleString()} km` : "Recorded in Fleet"}
             </span>
           </div>
