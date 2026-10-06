@@ -4,7 +4,7 @@ import connectDB from "@/lib/db";
 import { User } from "@/models/User";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
-import { buildSecurityNoticeEmail } from "@/lib/email-templates";
+import { buildSecurityNoticeEmail, getEmailLogoAttachment } from "@/lib/email-templates";
 
 export async function GET(
   req: Request,
@@ -70,11 +70,13 @@ export async function PUT(
             userEmail: updatedUser.email,
           });
 
+          const logoAtt = getEmailLogoAttachment();
           await transporter.sendMail({
             from: `"Leon Rent Car Operations" <${process.env.SMTP_USER}>`,
             to: updatedUser.email,
             subject,
             html: emailHtml,
+            attachments: logoAtt ? [logoAtt] : [],
           });
           console.log(`Password change confirmation email sent to ${updatedUser.email}`);
         } else {

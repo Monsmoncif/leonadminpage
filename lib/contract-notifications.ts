@@ -11,6 +11,7 @@ import {
   buildClientContractEmail,
   buildDriverTaskEmail,
   buildAdminHandoverReminderEmail,
+  getEmailLogoAttachment,
 } from "@/lib/email-templates";
 
 function getTransporter() {
@@ -148,13 +149,16 @@ export async function sendClientContractNotification(
             contractUrl: contractPdfUrl,
           });
 
-          const attachments = pdfBuffer ? [
-            {
+          const attachments: any[] = [];
+          const logoAtt = getEmailLogoAttachment();
+          if (logoAtt) attachments.push(logoAtt);
+          if (pdfBuffer) {
+            attachments.push({
               filename: `Contract-${contractNum}.pdf`,
               content: pdfBuffer,
               contentType: "application/pdf",
-            }
-          ] : [];
+            });
+          }
 
           await transporter.sendMail({
             from: `"Leon Rent Car" <${process.env.SMTP_USER}>`,
@@ -308,11 +312,13 @@ export async function sendDriverTaskNotification(
             actionUrl,
           });
 
+          const logoAtt = getEmailLogoAttachment();
           await transporter.sendMail({
             from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
             to: driver.email,
             subject,
             html: emailHtml,
+            attachments: logoAtt ? [logoAtt] : [],
           });
           results.email = true;
           console.log(`[DriverNotification] Email sent to ${driver.email}`);
@@ -452,11 +458,13 @@ export async function sendHandoverReminderNotification(
           viewUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/bookings`,
         });
 
+        const logoAtt = getEmailLogoAttachment();
         await transporter.sendMail({
           from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
           to: recipients.join(", "),
           subject,
           html: emailHtml,
+          attachments: logoAtt ? [logoAtt] : [],
         });
 
         results.email = true;

@@ -6,7 +6,7 @@ import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
 import nodemailer from "nodemailer";
 import { sendWhatsApp } from "@/lib/whatsapp";
-import { buildAdminEventNoticeEmail } from "@/lib/email-templates";
+import { buildAdminEventNoticeEmail, getEmailLogoAttachment } from "@/lib/email-templates";
 
 export async function POST(req: Request) {
   try {
@@ -69,11 +69,13 @@ export async function POST(req: Request) {
           depositAmount: isDelivered ? (contract.depositAmount || 0) : undefined,
         });
 
+        const logoAtt = getEmailLogoAttachment();
         await transporter.sendMail({
           from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
           to: adminEmail,
           subject,
           html: emailHtml,
+          attachments: logoAtt ? [logoAtt] : [],
         });
         results.email = true;
       } catch (emailErr) {

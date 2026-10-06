@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { buildBaseEmailLayout } from "@/lib/email-templates";
+import { buildBaseEmailLayout, getEmailLogoAttachment } from "@/lib/email-templates";
 
 export async function POST(req: Request) {
   try {
@@ -43,6 +43,7 @@ export async function POST(req: Request) {
       </p>
     `;
 
+    const logoAtt = getEmailLogoAttachment();
     const mailOptions = {
       from: `"Leon Rent Car" <${process.env.SMTP_USER}>`,
       to: email,
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
         referenceBadge: contractId ? `#${contractId.toString().substring(0, 8).toUpperCase()}` : undefined,
         contentHtml,
       }),
+      attachments: logoAtt ? [logoAtt] : [],
     };
 
     await transporter.sendMail(mailOptions);

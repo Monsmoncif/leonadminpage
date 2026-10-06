@@ -4,7 +4,7 @@ import { Contract } from "@/models/Contract";
 import { User } from "@/models/User";
 import nodemailer from "nodemailer";
 
-import { buildBaseEmailLayout, buildDetailRow } from "@/lib/email-templates";
+import { buildBaseEmailLayout, buildDetailRow, getEmailLogoAttachment } from "@/lib/email-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -84,11 +84,13 @@ export async function GET() {
         });
 
         try {
+          const logoAtt = getEmailLogoAttachment();
           await transporter.sendMail({
             from: `"Leon Rent Car Operations" <${process.env.SMTP_USER}>`,
             to: driver.email,
             subject,
             html: emailHtml,
+            attachments: logoAtt ? [logoAtt] : [],
           });
           emailsSent++;
         } catch (err) {

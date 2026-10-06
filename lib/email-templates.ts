@@ -1,15 +1,48 @@
+import path from "path";
+import fs from "fs";
+
 /**
- * Enterprise Email Templates System for Leon Rent Car
- * 
- * Clean, minimalist, and professional design matching global automotive enterprises (Sixt, Hertz, Enterprise, Stripe).
- * Free of AI-style gradients, cartoonish emojis, and visual clutter.
+ * Returns Nodemailer inline attachment object for the company logo.
+ * Uses optimized logo-email.png (or logo-original.png as fallback).
  */
+export function getEmailLogoAttachment(): {
+  filename: string;
+  path: string;
+  cid: string;
+  contentType: string;
+} | null {
+  try {
+    const emailLogo = path.join(process.cwd(), "public", "logo-email.png");
+    const originalLogo = path.join(process.cwd(), "public", "logo-original.png");
+
+    if (fs.existsSync(emailLogo)) {
+      return {
+        filename: "logo.png",
+        path: emailLogo,
+        cid: "leon-logo",
+        contentType: "image/png",
+      };
+    }
+    if (fs.existsSync(originalLogo)) {
+      return {
+        filename: "logo.png",
+        path: originalLogo,
+        cid: "leon-logo",
+        contentType: "image/png",
+      };
+    }
+  } catch (err) {
+    console.warn("[EmailTemplates] Could not locate logo attachment:", err);
+  }
+  return null;
+}
 
 interface BaseEmailOptions {
   title?: string;
   subtitle?: string;
   referenceBadge?: string;
   contentHtml: string;
+  logoSrc?: string;
 }
 
 export function buildBaseEmailLayout({
@@ -17,6 +50,7 @@ export function buildBaseEmailLayout({
   subtitle,
   referenceBadge,
   contentHtml,
+  logoSrc = "cid:leon-logo",
 }: BaseEmailOptions): string {
   const currentYear = new Date().getFullYear();
 
@@ -35,15 +69,19 @@ export function buildBaseEmailLayout({
         <!-- Email Container -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 580px; width: 100%; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);">
           
-          <!-- Corporate Header -->
+          <!-- Corporate Header with Logo -->
           <tr>
             <td style="padding: 24px 32px; border-bottom: 1px solid #f1f5f9; background-color: #ffffff;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td align="left" style="vertical-align: middle;">
-                    <div style="font-size: 16px; font-weight: 800; letter-spacing: 0.5px; color: #0f172a; text-transform: uppercase;">
-                      LEON <span style="font-weight: 400; color: #64748b;">RENT CAR</span>
-                    </div>
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="vertical-align: middle;">
+                          <img src="${logoSrc}" alt="Leon Rent Car" height="40" style="height: 40px; max-height: 44px; width: auto; max-width: 170px; object-fit: contain; display: block; border: 0;" />
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                   ${referenceBadge ? `
                   <td align="right" style="vertical-align: middle;">
