@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import { User } from "@/models/User";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
+import { buildSecurityNoticeEmail } from "@/lib/email-templates";
 
 export async function GET(
   req: Request,
@@ -64,21 +65,16 @@ export async function PUT(
 
         // Only attempt to send if credentials are provided in .env
         if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+          const { subject, html: emailHtml } = buildSecurityNoticeEmail({
+            userName: updatedUser.name,
+            userEmail: updatedUser.email,
+          });
+
           await transporter.sendMail({
-            from: `"Wheelzie Admin" <${process.env.SMTP_USER}>`,
+            from: `"Leon Rent Car Operations" <${process.env.SMTP_USER}>`,
             to: updatedUser.email,
-            subject: "Security Alert: Your Password Was Changed",
-            text: `Hello ${updatedUser.name},\n\nThis is a confirmation that the password for your Wheelzie account (${updatedUser.email}) was just changed.\n\nIf you did not authorize this change, please contact an administrator immediately.\n\nBest regards,\nWheelzie Team`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-                <h2 style="color: #1e293b; margin-bottom: 20px;">Security Alert: Password Changed</h2>
-                <p style="color: #334155; font-size: 16px; line-height: 1.5;">Hello <strong>${updatedUser.name}</strong>,</p>
-                <p style="color: #334155; font-size: 16px; line-height: 1.5;">This is a confirmation that the password for your Wheelzie account (<strong>${updatedUser.email}</strong>) was just changed.</p>
-                <p style="color: #334155; font-size: 16px; line-height: 1.5;">If you did not authorize this change, please contact an administrator immediately.</p>
-                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-                <p style="color: #64748b; font-size: 14px;">Best regards,<br/>The Wheelzie Team</p>
-              </div>
-            `,
+            subject,
+            html: emailHtml,
           });
           console.log(`Password change confirmation email sent to ${updatedUser.email}`);
         } else {

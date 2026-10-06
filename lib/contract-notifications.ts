@@ -7,6 +7,11 @@ import { Driver } from "@/models/Driver";
 import { sendWhatsApp, formatPhoneNumberForWhatsApp } from "@/lib/whatsapp";
 import nodemailer from "nodemailer";
 import { generateContractPdf, generateContractPdfFromPrintUrl } from "@/lib/pdf-generator";
+import {
+  buildClientContractEmail,
+  buildDriverTaskEmail,
+  buildAdminHandoverReminderEmail,
+} from "@/lib/email-templates";
 
 function getTransporter() {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
@@ -129,50 +134,19 @@ export async function sendClientContractNotification(
       const transporter = getTransporter();
       if (transporter) {
         try {
-          let subject = "";
-          let emailHtml = "";
-
-          if (type === "final") {
-            subject = `Your Rental Contract #${contractNum} — ${vehicleName} | Leon Car Rental`;
-
-            emailHtml = `
-              <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e; line-height: 1.7;">
-                <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-                  <h1 style="color: white; margin: 0; font-size: 22px;">Leon Car Rental</h1>
-                  <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Contract #${contractNum}</p>
-                </div>
-                <div style="padding: 30px; background: #ffffff; border: 1px solid #e2e8f0; border-top: 0;">
-                  <p style="font-size: 16px; margin: 0 0 16px;">Hello <strong>${clientName}</strong>,</p>
-                  <p style="font-size: 14px; margin: 0 0 16px;">Please find your rental contract attached. 📄</p>
-                  <p style="font-size: 14px; margin: 0 0 8px;">Thank you for choosing <strong>Leon Car Rental</strong>.</p>
-                  <p style="font-size: 14px; margin: 0;">Enjoy the drive & stay safe! 🚗</p>
-                </div>
-                <div style="padding: 16px 30px; background: #f1f5f9; border: 1px solid #e2e8f0; border-top: 0; border-radius: 0 0 12px 12px; text-align: center;">
-                  <p style="font-size: 12px; color: #94a3b8; margin: 0;">— <strong>Leon Car Rental</strong></p>
-                </div>
-              </div>
-            `;
-          } else {
-            subject = `Your Rental Contract #${contractNum} | Leon Car Rental`;
-
-            emailHtml = `
-              <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e; line-height: 1.7;">
-                <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-                  <h1 style="color: white; margin: 0; font-size: 22px;">Leon Car Rental</h1>
-                  <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Contract #${contractNum}</p>
-                </div>
-                <div style="padding: 30px; background: #ffffff; border: 1px solid #e2e8f0; border-top: 0;">
-                  <p style="font-size: 16px; margin: 0 0 16px;">Hello <strong>${clientName}</strong>,</p>
-                  <p style="font-size: 14px; margin: 0 0 16px;">Please find your rental contract attached. 📄</p>
-                  <p style="font-size: 14px; margin: 0 0 8px;">Thank you for choosing <strong>Leon Car Rental</strong>.</p>
-                  <p style="font-size: 14px; margin: 0;">Enjoy the drive & stay safe! 🚗</p>
-                </div>
-                <div style="padding: 16px 30px; background: #f1f5f9; border: 1px solid #e2e8f0; border-top: 0; border-radius: 0 0 12px 12px; text-align: center;">
-                  <p style="font-size: 12px; color: #94a3b8; margin: 0;">— <strong>Leon Car Rental</strong></p>
-                </div>
-              </div>
-            `;
-          }
+          const { subject, html: emailHtml } = buildClientContractEmail({
+            clientName,
+            contractNumber: contractNum,
+            vehicleName,
+            vehiclePlate,
+            startDate,
+            endDate,
+            pickupLocation: contract.pickupLocation,
+            totalAmount: contract.totalAmount,
+            dailyRate: contract.dailyRate,
+            type,
+            contractUrl: contractPdfUrl,
+          });
 
           const attachments = pdfBuffer ? [
             {
@@ -318,61 +292,26 @@ export async function sendDriverTaskNotification(
       const transporter = getTransporter();
       if (transporter) {
         try {
-          const emailHtml = `
-            <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e; line-height: 1.7;">
-              <div style="background: ${isDelivery ? '#10b981' : '#2563eb'}; padding: 24px 30px; border-radius: 12px 12px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 20px;">${taskArabicTitle}</h1>
-                <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">Contract #${contractNum} — ${taskType}</p>
-              </div>
-              
-              <div style="padding: 28px 30px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: 0; border-radius: 0 0 12px 12px;">
-                <p style="font-size: 16px; margin: 0 0 15px;">Hello <strong>${driver.name}</strong>,</p>
-                <p style="font-size: 14px; margin-bottom: 20px;">
-                  ${isDelivery 
-                    ? "لديك طلب جديد لتوصيل وتسليم سيارة للعميل (Give a Car to Client)." 
-                    : "لديك طلب جديد لاستلام السيارة من العميل وإرجاعها (Pick up Car & Return it)."}
-                </p>
-                
-                <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
-                  <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 10px 0; color: #64748b; width: 150px;">السيارة / Vehicle</td>
-                    <td style="padding: 10px 0; font-weight: 600;">${vehicleName} (${vehiclePlate})</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 10px 0; color: #64748b;">العميل / Client</td>
-                    <td style="padding: 10px 0; font-weight: 600;">${clientName}${clientPhone ? ` — <a href="tel:${clientPhone}" style="color: #2563eb; text-decoration: none;">${clientPhone}</a>` : ''}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 10px 0; color: #64748b;">${isDelivery ? 'موقع التسليم / Delivery' : 'موقع الاستلام / Pickup'}</td>
-                    <td style="padding: 10px 0; font-weight: 600;">${location}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 10px 0; color: #64748b;">التوقيت / Scheduled Time</td>
-                    <td style="padding: 10px 0; font-weight: 600;">${time}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px 0; color: #64748b;">فترة الإيجار / Period</td>
-                    <td style="padding: 10px 0; font-weight: 600;">${startDate} → ${endDate}</td>
-                  </tr>
-                </table>
-
-                ${contract.notes ? `<div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px; margin: 16px 0; font-size: 13px;"><strong>📋 تعليمات وملاحظات / Instructions:</strong><br/>${contract.notes}</div>` : ''}
-                
-                <div style="margin: 25px 0; text-align: center;">
-                  <a href="${actionUrl}" target="_blank" style="display: inline-block; padding: 14px 28px; background: ${isDelivery ? '#10b981' : '#2563eb'}; color: white; text-decoration: none; font-weight: bold; border-radius: 8px; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                    📲 فتح مهمة السائق (${isDelivery ? 'Confirm Handover' : 'Process Return'})
-                  </a>
-                </div>
-
-                <p style="font-size: 13px; color: #64748b; margin-top: 24px;">Best regards,<br/><strong>Leon Rent Car Dispatch</strong></p>
-              </div>
-            </div>
-          `;
+          const { subject, html: emailHtml } = buildDriverTaskEmail({
+            driverName: driver.name,
+            contractNumber: contractNum,
+            vehicleName,
+            vehiclePlate,
+            clientName,
+            clientPhone,
+            location,
+            time,
+            startDate,
+            endDate,
+            notes: contract.notes,
+            isDelivery,
+            actionUrl,
+          });
 
           await transporter.sendMail({
             from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
             to: driver.email,
-            subject: `${taskArabicTitle} — #${contractNum} | ${vehicleName}`,
+            subject,
             html: emailHtml,
           });
           results.email = true;
@@ -499,69 +438,24 @@ export async function sendHandoverReminderNotification(
 
         const recipients = Array.from(recipientSet);
 
-        const emailHtml = `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e; line-height: 1.7; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
-            <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 28px 32px; color: white;">
-              <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
-                ${timingBadgeText}
-              </span>
-              <h1 style="color: white; margin: 12px 0 4px; font-size: 22px; font-weight: 800;">تذكير بموعد تسليم سيارة</h1>
-              <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 14px;">Contract Handover Reminder — Contract ${contractNum}</p>
-            </div>
-            
-            <div style="padding: 30px 32px; background: #fafafa;">
-              <p style="font-size: 15px; margin: 0 0 20px; color: #334155;">
-                مرحباً <strong>إدارة ليون كار</strong>، هذا تذكير بموعد تسليم سيارة مجدول <strong>${timingArabic}</strong>:
-              </p>
-              
-              <table style="width: 100%; border-collapse: separate; border-spacing: 0; background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px; font-size: 14px;">
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 12px 18px; color: #64748b; width: 130px; border-bottom: 1px solid #f1f5f9;">رقم العقد</td>
-                  <td style="padding: 12px 18px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${contractNum}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 12px 18px; color: #64748b; border-bottom: 1px solid #f1f5f9;">السيارة / Vehicle</td>
-                  <td style="padding: 12px 18px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${vehicleName} ${vehiclePlate ? `(${vehiclePlate})` : ''}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 12px 18px; color: #64748b; border-bottom: 1px solid #f1f5f9;">العميل / Client</td>
-                  <td style="padding: 12px 18px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${clientName} ${clientPhone ? `(${clientPhone})` : ''}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 12px 18px; color: #64748b; border-bottom: 1px solid #f1f5f9;">موعد البدء / Start</td>
-                  <td style="padding: 12px 18px; font-weight: 700; color: #b45309; border-bottom: 1px solid #f1f5f9;">${startDateFormatted} — ${checkoutTime}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 12px 18px; color: #64748b; border-bottom: 1px solid #f1f5f9;">تاريخ الانتهاء / End</td>
-                  <td style="padding: 12px 18px; color: #334155; border-bottom: 1px solid #f1f5f9;">${endDateFormatted}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 12px 18px; color: #64748b;">موقع التسليم</td>
-                  <td style="padding: 12px 18px; color: #334155;">${location}</td>
-                </tr>
-              </table>
-
-              <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 18px; margin-bottom: 24px;">
-                <p style="margin: 0; font-size: 13px; color: #92400e; font-weight: 600;">
-                  ⚠️ يرجى التأكد من فحص ونظافة السيارة وتجهيز المفاتيح والوثائق قبل تسليمها للعميل.
-                </p>
-              </div>
-
-              <div style="text-align: center; margin-top: 10px;">
-                <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/bookings" style="background: #0f172a; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-size: 14px; font-weight: 700; display: inline-block;">
-                  فتح لوحة العقود / View Contract
-                </a>
-              </div>
-
-              <p style="font-size: 12px; color: #94a3b8; margin-top: 28px; text-align: center;">— Leon Rent Car Automated Dispatch System</p>
-            </div>
-          </div>
-        `;
+        const { subject, html: emailHtml } = buildAdminHandoverReminderEmail({
+          contractNumber: contractNum,
+          vehicleName,
+          vehiclePlate,
+          clientName,
+          clientPhone,
+          startDateFormatted,
+          endDateFormatted,
+          checkoutTime,
+          location,
+          timingLabel,
+          viewUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/bookings`,
+        });
 
         await transporter.sendMail({
           from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
           to: recipients.join(", "),
-          subject: `⏰ تذكير بموعد تسليم سيارة ${timingArabic} — عقد ${contractNum} | ${vehicleName}`,
+          subject,
           html: emailHtml,
         });
 

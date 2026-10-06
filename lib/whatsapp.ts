@@ -288,15 +288,11 @@ export async function sendWhatsApp({
           messageId: msgId,
         };
       } else {
-        console.error("[WhatsApp] Meta Text Send failed:", textRes.data);
-        return {
-          success: false,
-          provider: "meta",
-          error: textRes.data?.error?.message || "Failed to send text message via Meta",
-        };
+        const errorMsg = textRes.data?.error?.message || (typeof textRes.data === 'string' ? textRes.data : "Failed to send text message via Meta");
+        console.warn(`[WhatsApp] Meta Text Send returned error (${errorMsg}), proceeding to UltraMsg fallback.`);
       }
     } catch (metaErr: any) {
-      console.error("[WhatsApp] Meta API top-level exception:", metaErr.message || metaErr);
+      console.error("[WhatsApp] Meta API top-level exception, proceeding to UltraMsg fallback:", metaErr.message || metaErr);
     }
   }
 
@@ -318,9 +314,11 @@ export async function sendWhatsApp({
             caption: message,
           }),
         });
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         if (response.ok && !data.error) {
           return { success: true, provider: "ultramsg", messageId: String(data.id || "") };
+        } else {
+          console.warn("[WhatsApp] UltraMsg document send failed:", data?.error || response.status);
         }
       }
 
@@ -334,18 +332,30 @@ export async function sendWhatsApp({
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (response.ok && !data.error) {
         return { success: true, provider: "ultramsg", messageId: String(data.id || "") };
+      } else {
+        console.warn("[WhatsApp] UltraMsg chat send failed:", data?.error || response.status);
+        return {
+          success: false,
+          provider: "ultramsg",
+          error: data?.error || `UltraMsg failed with status ${response.status}`,
+        };
       }
     } catch (ultraErr: any) {
       console.error("[WhatsApp] UltraMsg fallback error:", ultraErr.message || ultraErr);
+      return {
+        success: false,
+        provider: "ultramsg",
+        error: ultraErr.message || "UltraMsg request failed",
+      };
     }
   }
 
   return {
     success: false,
     provider: "none",
-    error: "No working WhatsApp provider available (Meta Cloud API or UltraMsg)",
+    error: "No working WhatsApp provider available (Meta Cloud API blocked/expired, and UltraMsg instance stopped/unconfigured)",
   };
 }

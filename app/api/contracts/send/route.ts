@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { buildBaseEmailLayout } from "@/lib/email-templates";
 
 export async function POST(req: Request) {
   try {
@@ -19,30 +20,39 @@ export async function POST(req: Request) {
       },
     });
 
+    const contentHtml = `
+      <p style="margin: 0 0 16px; font-size: 14px; color: #334155;">
+        Dear <strong>${clientName || "Valued Customer"}</strong>,
+      </p>
+      <p style="margin: 0 0 20px; font-size: 13px; color: #475569; line-height: 1.6;">
+        Thank you for choosing Leon Rent Car. Your vehicle rental contract has been generated and confirmed in our system. You may view and download your full documentation using the link below:
+      </p>
+      <div style="text-align: center; margin: 28px 0 24px;">
+        <a href="${pdfUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px; letter-spacing: 0.2px;">
+          View & Download Rental Contract
+        </a>
+      </div>
+      <p style="margin: 0 0 12px; font-size: 12px; color: #64748b; line-height: 1.5;">
+        Direct access link:<br/>
+        <a href="${pdfUrl}" style="color: #2563eb; word-break: break-all; text-decoration: underline;">${pdfUrl}</a>
+      </p>
+      <p style="margin: 20px 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">
+        If you have any questions regarding your contract, please feel free to reach out to our support team.<br/>
+        Safe travels,<br/>
+        <strong style="color: #334155;">Leon Rent Car Operations</strong>
+      </p>
+    `;
+
     const mailOptions = {
       from: `"Leon Rent Car" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: `Your Vehicle Rental Contract - Leon Rent Car`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
-          <h2 style="color: #2F3645;">Hello ${clientName},</h2>
-          <p>Thank you for choosing Leon Rent Car for your rental needs!</p>
-          <p>Your vehicle rental contract has been successfully generated and signed.</p>
-          
-          <div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 8px; text-align: center;">
-            <a href="${pdfUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; font-weight: bold; border-radius: 6px;">
-              View & Download Your Contract
-            </a>
-            <p style="margin-top: 15px; font-size: 13px; color: #6c757d;">
-              Or copy this link: <br/>
-              <a href="${pdfUrl}" style="word-break: break-all; color: #10b981;">${pdfUrl}</a>
-            </p>
-          </div>
-          
-          <p>If you have any questions, feel free to reply to this email or contact us.</p>
-          <p>Drive safe!<br/><strong>The Leon Rent Car Team</strong></p>
-        </div>
-      `,
+      subject: `Rental Contract #${contractId ? contractId.toString().substring(0, 8).toUpperCase() : ""} | Leon Rent Car`,
+      html: buildBaseEmailLayout({
+        title: "Rental Agreement Confirmation",
+        subtitle: "Official vehicle rental documentation",
+        referenceBadge: contractId ? `#${contractId.toString().substring(0, 8).toUpperCase()}` : undefined,
+        contentHtml,
+      }),
     };
 
     await transporter.sendMail(mailOptions);

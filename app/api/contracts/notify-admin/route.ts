@@ -6,6 +6,7 @@ import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
 import nodemailer from "nodemailer";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { buildAdminEventNoticeEmail } from "@/lib/email-templates";
 
 export async function POST(req: Request) {
   try {
@@ -56,59 +57,22 @@ export async function POST(req: Request) {
           },
         });
 
-        const emailHtml = `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e; line-height: 1.7;">
-            <div style="background: ${isDelivered ? '#10b981' : '#3b82f6'}; padding: 24px 30px; border-radius: 12px 12px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 20px;">${eventTitle}</h1>
-              <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">Contract #${contractNum}</p>
-            </div>
-            
-            <div style="padding: 28px 30px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: 0; border-radius: 0 0 12px 12px;">
-              <p style="font-size: 16px; margin: 0 0 20px;">Hello <strong>Admin</strong>,</p>
-              <p style="font-size: 14px;">${isDelivered 
-                ? `Driver <strong>${driverName}</strong> has successfully delivered the vehicle to the client.`
-                : `Driver <strong>${driverName}</strong> has successfully picked up and returned the vehicle.`
-              }</p>
-              
-              <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 10px 0; color: #64748b; width: 140px;">Vehicle</td>
-                  <td style="padding: 10px 0; font-weight: 600;">${vehicleName} (${vehiclePlate})</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 10px 0; color: #64748b;">Client</td>
-                  <td style="padding: 10px 0; font-weight: 600;">${clientName}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 10px 0; color: #64748b;">Driver</td>
-                  <td style="padding: 10px 0; font-weight: 600;">${driverName}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 10px 0; color: #64748b;">Event</td>
-                  <td style="padding: 10px 0; font-weight: 600;">${isDelivered ? 'Vehicle handed over to client' : 'Vehicle collected from client'}</td>
-                </tr>
-                ${!isDelivered ? `
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 10px 0; color: #64748b;">Rest of Money Collected</td>
-                  <td style="padding: 10px 0; font-weight: 700; color: #059669;">$${contract.returnAmountCollected !== undefined ? contract.returnAmountCollected : 0} (${contract.returnPaymentMethod || "Cash"}) — Confirmed by Driver</td>
-                </tr>
-                ` : `
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 10px 0; color: #64748b;">Deposit Collected</td>
-                  <td style="padding: 10px 0; font-weight: 700; color: #059669;">$${contract.depositAmount || 0} — Confirmed by Driver</td>
-                </tr>
-                `}
-              </table>
-              
-              <p style="font-size: 13px; color: #64748b; margin-top: 24px;">— Leon Rent Car Notification</p>
-            </div>
-          </div>
-        `;
+        const { subject, html: emailHtml } = buildAdminEventNoticeEmail({
+          contractNumber: contractNum,
+          vehicleName,
+          vehiclePlate,
+          clientName,
+          driverName,
+          isDelivered,
+          collectedAmount: !isDelivered ? (contract.returnAmountCollected !== undefined ? contract.returnAmountCollected : 0) : undefined,
+          paymentMethod: contract.returnPaymentMethod || "Cash",
+          depositAmount: isDelivered ? (contract.depositAmount || 0) : undefined,
+        });
 
         await transporter.sendMail({
           from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
           to: adminEmail,
-          subject: `${isDelivered ? '✅' : '🔄'} ${isDelivered ? 'Vehicle Delivered' : 'Vehicle Returned & Settled'} — #${contractNum} | ${vehicleName}`,
+          subject,
           html: emailHtml,
         });
         results.email = true;
