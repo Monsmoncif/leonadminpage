@@ -15,7 +15,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Invalid credentials");
+          return null;
         }
 
         try {
@@ -47,17 +47,17 @@ export const authOptions: NextAuthOptions = {
           // -----------------------------------------------------
 
           if (!user) {
-            throw new Error("Invalid credentials");
+            return null;
           }
 
           const isMatch = await bcrypt.compare(credentials.password, user.password as string);
 
           if (!isMatch) {
-            throw new Error("Invalid credentials");
+            return null;
           }
 
           if (user.status !== "active") {
-            throw new Error("Account is inactive");
+            return null;
           }
 
           return {
@@ -68,7 +68,7 @@ export const authOptions: NextAuthOptions = {
           };
         } catch (error) {
           console.error("Auth Error:", error);
-          throw new Error("Authentication failed");
+          return null;
         }
       },
     }),
@@ -91,6 +91,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   session: {
     strategy: "jwt",

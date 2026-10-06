@@ -28,6 +28,8 @@ export default function LoginPage() {
       setIsLoading(false);
     } else {
       toast.success("Signed in successfully!");
+      router.push("/");
+      router.refresh();
     }
   };
 
