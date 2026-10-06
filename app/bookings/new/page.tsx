@@ -56,12 +56,10 @@ const formatDateToInput = (dateStr: string) => {
   }
 };
 
-// Dynamic steps based on contract type (Car is first step; Contract Type is chosen via header toggle)
 const DELIVERY_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Client", icon: User },
-  { id: 3, title: "Rental Data & Driver", icon: Truck },
-  { id: 4, title: "Review & Dispatch", icon: CheckCircle },
+  { id: 2, title: "Rental Data & Driver", icon: Truck },
+  { id: 3, title: "Review & Dispatch", icon: CheckCircle },
 ];
 
 const SHOP_STEPS = [
@@ -370,9 +368,9 @@ export function NewRentalAdminPageContent() {
     toast.success(`Admin signature applied (${adminName})`);
   };
 
-  // Canvas DPI initialization when reaching Review Step (Step 4)
+  // Canvas DPI initialization when reaching Review Step (Step 4 for Shop, Step 3 for Delivery)
   useEffect(() => {
-    const isReviewStep = currentStep === 4;
+    const isReviewStep = currentStep === (contractType === "Delivery" ? 3 : 4);
     if (isReviewStep) {
       const timer = setTimeout(() => {
         // Customer canvas (Shop only)
@@ -663,28 +661,41 @@ export function NewRentalAdminPageContent() {
       }
     }
 
-    // Step 2: Client selection (required for Shop)
-    if (contractType === "Shop" && currentStep === 2) {
-      if (!selectedClient) {
-        toast.error("Please select a client first.");
-        return;
-      }
-    }
+    // Delivery flow validation (Step 1: Car -> Step 2: Rental Data & Driver -> Step 3: Review & Dispatch)
+    if (contractType === "Delivery") {
+      if (currentStep === 2) {
+        if (!rentalData.deliveryDriverId) {
+          toast.error("Please assign a delivery driver for this contract.");
+          return;
+        }
 
-    // Step 3: Rental Data & Driver validation
-    if (currentStep === 3) {
-      if (contractType === "Delivery" && !rentalData.deliveryDriverId) {
-        toast.error("Please assign a delivery driver for this contract.");
-        return;
+        const vehicle = units.find(u => u._id === selectedVehicle);
+        const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
+        if (conflict && conflict.reason === "Booked") {
+          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
+          return;
+        }
+      }
+    } else {
+      // Shop flow validation (Step 1: Car -> Step 2: Client -> Step 3: Rental Data -> Step 4: Review & Create)
+      if (currentStep === 2) {
+        if (!selectedClient) {
+          toast.error("Please select a client first.");
+          return;
+        }
       }
 
-      const vehicle = units.find(u => u._id === selectedVehicle);
-      const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
-      if (conflict && conflict.reason === "Booked") {
-        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
-        return;
+      if (currentStep === 3) {
+        const vehicle = units.find(u => u._id === selectedVehicle);
+        const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
+        if (conflict && conflict.reason === "Booked") {
+          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
+          return;
+        }
       }
     }
 
@@ -797,6 +808,9 @@ export function NewRentalAdminPageContent() {
       if (contractType === "Delivery") {
         contractPayload.driverId = rentalData.deliveryDriverId;
         contractPayload.deliveryDriverId = rentalData.deliveryDriverId;
+        if (selectedClient) {
+          contractPayload.clientId = selectedClient;
+        }
         if (!isEditMode) {
           contractPayload.deliveryStatus = "Pending";
           contractPayload.status = "Draft";
@@ -1972,7 +1986,16 @@ export function NewRentalAdminPageContent() {
   // ===================== DETERMINE WHAT TO RENDER =====================
 
   const renderStepContent = () => {
-    // 4 Clean Steps: Car (1) → Client (2) → Rental Data (3) → Review & Confirm (4)
+    if (contractType === "Delivery") {
+      // 3 Steps for Driver Delivery: Car (1) → Rental Data & Driver (2) → Review & Dispatch (3)
+      // Client is skipped — driver registers the client upon delivery on-site
+      if (currentStep === 1) return renderVehicleSelector();
+      if (currentStep === 2) return renderRentalData();
+      if (currentStep === 3) return renderReview();
+      return null;
+    }
+
+    // 4 Clean Steps for Shop: Car (1) → Client (2) → Rental Data (3) → Review & Create (4)
     if (currentStep === 1) return renderVehicleSelector();
     if (currentStep === 2) return renderClientSelector();
     if (currentStep === 3) return renderRentalData();
@@ -2037,7 +2060,8 @@ export function NewRentalAdminPageContent() {
             type="button"
             onClick={() => {
               setContractType("Delivery");
-              if (currentStep > 4) setCurrentStep(4);
+              if (currentStep === 3) setCurrentStep(2);
+              else if (currentStep > 3) setCurrentStep(3);
             }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               contractType === "Delivery"
