@@ -834,35 +834,28 @@ function ReturnPageContent() {
                   <div className="space-y-3">
                     {/* Check-in Return Time */}
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-semibold text-text-secondary">
-                          Check-in Return Time (وقت الاسترجاع) <span className="text-red-500">*</span>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setShopReturnTime(getCurrentFormattedTime())}
-                          className="text-xs text-brand hover:text-brand-dark font-bold hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <span>Set time now</span>
-                        </button>
-                      </div>
+                      <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
+                        <span>Check-in Return Time (وقت الاسترجاع)</span>
+                        <span className="text-red-500">*</span>
+                      </label>
                       <div className="flex items-center gap-2">
                         <div className="relative flex-1">
-                          <Clock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
                           <input
                             type="text"
                             value={shopReturnTime}
                             onChange={(e) => setShopReturnTime(e.target.value)}
                             placeholder="e.g. 10:00 AM"
-                            className="w-full p-2.5 pl-10 rounded-xl border border-border bg-white text-sm font-medium text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                            className="w-full p-2.5 pl-8 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
                           />
+                          <Clock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
                         </div>
                         <button
                           type="button"
                           onClick={() => setShopReturnTime(getCurrentFormattedTime())}
-                          className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-secondary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 shadow-2xs flex items-center gap-1.5"
+                          className="px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1.5 shadow-2xs"
+                          title="Set current time"
                         >
-                          <Clock size={14} className="text-brand" />
+                          <Clock size={13} />
                           <span>Now</span>
                         </button>
                       </div>
