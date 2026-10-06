@@ -409,11 +409,9 @@ let ContractsService = class ContractsService {
             this.notifyAdmin({ contractId: existingContract._id.toString(), type: 'vehicle_delivered' }).catch((err) => console.error('Admin notify failed:', err));
             this.sendClient({ contractId: existingContract._id.toString(), type: 'initial' }).catch((err) => console.error('Client send failed:', err));
         }
-        const isConfirming = (body.deliveryStatus === 'Delivered' && existingContract.deliveryStatus !== 'Delivered') ||
-            (body.status === 'Active' && existingContract.status !== 'Active') ||
-            Boolean(body.isDispatched) ||
-            Boolean(body.dispatch);
-        if (isConfirming && !existingContract.contractNumber && !updatedData.contractNumber) {
+        const isHandoverConfirmed = (body.deliveryStatus === 'Delivered' && existingContract.deliveryStatus !== 'Delivered') ||
+            (body.status === 'Active' && existingContract.status !== 'Active');
+        if (isHandoverConfirmed && !existingContract.contractNumber && !updatedData.contractNumber) {
             const lastContract = await this.contractModel
                 .findOne({ contractNumber: { $exists: true, $ne: null } })
                 .sort({ contractNumber: -1 })
@@ -423,10 +421,6 @@ let ContractsService = class ContractsService {
                 ? lastContract.contractNumber + 1
                 : 2000;
             updatedData.contractNumber = nextContractNumber;
-            updatedData.isDispatched = true;
-            if (!existingContract.dispatchedAt) {
-                updatedData.dispatchedAt = new Date();
-            }
         }
         if (body.isDispatched !== undefined || body.dispatch !== undefined) {
             updatedData.isDispatched = Boolean(body.isDispatched || body.dispatch);
@@ -890,17 +884,6 @@ let ContractsService = class ContractsService {
         if (!assignedDriverId) {
             throw new common_1.BadRequestException('A delivery driver must be assigned before dispatching this contract.');
         }
-        if (!contract.contractNumber) {
-            const lastContract = await this.contractModel
-                .findOne({ contractNumber: { $exists: true, $ne: null } })
-                .sort({ contractNumber: -1 })
-                .select('contractNumber')
-                .lean();
-            const nextContractNumber = lastContract && typeof lastContract.contractNumber === 'number' && lastContract.contractNumber >= 2000
-                ? lastContract.contractNumber + 1
-                : 2000;
-            contract.contractNumber = nextContractNumber;
-        }
         contract.isDispatched = true;
         contract.dispatchedAt = new Date();
         await contract.save();
@@ -909,9 +892,10 @@ let ContractsService = class ContractsService {
             contractId: contract._id.toString(),
             type: 'delivery_assigned',
         }).catch((err) => console.error('Driver notification error on dispatch:', err));
+        const contractIdentifier = contract.contractNumber ? `#${contract.contractNumber}` : `#${contract._id.toString().substring(0, 8).toUpperCase()}`;
         return {
             success: true,
-            message: `Contract #${contract.contractNumber} dispatched successfully`,
+            message: `Contract ${contractIdentifier} dispatched successfully`,
             contract,
         };
     }
