@@ -226,7 +226,11 @@ export async function PUT(
         updatedData.status = "Active";
       }
       updatedData.deliveredAt = new Date();
-      await Unit.findByIdAndUpdate(existingContract.unitId, { status: "Rented" });
+      const unitUpdates: any = { status: "Rented" };
+      if (body.checkoutMileage !== undefined && Number(body.checkoutMileage) > 0) {
+        unitUpdates.mileage = Number(body.checkoutMileage);
+      }
+      await Unit.findByIdAndUpdate(existingContract.unitId, unitUpdates);
 
       try {
         const count = await Log.countDocuments();

@@ -34,7 +34,8 @@ import {
   Trash2,
   Sparkles,
   Image as ImageIcon,
-  Plus
+  Plus,
+  Gauge
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -195,6 +196,7 @@ export default function ConfirmDeliveryPage() {
     babySeatFee: 0,
     deliveryFee: 0,
     checkoutFuelLevel: 100,
+    checkoutMileage: 0,
     paymentMethod: "Cash" as string,
     paymentStatus: "Pending" as "Pending" | "Partial" | "Paid"
   });
@@ -318,6 +320,10 @@ export default function ConfirmDeliveryPage() {
           ? Number(contractData.collectionAmount)
           : (contractData.totalAmount !== undefined ? Number(contractData.totalAmount) : 0);
 
+        const initialMileage = contractData.checkoutMileage !== undefined && Number(contractData.checkoutMileage) > 0
+          ? Number(contractData.checkoutMileage)
+          : Number(contractData.unitMileage || contractData.unitId?.mileage || 0);
+
         setRentalData({
           rentalType: contractData.rentalType || "Daily",
           customerType: contractData.customerType || "B2C",
@@ -337,6 +343,7 @@ export default function ConfirmDeliveryPage() {
           babySeatFee: Number(contractData.babySeatFees) || 0,
           deliveryFee: Number(contractData.deliveryCharges) || 0,
           checkoutFuelLevel: Number(contractData.checkoutFuelLevel) || 100,
+          checkoutMileage: initialMileage,
           paymentMethod: contractData.paymentMethod || "Cash",
           paymentStatus: contractData.paymentStatus || "Pending",
         });
@@ -697,6 +704,7 @@ export default function ConfirmDeliveryPage() {
         status: "Active",
         checkoutTime: formattedCheckoutTime,
         checkoutFuelLevel: rentalData.checkoutFuelLevel,
+        checkoutMileage: Number(rentalData.checkoutMileage) || 0,
         clientId: selectedClient,
         additionalDriverName: additionalDriver.name.trim(),
         additionalDriverLicense: additionalDriver.license.trim(),
@@ -897,8 +905,10 @@ export default function ConfirmDeliveryPage() {
           <div className="grid grid-cols-2 gap-3 text-xs pt-1">
             <div className="bg-white p-3 rounded-xl border border-border/80">
               <span className="text-text-muted text-[11px] block">Checkout Mileage</span>
-              <span className="font-bold text-text-primary text-sm">
-                {contract.checkoutMileage ? `${contract.checkoutMileage.toLocaleString()} km` : "Recorded in Fleet"}
+              <span className="font-bold text-text-primary text-sm font-mono">
+                {rentalData.checkoutMileage > 0 
+                  ? `${rentalData.checkoutMileage.toLocaleString()} km` 
+                  : (contract.checkoutMileage ? `${contract.checkoutMileage.toLocaleString()} km` : "Recorded in Fleet")}
               </span>
             </div>
             <div className="bg-white p-3 rounded-xl border border-border/80">
@@ -945,6 +955,33 @@ export default function ConfirmDeliveryPage() {
                     <span>Now</span>
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-text-secondary flex items-center gap-1.5">
+                    <Gauge size={13} className="text-brand shrink-0" />
+                    <span>Handover Mileage (عداد الكيلومترات عند التسليم)</span>
+                    <span className="text-red-500">*</span>
+                  </label>
+                  {(contract.unitMileage || contract.unitId?.mileage) && (
+                    <span className="text-[10px] text-text-muted bg-gray-100 px-2 py-0.5 rounded font-mono">
+                      Fleet: {(contract.unitMileage || contract.unitId?.mileage).toLocaleString()} km
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Gauge size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input
+                    type="number"
+                    value={rentalData.checkoutMileage === 0 ? "" : rentalData.checkoutMileage}
+                    onChange={(e) => setRentalData({ ...rentalData, checkoutMileage: Number(e.target.value) })}
+                    placeholder="Current odometer KM"
+                    className="w-full pl-9 pr-12 py-2.5 bg-gray-50 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-mono"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">KM</span>
+                </div>
+                <p className="text-[10px] text-text-muted mt-1">Current vehicle odometer reading recorded at handover to client.</p>
               </div>
 
               <div>
@@ -1612,6 +1649,12 @@ export default function ConfirmDeliveryPage() {
           <div className="flex justify-between py-1 border-b border-gray-100">
             <span className="text-text-muted">Initial Fuel Level:</span>
             <span className="font-bold text-emerald-600">{rentalData.checkoutFuelLevel || 100}%</span>
+          </div>
+          <div className="flex justify-between py-1 border-b border-gray-100">
+            <span className="text-text-muted">Checkout Mileage (عداد الاستلام):</span>
+            <span className="font-bold text-text-primary font-mono">
+              {rentalData.checkoutMileage > 0 ? `${Number(rentalData.checkoutMileage).toLocaleString()} km` : "Recorded in Fleet"}
+            </span>
           </div>
           <div className="flex justify-between py-1 border-b border-gray-100">
             <span className="text-text-muted">Security Deposit:</span>

@@ -384,7 +384,11 @@ let ContractsService = class ContractsService {
                 updatedData.status = 'Active';
             }
             updatedData.deliveredAt = new Date();
-            await this.unitModel.findByIdAndUpdate(existingContract.unitId, { status: 'Rented' });
+            const unitUpdates = { status: 'Rented' };
+            if (body.checkoutMileage !== undefined && Number(body.checkoutMileage) > 0) {
+                unitUpdates.mileage = Number(body.checkoutMileage);
+            }
+            await this.unitModel.findByIdAndUpdate(existingContract.unitId, unitUpdates);
             try {
                 const count = await this.logModel.countDocuments();
                 await this.logModel.create({
