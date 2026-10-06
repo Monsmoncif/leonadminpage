@@ -158,6 +158,17 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
     return "";
   };
 
+  const getReturnDateTimeDisplay = () => {
+    if (!isReturned) return "";
+    const returnDateSource = contract.returnedAt || contract.actualEndDate || contract.updatedAt || contract.endDate;
+    const formattedDate = returnDateSource ? formatDate(returnDateSource) : "";
+    const time = getReturnTimeDisplay();
+    if (formattedDate && time) {
+      return `${formattedDate} - ${time}`;
+    }
+    return formattedDate || time || "N/A";
+  };
+
   const getReturnMileageDisplay = () => {
     const rawVal = contract.returnOdometer ?? contract.returnMileage ?? contract.checkinMileage;
     if (rawVal !== undefined && rawVal !== null && rawVal !== "" && !isNaN(Number(rawVal)) && Number(rawVal) > 0) {
@@ -505,11 +516,13 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                 </span>
               </div>
 
-              {/* Expected End Date / تاريخ الانتهاء المتوقع */}
+              {/* Return Date / تاريخ الإرجاع (or Expected End Date if pending) */}
               <div className="col-span-2 px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Expected End Date / تاريخ الانتهاء المتوقع</span>
-                <span className="font-bold truncate text-black">
-                  {contract.endDate ? formatDate(contract.endDate) : "N/A"}
+                <span className="text-[6px] text-gray-500 font-bold uppercase">
+                  {isReturned ? "Return Date / تاريخ الإرجاع" : "Expected End Date / تاريخ الانتهاء المتوقع"}
+                </span>
+                <span className={`font-bold truncate ${isReturned ? "text-emerald-950 font-extrabold" : "text-black"}`}>
+                  {isReturned ? getReturnDateTimeDisplay() : (contract.endDate ? formatDate(contract.endDate) : "N/A")}
                 </span>
               </div>
               <div className="px-1 py-[1.5px] border-b border-black flex flex-col justify-between">
