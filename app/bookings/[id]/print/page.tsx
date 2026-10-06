@@ -169,6 +169,30 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
     return formattedDate || time || "N/A";
   };
 
+  const getHandoverDateTimeDisplay = () => {
+    const handoverDateSource = contract.deliveredAt || contract.startDate;
+    const formattedDate = handoverDateSource ? formatDate(handoverDateSource) : "";
+    let time = contract.checkoutTime;
+    if (!time && contract.deliveredAt) {
+      try {
+        time = new Date(contract.deliveredAt).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      } catch {
+        time = "";
+      }
+    }
+    if (!time) {
+      time = "08:00 AM";
+    }
+    if (formattedDate && time) {
+      return `${formattedDate} - ${time}`;
+    }
+    return formattedDate || time || "N/A";
+  };
+
   const getReturnMileageDisplay = () => {
     const rawVal = contract.returnOdometer ?? contract.returnMileage ?? contract.checkinMileage;
     if (rawVal !== undefined && rawVal !== null && rawVal !== "" && !isNaN(Number(rawVal)) && Number(rawVal) > 0) {
@@ -501,13 +525,9 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                 <span className="font-bold truncate">{contract.dailyKmLimit > 0 ? `${contract.dailyKmLimit} km` : "Unlimited"}</span>
               </div>
 
-              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
+              <div className="col-span-2 px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Handover Date / تاريخ التسليم</span>
-                <span className="font-bold truncate">{formatDate(contract.deliveredAt || contract.startDate)}</span>
-              </div>
-              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col justify-between">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Handover Time / وقت التسليم</span>
-                <span className="font-bold truncate">{contract.checkoutTime || "08:00 AM"}</span>
+                <span className="font-bold truncate text-black">{getHandoverDateTimeDisplay()}</span>
               </div>
               <div className="px-1 py-[1.5px] border-b border-black flex flex-col justify-between">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Out KM / عداد الخروج</span>
