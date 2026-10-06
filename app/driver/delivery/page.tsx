@@ -1264,34 +1264,6 @@ export default function ConfirmDeliveryPage() {
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
-              <Clock size={13} className="text-brand" />
-              <span>Checkout Time (وقت استلام السيارة)</span>
-              <span className="text-red-500">*</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={rentalData.checkoutTime}
-                  onChange={(e) => setRentalData({ ...rentalData, checkoutTime: e.target.value })}
-                  placeholder="e.g. 10:00 AM"
-                  className="w-full p-2.5 pl-8 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
-                />
-                <Clock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-              </div>
-              <button
-                type="button"
-                onClick={() => setRentalData((prev: any) => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
-                className="px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1.5 shadow-2xs"
-                title="Set current time"
-              >
-                <Clock size={13} />
-                <span>Now</span>
-              </button>
-            </div>
-          </div>
 
           <div>
             <label className="text-xs font-semibold text-text-secondary block mb-1">Handover Location</label>
