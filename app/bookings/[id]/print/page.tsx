@@ -551,18 +551,6 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                   {isReturned ? getReturnMileageDisplay() : ""}
                 </span>
               </div>
-
-              {/* Fuel */}
-              <div className="px-1 py-[1.5px] border-r border-black flex flex-col justify-between">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Out Fuel / وقود الخروج</span>
-                <span className="font-bold text-emerald-700 truncate">{contract.checkoutFuelLevel || 100}%</span>
-              </div>
-              <div className="col-span-2 px-1 py-[1.5px] flex flex-col justify-between">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Return Fuel / وقود الإرجاع</span>
-                <span className="font-bold text-emerald-700 truncate">
-                  {isReturned && contract.returnFuelLevel !== undefined ? `${contract.returnFuelLevel}%` : ""}
-                </span>
-              </div>
             </div>
 
             {/* HIRE INFORMATION */}
@@ -588,41 +576,13 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               <div className="px-1 py-[1.5px] border-r border-t border-black flex flex-col">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Total Charges / الإجمالي</span>
                 <span className="font-black text-[8.5px] text-black truncate">
-                  AED {(() => {
-                    const rate = Number(contract.dailyRate) || 0;
-                    if (isReturned && (contract.returnedAt || contract.updatedAt)) {
-                      const s = new Date(contract.deliveredAt || contract.startDate).getTime();
-                      const e = new Date(contract.returnedAt || contract.updatedAt).getTime();
-                      const diff = Math.ceil((e - s) / (1000 * 3600 * 24));
-                      const actualDays = Math.max(1, diff);
-                      return (actualDays * rate).toFixed(2);
-                    }
-                    const days = Number(contract.totalDays) || 1;
-                    return (days * rate).toFixed(2);
-                  })()}
+                  AED {(Number(contract.totalAmount) || 0).toFixed(2)}
                 </span>
               </div>
               <div className="col-span-2 px-1 py-[1.5px] border-t border-black flex flex-col bg-brand/5">
                 <span className="text-[6px] text-brand font-extrabold uppercase">Balance Due / المستحق</span>
                 <span className="font-black text-[8.5px] text-brand truncate">
-                  AED {(() => {
-                    const rate = Number(contract.dailyRate) || 0;
-                    let days = Number(contract.totalDays) || 1;
-                    if (isReturned && (contract.returnedAt || contract.updatedAt)) {
-                      const s = new Date(contract.deliveredAt || contract.startDate).getTime();
-                      const e = new Date(contract.returnedAt || contract.updatedAt).getTime();
-                      const diff = Math.ceil((e - s) / (1000 * 3600 * 24));
-                      days = Math.max(1, diff);
-                    }
-                    const totalRent = days * rate;
-                    const salik = Number(contract.salikCharge || contract.salikFees) || 0;
-                    const parking = Number(contract.parkingCharge || contract.parkingFees) || 0;
-                    const fines = Number(contract.finesCharge || contract.finesFees) || 0;
-                    const fuel = Number(contract.fuelCharge || contract.fuelFees) || 0;
-                    const advancePaid = Number(contract.advancePayment) || 0;
-                    const total = totalRent + salik + parking + fines + fuel;
-                    return Math.max(0, total - advancePaid).toFixed(2);
-                  })()}
+                  AED {Math.max(0, (Number(contract.totalAmount) || 0) - (Number(contract.advancePayment) || 0)).toFixed(2)}
                 </span>
               </div>
             </div>
