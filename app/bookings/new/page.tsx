@@ -683,7 +683,7 @@ export function NewRentalAdminPageContent() {
       if (conflict && conflict.reason === "Booked") {
         const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
         const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please choose different dates.`);
+        toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
         return;
       }
     }
@@ -733,7 +733,7 @@ export function NewRentalAdminPageContent() {
         if (conflict.reason === "Booked") {
           const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
           const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          toast.error(`Date Conflict: This car is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflict.contractNumber}). Please select different dates.`);
+          toast.error(`Date Conflict: This car is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates.`);
         } else {
           toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
         }
@@ -1374,7 +1374,7 @@ export function NewRentalAdminPageContent() {
                       </span>
                     </div>
                     <p className="text-[11px] sm:text-xs text-red-700 leading-relaxed">
-                      This car (<strong className="font-semibold">{selectedUnit.make} {selectedUnit.model} - {selectedUnit.plate}</strong>) is already booked from <span className="font-semibold underline">{conflictStart}</span> to <span className="font-semibold underline">{conflictEnd}</span> (Contract #{conflict.contractNumber}). Please choose different dates or select another car.
+                      This car (<strong className="font-semibold">{selectedUnit.make} {selectedUnit.model} - {selectedUnit.plate}</strong>) is already booked from <span className="font-semibold underline">{conflictStart}</span> to <span className="font-semibold underline">{conflictEnd}</span>. Please choose different dates or select another car.
                     </p>
                   </div>
                 </div>

@@ -151,9 +151,8 @@ export async function PUT(
       if (conflictingContract) {
         const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-        const conflictNumber = conflictingContract.contractNumber || conflictingContract._id.toString().substring(0, 8).toUpperCase();
         return NextResponse.json(
-          { error: `Date Conflict: Vehicle (${targetUnitDoc.make} ${targetUnitDoc.model} - ${targetUnitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflictNumber}). Please select different dates.` },
+          { error: `Date Conflict: Vehicle (${targetUnitDoc.make} ${targetUnitDoc.model} - ${targetUnitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates.` },
           { status: 400 }
         );
       }

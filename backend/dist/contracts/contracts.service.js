@@ -201,8 +201,7 @@ let ContractsService = class ContractsService {
             if ((0, date_overlap_1.areDatesOverlapping)(existing.startDate, existing.endDate, body.startDate, body.endDate)) {
                 const conflictStart = new Date(existing.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                 const conflictEnd = new Date(existing.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                const conflictNumber = existing.contractNumber || existing._id.toString().substring(0, 8).toUpperCase();
-                throw new common_1.BadRequestException(`Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd} (Contract #${conflictNumber}). Please select different dates or choose another car.`);
+                throw new common_1.BadRequestException(`Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates or choose another car.`);
             }
         }
         const checkoutMileage = unitDoc.mileage || 0;
