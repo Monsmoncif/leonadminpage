@@ -1644,7 +1644,7 @@ function ConfirmHandoverPageContent() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
-      {/* Header (Matching Driver Handover Exactly) */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
         <div>
           <button
@@ -1654,81 +1654,6 @@ function ConfirmHandoverPageContent() {
             <ArrowLeft size={14} /> Back to Bookings
           </button>
           <h1 className="text-2xl font-bold text-text-primary">Confirm Vehicle Handover</h1>
-          <p className="text-sm text-text-secondary mt-1">
-            Handover delivery contract #{contractNum} — inspect vehicle, collect rental &amp; deposit, sign, and activate.
-          </p>
-        </div>
-
-        {/* Contract Info Pill & Switcher */}
-        <div className="flex items-center gap-2 self-start md:self-auto shrink-0 relative">
-          <div className="bg-gray-100 p-1.5 rounded-2xl flex items-center gap-2 border border-gray-200/80 shadow-2xs">
-            <span className="px-3 py-1.5 bg-white rounded-xl text-xs font-bold text-brand shadow-xs">
-              Contract #{contractNum}
-            </span>
-            <span className="px-3 py-1.5 text-xs font-semibold text-text-secondary">
-              {vehicleName}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsSwitchingContract(!isSwitchingContract)}
-            className="p-2.5 rounded-2xl border border-border bg-white hover:bg-gray-50 text-text-secondary transition-all shadow-2xs cursor-pointer"
-            title="Switch Booking"
-          >
-            <RefreshCw size={15} className="text-brand" />
-          </button>
-
-          {isSwitchingContract && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-border shadow-xl z-50 p-3 space-y-2 animate-fade-in-up">
-              <div className="flex items-center justify-between pb-1 border-b border-gray-100">
-                <span className="text-xs font-bold text-text-primary">Switch Booking ({pendingCount} Pending)</span>
-                <button
-                  type="button"
-                  onClick={() => setIsSwitchingContract(false)}
-                  className="p-1 rounded-md text-text-muted hover:text-text-primary"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-              <input
-                type="text"
-                placeholder="Search contracts..."
-                value={contractSearchQuery}
-                onChange={(e) => setContractSearchQuery(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-border text-xs focus:outline-none focus:ring-1 focus:ring-brand"
-              />
-              <div className="max-h-60 overflow-y-auto space-y-1.5 custom-scrollbar">
-                {contractsList
-                  .filter((c: any) => {
-                    if (!contractSearchQuery.trim()) return true;
-                    const q = contractSearchQuery.toLowerCase();
-                    return (
-                      String(c.contractNumber || c.id || c._id || "").toLowerCase().includes(q) ||
-                      String(c.customer || c.clientName || "").toLowerCase().includes(q) ||
-                      String(c.vehicle || "").toLowerCase().includes(q)
-                    );
-                  })
-                  .slice(0, 10)
-                  .map((c: any) => (
-                    <button
-                      key={c._id}
-                      type="button"
-                      onClick={() => {
-                        setIsSwitchingContract(false);
-                        router.push(`/bookings/handover?contractId=${c._id}`);
-                      }}
-                      className={`w-full p-2 rounded-lg text-left transition-colors flex flex-col gap-0.5 ${
-                        c._id === contract._id ? "bg-brand/5 border border-brand/20 text-brand" : "hover:bg-gray-50 text-text-primary"
-                      }`}
-                    >
-                      <span className="text-xs font-bold truncate">#{c.contractNumber || c.id || c._id?.substring(0, 8)} - {c.vehicle}</span>
-                      <span className="text-[10px] text-text-muted truncate">{c.customer || c.clientName} • {c.startDate}</span>
-                    </button>
-                  ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

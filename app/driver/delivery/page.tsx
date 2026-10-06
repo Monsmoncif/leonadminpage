@@ -1802,7 +1802,7 @@ export default function ConfirmDeliveryPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
-      {/* Header (Matching Admin Header Exactly) */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
         <div>
           <button
@@ -1812,19 +1812,6 @@ export default function ConfirmDeliveryPage() {
             <ArrowLeft size={14} /> Back to Driver Dashboard
           </button>
           <h1 className="text-2xl font-bold text-text-primary">Confirm Vehicle Handover</h1>
-          <p className="text-sm text-text-secondary mt-1">
-            Handover delivery contract #{contractNum} — inspect vehicle, collect rental &amp; deposit, sign, and activate.
-          </p>
-        </div>
-
-        {/* Contract Info Pill (Matching Admin Header Pill) */}
-        <div className="bg-gray-100 p-1.5 rounded-2xl flex items-center gap-2 border border-gray-200/80 shadow-2xs self-start md:self-auto shrink-0">
-          <span className="px-3 py-1.5 bg-white rounded-xl text-xs font-bold text-brand shadow-xs">
-            Contract #{contractNum}
-          </span>
-          <span className="px-3 py-1.5 text-xs font-semibold text-text-secondary">
-            {vehicleName}
-          </span>
         </div>
       </div>
 
