@@ -538,22 +538,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               <span className="font-bold text-[7.5px]">معلومات الاستئجار</span>
             </div>
 
-            <div className="grid grid-cols-4 border-b border-black text-[6.5px]">
-              <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Rental Duration / مدة الاستئجار</span>
-                <span className="font-bold text-[8px] truncate">
-                  {(() => {
-                    if (isReturned && (contract.returnedAt || contract.updatedAt)) {
-                      const s = new Date(contract.deliveredAt || contract.startDate).getTime();
-                      const e = new Date(contract.returnedAt || contract.updatedAt).getTime();
-                      const diff = Math.ceil((e - s) / (1000 * 3600 * 24));
-                      const actualDays = Math.max(1, diff);
-                      return `${actualDays} Days (Actual / الفعلي)`;
-                    }
-                    return `Daily Rate (${contract.rentalType || "Daily"})`;
-                  })()}
-                </span>
-              </div>
+            <div className="grid grid-cols-3 border-b border-black text-[6.5px]">
               <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
                 <span className="text-[6px] text-gray-500 font-bold uppercase">Hire Rate 24H (AED) / الإيجار اليومي</span>
                 <span className="font-bold text-[8px] truncate">AED {contract.dailyRate || 0}</span>
@@ -582,12 +567,6 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                     const days = Number(contract.totalDays) || 1;
                     return (days * rate).toFixed(2);
                   })()}
-                </span>
-              </div>
-              <div className="px-1 py-[1.5px] border-r border-t border-black flex flex-col bg-emerald-50/50">
-                <span className="text-[6px] text-emerald-800 font-bold uppercase">Prepaid Advance / العربون</span>
-                <span className="font-extrabold text-[8.5px] text-emerald-700 truncate">
-                  AED {Number(contract.advancePayment || 0).toFixed(2)}
                 </span>
               </div>
               <div className="col-span-2 px-1 py-[1.5px] border-t border-black flex flex-col bg-brand/5">
