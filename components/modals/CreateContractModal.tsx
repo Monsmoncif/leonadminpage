@@ -1432,12 +1432,12 @@ export default function CreateContractModal({
                     {/* 2. Rates & Deposit */}
                     <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
                       <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                        <DollarSign size={16} className="text-brand" /> Collection Amount &amp; Deposit (مبلغ التحصيل والتأمين)
+                        <DollarSign size={16} className="text-brand" /> Collection Amount &amp; Deposit
                       </h3>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate ($/day)">
                             Daily Rate ($/day)
                           </label>
                           <div className="relative">
@@ -1460,13 +1460,13 @@ export default function CreateContractModal({
                               className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
-                          <span className="text-[11px] text-text-muted mt-0.5 block">
+                          <span className="text-[11px] text-text-muted mt-0.5 block truncate">
                             {formData.unitId ? `Base vehicle rate ($/day)` : "Daily rental rate"}
                           </span>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount ($)">
                             Collection Amount ($) <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
@@ -1489,13 +1489,13 @@ export default function CreateContractModal({
                               className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
-                          <span className="text-[11px] text-text-muted mt-0.5 block">
+                          <span className="text-[11px] text-text-muted mt-0.5 block truncate">
                             Calculated: ${formData.dailyRate || 0} × {Math.max(1, Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 3600 * 24)))}d (editable)
                           </span>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-emerald-800 block mb-1">
+                          <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance ($)">
                             Advance ($)
                           </label>
                           <div className="relative">
@@ -1517,13 +1517,13 @@ export default function CreateContractModal({
                               className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
                             />
                           </div>
-                          <span className="text-[11px] text-emerald-700/80 mt-0.5 block">
+                          <span className="text-[11px] text-emerald-700/80 mt-0.5 block truncate">
                             Paid upfront now
                           </span>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount ($)">
                             Deposit Amount ($)
                           </label>
                           <div className="relative">
@@ -1539,7 +1539,7 @@ export default function CreateContractModal({
                               className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
-                          <span className="text-[11px] text-text-muted mt-0.5 block">
+                          <span className="text-[11px] text-text-muted mt-0.5 block truncate">
                             {formData.deliveryDriverId || formData.deliveryCharges > 0 
                               ? "Driver collects upon car delivery" 
                               : "Collected at shop counter"}
