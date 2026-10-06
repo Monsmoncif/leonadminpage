@@ -1479,7 +1479,7 @@ export function NewRentalAdminPageContent() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Daily Rate ($/day) / السعر اليومي
+                  Daily Rate ($/day)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
@@ -1505,7 +1505,7 @@ export function NewRentalAdminPageContent() {
 
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Collection Amount ($) / إجمالي التحصيل <span className="text-red-500">*</span>
+                  Collection Amount ($) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
@@ -1531,7 +1531,7 @@ export function NewRentalAdminPageContent() {
 
               <div>
                 <label className="text-xs font-semibold text-emerald-800 block mb-1">
-                  Advance ($) / العربون
+                  Advance ($)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-xs">$</span>
@@ -1553,13 +1553,13 @@ export function NewRentalAdminPageContent() {
                   />
                 </div>
                 <span className="text-[11px] text-emerald-700/80 mt-0.5 block">
-                  Paid upfront now (يُخصم من إجمالي التحصيل عند الاستلام)
+                  Paid upfront now
                 </span>
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Deposit Amount ($) / مبلغ التأمين
+                  Deposit Amount ($)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
@@ -1576,7 +1576,7 @@ export function NewRentalAdminPageContent() {
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block">
                   {contractType === "Delivery" 
-                    ? "Driver collects upon car delivery"
+                    ? "Driver collects upon car delivery" 
                     : "Collected at shop counter"}
                 </span>
               </div>
@@ -1592,7 +1592,7 @@ export function NewRentalAdminPageContent() {
                 <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
-                      Remaining to Collect on Handover (المتبقي للتحصيل عند التسليم)
+                      Remaining to Collect on Handover
                     </span>
                     <p className="text-xs text-text-muted mt-0.5">
                       Total Charges: ${totalCharges}
@@ -1607,7 +1607,7 @@ export function NewRentalAdminPageContent() {
                     </span>
                     {advancePaid > 0 && (
                       <span className="text-xs font-bold text-emerald-700 block">
-                        ✓ Prepaid Advance (عربون مدفوع): ${advancePaid}
+                        ✓ Prepaid Advance: ${advancePaid}
                       </span>
                     )}
                   </div>
@@ -1840,7 +1840,7 @@ export function NewRentalAdminPageContent() {
               </div>
               {Number(rentalData.advancePayment || 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-gray-100 bg-emerald-50/50 px-2 rounded-lg items-center">
-                  <span className="text-emerald-800 font-bold text-xs">Prepaid Advance / العربون المدفوع مسبقاً:</span>
+                  <span className="text-emerald-800 font-bold text-xs">Prepaid Advance:</span>
                   <span className="font-black text-emerald-700 text-xs">-${rentalData.advancePayment}</span>
                 </div>
               )}
@@ -1848,8 +1848,8 @@ export function NewRentalAdminPageContent() {
                 <div>
                   <span className="font-bold text-brand block">
                     {Number(rentalData.advancePayment || 0) > 0 
-                      ? "Remaining Handover Collection (المتبقي للتحصيل عند التسليم):" 
-                      : "Total Handover Collection (إجمالي التحصيل):"}
+                      ? "Remaining Handover Collection:" 
+                      : "Total Handover Collection:"}
                   </span>
                   <span className="text-[10px] text-text-muted">
                     {Number(rentalData.advancePayment || 0) > 0 
