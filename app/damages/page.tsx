@@ -255,7 +255,7 @@ export default function DamagesPage() {
                           <span className="text-text-muted italic text-sm">Unknown</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 font-semibold text-red-600">${damage.cost}</td>
+                      <td className="py-3 px-4 font-semibold text-red-600">AED {damage.cost}</td>
                       <td className="py-3 px-4">
                         <select
                           value={damage.status}
@@ -359,7 +359,7 @@ export default function DamagesPage() {
         title="Delete Damage Record"
         itemName={(() => {
           const d = damages.find((item: any) => item._id === deleteModalState.id);
-          return d ? `${d.description || "Damage record"} ($${d.cost || 0})` : "this damage record";
+          return d ? `${d.description || "Damage record"} (AED ${d.cost || 0})` : "this damage record";
         })()}
         isLoading={isDeleting}
       />

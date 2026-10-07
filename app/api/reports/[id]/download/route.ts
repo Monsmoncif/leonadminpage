@@ -40,7 +40,7 @@ export async function GET(
           .populate("unitId")
           .lean();
         
-        csvContent += "Contract ID,Customer Name,Vehicle Plate,Start Date,End Date,Status,Total Amount ($)\n";
+        csvContent += "Contract ID,Customer Name,Vehicle Plate,Start Date,End Date,Status,Total Amount (AED)\n";
         contracts.forEach((c: any) => {
           csvContent += `"${c._id}","${c.clientId?.name || 'Unknown'}","${c.unitId?.plate || 'Unknown'}","${new Date(c.startDate).toLocaleDateString()}","${new Date(c.endDate).toLocaleDateString()}","${c.status}","${c.totalAmount || 0}"\n`;
         });
@@ -48,7 +48,7 @@ export async function GET(
 
       case "Vehicle Utilization":
         const units = await Unit.find({}).lean();
-        csvContent += "Vehicle ID,Make,Model,Year,Plate,Status,Daily Rate ($),KM Limit\n";
+        csvContent += "Vehicle ID,Make,Model,Year,Plate,Status,Daily Rate (AED),KM Limit\n";
         units.forEach((u: any) => {
           csvContent += `"${u._id}","${u.make}","${u.model}","${u.year}","${u.plate}","${u.status}","${u.dailyRate || 0}","${u.dailyKmLimit || 'Unlimited'}"\n`;
         });
@@ -64,7 +64,7 @@ export async function GET(
 
       case "Damage & Maintenance":
         const damages = await Damage.find(dateQuery).populate("unitId").lean();
-        csvContent += "Damage ID,Vehicle Plate,Description,Status,Cost ($),Reported Date\n";
+        csvContent += "Damage ID,Vehicle Plate,Description,Status,Cost (AED),Reported Date\n";
         damages.forEach((d: any) => {
           csvContent += `"${d._id}","${d.unitId?.plate || 'Unknown'}","${d.description}","${d.status}","${d.cost || 0}","${new Date(d.createdAt).toLocaleDateString()}"\n`;
         });

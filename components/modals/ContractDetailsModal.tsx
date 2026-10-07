@@ -576,7 +576,7 @@ export default function ContractDetailsModal({
                   <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60">
                     <span className="text-[11px] text-text-muted block">Daily Hire Rate (اليومي)</span>
                     <strong className="text-text-primary font-bold block mt-0.5">
-                      ${dailyRate} / day
+                      AED {dailyRate} / day
                     </strong>
                     <span className="text-[10px] text-text-muted font-medium block mt-0.5">
                       Base Rate
@@ -586,10 +586,10 @@ export default function ContractDetailsModal({
                   <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60">
                     <span className="text-[11px] text-text-muted block">Total Rental Amount (الإجمالي)</span>
                     <strong className="text-text-primary font-black text-sm block mt-0.5">
-                      ${totalAmount}
+                      AED {totalAmount}
                     </strong>
                     <span className="text-[10px] text-text-muted font-medium block mt-0.5">
-                      ${dailyRate} × {totalDays}d
+                      AED {dailyRate} × {totalDays}d
                     </span>
                   </div>
                 </div>
@@ -600,7 +600,7 @@ export default function ContractDetailsModal({
                     <div>
                       <span className="text-[11px] font-semibold text-emerald-800 block">Advance Paid (العربون):</span>
                       <strong className="text-emerald-700 font-bold text-sm">
-                        ${advancePaid}
+                        AED {advancePaid}
                       </strong>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
@@ -612,7 +612,7 @@ export default function ContractDetailsModal({
                     <div>
                       <span className="text-[11px] font-semibold text-brand block">Balance Due on Handover (المستحق):</span>
                       <strong className="text-brand font-black text-sm">
-                        ${balanceDue}
+                        AED {balanceDue}
                       </strong>
                     </div>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
@@ -628,7 +628,7 @@ export default function ContractDetailsModal({
                     <div>
                       <span className="text-[11px] font-semibold text-amber-900 block">Security Deposit (التأمين):</span>
                       <strong className="text-amber-800 font-bold text-sm">
-                        ${depositAmount}
+                        AED {depositAmount}
                       </strong>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900">
@@ -642,13 +642,13 @@ export default function ContractDetailsModal({
                   <div className="p-2.5 bg-gray-50 rounded-xl border border-border/60 flex items-center gap-4 text-xs text-text-secondary flex-wrap">
                     <span className="font-bold text-text-primary text-[11px]">Included Extras:</span>
                     {Number(contractData.babySeatFees || 0) > 0 && (
-                      <span className="flex items-center gap-1 font-medium">Baby Seat: <strong>${contractData.babySeatFees}</strong></span>
+                      <span className="flex items-center gap-1 font-medium">Baby Seat: <strong>AED {contractData.babySeatFees}</strong></span>
                     )}
                     {Number(contractData.deliveryCharges || 0) > 0 && (
-                      <span className="flex items-center gap-1 font-medium">Delivery: <strong>${contractData.deliveryCharges}</strong></span>
+                      <span className="flex items-center gap-1 font-medium">Delivery: <strong>AED {contractData.deliveryCharges}</strong></span>
                     )}
                     {Number(contractData.tintingFees || 0) > 0 && (
-                      <span className="flex items-center gap-1 font-medium">Tinting: <strong>${contractData.tintingFees}</strong></span>
+                      <span className="flex items-center gap-1 font-medium">Tinting: <strong>AED {contractData.tintingFees}</strong></span>
                     )}
                   </div>
                 )}
@@ -874,7 +874,7 @@ export default function ContractDetailsModal({
                       <span className="text-text-muted block text-[11px] mb-0.5">Required Deposit:</span>
                       <strong className="text-amber-700 font-bold text-sm flex items-center gap-1">
                         <DollarSign size={14} className="text-amber-600" />
-                        ${contractData.depositAmount || 0}
+                        AED {contractData.depositAmount || 0}
                       </strong>
                     </div>
                     <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-md">
@@ -891,11 +891,11 @@ export default function ContractDetailsModal({
                         Prepaid Advance / العربون
                       </span>
                       <p className="text-[11px] text-emerald-700 mt-0.5">
-                        Paid upon booking. Remaining rental due on handover: ${Math.max(0, (Number(contractData.totalAmount) || 0) - Number(contractData.advancePayment))}
+                        Paid upon booking. Remaining rental due on handover: AED {Math.max(0, (Number(contractData.totalAmount) || 0) - Number(contractData.advancePayment))}
                       </p>
                     </div>
                     <span className="text-base font-black text-emerald-700">
-                      ${contractData.advancePayment}
+                      AED {contractData.advancePayment}
                     </span>
                   </div>
                 )}
@@ -934,7 +934,7 @@ export default function ContractDetailsModal({
                       </strong>
                     </div>
                     <span className="text-[10px] font-semibold text-text-secondary bg-gray-50 border border-border px-2 py-1 rounded-md">
-                      {contractData.pricePerExtraKm ? `$${contractData.pricePerExtraKm}/extra km` : "No extra fee"}
+                      {contractData.pricePerExtraKm ? `AED ${contractData.pricePerExtraKm}/extra km` : "No extra fee"}
                     </span>
                   </div>
 
@@ -1083,7 +1083,7 @@ export default function ContractDetailsModal({
                     <span className="text-text-muted block text-[11px] mb-1">Actual Deposit Collected:</span>
                     <div className="flex items-center justify-between">
                       <strong className="text-emerald-700 font-black text-sm">
-                        ${contractData.depositAmount || 0}
+                        AED {contractData.depositAmount || 0}
                       </strong>
                       <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
                         {isDelivered ? "Collected" : "Pending"}
@@ -1347,7 +1347,7 @@ export default function ContractDetailsModal({
                         Rest of Money Collected by Driver (تم استلام باقي المبلغ):
                       </span>
                       <strong className="text-sm font-black text-emerald-700">
-                        ${contractData.returnAmountCollected.toFixed(2)} ({contractData.returnPaymentMethod || "Cash"})
+                        AED {contractData.returnAmountCollected.toFixed(2)} ({contractData.returnPaymentMethod || "Cash"})
                       </strong>
                     </div>
                   </div>
@@ -1478,7 +1478,7 @@ export default function ContractDetailsModal({
                     </div>
                     {contractData.damageCharge > 0 && (
                       <span className="text-sm font-black text-red-700">
-                        Total Charge: ${contractData.damageCharge}
+                        Total Charge: AED {contractData.damageCharge}
                       </span>
                     )}
                   </div>
@@ -1487,13 +1487,13 @@ export default function ContractDetailsModal({
                     damages.map((d: any) => (
                       <div key={d._id} className="bg-white/90 p-2.5 sm:p-3 rounded-xl border border-red-100 text-xs text-red-950 flex items-center justify-between">
                         <span className="font-medium text-red-950">{d.description}</span>
-                        <strong className="text-red-700 font-bold">${d.cost}</strong>
+                        <strong className="text-red-700 font-bold">AED {d.cost}</strong>
                       </div>
                     ))
                   ) : contractData.newDamages && contractData.newDamages !== "None" ? (
                     <div className="bg-white/90 p-2.5 sm:p-3 rounded-xl border border-red-100 text-xs text-red-950 flex items-center justify-between">
                       <span className="font-medium text-red-950">{contractData.newDamages}</span>
-                      <strong className="text-red-700 font-bold">${contractData.damageCharge || 0}</strong>
+                      <strong className="text-red-700 font-bold">AED {contractData.damageCharge || 0}</strong>
                     </div>
                   ) : null}
                 </div>
@@ -1511,7 +1511,7 @@ export default function ContractDetailsModal({
                       <span>Additional Return Charges (SALIK, PARKING, FINES, FUEL):</span>
                     </div>
                     <span className="text-sm font-black text-amber-700">
-                      Total: ${(
+                      Total: AED {(
                         (Number(contractData.salikCharge || contractData.salikFees) || 0) +
                         (Number(contractData.parkingCharge || contractData.parkingFees) || 0) +
                         (Number(contractData.finesCharge || contractData.finesFees) || 0) +
@@ -1525,7 +1525,7 @@ export default function ContractDetailsModal({
                       <div className="bg-white/90 p-2.5 rounded-xl border border-amber-100 flex flex-col">
                         <span className="text-[10px] text-text-muted font-bold">SALIK (سالك)</span>
                         <span className="text-xs font-black text-text-primary mt-0.5">
-                          ${(Number(contractData.salikCharge || contractData.salikFees) || 0).toFixed(2)}
+                          AED {(Number(contractData.salikCharge || contractData.salikFees) || 0).toFixed(2)}
                         </span>
                       </div>
                     )}
@@ -1533,7 +1533,7 @@ export default function ContractDetailsModal({
                       <div className="bg-white/90 p-2.5 rounded-xl border border-amber-100 flex flex-col">
                         <span className="text-[10px] text-text-muted font-bold">PARKING (مواقف)</span>
                         <span className="text-xs font-black text-text-primary mt-0.5">
-                          ${(Number(contractData.parkingCharge || contractData.parkingFees) || 0).toFixed(2)}
+                          AED {(Number(contractData.parkingCharge || contractData.parkingFees) || 0).toFixed(2)}
                         </span>
                       </div>
                     )}
@@ -1541,7 +1541,7 @@ export default function ContractDetailsModal({
                       <div className="bg-white/90 p-2.5 rounded-xl border border-amber-100 flex flex-col">
                         <span className="text-[10px] text-text-muted font-bold">FINES (مخالفات)</span>
                         <span className="text-xs font-black text-text-primary mt-0.5">
-                          ${(Number(contractData.finesCharge || contractData.finesFees) || 0).toFixed(2)}
+                          AED {(Number(contractData.finesCharge || contractData.finesFees) || 0).toFixed(2)}
                         </span>
                       </div>
                     )}
@@ -1549,7 +1549,7 @@ export default function ContractDetailsModal({
                       <div className="bg-white/90 p-2.5 rounded-xl border border-amber-100 flex flex-col">
                         <span className="text-[10px] text-text-muted font-bold">FUEL (وقود)</span>
                         <span className="text-xs font-black text-text-primary mt-0.5">
-                          ${(Number(contractData.fuelCharge || contractData.fuelFees) || 0).toFixed(2)}
+                          AED {(Number(contractData.fuelCharge || contractData.fuelFees) || 0).toFixed(2)}
                         </span>
                       </div>
                     )}

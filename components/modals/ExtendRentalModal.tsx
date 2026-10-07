@@ -239,10 +239,10 @@ export default function ExtendRentalModal({
                 <span className="text-text-muted block text-[11px] mb-0.5">Rate &amp; Duration:</span>
                 <strong className="text-text-primary font-bold flex items-center gap-1 text-xs">
                   <DollarSign size={13} className="text-emerald-600 shrink-0" />
-                  ${dailyRate}/day • {currentTotalDays} days
+                  AED {dailyRate}/day • {currentTotalDays} days
                 </strong>
                 <span className="text-[10px] text-text-muted block">
-                  Original: ${currentContractAmount.toFixed(2)}
+                  Original: AED {currentContractAmount.toFixed(2)}
                 </span>
               </div>
 
@@ -465,10 +465,10 @@ export default function ExtendRentalModal({
                   Current Total Amount
                 </span>
                 <strong className="text-base sm:text-lg font-black text-text-primary block">
-                  ${currentContractAmount.toFixed(2)}
+                  AED {currentContractAmount.toFixed(2)}
                 </strong>
                 <span className="text-[10px] text-text-muted block">
-                  {currentTotalDays} days @ ${dailyRate}/day
+                  {currentTotalDays} days @ AED {dailyRate}/day
                 </span>
               </div>
 
@@ -483,10 +483,10 @@ export default function ExtendRentalModal({
                   </span>
                 </div>
                 <strong className="text-base sm:text-lg font-black text-amber-700 block">
-                  +${extensionCost.toFixed(2)}
+                  +AED {extensionCost.toFixed(2)}
                 </strong>
                 <span className="text-[10px] text-amber-700/90 block">
-                  {extraDays} day{extraDays > 1 ? 's' : ''} × ${dailyRate}/day
+                  {extraDays} day{extraDays > 1 ? 's' : ''} × AED {dailyRate}/day
                 </span>
               </div>
 
@@ -501,7 +501,7 @@ export default function ExtendRentalModal({
                   </span>
                 </div>
                 <strong className="text-base sm:text-lg font-black text-emerald-700 block">
-                  ${newTotalAmount.toFixed(2)}
+                  AED {newTotalAmount.toFixed(2)}
                 </strong>
                 <span className="text-[10px] text-emerald-700/80 block">
                   {newTotalDays} total rental days

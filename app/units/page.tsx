@@ -434,7 +434,7 @@ export default function UnitsPage() {
                             </select>
                             <div className="flex items-center gap-1.5 text-[10px] font-semibold">
                               <span className="px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">
-                                Rate: ${unit.dailyRate || 100}/day
+                                Rate: AED {unit.dailyRate || 100}/day
                               </span>
                               <span className={`px-1.5 py-0.5 rounded border ${unit.dailyKmLimit ? "bg-gray-50 text-gray-700 border-gray-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
                                 {unit.dailyKmLimit ? `${unit.dailyKmLimit} km/d` : "Unlimited"}

@@ -200,7 +200,7 @@ export default function ReturnVehicleModal({
               <h3 className="text-sm font-bold text-blue-900 mb-2">Contract Data</h3>
               <div className="flex justify-between text-sm">
                 <span className="text-blue-700 font-medium">Daily Rate</span>
-                <span className="font-semibold text-blue-900">${contract.dailyRate || 0}</span>
+                <span className="font-semibold text-blue-900">AED {contract.dailyRate || 0}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-blue-700 font-medium">Daily KM Limit</span>
@@ -208,7 +208,7 @@ export default function ReturnVehicleModal({
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-blue-700 font-medium">Price per Extra KM</span>
-                <span className="font-semibold text-blue-900">${contract.pricePerExtraKm || 0}</span>
+                <span className="font-semibold text-blue-900">AED {contract.pricePerExtraKm || 0}</span>
               </div>
             </div>
 
@@ -267,7 +267,7 @@ export default function ReturnVehicleModal({
               </div>
               <div className="flex justify-between text-sm pt-3 border-t border-border">
                 <span className="text-text-primary font-semibold">Extra KM Charge</span>
-                <span className="font-bold text-red-600">${extraKmCharge.toFixed(2)}</span>
+                <span className="font-bold text-red-600">AED {extraKmCharge.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -281,7 +281,7 @@ export default function ReturnVehicleModal({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-bold text-text-primary uppercase tracking-wider text-muted">Damages Recorded</h4>
-                <span className="text-sm font-bold text-red-600">Total: ${damageChargeNum.toFixed(2)}</span>
+                <span className="text-sm font-bold text-red-600">Total: AED {damageChargeNum.toFixed(2)}</span>
               </div>
               
               {damages.length > 0 ? (
@@ -292,7 +292,7 @@ export default function ReturnVehicleModal({
                         <p className="text-sm font-semibold text-red-900">{d.description}</p>
                         <p className="text-xs text-red-700 mt-1">Status: {d.status}</p>
                       </div>
-                      <span className="text-sm font-bold text-red-600">${d.cost}</span>
+                      <span className="text-sm font-bold text-red-600">AED {d.cost}</span>
                     </div>
                   ))}
                 </div>
@@ -354,7 +354,7 @@ export default function ReturnVehicleModal({
                 </div>
                 {(salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum) > 0 && (
                   <span className="text-[10px] font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-full">
-                    +${(salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum).toFixed(2)}
+                    +AED {(salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum).toFixed(2)}
                   </span>
                 )}
               </div>
@@ -364,10 +364,10 @@ export default function ReturnVehicleModal({
                 <div className="space-y-1 bg-white p-3 rounded-lg border border-border/80">
                   <label className="text-[11px] font-bold text-text-primary flex items-center justify-between">
                     <span>SALIK (سالك)</span>
-                    <span className="text-[9px] text-text-muted">$</span>
+                    <span className="text-[9px] text-text-muted">AED</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">$</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
                     <input
                       type="number"
                       min="0"
@@ -375,7 +375,7 @@ export default function ReturnVehicleModal({
                       value={salikCharge}
                       onChange={(e) => setSalikCharge(e.target.value)}
                       placeholder="0.00"
-                      className="w-full pl-6 pr-2 py-1.5 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                      className="w-full pl-10 pr-2 py-1.5 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                     />
                   </div>
                 </div>
@@ -384,10 +384,10 @@ export default function ReturnVehicleModal({
                 <div className="space-y-1 bg-white p-3 rounded-lg border border-border/80">
                   <label className="text-[11px] font-bold text-text-primary flex items-center justify-between">
                     <span>PARKING (مواقف)</span>
-                    <span className="text-[9px] text-text-muted">$</span>
+                    <span className="text-[9px] text-text-muted">AED</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">$</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
                     <input
                       type="number"
                       min="0"
@@ -395,7 +395,7 @@ export default function ReturnVehicleModal({
                       value={parkingCharge}
                       onChange={(e) => setParkingCharge(e.target.value)}
                       placeholder="0.00"
-                      className="w-full pl-6 pr-2 py-1.5 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                      className="w-full pl-10 pr-2 py-1.5 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                     />
                   </div>
                 </div>
@@ -404,10 +404,10 @@ export default function ReturnVehicleModal({
                 <div className="space-y-1 bg-white p-3 rounded-lg border border-border/80">
                   <label className="text-[11px] font-bold text-text-primary flex items-center justify-between">
                     <span>FINES (مخالفات)</span>
-                    <span className="text-[9px] text-text-muted">$</span>
+                    <span className="text-[9px] text-text-muted">AED</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">$</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
                     <input
                       type="number"
                       min="0"
@@ -415,7 +415,7 @@ export default function ReturnVehicleModal({
                       value={finesCharge}
                       onChange={(e) => setFinesCharge(e.target.value)}
                       placeholder="0.00"
-                      className="w-full pl-6 pr-2 py-1.5 rounded-lg border border-border bg-surface text-xs font-bold text-red-600 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                      className="w-full pl-10 pr-2 py-1.5 rounded-lg border border-border bg-surface text-xs font-bold text-red-600 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                     />
                   </div>
                 </div>
@@ -424,10 +424,10 @@ export default function ReturnVehicleModal({
                 <div className="space-y-1 bg-white p-3 rounded-lg border border-border/80">
                   <label className="text-[11px] font-bold text-text-primary flex items-center justify-between">
                     <span>FUEL (وقود)</span>
-                    <span className="text-[9px] text-text-muted">$</span>
+                    <span className="text-[9px] text-text-muted">AED</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">$</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
                     <input
                       type="number"
                       min="0"
@@ -435,7 +435,7 @@ export default function ReturnVehicleModal({
                       value={fuelCharge}
                       onChange={(e) => setFuelCharge(e.target.value)}
                       placeholder="0.00"
-                      className="w-full pl-6 pr-2 py-1.5 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                      className="w-full pl-10 pr-2 py-1.5 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                     />
                   </div>
                 </div>
@@ -447,38 +447,38 @@ export default function ReturnVehicleModal({
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Extra KM Charge</span>
                 <span className={`font-semibold ${extraKmCharge > 0 ? 'text-red-600' : 'text-text-primary'}`}>
-                  {extraKmCharge > 0 ? `+$${extraKmCharge.toFixed(2)}` : "$0.00"}
+                  {extraKmCharge > 0 ? `+AED ${extraKmCharge.toFixed(2)}` : "AED 0.00"}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Damage Charges</span>
                 <span className={`font-semibold ${damageChargeNum > 0 ? 'text-red-600' : 'text-text-primary'}`}>
-                  {damageChargeNum > 0 ? `+$${damageChargeNum.toFixed(2)}` : "$0.00"}
+                  {damageChargeNum > 0 ? `+AED ${damageChargeNum.toFixed(2)}` : "AED 0.00"}
                 </span>
               </div>
 
               {salikChargeNum > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">SALIK / Tolls</span>
-                  <span className="font-semibold text-brand">+${salikChargeNum.toFixed(2)}</span>
+                  <span className="font-semibold text-brand">+AED ${salikChargeNum.toFixed(2)}</span>
                 </div>
               )}
               {parkingChargeNum > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Parking Fee</span>
-                  <span className="font-semibold text-brand">+${parkingChargeNum.toFixed(2)}</span>
+                  <span className="font-semibold text-brand">+AED ${parkingChargeNum.toFixed(2)}</span>
                 </div>
               )}
               {finesChargeNum > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Traffic Fines</span>
-                  <span className="font-semibold text-red-600">+${finesChargeNum.toFixed(2)}</span>
+                  <span className="font-semibold text-red-600">+AED ${finesChargeNum.toFixed(2)}</span>
                 </div>
               )}
               {fuelChargeNum > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Fuel Charge</span>
-                  <span className="font-semibold text-brand">+${fuelChargeNum.toFixed(2)}</span>
+                  <span className="font-semibold text-brand">+AED ${fuelChargeNum.toFixed(2)}</span>
                 </div>
               )}
 
@@ -499,7 +499,7 @@ export default function ReturnVehicleModal({
             <div className="bg-brand/5 border border-brand/20 p-4 rounded-xl text-center">
               <p className="text-text-secondary text-xs font-medium mb-0.5">Total Return Charges Due</p>
               <div className={`text-2xl font-black ${finalTotal > 0 ? 'text-brand' : 'text-emerald-700'}`}>
-                ${finalTotal.toFixed(2)}
+                AED {finalTotal.toFixed(2)}
               </div>
             </div>
             

@@ -918,7 +918,7 @@ export default function VehicleReturnPage() {
                 Estimated Repair Cost (تكلفة الإصلاح)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">AED</span>
                 <input
                   type="number"
                   min="0"
@@ -1142,7 +1142,7 @@ export default function VehicleReturnPage() {
           </div>
           {totalReturnCharges > 0 && (
             <span className="text-xs font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-full">
-              +${totalReturnCharges.toFixed(2)} Total Due
+              +AED {totalReturnCharges.toFixed(2)} Total Due
             </span>
           )}
         </div>
@@ -1151,9 +1151,9 @@ export default function VehicleReturnPage() {
           <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
             <div>
               <span className="font-bold block">Extra Mileage Fee ({extraKm.toLocaleString()} km exceeded limit)</span>
-              <span className="text-red-700 text-[11px]">${pricePerExtraKm.toFixed(2)} per extra km • {totalIncludedKm.toLocaleString()} km included</span>
+              <span className="text-red-700 text-[11px]">AED {pricePerExtraKm.toFixed(2)} per extra km • {totalIncludedKm.toLocaleString()} km included</span>
             </div>
-            <strong className="font-bold text-sm text-red-600">+${extraKmCharge.toFixed(2)}</strong>
+            <strong className="font-bold text-sm text-red-600">+AED {extraKmCharge.toFixed(2)}</strong>
           </div>
         )}
 
@@ -1163,7 +1163,7 @@ export default function VehicleReturnPage() {
               <span className="font-bold block">Reported Vehicle Damage ({damagePhotos.length} photos)</span>
               <span className="text-red-700 text-[11px] truncate max-w-sm block">{newDamages || "Damage reported"}</span>
             </div>
-            <strong className="font-bold text-sm text-red-600">+${damageChargeNum.toFixed(2)}</strong>
+            <strong className="font-bold text-sm text-red-600">+AED {damageChargeNum.toFixed(2)}</strong>
           </div>
         )}
 
@@ -1174,7 +1174,7 @@ export default function VehicleReturnPage() {
               SALIK (سالك)
             </label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
               <input
                 type="number"
                 min="0"
@@ -1182,7 +1182,7 @@ export default function VehicleReturnPage() {
                 value={salikCharge}
                 onChange={(e) => setSalikCharge(e.target.value)}
                 placeholder="0.00"
-                className="w-full pl-6 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
               />
             </div>
             <span className="text-[9px] text-text-muted block">Toll gates</span>
@@ -1194,7 +1194,7 @@ export default function VehicleReturnPage() {
               PARKING (مواقف)
             </label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
               <input
                 type="number"
                 min="0"
@@ -1202,7 +1202,7 @@ export default function VehicleReturnPage() {
                 value={parkingCharge}
                 onChange={(e) => setParkingCharge(e.target.value)}
                 placeholder="0.00"
-                className="w-full pl-6 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
               />
             </div>
             <span className="text-[9px] text-text-muted block">Parking tickets</span>
@@ -1214,7 +1214,7 @@ export default function VehicleReturnPage() {
               FINES (مخالفات)
             </label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
               <input
                 type="number"
                 min="0"
@@ -1222,7 +1222,7 @@ export default function VehicleReturnPage() {
                 value={finesCharge}
                 onChange={(e) => setFinesCharge(e.target.value)}
                 placeholder="0.00"
-                className="w-full pl-6 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-red-600 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-red-600 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
               />
             </div>
             <span className="text-[9px] text-text-muted block">Traffic violations</span>
@@ -1234,7 +1234,7 @@ export default function VehicleReturnPage() {
               FUEL (وقود)
             </label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-xs text-text-muted">$</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
               <input
                 type="number"
                 min="0"
@@ -1242,7 +1242,7 @@ export default function VehicleReturnPage() {
                 value={fuelCharge}
                 onChange={(e) => setFuelCharge(e.target.value)}
                 placeholder="0.00"
-                className="w-full pl-6 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
               />
             </div>
             <span className="text-[9px] text-text-muted block">Refueling charge</span>
@@ -1261,7 +1261,7 @@ export default function VehicleReturnPage() {
                 Additional Settlement Due from Client
               </span>
               <div className="mt-1 flex items-center justify-center gap-1.5 text-brand">
-                <span className="font-black text-2xl">+${totalReturnCharges.toFixed(2)}</span>
+                <span className="font-black text-2xl">+AED {totalReturnCharges.toFixed(2)}</span>
               </div>
               <p className="text-xs text-red-600 mt-1">
                 Collect the remaining balance for extra mileage and/or reported damages from the client.
@@ -1273,7 +1273,7 @@ export default function VehicleReturnPage() {
                 Clean Return — Zero Balance Due
               </span>
               <div className="mt-1 flex items-center justify-center gap-1.5 text-emerald-700">
-                <span className="font-black text-2xl">$0.00 Due</span>
+                <span className="font-black text-2xl">AED 0.00 Due</span>
               </div>
               <p className="text-xs text-emerald-700 mt-1">
                 No extra mileage or damage fees recorded. The car will be marked Available in fleet.

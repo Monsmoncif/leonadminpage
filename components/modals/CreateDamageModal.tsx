@@ -362,7 +362,7 @@ export default function CreateDamageModal({
 
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Estimated Repair Cost ($)
+                  Estimated Repair Cost (AED)
                 </label>
               <input
                 type="number"

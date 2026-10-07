@@ -274,7 +274,7 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
 
       itemY += 16;
       doc.font("Helvetica").text(`Daily Rate:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`$${data.dailyRate}/day`, leftColX + 100, itemY);
+      doc.font("Helvetica-Bold").text(`AED ${data.dailyRate}/day`, leftColX + 100, itemY);
 
       // Box 4: Financial Settlement
       doc.rect(rightColX, y, colWidth, 120).fillAndStroke(lightBg, borderColor);
@@ -284,11 +284,11 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
       itemY = y + 32;
       doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
       doc.text(`Rental Charges:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`$${data.totalAmount}`, rightColX + 110, itemY);
+      doc.font("Helvetica-Bold").text(`AED ${data.totalAmount}`, rightColX + 110, itemY);
 
       itemY += 16;
       doc.font("Helvetica").text(`Security Deposit:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`$${data.depositAmount}`, rightColX + 110, itemY);
+      doc.font("Helvetica-Bold").text(`AED ${data.depositAmount}`, rightColX + 110, itemY);
 
       itemY += 16;
       doc.font("Helvetica").text(`Payment Method:`, rightColX + 12, itemY);
@@ -299,7 +299,7 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
 
       itemY += 18;
       doc.rect(rightColX + 10, itemY - 2, colWidth - 20, 22).fill("#e2e8f0");
-      doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(9.5).text(`AMOUNT DUE: $${totalDue.toFixed(2)}`, rightColX + 18, itemY + 3);
+      doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(9.5).text(`AMOUNT DUE: AED ${totalDue.toFixed(2)}`, rightColX + 18, itemY + 3);
 
       y += 135;
 

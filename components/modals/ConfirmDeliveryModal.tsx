@@ -1122,25 +1122,25 @@ export default function ConfirmDeliveryModal({
                     {Number(contract.advancePayment || 0) > 0 ? "Remaining Rental Due" : "Rental Amount Due"}
                   </span>
                   <strong className="text-lg font-black text-gray-900">
-                    ${Number(contract.advancePayment || 0) > 0 
+                    AED {Number(contract.advancePayment || 0) > 0 
                       ? Math.max(0, (Number(contract.totalAmount) || 0) - Number(contract.advancePayment)) 
                       : (contract.totalAmount || 0)}
                   </strong>
                   <span className="text-[10px] text-gray-500 block mt-0.5">
                     {Number(contract.advancePayment || 0) > 0 
-                      ? `Total: $${contract.totalAmount} (Prepaid: -$${contract.advancePayment})`
+                      ? `Total: AED ${contract.totalAmount} (Prepaid: -AED ${contract.advancePayment})`
                       : `For ${contract.totalDays || 1} rental days`}
                   </span>
                 </div>
                 <div className="bg-amber-50 p-3.5 rounded-xl border border-amber-200">
                   <span className="text-[11px] font-bold text-amber-800 block uppercase">Security Deposit</span>
-                  <strong className="text-lg font-black text-amber-950">${depositAmount}</strong>
+                  <strong className="text-lg font-black text-amber-950">AED {depositAmount}</strong>
                   <span className="text-[10px] text-amber-700/80 block mt-0.5">Refundable guarantee</span>
                 </div>
                 <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200">
                   <span className="text-[11px] font-bold text-emerald-800 block uppercase">Total to Collect</span>
                   <strong className="text-lg font-black text-emerald-950">
-                    ${(Number(collectedRentalAmount) || 0) + (Number(depositAmount) || 0)}
+                    AED {(Number(collectedRentalAmount) || 0) + (Number(depositAmount) || 0)}
                   </strong>
                   <span className="text-[10px] text-emerald-700/80 block mt-0.5">
                     {Number(contract.advancePayment || 0) > 0 ? "Remaining Rental + Deposit" : "Rental + Security Deposit"}
@@ -1177,7 +1177,7 @@ export default function ConfirmDeliveryModal({
                   </div>
                   <span className="text-[10px] text-text-muted mt-0.5 block">
                     {Number(contract.advancePayment || 0) > 0
-                      ? `Remaining balance ($${contract.advancePayment} prepaid booking advance)`
+                      ? `Remaining balance (AED ${contract.advancePayment} prepaid booking advance)`
                       : "Fixed by Admin (non-editable)"}
                   </span>
                 </div>
@@ -1507,7 +1507,7 @@ export default function ConfirmDeliveryModal({
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Payment Terms</span>
                     <strong className="text-sm font-bold text-emerald-700 block truncate">{paymentMethod}</strong>
                     <p className="text-[11px] text-gray-600">
-                      Rental: ${collectedRentalAmount} • Deposit: ${depositAmount}
+                      Rental: AED {collectedRentalAmount} • Deposit: AED {depositAmount}
                     </p>
                   </div>
                 </div>

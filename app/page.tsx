@@ -78,7 +78,7 @@ const progressGradients = [
 
 // Default empty state
 const emptyStats = {
-  totalRevenue: "$0",
+  totalRevenue: "AED 0",
   activeRentals: "0",
   totalCustomers: "0",
   totalDrivers: "0",
@@ -380,7 +380,7 @@ export default function Dashboard() {
           {revenueChartData.length > 0 ? (
             <LineChartComponent
               data={revenueChartData}
-              lines={[{ dataKey: "revenue", color: "#22C55E", name: "Revenue ($)" }]}
+              lines={[{ dataKey: "revenue", color: "#22C55E", name: "Revenue (AED)" }]}
               height={250}
               useArea
             />

@@ -204,7 +204,7 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
                       <p className="text-sm font-semibold text-red-900">{damage.description}</p>
                       <p className="text-xs font-bold uppercase tracking-wider text-red-700 mt-2">Status: {damage.status}</p>
                     </div>
-                    <span className="text-base font-bold text-red-600">${damage.cost}</span>
+                    <span className="text-base font-bold text-red-600">AED {damage.cost}</span>
                   </div>
                 ))}
               </div>

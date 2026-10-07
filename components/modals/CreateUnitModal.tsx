@@ -1030,7 +1030,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Daily Rate ($) <span className="text-red-500">*</span>
+                    Daily Rate (AED) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1061,7 +1061,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
 
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Price per Extra KM ($) <span className="text-red-500">*</span>
+                    Price per Extra KM (AED) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"

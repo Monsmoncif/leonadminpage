@@ -65,11 +65,11 @@ export default function PaymentMethodSelector({
     if (/card/i.test(val)) selected.push("Card");
     if (/crypto/i.test(val)) selected.push("Crypto");
 
-    // Extract amounts if present: e.g. "Cash ($100) + Card ($200)"
+    // Extract amounts if present: e.g. "Cash (AED 100) + Card (AED 200)"
     const amounts: Record<SinglePaymentMethod, string> = { Cash: "", Card: "", Crypto: "" };
-    const cashMatch = val.match(/cash\s*(?:\(?\$?\s*([0-9.]+)\)?)?/i);
-    const cardMatch = val.match(/card\s*(?:\(?\$?\s*([0-9.]+)\)?)?/i);
-    const cryptoMatch = val.match(/crypto\s*(?:\(?\$?\s*([0-9.]+)\)?)?/i);
+    const cashMatch = val.match(/cash\s*(?:\(?(?:AED|\$)?\s*([0-9.]+)\)?)?/i);
+    const cardMatch = val.match(/card\s*(?:\(?(?:AED|\$)?\s*([0-9.]+)\)?)?/i);
+    const cryptoMatch = val.match(/crypto\s*(?:\(?(?:AED|\$)?\s*([0-9.]+)\)?)?/i);
 
     if (cashMatch && cashMatch[1]) amounts.Cash = cashMatch[1];
     if (cardMatch && cardMatch[1]) amounts.Card = cardMatch[1];
@@ -99,7 +99,7 @@ export default function PaymentMethodSelector({
     if (hasAnyAmount) {
       const parts = methods.map((m) => {
         const amt = amounts[m];
-        return amt && Number(amt) > 0 ? `${m} ($${amt})` : m;
+        return amt && Number(amt) > 0 ? `${m} (AED ${amt})` : m;
       });
       onChange(parts.join(" + "));
     } else {
@@ -250,7 +250,7 @@ export default function PaymentMethodSelector({
                 onClick={handleSplitEvenly}
                 className="text-[10px] font-bold text-brand hover:underline cursor-pointer"
               >
-                Split Evenly (${(totalAmount / selectedMethods.length).toFixed(2)} each)
+                Split Evenly (AED {(totalAmount / selectedMethods.length).toFixed(2)} each)
               </button>
             )}
           </div>
@@ -292,8 +292,8 @@ export default function PaymentMethodSelector({
                       <Icon size={14} className={methodInfo?.color || "text-brand"} />
                       <span className="text-xs font-bold text-text-primary truncate">{m} Amount:</span>
                     </div>
-                    <div className="relative w-28 shrink-0">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">$</span>
+                    <div className="relative w-32 shrink-0">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-muted">AED</span>
                       <input
                         type="number"
                         min="0"
@@ -301,7 +301,7 @@ export default function PaymentMethodSelector({
                         placeholder="0.00"
                         value={splitAmounts[m] || ""}
                         onChange={(e) => handleAmountChange(m, e.target.value)}
-                        className="w-full pl-5 pr-2 py-1 text-xs font-bold text-text-primary bg-white border border-border rounded-md focus:ring-1 focus:ring-brand focus:border-brand outline-none text-right"
+                        className="w-full pl-9 pr-2 py-1 text-xs font-bold text-text-primary bg-white border border-border rounded-md focus:ring-1 focus:ring-brand focus:border-brand outline-none text-right"
                       />
                     </div>
                   </div>
@@ -313,12 +313,12 @@ export default function PaymentMethodSelector({
             {totalAmount !== undefined && totalAmount > 0 && (
               <div className="flex items-center justify-between text-[11px] pt-1 px-1 font-semibold">
                 <span className="text-text-muted">
-                  {totalLabel}: <strong className="text-text-primary font-bold">${totalAmount.toFixed(2)}</strong>
+                  {totalLabel}: <strong className="text-text-primary font-bold">AED {totalAmount.toFixed(2)}</strong>
                 </span>
                 <span className={Math.abs(totalAllocated - totalAmount) < 0.01 ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-                  Allocated: ${totalAllocated.toFixed(2)}
+                  Allocated: AED {totalAllocated.toFixed(2)}
                   {Math.abs(totalAllocated - totalAmount) >= 0.01 && remaining !== undefined && (
-                    <span className="text-red-600 ml-1">(${remaining.toFixed(2)} left)</span>
+                    <span className="text-red-600 ml-1">(AED {remaining.toFixed(2)} left)</span>
                   )}
                   {Math.abs(totalAllocated - totalAmount) < 0.01 && <span className="ml-1 text-emerald-600">✓</span>}
                 </span>

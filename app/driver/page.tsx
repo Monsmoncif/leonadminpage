@@ -277,7 +277,7 @@ export default function DriverDashboard() {
 
       let paymentNote = "";
       if (data.paymentMethod) {
-        paymentNote = `[Handover Payment: ${data.paymentMethod}, Collected: $${data.rentalAmountCollected ?? 0} (${data.paymentStatus})]`;
+        paymentNote = `[Handover Payment: ${data.paymentMethod}, Collected: AED ${data.rentalAmountCollected ?? 0} (${data.paymentStatus})]`;
       }
 
       let finalNotes = cleanHandoverNotes;

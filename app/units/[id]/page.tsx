@@ -462,7 +462,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                 <div>
                   <p className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-1">Daily Rate</p>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-emerald-600">${unit.dailyRate ?? 'N/A'}</span>
+                    <span className="text-3xl font-black text-emerald-600">AED {unit.dailyRate ?? 'N/A'}</span>
                     <span className="text-sm font-semibold text-text-muted">/day</span>
                   </div>
                 </div>
@@ -658,7 +658,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                   <span className="text-[10px] uppercase font-bold tracking-wider">Revenue</span>
                 </div>
                 <p className="text-lg font-black text-text-primary">
-                  ${totalRevenue.toLocaleString()}
+                  AED {totalRevenue.toLocaleString()}
                 </p>
               </div>
 
@@ -1037,11 +1037,11 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                           <div className="flex flex-col">
                             <div className="flex items-baseline gap-1 font-bold text-text-primary">
                               <span className="text-sm font-black text-emerald-700">
-                                ${(contract.totalAmount || 0).toLocaleString()}
+                                AED {(contract.totalAmount || 0).toLocaleString()}
                               </span>
                               {contract.dailyRate && (
                                 <span className="text-[10px] text-text-muted font-normal">
-                                  (${contract.dailyRate}/d)
+                                  ({contract.dailyRate} AED/d)
                                 </span>
                               )}
                             </div>

@@ -10,9 +10,9 @@ export const dashboardStats = {
   vehiclesInMaintenance: "8",
   totalCustomers: "890",
   totalDrivers: "45",
-  totalRevenue: "$154,200",
+  totalRevenue: "AED 154,200",
   damagesReported: "15",
-  depositsPending: "$4,500",
+  depositsPending: "AED 4,500",
 };
 
 export const rentalsPerMonthData = [
@@ -137,7 +137,7 @@ export const bookingsData = [
     vehicle: "Toyota Corolla (TX1234)",
     startDate: "2028-08-01",
     endDate: "2028-08-05",
-    deposit: "$200",
+    deposit: "AED 200",
     status: "Completed" as const,
   },
   {
@@ -147,7 +147,7 @@ export const bookingsData = [
     vehicle: "Honda Civic (HX5678)",
     startDate: "2028-08-03",
     endDate: "2028-08-10",
-    deposit: "$150",
+    deposit: "AED 150",
     status: "Active" as const,
   },
   {
@@ -157,7 +157,7 @@ export const bookingsData = [
     vehicle: "Ford Focus (FX9012)",
     startDate: "2028-08-05",
     endDate: "2028-08-15",
-    deposit: "$300",
+    deposit: "AED 300",
     status: "Waiting Signature" as const,
   },
   {
@@ -167,7 +167,7 @@ export const bookingsData = [
     vehicle: "Chevrolet Malibu (CX3456)",
     startDate: "2028-08-10",
     endDate: "2028-08-12",
-    deposit: "$100",
+    deposit: "AED 100",
     status: "Draft" as const,
   },
   {
@@ -177,7 +177,7 @@ export const bookingsData = [
     vehicle: "Nissan Altima (NX7890)",
     startDate: "2028-08-02",
     endDate: "2028-08-04",
-    deposit: "$250",
+    deposit: "AED 250",
     status: "Cancelled" as const,
   },
 ];
@@ -469,9 +469,9 @@ export const paymentsData = [
     id: "INV-WZ001",
     client: "Alice Johnson",
     car: "Toyota Corolla",
-    ratePerDay: "$50",
+    ratePerDay: "AED 50",
     rentalPeriod: "3 Days",
-    amount: "$150",
+    amount: "AED 150",
     dueDate: "2024-08-05",
     status: "completed" as const,
   }
@@ -482,11 +482,11 @@ export const cashflowData = [
 ];
 
 export const expenseBreakdown = [
-  { name: "Vehicle Maintenance", value: 30, color: "#E53935", amount: "$3,000" },
+  { name: "Vehicle Maintenance", value: 30, color: "#E53935", amount: "AED 3,000" },
 ];
 
 export const transactionsData = [
-  { id: 1, name: "Oil Change", category: "Vehicle Maintenance", categoryColor: "#1E293B", quantity: 1, amount: "$100", date: "2024-08-01", status: "completed" as const },
+  { id: 1, name: "Oil Change", category: "Vehicle Maintenance", categoryColor: "#1E293B", quantity: 1, amount: "AED 100", date: "2024-08-01", status: "completed" as const },
 ];
 
 export const trackingDrivers = [
@@ -561,7 +561,7 @@ export const damagesData = [
     contract: "CTR-1002",
     description: "Broken taillight from reversing into a pole.",
     date: "2028-08-05",
-    cost: "$450",
+    cost: "AED 450",
     status: "Pending" as const,
   },
   {
@@ -571,7 +571,7 @@ export const damagesData = [
     contract: "CTR-1001",
     description: "Scratch on front bumper.",
     date: "2028-07-20",
-    cost: "$120",
+    cost: "AED 120",
     status: "Repaired" as const,
   }
 ];

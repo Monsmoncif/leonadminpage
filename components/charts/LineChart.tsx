@@ -33,7 +33,7 @@ export default function LineChartComponent({
   xKey = "month",
   height = 280,
   showGrid = true,
-  yAxisFormatter = (v: number) => `$${(v / 1000).toFixed(0)}K`,
+  yAxisFormatter = (v: number) => `${(v / 1000).toFixed(0)}K AED`,
   useArea = false,
 }: LineChartProps) {
   const Chart = useArea ? AreaChart : RechartsLineChart;

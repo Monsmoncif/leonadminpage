@@ -10,7 +10,7 @@ import { syncUnitStatuses } from "@/lib/unit-status";
 
 const emptyResponse = {
   stats: {
-    totalRevenue: "$0",
+    totalRevenue: "AED 0",
     activeRentals: "0",
     totalCustomers: "0",
     totalDrivers: "0",
@@ -22,7 +22,7 @@ const emptyResponse = {
     overdueRentals: "0",
     totalRentals: "0",
     damagesReported: "0",
-    depositsPending: "$0",
+    depositsPending: "AED 0",
   },
   rentalsPerMonthData: [],
   revenueData: [],
@@ -371,7 +371,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       stats: {
-        totalRevenue: `$${revenueThisMonth.toLocaleString()}`, // Changed to show this month's revenue
+        totalRevenue: `AED ${revenueThisMonth.toLocaleString()}`, // Changed to show this month's revenue
         activeRentals: String(activeContracts),
         totalCustomers: String(totalClients),
         totalDrivers: String(totalDrivers),
@@ -383,7 +383,7 @@ export async function GET(request: Request) {
         overdueRentals: String(overdueContracts),
         totalRentals: String(totalContracts),
         damagesReported: "0",
-        depositsPending: "$0",
+        depositsPending: "AED 0",
         changes,
       },
       rentalsPerMonthData,

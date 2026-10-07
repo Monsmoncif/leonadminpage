@@ -992,7 +992,7 @@ export default function CreateContractModal({
                             <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
                               <span className="font-mono text-text-muted bg-gray-100 px-2 py-0.5 rounded">{unit.plate}</span>
                               <div>
-                                <span className="text-base font-bold text-text-primary">${unit.dailyRate || 85}</span>
+                                <span className="text-base font-bold text-text-primary">AED {unit.dailyRate || 85}</span>
                                 <span className="text-text-muted text-[11px]">/day</span>
                               </div>
                             </div>
@@ -1437,11 +1437,11 @@ export default function CreateContractModal({
 
                       <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate ($/day)">
-                            Daily Rate ($/day)
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate (AED/day)">
+                            Daily Rate (AED/day)
                           </label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                             <input 
                               type="number" 
                               value={formData.dailyRate === 0 ? "" : formData.dailyRate} 
@@ -1457,20 +1457,20 @@ export default function CreateContractModal({
                                 }));
                               }} 
                               placeholder="e.g. 50"
-                              className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
                           <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                            {formData.unitId ? `Base vehicle rate ($/day)` : "Daily rental rate"}
+                            {formData.unitId ? `Base vehicle rate (AED/day)` : "Daily rental rate"}
                           </span>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount ($)">
-                            Collection Amount ($) <span className="text-red-500">*</span>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount (AED)">
+                            Collection Amount (AED) <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                             <input 
                               type="number" 
                               value={formData.collectionAmount === 0 ? "" : formData.collectionAmount} 
@@ -1486,20 +1486,20 @@ export default function CreateContractModal({
                                 }));
                               }} 
                               placeholder="e.g. 350"
-                              className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
                           <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                            Calculated: ${formData.dailyRate || 0} × {Math.max(1, Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 3600 * 24)))}d (editable)
+                            Calculated: AED {formData.dailyRate || 0} × {Math.max(1, Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 3600 * 24)))}d (editable)
                           </span>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance ($)">
-                            Advance ($)
+                          <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance (AED)">
+                            Advance (AED)
                           </label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-xs">$</span>
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-[10px]">AED</span>
                             <input 
                               type="number" 
                               value={formData.advancePayment === 0 ? "" : formData.advancePayment} 
@@ -1514,7 +1514,7 @@ export default function CreateContractModal({
                                 }));
                               }} 
                               placeholder="0"
-                              className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
+                              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
                             />
                           </div>
                           <span className="text-[11px] text-emerald-700/80 mt-0.5 block truncate">
@@ -1523,11 +1523,11 @@ export default function CreateContractModal({
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount ($)">
-                            Deposit Amount ($)
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount (AED)">
+                            Deposit Amount (AED)
                           </label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                             <input 
                               type="number" 
                               value={formData.depositAmount === 0 ? "" : formData.depositAmount} 
@@ -1536,7 +1536,7 @@ export default function CreateContractModal({
                                 setFormData(prev => ({ ...prev, depositAmount: val }));
                               }} 
                               placeholder="0"
-                              className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
                           <span className="text-[11px] text-text-muted mt-0.5 block truncate">
@@ -1560,19 +1560,19 @@ export default function CreateContractModal({
                                 Remaining to Collect on Handover
                               </span>
                               <p className="text-xs text-text-muted mt-0.5">
-                                Total Charges: ${totalCharges}
-                                {advancePaid > 0 ? ` - Prepaid Advance: $${advancePaid}` : ""}
-                                {formData.deliveryCharges > 0 ? ` (inc. Delivery $${formData.deliveryCharges})` : ""}
-                                {formData.babySeatFees > 0 ? ` (inc. Baby Seat $${formData.babySeatFees})` : ""}
+                                Total Charges: AED {totalCharges}
+                                {advancePaid > 0 ? ` - Prepaid Advance: AED ${advancePaid}` : ""}
+                                {formData.deliveryCharges > 0 ? ` (inc. Delivery AED ${formData.deliveryCharges})` : ""}
+                                {formData.babySeatFees > 0 ? ` (inc. Baby Seat AED ${formData.babySeatFees})` : ""}
                               </p>
                             </div>
                             <div className="text-left sm:text-right">
                               <span className="text-2xl font-black text-brand">
-                                ${remainingToCollect}
+                                AED {remainingToCollect}
                               </span>
                               {advancePaid > 0 && (
                                 <span className="text-xs font-bold text-emerald-700 block">
-                                  ✓ Prepaid Advance: ${advancePaid}
+                                  ✓ Prepaid Advance: AED {advancePaid}
                                 </span>
                               )}
                             </div>
@@ -1592,7 +1592,7 @@ export default function CreateContractModal({
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">Price per Extra KM ($)</label>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1">Price per Extra KM (AED)</label>
                           <input 
                             type="number" 
                             value={formData.pricePerExtraKm} 
@@ -1604,7 +1604,7 @@ export default function CreateContractModal({
 
                       <div className="grid grid-cols-2 gap-3 pt-2">
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee ($)</label>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee (AED)</label>
                           <input 
                             type="number" 
                             value={formData.babySeatFees} 
@@ -1613,7 +1613,7 @@ export default function CreateContractModal({
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge ($)</label>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge (AED)</label>
                           <input 
                             type="number" 
                             value={formData.deliveryCharges} 
@@ -1735,7 +1735,7 @@ export default function CreateContractModal({
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-text-muted">Rental Collection Amount:</span>
-                          <span className="font-bold text-text-primary">${formData.collectionAmount} (~${formData.dailyRate}/day)</span>
+                          <span className="font-bold text-text-primary">AED {formData.collectionAmount} (~AED {formData.dailyRate}/day)</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-text-muted">Initial Fuel &amp; Odometer:</span>
@@ -1749,25 +1749,25 @@ export default function CreateContractModal({
                         {formData.deliveryCharges > 0 && (
                           <div className="flex justify-between py-1 border-b border-gray-100">
                             <span className="text-text-muted">Delivery Fee:</span>
-                            <span className="font-semibold text-text-primary">${formData.deliveryCharges}</span>
+                            <span className="font-semibold text-text-primary">AED {formData.deliveryCharges}</span>
                           </div>
                         )}
                         {formData.babySeatFees > 0 && (
                           <div className="flex justify-between py-1 border-b border-gray-100">
                             <span className="text-text-muted">Baby Seat Fee:</span>
-                            <span className="font-semibold text-text-primary">${formData.babySeatFees}</span>
+                            <span className="font-semibold text-text-primary">AED {formData.babySeatFees}</span>
                           </div>
                         )}
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-text-muted">Expected Deposit:</span>
                           <span className="font-bold text-emerald-600">
-                            ${formData.depositAmount} {formData.deliveryDriverId || formData.deliveryCharges > 0 ? "(Collected upon delivery)" : "(Collected at shop)"}
+                            AED {formData.depositAmount} {formData.deliveryDriverId || formData.deliveryCharges > 0 ? "(Collected upon delivery)" : "(Collected at shop)"}
                           </span>
                         </div>
                         {Number(formData.advancePayment || 0) > 0 && (
                           <div className="flex justify-between py-1 border-b border-gray-100 bg-emerald-50/50 px-2 rounded-lg items-center">
                             <span className="text-emerald-800 font-bold text-xs">Prepaid Advance:</span>
-                            <span className="font-black text-emerald-700 text-xs">-${formData.advancePayment}</span>
+                            <span className="font-black text-emerald-700 text-xs">- AED {formData.advancePayment}</span>
                           </div>
                         )}
                         <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
@@ -1779,12 +1779,12 @@ export default function CreateContractModal({
                             </span>
                             <span className="text-[10px] text-text-muted">
                               {Number(formData.advancePayment || 0) > 0 
-                                ? `Total $${Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)} - Advance $${formData.advancePayment}`
+                                ? `Total AED ${Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)} - Advance AED ${formData.advancePayment}`
                                 : `Collection Price ${formData.deliveryCharges > 0 ? "+ Delivery" : ""}`}
                             </span>
                           </div>
                           <span className="text-base font-black text-brand">
-                            ${Math.max(0, (Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)) - Number(formData.advancePayment || 0))}
+                            AED {Math.max(0, (Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)) - Number(formData.advancePayment || 0))}
                           </span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100 items-center">
@@ -1808,7 +1808,7 @@ export default function CreateContractModal({
                         <div className="flex justify-between py-1">
                           <span className="text-text-muted">Mileage Limit:</span>
                           <span className="font-semibold text-text-primary">
-                            {formData.dailyKmLimit ? `${formData.dailyKmLimit} km/day (+$${formData.pricePerExtraKm}/km)` : "Unlimited mileage"}
+                            {formData.dailyKmLimit ? `${formData.dailyKmLimit} km/day (+AED ${formData.pricePerExtraKm}/km)` : "Unlimited mileage"}
                           </span>
                         </div>
                       </div>
@@ -1817,9 +1817,9 @@ export default function CreateContractModal({
                         <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider block mb-1">
                           Total Rental Amount
                         </span>
-                        <span className="text-3xl font-black text-brand">${calculatedTotalRent.toFixed(2)}</span>
+                        <span className="text-3xl font-black text-brand">AED {calculatedTotalRent.toFixed(2)}</span>
                         <span className="text-[11px] text-text-muted block mt-1">
-                          Total rental charges (deposit of ${formData.depositAmount} held separately upon handover)
+                          Total rental charges (deposit of AED {formData.depositAmount} held separately upon handover)
                         </span>
                       </div>
                     </div>

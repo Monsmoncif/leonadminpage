@@ -1053,7 +1053,7 @@ export function NewRentalAdminPageContent() {
                 <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
                   <span className="font-mono text-text-muted bg-gray-100 px-2 py-0.5 rounded">{unit.plate}</span>
                   <div>
-                    <span className="text-base font-bold text-text-primary">${unit.dailyRate || 85}</span>
+                    <span className="text-base font-bold text-text-primary">AED {unit.dailyRate || 85}</span>
                     <span className="text-text-muted text-[11px]">/day</span>
                   </div>
                 </div>
@@ -1492,11 +1492,11 @@ export function NewRentalAdminPageContent() {
 
             <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate ($/day)">
-                  Daily Rate ($/day)
+                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate (AED/day)">
+                  Daily Rate (AED/day)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                   <input 
                     type="number" 
                     value={rentalData.dailyRate === 0 ? "" : rentalData.dailyRate} 
@@ -1509,20 +1509,20 @@ export function NewRentalAdminPageContent() {
                       }));
                     }} 
                     placeholder="e.g. 50"
-                    className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                  {selectedVehicle ? `Base vehicle rate ($/day)` : "Daily rental rate"}
+                  {selectedVehicle ? `Base vehicle rate (AED/day)` : "Daily rental rate"}
                 </span>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount ($)">
-                  Collection Amount ($) <span className="text-red-500">*</span>
+                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount (AED)">
+                  Collection Amount (AED) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                   <input 
                     type="number" 
                     value={rentalData.collectionAmount === 0 ? "" : rentalData.collectionAmount} 
@@ -1535,20 +1535,20 @@ export function NewRentalAdminPageContent() {
                       }));
                     }} 
                     placeholder="e.g. 350"
-                    className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                  Calculated: ${rentalData.dailyRate || 0} × {totalDays}d (editable)
+                  Calculated: AED {rentalData.dailyRate || 0} × {totalDays}d (editable)
                 </span>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance ($)">
-                  Advance ($)
+                <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance (AED)">
+                  Advance (AED)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-xs">$</span>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-[10px]">AED</span>
                   <input 
                     type="number" 
                     value={rentalData.advancePayment === 0 ? "" : rentalData.advancePayment} 
@@ -1563,7 +1563,7 @@ export function NewRentalAdminPageContent() {
                       }));
                     }} 
                     placeholder="0"
-                    className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
                   />
                 </div>
                 <span className="text-[11px] text-emerald-700/80 mt-0.5 block truncate">
@@ -1572,11 +1572,11 @@ export function NewRentalAdminPageContent() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount ($)">
-                  Deposit Amount ($)
+                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount (AED)">
+                  Deposit Amount (AED)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">$</span>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                   <input 
                     type="number" 
                     value={rentalData.depositAmount === 0 ? "" : rentalData.depositAmount} 
@@ -1585,7 +1585,7 @@ export function NewRentalAdminPageContent() {
                       setRentalData(prev => ({ ...prev, depositAmount: val }));
                     }} 
                     placeholder="0"
-                    className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
@@ -1609,19 +1609,19 @@ export function NewRentalAdminPageContent() {
                       Remaining to Collect on Handover
                     </span>
                     <p className="text-xs text-text-muted mt-0.5">
-                      Total Charges: ${totalCharges}
-                      {advancePaid > 0 ? ` - Prepaid Advance: $${advancePaid}` : ""}
-                      {rentalData.deliveryFee > 0 ? ` (inc. Delivery $${rentalData.deliveryFee})` : ""}
-                      {rentalData.babySeatFee > 0 ? ` (inc. Baby Seat $${rentalData.babySeatFee})` : ""}
+                      Total Charges: AED {totalCharges}
+                      {advancePaid > 0 ? ` - Prepaid Advance: AED ${advancePaid}` : ""}
+                      {rentalData.deliveryFee > 0 ? ` (inc. Delivery AED ${rentalData.deliveryFee})` : ""}
+                      {rentalData.babySeatFee > 0 ? ` (inc. Baby Seat AED ${rentalData.babySeatFee})` : ""}
                     </p>
                   </div>
                   <div className="text-left sm:text-right">
                     <span className="text-2xl font-black text-brand">
-                      ${remainingToCollect}
+                      AED {remainingToCollect}
                     </span>
                     {advancePaid > 0 && (
                       <span className="text-xs font-bold text-emerald-700 block">
-                        ✓ Prepaid Advance: ${advancePaid}
+                        ✓ Prepaid Advance: AED {advancePaid}
                       </span>
                     )}
                   </div>
@@ -1641,7 +1641,7 @@ export function NewRentalAdminPageContent() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Price per Extra KM ($)</label>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Price per Extra KM (AED)</label>
                 <input 
                   type="number" 
                   value={rentalData.pricePerExtraKm} 
@@ -1654,7 +1654,7 @@ export function NewRentalAdminPageContent() {
             {/* Extra Fees Grid (Baby Seat Fee & Delivery Charge) */}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee ($)</label>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee (AED)</label>
                 <input 
                   type="number" 
                   value={rentalData.babySeatFee === 0 ? "" : rentalData.babySeatFee} 
@@ -1664,7 +1664,7 @@ export function NewRentalAdminPageContent() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge ($)</label>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge (AED)</label>
                 <input 
                   type="number" 
                   value={rentalData.deliveryFee === 0 ? "" : rentalData.deliveryFee} 
@@ -1829,7 +1829,7 @@ export function NewRentalAdminPageContent() {
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100">
                 <span className="text-text-muted">Rental Collection Amount:</span>
-                <span className="font-bold text-text-primary">${rentalData.collectionAmount} (~${rentalData.dailyRate}/day)</span>
+                <span className="font-bold text-text-primary">AED {rentalData.collectionAmount} (~AED {rentalData.dailyRate}/day)</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100">
                 <span className="text-text-muted">Initial Fuel &amp; Odometer:</span>
@@ -1843,19 +1843,19 @@ export function NewRentalAdminPageContent() {
               {rentalData.deliveryFee > 0 && (
                 <div className="flex justify-between py-1 border-b border-gray-100">
                   <span className="text-text-muted">Delivery Fee:</span>
-                  <span className="font-semibold text-text-primary">${rentalData.deliveryFee}</span>
+                  <span className="font-semibold text-text-primary">AED {rentalData.deliveryFee}</span>
                 </div>
               )}
               <div className="flex justify-between py-1 border-b border-gray-100">
                 <span className="text-text-muted">Expected Deposit:</span>
                 <span className="font-bold text-emerald-600">
-                  ${rentalData.depositAmount} {contractType === "Delivery" ? "(Collected by driver)" : "(Collected at shop)"}
+                  AED {rentalData.depositAmount} {contractType === "Delivery" ? "(Collected by driver)" : "(Collected at shop)"}
                 </span>
               </div>
               {Number(rentalData.advancePayment || 0) > 0 && (
                 <div className="flex justify-between py-1 border-b border-gray-100 bg-emerald-50/50 px-2 rounded-lg items-center">
                   <span className="text-emerald-800 font-bold text-xs">Prepaid Advance:</span>
-                  <span className="font-black text-emerald-700 text-xs">-${rentalData.advancePayment}</span>
+                  <span className="font-black text-emerald-700 text-xs">- AED {rentalData.advancePayment}</span>
                 </div>
               )}
               <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
@@ -1867,12 +1867,12 @@ export function NewRentalAdminPageContent() {
                   </span>
                   <span className="text-[10px] text-text-muted">
                     {Number(rentalData.advancePayment || 0) > 0 
-                      ? `Total $${Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)} - Advance $${rentalData.advancePayment}`
+                      ? `Total AED ${Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)} - Advance AED ${rentalData.advancePayment}`
                       : `Collection Price ${rentalData.deliveryFee > 0 ? "+ Delivery" : ""}`}
                   </span>
                 </div>
                 <span className="text-base font-black text-brand">
-                  ${Math.max(0, (Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)) - Number(rentalData.advancePayment || 0))}
+                  AED {Math.max(0, (Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)) - Number(rentalData.advancePayment || 0))}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100 items-center">
