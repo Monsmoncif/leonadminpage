@@ -1154,9 +1154,19 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3.5 rounded-xl flex items-start gap-2">
-                <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                <p>{error}</p>
+              <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3.5 rounded-xl flex items-start justify-between gap-2 animate-fade-in">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-500" />
+                  <p>{error}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="p-1 hover:bg-red-100 rounded-lg text-red-400 hover:text-red-700 transition-colors cursor-pointer shrink-0"
+                  aria-label="Dismiss error"
+                >
+                  <X size={15} />
+                </button>
               </div>
             )}
           </form>

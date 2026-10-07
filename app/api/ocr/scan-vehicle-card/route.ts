@@ -170,34 +170,48 @@ CRITICAL RULES:
     async function scanImagesBatch(imagesToProcess: any[]): Promise<any> {
       let ext: any = null;
 
-      // Priority 1: Groq AI (Free + Fast)
+      // Priority 1: Groq AI (Free + Fast - Primary OCR engine)
       if (groqKey && isProviderAvailable("groq")) {
         try {
           ext = await callGroqVision(groqKey, systemPrompt, imagesToProcess);
         } catch (groqErr: any) {
-          markProviderFailed("groq", 60000);
-          console.error("Groq Vehicle OCR error:", groqErr?.message || groqErr);
-          errors.push(`Groq: ${groqErr?.message || groqErr}`);
+          console.warn("Groq Vehicle OCR first attempt:", groqErr?.message || groqErr);
+          // Auto-retry once after a short delay on transient error or timeout
+          try {
+            await new Promise((r) => setTimeout(r, 1200));
+            ext = await callGroqVision(groqKey, systemPrompt, imagesToProcess);
+          } catch (retryErr: any) {
+            console.error("Groq Vehicle OCR retry error:", retryErr?.message || retryErr);
+            errors.push(`Groq: ${retryErr?.message || retryErr}`);
+          }
         }
       }
 
-      // Priority 2: Gemini AI (Free Fallback)
+      // Priority 2: Gemini AI (Fallback if valid key configured)
       if (!ext && geminiKey && isProviderAvailable("gemini")) {
         try {
           ext = await callGeminiVision(geminiKey, systemPrompt, imagesToProcess);
         } catch (geminiErr: any) {
-          markProviderFailed("gemini", 60000);
+          if (String(geminiErr?.message).includes("401")) {
+            markProviderFailed("gemini", 24 * 3600 * 1000);
+          } else {
+            markProviderFailed("gemini", 30000);
+          }
           console.error("Gemini Vehicle OCR error:", geminiErr?.message || geminiErr);
           errors.push(`Gemini: ${geminiErr?.message || geminiErr}`);
         }
       }
 
-      // Priority 3: OpenAI (Paid Fallback)
+      // Priority 3: OpenAI (Fallback if valid key configured)
       if (!ext && openaiKey && isProviderAvailable("openai")) {
         try {
           ext = await callOpenAIVision(openaiKey, systemPrompt, imagesToProcess);
         } catch (openaiErr: any) {
-          markProviderFailed("openai", 15000);
+          if (String(openaiErr?.message).includes("401")) {
+            markProviderFailed("openai", 24 * 3600 * 1000);
+          } else {
+            markProviderFailed("openai", 30000);
+          }
           console.error("OpenAI Vehicle OCR error:", openaiErr?.message || openaiErr);
           errors.push(`OpenAI: ${openaiErr?.message || openaiErr}`);
         }
@@ -212,18 +226,17 @@ CRITICAL RULES:
     } else {
       // Multiple images provided (e.g. separate front and back photos)
       extracted = await scanImagesBatch(parsedImages);
-      // Fallback merge if incomplete
+      // Fallback merge if incomplete - scan sequentially to prevent concurrency spikes
       if (!extracted || (!extracted.plate && !extracted.vin)) {
-        const individualResults = await Promise.all(
-          parsedImages.map((img) => scanImagesBatch([img]))
-        );
         const merged: any = {};
-        for (const res of individualResults) {
-          if (!res || typeof res !== "object") continue;
-          for (const [k, v] of Object.entries(res)) {
-            if (v !== undefined && v !== null && v !== "") {
-              if (!merged[k] || merged[k] === "") {
-                merged[k] = v;
+        for (const img of parsedImages) {
+          const res = await scanImagesBatch([img]);
+          if (res && typeof res === "object") {
+            for (const [k, v] of Object.entries(res)) {
+              if (v !== undefined && v !== null && v !== "") {
+                if (!merged[k] || merged[k] === "") {
+                  merged[k] = v;
+                }
               }
             }
           }
@@ -235,8 +248,9 @@ CRITICAL RULES:
     }
 
     if (!extracted || typeof extracted !== "object" || Object.keys(extracted).length === 0) {
+      console.error("[Vehicle OCR] All providers failed:", errors);
       throw new Error(
-        `فشل استخراج بيانات رخصة المركبة عبر الذكاء الاصطناعي. تفاصيل الأخطاء: ${errors.join(" | ")}`
+        "تعذر قراءة بيانات رخصة المركبة تلقائياً من الصورة. يرجى التأكد من وضوح الصورة وإضاءتها، أو إدخال البيانات يدوياً."
       );
     }
 
@@ -391,7 +405,7 @@ async function callGroqVision(groqKey: string, systemPrompt: string, parsedImage
       Authorization: `Bearer ${groqKey}`,
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(35000),
   });
 
   if (!aiRes.ok) {

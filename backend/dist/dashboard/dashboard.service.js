@@ -272,7 +272,7 @@ let DashboardService = class DashboardService {
         ];
         return {
             stats: {
-                totalRevenue: `$${revenueThisMonth.toLocaleString()}`,
+                totalRevenue: `AED ${revenueThisMonth.toLocaleString()}`,
                 activeRentals: String(activeContracts),
                 totalCustomers: String(totalClients),
                 totalDrivers: String(totalDrivers),
@@ -284,7 +284,7 @@ let DashboardService = class DashboardService {
                 overdueRentals: String(overdueContracts),
                 totalRentals: String(totalContracts),
                 damagesReported: String(damagesCount),
-                depositsPending: '$0',
+                depositsPending: 'AED 0',
                 changes,
             },
             rentalsPerMonthData,

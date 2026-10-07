@@ -239,7 +239,11 @@ Extraction Guidelines:
         try {
           ext = await callGeminiVision(geminiKey, systemPrompt, imagesToProcess);
         } catch (geminiErr: any) {
-          markProviderFailed("gemini", 60000);
+          if (String(geminiErr?.message).includes("401")) {
+            markProviderFailed("gemini", 24 * 3600 * 1000);
+          } else {
+            markProviderFailed("gemini", 30000);
+          }
           console.error("Gemini OCR error:", geminiErr?.message || geminiErr);
           errors.push(`Gemini: ${geminiErr?.message || geminiErr}`);
         }
@@ -250,7 +254,11 @@ Extraction Guidelines:
         try {
           ext = await callOpenAIVision(openaiKey, systemPrompt, imagesToProcess);
         } catch (openaiErr: any) {
-          markProviderFailed("openai", 60000);
+          if (String(openaiErr?.message).includes("401")) {
+            markProviderFailed("openai", 24 * 3600 * 1000);
+          } else {
+            markProviderFailed("openai", 30000);
+          }
           console.error("OpenAI OCR error:", openaiErr?.message || openaiErr);
           errors.push(`OpenAI: ${openaiErr?.message || openaiErr}`);
         }
@@ -315,8 +323,9 @@ Extraction Guidelines:
     }
 
     if (!extracted || typeof extracted !== "object" || Object.keys(extracted).length === 0) {
+      console.error("[Document OCR] All providers failed:", errors);
       throw new Error(
-        `فشل استخراج البيانات عبر محركات الذكاء الاصطناعي. تفاصيل الأخطاء: ${errors.join(" | ")}`
+        "تعذر استخراج بيانات المستند تلقائياً من الصورة. يرجى التأكد من وضوح الصورة أو إدخال البيانات يدوياً."
       );
     }
 
