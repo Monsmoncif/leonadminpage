@@ -473,7 +473,7 @@ export default function ContractsPage() {
                       <th className="text-left py-3 px-4 text-text-muted font-semibold whitespace-nowrap">
                         Contract
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-left py-3 px-4 text-text-muted font-semibold min-w-[240px]">
                         Customer / Driver
                       </th>
                       <th className="text-left py-3 px-4 text-text-muted font-semibold">
@@ -537,14 +537,17 @@ export default function ContractsPage() {
                               )}
                             </td>
 
-                            {/* Customer / Driver Column (Only customer name & driver name) */}
-                            <td className="py-3 px-4">
+                            {/* Customer / Driver Column (Shows full customer name & driver name) */}
+                            <td className="py-3 px-4 min-w-[240px]">
                               <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-sm ${getAvatarColor(contract.customer)}`}>
                                   {getInitials(contract.customer)}
                                 </div>
-                                <div className="min-w-0">
-                                  <span className="font-semibold flex items-center gap-1.5 text-text-primary">
+                                <div className="flex-1 min-w-0">
+                                  <span 
+                                    className="font-semibold text-text-primary block break-words leading-snug"
+                                    title={contract.customer}
+                                  >
                                     {contract.customer}
                                   </span>
                                   {(() => {
@@ -565,7 +568,7 @@ export default function ContractsPage() {
                                     }
 
                                     return (
-                                      <p className="text-xs text-text-muted truncate mt-0.5" title={`Driver: ${driverDisplay}`}>
+                                      <p className="text-xs text-text-muted mt-0.5 break-words leading-tight" title={`Driver: ${driverDisplay}`}>
                                         {driverDisplay}
                                       </p>
                                     );
