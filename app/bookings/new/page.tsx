@@ -29,7 +29,9 @@ import {
   PenTool,
   RotateCcw,
   Gauge,
-  ShieldCheck
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -124,6 +126,7 @@ export function NewRentalAdminPageContent() {
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState("");
   const [fleetFilter, setFleetFilter] = useState<"available" | "all">("all");
+  const [showAllCars, setShowAllCars] = useState(false);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -1014,88 +1017,122 @@ export function NewRentalAdminPageContent() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredUnits.map((unit) => {
-            const isSelected = selectedVehicle === unit._id;
-            const conflict = getUnitConflict(unit, rentalData.startDate, rentalData.endDate);
-            const isAvailable = !conflict;
-
-            return (
-              <div
-                key={unit._id}
-                onClick={() => {
-                  if (unit.status === "Maintenance" || unit.status === "Out of Service") {
-                    toast.error(`This car is currently in ${unit.status} and cannot be booked.`);
-                    return;
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(showAllCars || filteredUnits.length <= 3 
+              ? filteredUnits 
+              : (() => {
+                  const top3 = filteredUnits.slice(0, 3);
+                  if (selectedVehicle && !top3.some(u => u._id === selectedVehicle)) {
+                    const sel = filteredUnits.find(u => u._id === selectedVehicle);
+                    if (sel) return [...top3, sel];
                   }
-                  setSelectedVehicle(unit._id);
-                  const start = new Date(rentalData.startDate);
-                  const end = new Date(rentalData.endDate);
-                  const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
-                  const defaultRate = unit.dailyRate || 85;
-                  setRentalData(prev => ({
-                    ...prev,
-                    dailyRate: defaultRate,
-                    collectionAmount: defaultRate * days,
-                    dailyKmLimit: unit.dailyKmLimit || 0,
-                    pricePerExtraKm: unit.pricePerExtraKm || 0,
-                    checkoutMileage: unit.mileage || 0,
-                  }));
+                  return top3;
+                })()
+            ).map((unit) => {
+              const isSelected = selectedVehicle === unit._id;
+              const conflict = getUnitConflict(unit, rentalData.startDate, rentalData.endDate);
+              const isAvailable = !conflict;
 
-                  if (conflict && conflict.reason === "Booked") {
-                    const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                    const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                    toast.info(`Selected ${unit.make} ${unit.model}. Note: It is booked from ${conflictStart} to ${conflictEnd}. Please choose non-overlapping dates.`);
-                  } else {
-                    toast.success(`Selected ${unit.make} ${unit.model} (${unit.plate})`);
-                  }
-                }}
-                className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group cursor-pointer card-hover ${
-                  isSelected 
-                    ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md" 
-                    : "border-border shadow-sm hover:border-gray-300"
-                }`}
+              return (
+                <div
+                  key={unit._id}
+                  onClick={() => {
+                    if (unit.status === "Maintenance" || unit.status === "Out of Service") {
+                      toast.error(`This car is currently in ${unit.status} and cannot be booked.`);
+                      return;
+                    }
+                    setSelectedVehicle(unit._id);
+                    const start = new Date(rentalData.startDate);
+                    const end = new Date(rentalData.endDate);
+                    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+                    const defaultRate = unit.dailyRate || 85;
+                    setRentalData(prev => ({
+                      ...prev,
+                      dailyRate: defaultRate,
+                      collectionAmount: defaultRate * days,
+                      dailyKmLimit: unit.dailyKmLimit || 0,
+                      pricePerExtraKm: unit.pricePerExtraKm || 0,
+                      checkoutMileage: unit.mileage || 0,
+                    }));
+
+                    if (conflict && conflict.reason === "Booked") {
+                      const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                      const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                      toast.info(`Selected ${unit.make} ${unit.model}. Note: It is booked from ${conflictStart} to ${conflictEnd}. Please choose non-overlapping dates.`);
+                    } else {
+                      toast.success(`Selected ${unit.make} ${unit.model} (${unit.plate})`);
+                    }
+                  }}
+                  className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group cursor-pointer card-hover ${
+                    isSelected 
+                      ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md" 
+                      : "border-border shadow-sm hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-text-muted font-bold mb-0.5">
+                        {unit.make} • {unit.year || new Date().getFullYear()}
+                      </p>
+                      <h3 className="text-base font-bold text-text-primary leading-tight">{unit.model}</h3>
+                    </div>
+                    {isSelected ? (
+                      <span className="bg-brand text-white p-1 rounded-full"><CheckCircle2 size={16} /></span>
+                    ) : conflict?.reason === "Booked" ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        Booked ({new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+                      </span>
+                    ) : unit.status === "Maintenance" || unit.status === "Out of Service" ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                        {unit.status}
+                      </span>
+                    ) : (
+                      <StatusBadge variant="available" text="Available" />
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 flex items-center justify-center min-h-[130px] my-3 relative bg-gray-50/70 rounded-xl border border-gray-100 group-hover:bg-gray-100/60 transition-colors">
+                    {unit.images && unit.images.length > 0 ? (
+                      <img src={unit.images[0]} alt={unit.model} className="max-w-full max-h-28 object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <ExecutiveCarIcon size={44} className="text-gray-300" />
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
+                    <span className="font-mono text-text-muted bg-gray-100 px-2 py-0.5 rounded">{unit.plate}</span>
+                    <div>
+                      <span className="text-base font-bold text-text-primary">AED {unit.dailyRate || 85}</span>
+                      <span className="text-text-muted text-[11px]">/day</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {filteredUnits.length > 3 && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAllCars(prev => !prev)}
+                className="px-6 py-2.5 bg-white hover:bg-gray-50 text-text-primary text-xs font-bold rounded-xl border border-border shadow-xs hover:shadow transition-all flex items-center gap-2 cursor-pointer group"
               >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wider text-text-muted font-bold mb-0.5">
-                      {unit.make} • {unit.year || new Date().getFullYear()}
-                    </p>
-                    <h3 className="text-base font-bold text-text-primary leading-tight">{unit.model}</h3>
-                  </div>
-                  {isSelected ? (
-                    <span className="bg-brand text-white p-1 rounded-full"><CheckCircle2 size={16} /></span>
-                  ) : conflict?.reason === "Booked" ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                      Booked ({new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })})
-                    </span>
-                  ) : unit.status === "Maintenance" || unit.status === "Out of Service" ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                      {unit.status}
-                    </span>
-                  ) : (
-                    <StatusBadge variant="available" text="Available" />
-                  )}
-                </div>
-                
-                <div className="flex-1 flex items-center justify-center min-h-[130px] my-3 relative bg-gray-50/70 rounded-xl border border-gray-100 group-hover:bg-gray-100/60 transition-colors">
-                  {unit.images && unit.images.length > 0 ? (
-                    <img src={unit.images[0]} alt={unit.model} className="max-w-full max-h-28 object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-300" />
-                  ) : (
-                    <ExecutiveCarIcon size={44} className="text-gray-300" />
-                  )}
-                </div>
-
-                <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
-                  <span className="font-mono text-text-muted bg-gray-100 px-2 py-0.5 rounded">{unit.plate}</span>
-                  <div>
-                    <span className="text-base font-bold text-text-primary">AED {unit.dailyRate || 85}</span>
-                    <span className="text-text-muted text-[11px]">/day</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                {showAllCars ? (
+                  <>
+                    <span>Show Less (عرض 3 فقط)</span>
+                    <ChevronUp size={16} className="text-text-muted group-hover:text-text-primary transition-transform" />
+                  </>
+                ) : (
+                  <>
+                    <span>Show More Cars (عرض المزيد من السيارات) — +{filteredUnits.length - 3}</span>
+                    <ChevronDown size={16} className="text-text-muted group-hover:text-text-primary transition-transform" />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

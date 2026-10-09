@@ -55,97 +55,80 @@ function getBrowserExecutablePath(): string | null {
   return null;
 }
 
-let globalBrowser: any = null;
-let browserLaunchingPromise: Promise<any> | null = null;
-
-async function getOrCreateBrowser(execPath: string): Promise<any> {
-  if (globalBrowser && globalBrowser.isConnected()) {
-    return globalBrowser;
-  }
-
-  if (browserLaunchingPromise) {
-    return browserLaunchingPromise;
-  }
-
-  browserLaunchingPromise = (async () => {
-    try {
-      const browser = await puppeteer.launch({
-        executablePath: execPath,
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--no-first-run",
-          "--no-default-browser-check",
-          "--disable-extensions",
-          "--disable-sync",
-        ],
-      });
-
-      browser.on("disconnected", () => {
-        globalBrowser = null;
-      });
-
-      globalBrowser = browser;
-      return browser;
-    } finally {
-      browserLaunchingPromise = null;
-    }
-  })();
-
-  return browserLaunchingPromise;
-}
 
 /**
- * Generates the EXACT contract PDF matching the Admin Print page (/bookings/[id]/print)
- * 100% identical to the contract that admin prints out.
+ * Generates the EXACT official contract PDF matching the Admin Print page (/bookings/[id]/print)
+ * 100% identical to the physical printed contract agreement.
  */
 export async function generateContractPdfFromPrintUrl(
   contractId: string,
   fallbackData?: ContractPdfData
 ): Promise<Buffer> {
   const execPath = getBrowserExecutablePath();
-  if (execPath) {
-    let page: any = null;
+  if (!execPath) {
+    console.error("[PdfGenerator] No Chrome or Edge executable found on server host");
+    if (fallbackData) return generateContractPdf(fallbackData);
+    throw new Error("No browser executable found to render print PDF");
+  }
+
+  let browser: any = null;
+  let page: any = null;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: execPath,
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-extensions",
+      ],
+    });
+
+    page = await browser.newPage();
+    await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
+
+    const baseUrl = process.env.NEXTAUTH_URL || "http://127.0.0.1:3000";
+    const printUrl = `${baseUrl}/bookings/${contractId}/print?noprint=1&fresh=1`;
+
     try {
-      const browser = await getOrCreateBrowser(execPath);
-      page = await browser.newPage();
+      await page.goto(printUrl, { waitUntil: "networkidle0", timeout: 20000 });
+    } catch {
+      await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+    }
 
-      const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-      const printUrl = `${baseUrl}/bookings/${contractId}/print?noprint=1&fresh=1&t=${Date.now()}`;
+    // Wait for the contract page content to be fully rendered
+    await page.waitForSelector("#contract-page-1, #contract-print-content", { timeout: 15000 });
+    
+    // Brief settle time for fonts, diagrams, stamps, and signatures
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
-      await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
-      await page.waitForSelector("#contract-print-content", { timeout: 15000 });
-      // Brief pause to allow fonts, signatures, and dynamic layout to settle
-      await new Promise((resolve) => setTimeout(resolve, 300));
+    const pdfUint8Array = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "6mm", bottom: "6mm", left: "5mm", right: "5mm" },
+    });
 
-      const pdfUint8Array = await page.pdf({
-        format: "A4",
-        printBackground: true,
-        margin: { top: "6mm", bottom: "6mm", left: "5mm", right: "5mm" },
-      });
-
-      await page.close();
-      page = null;
-
-      const pdfBuffer = Buffer.from(pdfUint8Array);
-      console.log(`[PdfGenerator] Rendered exact admin print contract (${pdfBuffer.length} bytes) for #${contractId}`);
-      return pdfBuffer;
-    } catch (browserErr) {
-      console.error("[PdfGenerator] Failed to render via headless browser, falling back to pdfkit:", browserErr);
-      if (page) {
-        try { await page.close(); } catch {}
-      }
+    const pdfBuffer = Buffer.from(pdfUint8Array);
+    console.log(`[PdfGenerator] Successfully generated official contract PDF (${pdfBuffer.length} bytes) for #${contractId}`);
+    return pdfBuffer;
+  } catch (err) {
+    console.error(`[PdfGenerator] Failed generating print PDF for contract ${contractId}:`, err);
+    if (fallbackData) {
+      return generateContractPdf(fallbackData);
+    }
+    throw err;
+  } finally {
+    if (page) {
+      try { await page.close(); } catch {}
+    }
+    if (browser) {
+      try { await browser.close(); } catch {}
     }
   }
-
-  // Fallback to pdfkit if browser not available or error occurred
-  if (fallbackData) {
-    return generateContractPdf(fallbackData);
-  }
-  throw new Error("Could not generate PDF from print URL or fallback data");
 }
 
 /**

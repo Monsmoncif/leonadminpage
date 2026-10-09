@@ -16,20 +16,37 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
 
-    if (result?.error) {
-      toast.error("Invalid credentials");
-      setIsLoading(false);
-    } else {
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        toast.error("Invalid credentials");
+        setIsLoading(false);
+        return;
+      }
+
       toast.success("Signed in successfully!");
-      router.push("/");
-      router.refresh();
+      
+      // Check role to direct to correct dashboard
+      try {
+        const sessRes = await fetch("/api/auth/session");
+        const sessData = await sessRes.json();
+        if (sessData?.user?.role === "driver") {
+          window.location.href = "/driver";
+          return;
+        }
+      } catch {
+        // fallback
+      }
+      window.location.href = "/";
+    } catch (err: any) {
+      toast.error("An error occurred during sign in");
+      setIsLoading(false);
     }
   };
 
