@@ -400,11 +400,14 @@ export async function PUT(
           fetch(`${baseUrl}/api/contracts/notify-admin`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contractId: existingContract._id.toString(), type: "vehicle_returned" }),
+            body: JSON.stringify({ contractId: updatedContract._id.toString(), type: "vehicle_returned" }),
           }).catch(err => console.error("Failed to notify admin on return:", err));
         } catch (e) { console.error("Admin return notify failed:", e); }
 
-        // Note: On vehicle return, contract is kept for internal admin records only and NOT sent to client
+        // Send VIP Thank You & Return Completion notification to client (No PDF attached)
+        sendClientContractNotification(updatedContract._id.toString(), "final").catch((finalErr) => {
+          console.error("Client final return notification failed:", finalErr);
+        });
 
 
         // Automatically generate Before and After inspections for Comparison

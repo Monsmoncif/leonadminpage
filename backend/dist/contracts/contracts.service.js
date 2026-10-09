@@ -290,6 +290,7 @@ let ContractsService = class ContractsService {
         catch (e) {
             console.error('Failed to create log', e);
         }
+        this.sendClient({ contractId: contract._id.toString(), type: 'created' }).catch((e) => console.error('Client booking notification trigger failed:', e));
         return contract;
     }
     async update(id, body, currentUser) {
@@ -497,7 +498,8 @@ let ContractsService = class ContractsService {
                     message: `Contract ${updatedContract._id.toString().substring(0, 8).toUpperCase()} was returned. Driver confirmed collecting ${body.returnAmountCollected !== undefined ? `$${body.returnAmountCollected}` : 'remaining balance'} to admin.`,
                     type: 'alert',
                 });
-                this.notifyAdmin({ contractId: existingContract._id.toString(), type: 'vehicle_returned' }).catch((e) => console.error('Admin return notify failed:', e));
+                this.notifyAdmin({ contractId: updatedContract._id.toString(), type: 'vehicle_returned' }).catch((e) => console.error('Admin return notify failed:', e));
+                this.sendClient({ contractId: updatedContract._id.toString(), type: 'final' }).catch((e) => console.error('Client final return notification failed:', e));
                 try {
                     const returnOdo = Number(body.returnOdometer) || initialMileage;
                     const inspCount = await this.inspectionModel.countDocuments();

@@ -325,9 +325,10 @@ export async function POST(req: Request) {
     // Synchronize vehicle status: if contract starts today or in past, it becomes Rented; if it starts in the future, it stays Available until the start date arrives
     await syncUnitStatuses(body.unitId);
 
-    // Notice: PDF creation and official contract numbers are NOT sent on creation.
-    // They are triggered when Handover is confirmed (by Admin in Shop or Driver on Delivery).
-
+    // Automatically send booking confirmation notification to client (Order confirmed - without PDF)
+    sendClientContractNotification(contract._id.toString(), "created").catch((notifErr) => {
+      console.error("Failed to dispatch client booking confirmation notification:", notifErr);
+    });
 
     return NextResponse.json(contract, { status: 201 });
   } catch (error: any) {

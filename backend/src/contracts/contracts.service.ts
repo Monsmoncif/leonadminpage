@@ -318,6 +318,11 @@ export class ContractsService {
       console.error('Failed to create log', e);
     }
 
+    // Send automated booking confirmation to client (Order confirmed - without PDF)
+    this.sendClient({ contractId: contract._id.toString(), type: 'created' }).catch((e) =>
+      console.error('Client booking notification trigger failed:', e),
+    );
+
     return contract;
   }
 
@@ -569,10 +574,14 @@ export class ContractsService {
           type: 'alert',
         });
 
-        this.notifyAdmin({ contractId: existingContract._id.toString(), type: 'vehicle_returned' }).catch(
+        this.notifyAdmin({ contractId: updatedContract._id.toString(), type: 'vehicle_returned' }).catch(
           (e) => console.error('Admin return notify failed:', e),
         );
-        // Note: On vehicle return, contract is for internal admin records only and NOT sent to client
+
+        // Send VIP Thank You & Return Completion notification to client (No PDF attached)
+        this.sendClient({ contractId: updatedContract._id.toString(), type: 'final' }).catch(
+          (e) => console.error('Client final return notification failed:', e),
+        );
 
         try {
           const returnOdo = Number(body.returnOdometer) || initialMileage;
