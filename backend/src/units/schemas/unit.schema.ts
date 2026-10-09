@@ -75,6 +75,15 @@ export class Unit {
 
   @Prop({ default: '' })
   owner?: string;
+
+  @Prop({ type: Number, default: 0 })
+  initialMileage?: number;
+
+  @Prop({ type: Number, default: 0 })
+  lastOilChangeMileage?: number;
+
+  @Prop({ type: Date, required: false })
+  lastOilChangeDate?: Date;
 }
 
 export const UnitSchema = SchemaFactory.createForClass(Unit);

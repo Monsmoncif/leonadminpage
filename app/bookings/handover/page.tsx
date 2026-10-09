@@ -33,17 +33,14 @@ import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
-import CreateClientModal from "@/components/modals/CreateClientModal";
-import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import { useToast } from "@/components/providers/ToastProvider";
 
-// EXACT same 5 steps as Driver Handover (Car -> Client -> Inspection Photos -> Rental Data -> Sign & Review)
+// 4 steps for Admin Shop Handover (Car -> Inspection Photos -> Rental Data -> Sign & Review)
 const STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Client", icon: User },
-  { id: 3, title: "Inspection Photos", icon: Camera },
-  { id: 4, title: "Rental Data", icon: FileText },
-  { id: 5, title: "Sign & Review", icon: PenTool },
+  { id: 2, title: "Inspection Photos", icon: Camera },
+  { id: 3, title: "Rental Data", icon: FileText },
+  { id: 4, title: "Sign & Review", icon: PenTool },
 ];
 
 export const formatTimeDisplay = (rawTime?: string): string => {
@@ -374,9 +371,9 @@ function ConfirmHandoverPageContent() {
     scrollToTop();
   }, [currentStep]);
 
-  // Canvas DPI initialization when reaching Review Step (Step 5)
+  // Canvas DPI initialization when reaching Review Step (Step 4)
   useEffect(() => {
-    const isReviewStep = currentStep === 5;
+    const isReviewStep = currentStep === 4;
     if (isReviewStep) {
       const timer = setTimeout(() => {
         const canvas = canvasRef.current;
@@ -527,17 +524,8 @@ function ConfirmHandoverPageContent() {
       }
     }
 
-    // Validation for Step 2: Client
-    if (currentStep === 2) {
-      if (!selectedClient) {
-        setError("Please select or register a primary customer.");
-        toast.error("Please select a customer before proceeding.");
-        return;
-      }
-    }
-
-    // Validation for Step 4: Rental Data & Payment
-    if (currentStep === 4) {
+    // Validation for Step 3: Rental Data & Payment
+    if (currentStep === 3) {
       if (!isDepositConfirmed) {
         setError("Please confirm receipt of money by checking 'Confirm Get All Money'.");
         toast.error("Please check 'Confirm Get All Money' before proceeding.");
@@ -593,14 +581,14 @@ function ConfirmHandoverPageContent() {
   // Final Submission to API
   const handleConfirmHandover = async () => {
     if (!isDepositConfirmed) {
-      setError("Please check 'Confirm Get All Money' in Step 4 before activating the contract.");
-      toast.error("Please confirm payment in Step 4.");
-      setCurrentStep(4);
+      setError("Please check 'Confirm Get All Money' in Step 3 before activating the contract.");
+      toast.error("Please confirm payment in Step 3.");
+      setCurrentStep(3);
       return;
     }
 
     if (!signatureData) {
-      setError("Customer signature is required. Please capture customer signature in Step 5.");
+      setError("Customer signature is required. Please capture customer signature in Step 4.");
       toast.error("Customer signature is required. (توقيع العميل مطلوب)");
       return;
     }
@@ -705,7 +693,7 @@ function ConfirmHandoverPageContent() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-8 flex items-center justify-between">
-          {[1, 2, 3, 4, 5].map((i) => (
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-gray-200"></div>
               <div className="w-16 h-2 bg-gray-200 rounded-full hidden sm:block"></div>
@@ -772,10 +760,10 @@ function ConfirmHandoverPageContent() {
   const depositTotal = Number(rentalData.depositAmount || 0);
   const grandTotal = collectionTotal + depositTotal;
 
-  // Selected client object (strictly null when deselected)
+  // Selected client object
   const selectedClientObj = selectedClient
     ? clients.find((c) => String(c._id) === String(selectedClient)) || (typeof clientToEdit === "object" && clientToEdit?._id ? clientToEdit : null)
-    : null;
+    : (contract?.clientId && typeof contract.clientId === "object" ? contract.clientId : null);
   const secondDriverName = secondDriverClient?.name || additionalDriver.name;
   const secondDriverLicense = secondDriverClient?.licenseNumber || additionalDriver.license;
 
@@ -788,6 +776,18 @@ function ConfirmHandoverPageContent() {
           <p className="text-xs text-text-muted mt-0.5">
             Verify the assigned vehicle profile, set handover time, and inspect checkout fuel level
           </p>
+        </div>
+        {/* Customer Info Card */}
+        <div className="flex items-center gap-3 bg-white border border-border px-4 py-2.5 rounded-2xl shadow-2xs">
+          <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs shrink-0">
+            <User size={15} />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-text-muted block leading-none">Customer / العميل</span>
+            <span className="text-xs font-bold text-text-primary block leading-snug mt-0.5">
+              {selectedClientObj?.name || contract?.customer || "Customer"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -948,198 +948,12 @@ function ConfirmHandoverPageContent() {
     </div>
   );
 
-  // ===================== STEP 2: CLIENT (Matching Driver renderClientStep) =====================
-  const renderClientStep = () => (
-    <div className="space-y-5 animate-fade-in-up">
-      {/* Step Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-text-primary">Select Customer (اختيار العميل)</h2>
-          <p className="text-xs text-text-muted mt-0.5">Click a customer card to select, or register / edit client</p>
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
-            <input
-              type="text"
-              placeholder="Search by name, phone, license..."
-              value={clientSearchQuery}
-              onChange={(e) => setClientSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setIsAddingForSecondDriver(false);
-              setClientToEdit(selectedClientObj || null);
-              setIsClientModalOpen(true);
-            }}
-            className="px-3.5 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
-            title="Edit selected client or register new"
-          >
-            <UserCheck size={14} />
-            <span>{selectedClientObj ? "Edit Client" : "+ New Client"}</span>
-          </button>
-
-          {/* Compact 2nd Driver Icon Button */}
-          <button
-            type="button"
-            onClick={() => setIsSelectSecondDriverModalOpen(true)}
-            className={`relative p-2 rounded-xl border transition-all cursor-pointer shrink-0 group ${
-              secondDriverName
-                ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
-                : "bg-gray-50 border-border text-text-muted hover:border-red-400 hover:text-red-600 hover:bg-red-50/50"
-            }`}
-            title={secondDriverName ? `2nd Driver: ${secondDriverName}` : "Add 2nd Driver (إضافة سائق ثاني)"}
-          >
-            <User size={16} />
-            <span
-              className={`absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-xs ${
-                secondDriverName ? "bg-red-600" : "bg-gray-400 group-hover:bg-red-600"
-              }`}
-            >
-              2
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Selection Chips — only when someone is selected */}
-      {(selectedClientObj || secondDriverName) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {selectedClientObj && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/8 border border-brand/20">
-              <span className="w-5 h-5 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center">
-                1
-              </span>
-              <span className="text-xs font-semibold text-text-primary truncate max-w-[160px]">
-                {selectedClientObj.name}
-              </span>
-              <CheckCircle2 size={13} className="text-brand shrink-0" />
-              <button
-                type="button"
-                onClick={() => {
-                  setClientToEdit(selectedClientObj);
-                  setIsClientModalOpen(true);
-                }}
-                className="text-brand hover:text-brand-dark transition-colors cursor-pointer text-[10px] font-bold underline ml-1"
-                title="Edit Client Info"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedClient(null);
-                  setClientToEdit(null);
-                  setError(null);
-                }}
-                className="text-text-muted hover:text-red-500 transition-colors cursor-pointer ml-0.5"
-                title="Deselect client"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          )}
-          {secondDriverName && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200">
-              <span className="w-5 h-5 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center">
-                2
-              </span>
-              <span className="text-xs font-semibold text-text-primary truncate max-w-[140px]">
-                {secondDriverName}
-              </span>
-              {secondDriverLicense && (
-                <span className="text-[9px] font-mono text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
-                  {secondDriverLicense}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={handleRemoveSecondDriver}
-                className="text-red-400 hover:text-red-600 transition-colors cursor-pointer ml-0.5"
-                title="Remove second driver"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!clientSearchQuery && clients.length > 6 && (
-        <p className="text-[11px] text-text-muted">
-          Showing latest 6 customers. Use search to find any other customer, or click &quot;Edit Client&quot; to update details.
-        </p>
-      )}
-
-      {filteredClients.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl bg-gray-50/50">
-          <User size={40} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-text-primary">No customers found</p>
-          <p className="text-xs text-text-muted mt-1">Click &quot;+ New Client&quot; to register the customer right away.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredClients.map((client) => {
-            const isSelected = selectedClient ? String(selectedClient) === String(client._id) : false;
-            return (
-              <div
-                key={client._id}
-                onClick={() => {
-                  setError(null);
-                  if (selectedClient && String(selectedClient) === String(client._id)) {
-                    setSelectedClient(null);
-                    setClientToEdit(null);
-                  } else {
-                    setSelectedClient(String(client._id));
-                    setClientToEdit(client);
-                  }
-                }}
-                className={`bg-card rounded-2xl border p-4 flex items-center justify-between transition-all cursor-pointer group card-hover ${
-                  isSelected
-                    ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md"
-                    : "border-border shadow-sm hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm shrink-0">
-                    {client.name?.charAt(0)?.toUpperCase() || "C"}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-text-primary leading-snug truncate">{client.name}</h3>
-                    <p className="text-xs text-text-muted truncate">{client.phone || "No phone"}</p>
-                    {client.idNumber && (
-                      <span className="text-[10px] font-mono text-gray-500 block truncate">
-                        ID: {client.idNumber}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {isSelected ? (
-                  <span className="bg-brand text-white p-1 rounded-full shrink-0">
-                    <CheckCircle2 size={16} />
-                  </span>
-                ) : (
-                  <div className="w-5 h-5 rounded-full border border-gray-300 group-hover:border-brand shrink-0" />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-
-  // ===================== STEP 3: INSPECTION PHOTOS (Matching Driver renderInspectionStep) =====================
+  // ===================== STEP 2: INSPECTION PHOTOS =====================
   const renderInspectionStep = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 3: Pre-Handover Vehicle Inspection Photos</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step 2: Pre-Handover Vehicle Inspection Photos</h2>
           <p className="text-xs text-text-muted mt-0.5">
             Take or upload 8 standard angles to document vehicle condition before client handover
           </p>
@@ -1156,11 +970,11 @@ function ConfirmHandoverPageContent() {
     </div>
   );
 
-  // ===================== STEP 4: RENTAL DATA (Matching Driver renderRentalDataStep) =====================
+  // ===================== STEP 3: RENTAL DATA =====================
   const renderRentalDataStep = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div>
-        <h2 className="text-lg font-bold text-text-primary">Rental Period &amp; Financial Terms</h2>
+        <h2 className="text-lg font-bold text-text-primary">Step 3: Rental Period &amp; Financial Terms</h2>
         <p className="text-xs text-text-muted mt-0.5">
           Specify dates, locations, payment method, and confirm collection of all required money
         </p>
@@ -1436,12 +1250,12 @@ function ConfirmHandoverPageContent() {
     </div>
   );
 
-  // ===================== STEP 5: SIGN & REVIEW (Matching Driver renderReviewStep) =====================
+  // ===================== STEP 4: SIGN & REVIEW =====================
   const renderReviewStep = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 5: Review &amp; Sign Contract</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step 4: Review &amp; Sign Contract</h2>
           <p className="text-xs text-text-muted mt-0.5">
             Review full handover terms and capture signatures to finalize and activate the rental contract
           </p>
@@ -1648,10 +1462,9 @@ function ConfirmHandoverPageContent() {
   // Render active step content
   const renderStepContent = () => {
     if (currentStep === 1) return renderCarStep();
-    if (currentStep === 2) return renderClientStep();
-    if (currentStep === 3) return renderInspectionStep();
-    if (currentStep === 4) return renderRentalDataStep();
-    if (currentStep === 5) return renderReviewStep();
+    if (currentStep === 2) return renderInspectionStep();
+    if (currentStep === 3) return renderRentalDataStep();
+    if (currentStep === 4) return renderReviewStep();
     return null;
   };
 
@@ -1799,31 +1612,7 @@ function ConfirmHandoverPageContent() {
         </div>
       </div>
 
-      {/* Modals for Client Registration/Editing and Second Driver */}
-      {isClientModalOpen && (
-        <CreateClientModal
-          isOpen={isClientModalOpen}
-          onClose={() => setIsClientModalOpen(false)}
-          onSuccess={handleClientModalSuccess}
-          clientToEdit={clientToEdit}
-        />
-      )}
 
-      {isSelectSecondDriverModalOpen && (
-        <SelectSecondDriverModal
-          isOpen={isSelectSecondDriverModalOpen}
-          onClose={() => setIsSelectSecondDriverModalOpen(false)}
-          clients={clients}
-          primaryClientId={selectedClient}
-          onSelectSecondDriver={handleSelectSecondDriver}
-          onOpenCreateClientModal={() => {
-            setIsSelectSecondDriverModalOpen(false);
-            setIsAddingForSecondDriver(true);
-            setClientToEdit(null);
-            setIsClientModalOpen(true);
-          }}
-        />
-      )}
 
       {/* Lightbox Preview Modal for Money Proof Photos */}
       {previewMoneyPhotoUrl && (

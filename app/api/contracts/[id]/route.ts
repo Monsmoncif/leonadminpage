@@ -15,6 +15,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { sendClientContractNotification, sendDriverTaskNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
+import { clearPdfCache } from "@/app/api/contracts/[id]/pdf/route";
 
 export async function GET(
   request: Request,
@@ -276,9 +277,9 @@ export async function PUT(
         .lean();
 
       const nextContractNumber =
-        lastContract && typeof (lastContract as any).contractNumber === "number" && (lastContract as any).contractNumber >= 2000
+        lastContract && typeof (lastContract as any).contractNumber === "number" && (lastContract as any).contractNumber >= 2200
           ? (lastContract as any).contractNumber + 1
-          : 2000;
+          : 2200;
 
       updatedData.contractNumber = nextContractNumber;
     }
@@ -302,6 +303,9 @@ export async function PUT(
         { status: 500 }
       );
     }
+
+    // Invalidate cached PDF so fresh PDF with latest handover mileage, fuel, and signature is generated
+    clearPdfCache(resolvedParams.id);
 
     // Auto-send initial contract PDF to client once vehicle handover is confirmed (Delivered)
     const isHandoverConfirmation = 

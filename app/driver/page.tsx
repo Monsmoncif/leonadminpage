@@ -13,13 +13,15 @@ import {
   Search, 
   AlertCircle,
   LayoutGrid,
-  List
+  List,
+  Plus
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useToast } from "@/components/providers/ToastProvider";
 import { sparklineData } from "@/data/mock";
 import ConfirmDeliveryModal from "@/components/modals/ConfirmDeliveryModal";
@@ -177,8 +179,14 @@ export default function DriverDashboard() {
         const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned";
         const isCancelled = contract.status === "Cancelled";
 
-        // Unconfirmed / Undispatched contracts must NOT appear in Driver Dashboard
-        const isDispatched = Boolean(contract.isDispatched || contract.contractNumber || contract.deliveryStatus === "Delivered" || contract.status === "Active");
+        // Unconfirmed / Undispatched contracts must NOT appear in Driver Dashboard (unless assigned to or created for driver)
+        const isDispatched = Boolean(
+          contract.isDispatched || 
+          contract.contractNumber || 
+          contract.deliveryStatus === "Delivered" || 
+          contract.status === "Active" ||
+          (contract.deliveryDriverId && matchDriverId(contract.deliveryDriverId, session?.user?.id))
+        );
         if (!isDispatched && !isDelivered) {
           return;
         }
@@ -562,6 +570,15 @@ export default function DriverDashboard() {
           <p className="text-sm text-text-secondary mt-1">
             Welcome back, {session?.user?.name?.split(" ")[0] || "Driver"}. Manage your assigned delivery handovers and vehicle returns.
           </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/driver/contracts/new"
+            className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer shrink-0"
+          >
+            <Plus size={18} />
+            <span>New Contract</span>
+          </Link>
         </div>
       </div>
 

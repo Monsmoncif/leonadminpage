@@ -84,67 +84,91 @@ export async function sendClientContractNotification(
     const contractPdfUrl = `${baseUrl}/bookings/${contract._id}/print`;
     const contractDownloadUrl = `${baseUrl}/api/contracts/${contract._id}/pdf`;
 
-    // 0. GENERATE REAL PDF BUFFER FOR ATTACHMENT (Exact match of Admin Print Page /bookings/[id]/print)
+    // 0. GENERATE REAL PDF BUFFER FOR ATTACHMENT (Exact match of Admin Print Page /bookings/[id]/print, with instant PDFKit fallback)
+    const contractPdfData = {
+      contractNumber: contractNum,
+      clientName,
+      clientPhone: clientPhone || "",
+      clientEmail: clientEmail || "",
+      clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
+      clientType: clientDoc.clientType || (clientDoc.idNumber ? "Resident" : "Tourist"),
+      clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
+      vehicleName,
+      vehiclePlate,
+      vehicleColor,
+      vehicleYear,
+      checkoutMileage: contract.checkoutMileage || contract.startMileage || 0,
+      checkoutFuelLevel: contract.checkoutFuelLevel !== undefined ? Number(contract.checkoutFuelLevel) : 100,
+      startDate,
+      endDate,
+      status: contract.status,
+      deliveryStatus: contract.deliveryStatus,
+      returnedAt: contract.returnedAt || contract.updatedAt,
+      totalDays: contract.totalDays || 1,
+      dailyRate: contract.dailyRate || (contract.totalDays ? Math.round(contract.totalAmount / contract.totalDays) : contract.totalAmount),
+      depositAmount: contract.depositAmount || 0,
+      totalAmount: contract.totalAmount || 0,
+      paymentMethod: contract.paymentMethod || "Cash",
+      salikCharge: Number(contract.salikCharge || contract.salikFees || 0),
+      parkingCharge: Number(contract.parkingCharge || contract.parkingFees || 0),
+      finesCharge: Number(contract.finesCharge || contract.finesFees || 0),
+      fuelCharge: Number(contract.fuelCharge || contract.fuelFees || 0),
+      notes: contract.notes || "",
+      customerSignature: contract.customerSignature || contract.signature,
+      createdAt: new Date(contract.createdAt || Date.now()).toLocaleDateString("en-GB"),
+    };
+
     let pdfBuffer: Buffer | undefined;
     try {
-      // Timeout PDF generation after 15s so it doesn't block WhatsApp sending
-      const pdfPromise = generateContractPdfFromPrintUrl(contract._id.toString(), {
-        contractNumber: contractNum,
-        clientName,
-        clientPhone: clientPhone || "",
-        clientEmail: clientEmail || "",
-        clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
-        clientType: clientDoc.clientType || (clientDoc.idNumber ? "Resident" : "Tourist"),
-        clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
-        vehicleName,
-        vehiclePlate,
-        vehicleColor,
-        vehicleYear,
-        checkoutMileage: contract.checkoutMileage || contract.startMileage || 0,
-        checkoutFuelLevel: contract.checkoutFuelLevel !== undefined ? Number(contract.checkoutFuelLevel) : 100,
-        startDate,
-        endDate,
-        status: contract.status,
-        deliveryStatus: contract.deliveryStatus,
-        returnedAt: contract.returnedAt || contract.updatedAt,
-        totalDays: contract.totalDays || 1,
-        dailyRate: contract.dailyRate || (contract.totalDays ? Math.round(contract.totalAmount / contract.totalDays) : contract.totalAmount),
-        depositAmount: contract.depositAmount || 0,
-        totalAmount: contract.totalAmount || 0,
-        paymentMethod: contract.paymentMethod || "Cash",
-        salikCharge: Number(contract.salikCharge || contract.salikFees || 0),
-        parkingCharge: Number(contract.parkingCharge || contract.parkingFees || 0),
-        finesCharge: Number(contract.finesCharge || contract.finesFees || 0),
-        fuelCharge: Number(contract.fuelCharge || contract.fuelFees || 0),
-        notes: contract.notes || "",
-        customerSignature: contract.customerSignature || contract.signature,
-        createdAt: new Date(contract.createdAt || Date.now()).toLocaleDateString("en-GB"),
-      });
+      // Step A: Attempt exact browser rendering matching /bookings/[id]/print
+      const pdfPromise = generateContractPdfFromPrintUrl(contract._id.toString(), contractPdfData);
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("PDF generation timed out after 15s")), 15000)
+        setTimeout(() => reject(new Error("Browser PDF generation timed out after 35s")), 35000)
       );
       pdfBuffer = await Promise.race([pdfPromise, timeoutPromise]);
       console.log(`[ClientNotification] Generated exact admin print PDF (${pdfBuffer.length} bytes) for contract #${contractNum}`);
-    } catch (pdfErr) {
-      console.error(`[ClientNotification] Error generating PDF for contract #${contractNum}:`, pdfErr);
-      // pdfBuffer stays undefined — WhatsApp will send text only
+    } catch (browserErr) {
+      console.warn(`[ClientNotification] Browser PDF render failed/timed out for contract #${contractNum}, generating via PDFKit fallback:`, browserErr);
+      try {
+        pdfBuffer = await generateContractPdf(contractPdfData);
+        console.log(`[ClientNotification] Generated PDFKit fallback PDF (${pdfBuffer.length} bytes) for contract #${contractNum}`);
+      } catch (fallbackErr) {
+        console.error(`[ClientNotification] Both PDF generation methods failed for contract #${contractNum}:`, fallbackErr);
+      }
     }
 
-    // 1. SEND GMAIL TO CLIENT WITH ATTACHED PDF
+    // 1. SEND GMAIL TO CLIENT WITH REAL CONTRACT DETAILS & ATTACHED PDF
     if (clientEmail) {
       const transporter = getTransporter();
       if (transporter) {
         try {
           const { subject, html: emailHtml } = buildClientContractEmail({
             clientName,
+            clientPhone: clientPhone || "",
+            clientEmail: clientEmail || "",
+            clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
+            clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
             contractNumber: contractNum,
             vehicleName,
             vehiclePlate,
+            vehicleColor,
+            vehicleYear,
+            checkoutMileage: contract.checkoutMileage || contract.startMileage,
+            checkoutFuelLevel: contract.checkoutFuelLevel !== undefined ? Number(contract.checkoutFuelLevel) : undefined,
             startDate,
             endDate,
+            startTime: contract.checkoutTime || contract.startTime,
+            endTime: contract.returnTime || contract.endTime,
             pickupLocation: contract.pickupLocation,
-            totalAmount: contract.totalAmount,
+            returnLocation: contract.returnLocation,
+            totalDays: contract.totalDays,
             dailyRate: contract.dailyRate,
+            collectionAmount: contract.collectionAmount || contract.totalAmount,
+            advancePayment: contract.advancePayment || contract.advance,
+            depositAmount: contract.depositAmount,
+            totalAmount: contract.totalAmount,
+            paymentMethod: contract.paymentMethod,
+            notes: contract.notes,
             type,
             contractUrl: contractPdfUrl,
           });
@@ -168,7 +192,7 @@ export async function sendClientContractNotification(
             attachments,
           });
           results.email = true;
-          console.log(`[ClientNotification] Email with attached PDF sent to ${clientEmail}`);
+          console.log(`[ClientNotification] Email with real contract and attached PDF sent to ${clientEmail}`);
         } catch (mailErr) {
           console.error(`[ClientNotification] Failed to send email to ${clientEmail}:`, mailErr);
         }

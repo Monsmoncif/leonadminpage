@@ -103,11 +103,11 @@ export default function Sidebar() {
 
       <aside
         className={`fixed left-0 top-0 bottom-0 z-50 flex flex-col bg-white border-r border-border transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-[78px]" : "translate-x-0 w-[264px]"
+          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-[72px]" : "translate-x-0 w-[216px]"
         }`}
       >
       {/* ── Brand header ────────────────────────────────────── */}
-      <div className="relative flex items-center px-5 h-[72px] border-b border-border/50 shrink-0 justify-between">
+      <div className="relative flex items-center px-4 h-[68px] border-b border-border/50 shrink-0 justify-between">
         <div
           className={`flex flex-col overflow-hidden transition-all duration-300 ${
             collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
@@ -146,19 +146,19 @@ export default function Sidebar() {
       </div>
 
       {/* ── Navigation ──────────────────────────────────────── */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar py-4 px-3">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar py-3 px-2.5">
         {sections.map((section, sIdx) => (
-          <div key={section.label} className={sIdx > 0 ? "mt-5" : ""}>
+          <div key={section.label} className={sIdx > 0 ? "mt-4" : ""}>
             {/* Section label */}
             <div
-              className={`flex items-center h-6 mb-1.5 transition-all duration-300 ${
-                collapsed ? "justify-center" : "px-3"
+              className={`flex items-center h-5 mb-1 transition-all duration-300 ${
+                collapsed ? "justify-center" : "px-2.5"
               }`}
             >
               {collapsed ? (
-                <div className="w-5 h-[1px] bg-border/80 rounded-full" />
+                <div className="w-4 h-[1px] bg-border/80 rounded-full" />
               ) : (
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-muted/70 select-none">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted/70 select-none">
                   {section.label}
                 </span>
               )}
@@ -181,10 +181,10 @@ export default function Sidebar() {
                         }
                       }}
                       className={`
-                        relative flex items-center gap-3 rounded-xl
-                        text-[13.5px] font-medium
+                        relative flex items-center gap-2.5 rounded-xl
+                        text-[13px] font-medium
                         transition-all duration-200 ease-out
-                        ${collapsed ? "justify-center px-0 py-2.5 mx-auto w-11 h-11" : "px-3 py-2.5"}
+                        ${collapsed ? "justify-center px-0 py-2.5 mx-auto w-10 h-10" : "px-3 py-2"}
                         ${
                           active
                             ? "bg-brand/[0.08] text-brand shadow-[inset_0_0_0_1px_rgba(229,57,53,0.08)]"
@@ -193,11 +193,6 @@ export default function Sidebar() {
                         group
                       `}
                     >
-                      {/* Active indicator bar */}
-                      {active && !collapsed && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-brand rounded-r-full shadow-[2px_0_8px_rgba(229,57,53,0.3)]" />
-                      )}
-
                       {/* Icon */}
                       <span
                         className={`shrink-0 transition-all duration-200 ${
@@ -206,7 +201,7 @@ export default function Sidebar() {
                             : "text-text-muted group-hover:text-text-secondary"
                         }`}
                       >
-                        <item.icon size={item.name === "Units" ? 15 : 20} strokeWidth={active ? 2.2 : 1.8} />
+                        <item.icon size={item.name === "Units" ? 15 : 18} strokeWidth={active ? 2.2 : 1.8} />
                       </span>
 
                       {/* Label */}
@@ -249,19 +244,18 @@ export default function Sidebar() {
       </nav>
 
       {/* ── Logout ──────────────────────────────── */}
-      <div className="shrink-0 border-t border-border/50 p-3">
-        {/* Logout */}
+      <div className="shrink-0 border-t border-border/50 p-2.5">
         <button
           onClick={handleLogout}
           className={`
-            flex items-center gap-3 rounded-xl text-[13px] font-medium
+            flex items-center gap-2.5 rounded-xl text-[13px] font-medium
             text-text-secondary hover:bg-red-50/80 hover:text-red-600
             transition-all duration-200 w-full group
-            ${collapsed ? "justify-center p-2.5 mx-auto w-11 h-11" : "px-3 py-2.5"}
+            ${collapsed ? "justify-center p-2 mx-auto w-10 h-10" : "px-3 py-2"}
           `}
         >
           <LogOut
-            size={19}
+            size={18}
             strokeWidth={1.8}
             className="shrink-0 text-text-muted group-hover:text-red-500 transition-colors"
           />

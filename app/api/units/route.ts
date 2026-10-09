@@ -71,6 +71,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     await connectDB();
     
+    const mileageNum = Number(body.mileage) || 0;
+    if (body.initialMileage === undefined || body.initialMileage === null) {
+      body.initialMileage = mileageNum;
+    }
+    if (body.lastOilChangeMileage === undefined || body.lastOilChangeMileage === null || body.lastOilChangeMileage === 0) {
+      body.lastOilChangeMileage = mileageNum;
+    }
+    if (!body.lastOilChangeDate) {
+      body.lastOilChangeDate = new Date();
+    }
+    
     const unit = await Unit.create(body);
     return NextResponse.json(unit, { status: 201 });
   } catch (error: any) {

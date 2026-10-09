@@ -22,6 +22,9 @@ export interface IUnit {
   insuranceExpiry?: Date | string;
   registrationExpiry?: Date | string;
   owner?: string;
+  initialMileage?: number;
+  lastOilChangeMileage?: number;
+  lastOilChangeDate?: Date | string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +38,7 @@ const unitSchema = new Schema<IUnit>(
     vin: { type: String, required: true, unique: true },
     color: { type: String, required: true },
     mileage: { type: Number, required: true, default: 0 },
+    initialMileage: { type: Number, default: 0 },
     status: { 
       type: String, 
       enum: ["Available", "Rented", "Maintenance", "Out of Service"],
@@ -53,6 +57,8 @@ const unitSchema = new Schema<IUnit>(
     insuranceExpiry: { type: Date, required: false },
     registrationExpiry: { type: Date, required: false },
     owner: { type: String, default: "" },
+    lastOilChangeMileage: { type: Number, default: 0 },
+    lastOilChangeDate: { type: Date, required: false },
   },
   { timestamps: true }
 );

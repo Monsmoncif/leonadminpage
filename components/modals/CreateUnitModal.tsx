@@ -66,6 +66,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
     vin: "",
     color: "",
     mileage: 0 as number | string,
+    lastOilChangeMileage: "" as number | string,
     status: "Available",
     dailyRate: 100 as number | string,
     dailyKmLimit: 0 as number | string,
@@ -98,6 +99,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
           vin: unitToEdit.vin || "",
           color: unitToEdit.color || "",
           mileage: unitToEdit.mileage ?? 0,
+          lastOilChangeMileage: unitToEdit.lastOilChangeMileage ?? 0,
           status: unitToEdit.status || "Available",
           dailyRate: unitToEdit.dailyRate ?? 100,
           dailyKmLimit: unitToEdit.dailyKmLimit ?? 0,
@@ -149,6 +151,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
       vin: "",
       color: "",
       mileage: 0,
+      lastOilChangeMileage: "",
       status: "Available",
       dailyRate: 100,
       dailyKmLimit: 0,
@@ -448,14 +451,21 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
       const method = unitToEdit ? "PUT" : "POST";
       const url = unitToEdit ? `/api/units/${unitToEdit._id}` : "/api/units";
 
-      toast.success("Saving vehicle details...");
+      const currentMileage = Number(formData.mileage) || 0;
+      const specifiedVidange = Number(formData.lastOilChangeMileage);
+      const finalVidange = !isNaN(specifiedVidange) && specifiedVidange > 0
+        ? specifiedVidange
+        : (unitToEdit?.lastOilChangeMileage ?? currentMileage);
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
           year: Number(formData.year),
-          mileage: Number(formData.mileage),
+          mileage: currentMileage,
+          initialMileage: unitToEdit?.initialMileage ?? currentMileage,
+          lastOilChangeMileage: finalVidange,
           dailyRate: Number(formData.dailyRate),
           dailyKmLimit: Number(formData.dailyKmLimit),
           pricePerExtraKm: Number(formData.pricePerExtraKm),
@@ -1009,6 +1019,25 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                     value={formData.mileage || ""}
                     onChange={(e) => setFormData({...formData, mileage: parseInt(e.target.value) || 0})}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                    Last Oil Change / Vidange (km) (آخر تغيير زيت)
+                  </label>
+                  <input 
+                    type="number"
+                    min="0"
+                    placeholder={!unitToEdit ? `Default: ${formData.mileage || 0} km` : "e.g. 10000"}
+                    className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                    value={formData.lastOilChangeMileage !== "" && formData.lastOilChangeMileage !== undefined ? formData.lastOilChangeMileage : ""}
+                    onChange={(e) => setFormData({...formData, lastOilChangeMileage: e.target.value === "" ? "" : parseInt(e.target.value) || 0})}
+                  />
+                  <span className="text-[10px] text-text-muted mt-1 block">
+                    {!unitToEdit 
+                      ? "يبدأ العدّ تلقائياً من عداد السيارة عند إنشائها ويطلب التغيير بعد كل 10,000 كم (Starts from creation mileage + 10,000 km)"
+                      : "دورة الصيانة كل 10,000 كم (Interval of 10,000 km)"}
+                  </span>
                 </div>
               </div>
             </div>

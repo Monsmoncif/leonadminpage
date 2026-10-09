@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/StatusBadge";
+import TablePagination from "@/components/ui/TablePagination";
 import { useToast } from "@/components/providers/ToastProvider";
 import CreateDriverModal from "@/components/modals/CreateDriverModal";
 import { useRouter } from "next/navigation";
@@ -76,7 +77,7 @@ export default function DriversPage() {
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const toast = useToast();
   const router = useRouter();
 
@@ -491,42 +492,15 @@ export default function DriversPage() {
               </div>
 
               {/* Pagination */}
-              <div className="p-3 border-t border-border flex items-center justify-between text-xs text-text-secondary bg-white">
-                <p>
-                  Showing{" "}
-                  <span className="font-medium text-text-primary">
-                    {filteredDrivers.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-medium text-text-primary">
-                    {Math.min(currentPage * itemsPerPage, filteredDrivers.length)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-medium text-text-primary">
-                    {filteredDrivers.length}
-                  </span>{" "}
-                  drivers
-                </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Prev
-                  </button>
-                  <button className="px-2.5 py-1 bg-brand text-white rounded-md font-medium shadow-sm">
-                    {currentPage}
-                  </button>
-                  <button 
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredDrivers.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+                itemLabel="drivers"
+              />
             </div>
           </div>
         </div>

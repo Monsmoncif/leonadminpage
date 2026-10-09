@@ -41,7 +41,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
 
       const contractNum = contract.contractNumber
         ? String(contract.contractNumber)
-        : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2000");
+        : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2200");
       document.title = contractNum;
 
       if (!isHandedOver) return;
@@ -94,29 +94,6 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
     contract.status === "Completed"
   );
 
-  if (!isHandedOver) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <div className="bg-white rounded-2xl border border-amber-200 p-8 max-w-md w-full text-center shadow-lg">
-          <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200">
-            <AlertCircle size={28} />
-          </div>
-          <h2 className="text-lg font-bold text-gray-900 mb-1">Handover Pending</h2>
-          <p className="text-xs text-amber-700 font-semibold mb-3">تأكيد تسليم السيارة معلق</p>
-          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            This contract has not been handed over yet. The official contract PDF will only be available once the vehicle handover is confirmed by the admin (Shop) or by the driver.
-          </p>
-          <button
-            onClick={() => window.close()}
-            className="w-full py-2.5 bg-brand text-white font-semibold rounded-xl text-sm hover:bg-brand-dark transition-all cursor-pointer shadow-sm"
-          >
-            Close Window
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Format Helper functions
   const formatDate = (dateStr: any) => {
     if (!dateStr) return "";
@@ -135,7 +112,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   // Form serial number
   const serialNo = contract.contractNumber
     ? String(contract.contractNumber)
-    : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2000");
+    : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2200");
 
   const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned" || Boolean(contract.returnedAt);
 
@@ -269,13 +246,15 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
           #contract-page-2 {
             page-break-before: always !important;
             break-before: page !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            page-break-after: avoid !important;
-            break-after: avoid !important;
+            page-break-inside: auto !important;
+            break-inside: auto !important;
             min-height: 0 !important;
             height: auto !important;
             box-sizing: border-box !important;
+          }
+          .term-row {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
@@ -665,116 +644,143 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
           {/* Row 5: Smoking prohibition */}
           <div className="px-2 py-0.5 text-center">
             <p className="font-bold text-[6.8px] leading-tight text-gray-950 flex items-center justify-center gap-1.5" dir="rtl">
-              <span>ممنوع التدخين داخل المركبة، في حال المخالفة سيتم فرض غرامة تصل إلى 2500 درهم إماراتي.</span>
+              <span className="text-[9px] text-red-600">🚭</span>
+              <span>حظر التدخين داخل السيارة المستأجرة إذ كان السائق أو الراكب يدخن داخل السيارة، فهم مسؤولون عن دفع غرامة تتراوح بين 200 درهم إلى 400 درهم.</span>
               <span className="text-[9px] text-red-600">🚭</span>
             </p>
             <p className="text-[6px] font-semibold leading-tight text-gray-900 mt-0.5 flex items-center justify-center gap-1.5">
-              <span className="text-[9px] text-red-600">🚭</span>
-              <span>Smoking is strictly prohibited inside the vehicle. Any violation may result in a fine of up to AED 2,500.</span>
+              <span>Smoking is prohibited inside the rented vehicle. If the driver or passenger smokes inside the vehicle, they are responsible for paying a fine ranging from AED 200 to AED 400.</span>
             </p>
           </div>
         </div>
 
         {/* ===== TABLE 2: NOTE / TERMS AND CONDITIONS ===== */}
         <div className="border-b border-black text-black bg-white">
-          <div className="grid grid-cols-2 bg-gray-100 border-b border-black py-0.5 px-2">
-            <span className="font-extrabold text-[8px] uppercase tracking-wide">Note:</span>
-            <span className="font-extrabold text-[8.5px] text-right" dir="rtl">ملاحظات:</span>
+          <div className="grid grid-cols-2 bg-gray-100 border-b border-black py-0.5 px-2 items-center">
+            <span className="font-extrabold text-[8px] uppercase tracking-wide text-black">Note:</span>
+            <span className="font-extrabold text-[8.8px] text-right text-black" dir="rtl">ملاحظات:</span>
           </div>
 
-          <div className="grid grid-cols-2 text-[5.8px] leading-[1.18]">
-            {/* Left Column (English) */}
-            <div className="p-1.5 border-r border-black flex flex-col space-y-1 text-gray-900">
-              <div className="font-bold text-[6.5px]">
-                Terms and Conditions of Rental <span className="font-normal text-[5.2px] text-gray-600">(Subject to the laws of the United Arab Emirates)</span>
+          {/* Subtitle Row - Balanced font sizes */}
+          <div className="grid grid-cols-2 border-b border-black/20 bg-gray-50/50 py-0.5 px-2 items-center text-gray-950">
+            <div className="pr-1.5 font-bold text-[6.3px] leading-tight">
+              Terms and Conditions of Rental <span className="font-normal text-gray-600">(Subject to the laws of the United Arab Emirates)</span>
+            </div>
+            <div className="pl-1.5 text-right font-bold text-[7px] leading-tight" dir="rtl">
+              أحكام وشروط الإيجار <span className="font-normal text-gray-600">(خاضعة لأحكام وقانون دولة الإمارات العربية المتحدة)</span>
+            </div>
+          </div>
+
+          {/* 8 Symmetrical Paired Rows - Balanced visual sizes: English 6px, Arabic 6.8px font-semibold */}
+          <div>
+            {/* Item 1 */}
+            <div className="grid grid-cols-2 border-b border-gray-100 py-0.5 px-2 items-start">
+              <div className="pr-1.5 flex items-start gap-1 text-[6px] leading-[1.22] text-gray-900">
+                <span className="shrink-0 font-bold">•</span>
+                <span>If the vehicle is impounded by government authorities for any violation of the law, I agree to pay the rental charges until the vehicle is returned to Leon Car Rental L.L.C.</span>
               </div>
-              <ul className="space-y-0.5 list-none pl-0">
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>If the vehicle is impounded by government authorities for any violation of the law, I agree to pay the rental charges until the vehicle is returned to Leon Car Rental L.L.C.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <div>
-                    <span>For all customers who are involved in collision accidents or hit-and-run incidents where the fault is attributed to a third party, the additional insurance coverage shall be applied as follows:</span>
-                    <div className="pl-1.5 pt-0.5 space-y-0.5">
-                      <p>a) In the case of total loss accidents (vehicle write-off), an amount starting from AED 3,000 will be charged in addition to a 10% deductible, in accordance with the Insurance Law and the insurance policy.</p>
-                      <p>b) If the driver of the vehicle causing the accident is under 25 years of age, an additional 10% deductible shall be added, in accordance with the Insurance Law and the insurance policy.</p>
-                    </div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>A police report is mandatory in all cases.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>The renter agrees to return the vehicle with the same amount of fuel as it had at the time of rental.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>The rental period is calculated on a 24-hour basis.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>In the event of mechanical failures resulting from misuse (such as engine damage due to overheating, driving in rough areas, or failure to observe road conditions), the renter shall bear the cost of damages and repairs.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>By signing below on this page, the renter shall be responsible for the first excess of insurance, which is 10% of the compulsory deductible amount, for any damage or loss (including fire and theft) that occurs to the vehicle during its use, operation, or driving in accordance with this rental contract, despite payment of the stated fees.<br/>In the event of using, operating, or driving the vehicle in violation of any of the terms and conditions of this rental contract, the owner shall have the right to apply the provisions stated below/on the back of this page.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>Payment: The renter agrees, without discussion, to pay and settle all charges related to the vehicle rental to Leon Car Rental L.L.C. (the Company) on or before the date of returning the vehicle. In the event that the contract is open until the end of the month, the renter agrees to pay the rental charges in advance.</span>
-                </li>
-              </ul>
+              <div className="pl-1.5 flex items-start gap-1 text-right text-[6.8px] leading-[1.25] font-semibold text-gray-950" dir="rtl">
+                <span className="shrink-0 font-bold">•</span>
+                <span>إذا تم حجز المركبة من قبل السلطات الحكومية لأي مخالفة للقانون فإنني أوافق على دفع تكاليف الاستئجار حتى يتم إعادة المركبة إلى شركة ليون لتأجير السيارات ش.ذ.م.م.</span>
+              </div>
             </div>
 
-            {/* Right Column (Arabic) */}
-            <div className="p-1.5 flex flex-col space-y-1 text-right text-gray-900" dir="rtl">
-              <div className="font-bold text-[6.5px]">
-                أحكام وشروط الإيجار <span className="font-normal text-[5.2px] text-gray-600">(خاضعة لأحكام وقانون دولة الإمارات العربية المتحدة)</span>
-              </div>
-              <ul className="space-y-0.5 list-none pr-0">
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>إذا تم حجز المركبة من قبل السلطات الحكومية لأي مخالفة للقانون فإنني أوافق على دفع تكاليف الاستئجار حتى يتم إعادة المركبة إلى شركة ليون لتأجير السيارات ش.ذ.م.م.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <div>
-                    <span>بالنسبة لجميع الزبائن الذين يرتكبون حوادث صدم أو هروب من موقع الحادث بحيث يكون إرجاع الخطأ إلى طرف ثالث فسوف يتم تغطية التأمين الإضافي على النحو التالي:</span>
-                    <div className="pr-1.5 pt-0.5 space-y-0.5">
-                      <p>أ- في حالة حوادث الخسارة الكلية (شطب المركبة) سيتم احتساب ابتداءً من 3000 درهم بالإضافة إلى نسبة 10% تحمل إضافي حسب قانون التأمينات وبوليصة التأمين.</p>
-                      <p>ب- وفي حالة كان قائد المركبة المتسبب بالحادث تضاف للبند نسبة تحمل 10% للسائق تحت عمر 25 سنة حسب قانون التأمينات وبوليصة التأمين.</p>
-                    </div>
+            {/* Item 2 */}
+            <div className="grid grid-cols-2 border-b border-gray-100 py-0.5 px-2 items-start">
+              <div className="pr-1.5 flex items-start gap-1 text-[6px] leading-[1.22] text-gray-900">
+                <span className="shrink-0 font-bold">•</span>
+                <div>
+                  <span>For all customers who are involved in collision accidents or hit-and-run incidents where the fault is attributed to a third party, the additional insurance coverage shall be applied as follows:</span>
+                  <div className="pl-1.5 pt-0.5 space-y-0.5">
+                    <p>a) In the case of total loss accidents (vehicle write-off), an amount starting from AED 3,000 will be charged in addition to a 10% deductible, in accordance with the Insurance Law and the insurance policy.</p>
+                    <p>b) If the driver of the vehicle causing the accident is under 25 years of age, an additional 10% deductible shall be added, in accordance with the Insurance Law and the insurance policy.</p>
                   </div>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>تقرير الشرطة إلزامي في كل الأحوال.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>يوافق المستأجر على إعادة المركبة بنفس كمية الوقود التي كانت في المركبة عند استئجارها.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>يتم احتساب مدة التأجير على أساس 24 ساعة.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>في حالة الأعطال الميكانيكية الناتجة عن سوء الاستعمال (كـ تلف المحرك بسبب ارتفاع درجة حرارته، القيادة في المناطق الوعرة، عدم مراعاة ظروف الطريق) يتحمل المستأجر قيمة الأضرار وإصلاحها.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>بالتوقيع أدناه بهذه الصفحة يكون المستأجر مسؤولاً عن الزيادة الأولى في التأمين وهي 10% من قيمة التحمل الإجباري لأي ضرر أو فقد (بما في ذلك الحريق والسرقة) يحدث للمركبة أثناء استعمالها أو تشغيلها أو قيادتها وفقاً لعقد الإيجار هذا بالرغم من سداد الرسوم المذكورة وفي حالة استعمال أو تشغيل أو قيادة المركبة بالمخالفة لأي من أحكام وشروط عقد الإيجار هذا يحق للمالك تطبيق الأحكام المبينة أدناه / خلف هذه الصفحة.</span>
-                </li>
-                <li className="flex items-start gap-1">
-                  <span className="shrink-0 font-bold">•</span>
-                  <span>السداد: يقبل المستأجر بدون مناقشة أن يدفع ويسدد كافة الرسوم المتعلقة بإيجار المركبة إلى ليون لتأجير السيارات ش.ذ.م.م (الشركة) في تاريخ أو قبل إعادة المركبة وفي حالة أن العقد مفتوح لنهاية الشهر ومن لآخر يوافق المستأجر على سداد الإيجار مقدماً.</span>
-                </li>
-              </ul>
+                </div>
+              </div>
+              <div className="pl-1.5 flex items-start gap-1 text-right text-[6.8px] leading-[1.25] font-semibold text-gray-950" dir="rtl">
+                <span className="shrink-0 font-bold">•</span>
+                <div>
+                  <span>بالنسبة لجميع الزبائن الذين يرتكبون حوادث صدم أو هروب من موقع الحادث بحيث يكون إرجاع الخطأ إلى طرف ثالث فسوف يتم تغطية التأمين الإضافي على النحو التالي:</span>
+                  <div className="pr-1.5 pt-0.5 space-y-0.5">
+                    <p>أ- في حالة حوادث الخسارة الكلية (شطب المركبة) سيتم احتساب ابتداءً من 3000 درهم بالإضافة إلى نسبة 10% تحمل إضافي حسب قانون التأمينات وبوليصة التأمين.</p>
+                    <p>ب- وفي حالة كان قائد المركبة المتسبب بالحادث تضاف للبند نسبة تحمل 10% للسائق تحت عمر 25 سنة حسب قانون التأمينات وبوليصة التأمين.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Item 3 */}
+            <div className="grid grid-cols-2 border-b border-gray-100 py-0.5 px-2 items-start">
+              <div className="pr-1.5 flex items-start gap-1 text-[6px] leading-[1.22] text-gray-900">
+                <span className="shrink-0 font-bold">•</span>
+                <span>A police report is mandatory in all cases.</span>
+              </div>
+              <div className="pl-1.5 flex items-start gap-1 text-right text-[6.8px] leading-[1.25] font-semibold text-gray-950" dir="rtl">
+                <span className="shrink-0 font-bold">•</span>
+                <span>تقرير الشرطة إلزامي في كل الأحوال.</span>
+              </div>
+            </div>
+
+            {/* Item 4 */}
+            <div className="grid grid-cols-2 border-b border-gray-100 py-0.5 px-2 items-start">
+              <div className="pr-1.5 flex items-start gap-1 text-[6px] leading-[1.22] text-gray-900">
+                <span className="shrink-0 font-bold">•</span>
+                <span>The renter agrees to return the vehicle with the same amount of fuel as it had at the time of rental.</span>
+              </div>
+              <div className="pl-1.5 flex items-start gap-1 text-right text-[6.8px] leading-[1.25] font-semibold text-gray-950" dir="rtl">
+                <span className="shrink-0 font-bold">•</span>
+                <span>يوافق المستأجر على إعادة المركبة بنفس كمية الوقود التي كانت في المركبة عند استئجارها.</span>
+              </div>
+            </div>
+
+            {/* Item 5 */}
+            <div className="grid grid-cols-2 border-b border-gray-100 py-0.5 px-2 items-start">
+              <div className="pr-1.5 flex items-start gap-1 text-[6px] leading-[1.22] text-gray-900">
+                <span className="shrink-0 font-bold">•</span>
+                <span>The rental period is calculated on a 24-hour basis.</span>
+              </div>
+              <div className="pl-1.5 flex items-start gap-1 text-right text-[6.8px] leading-[1.25] font-semibold text-gray-950" dir="rtl">
+                <span className="shrink-0 font-bold">•</span>
+                <span>يتم احتساب مدة التأجير على أساس 24 ساعة.</span>
+              </div>
+            </div>
+
+            {/* Item 6 */}
+            <div className="grid grid-cols-2 border-b border-gray-100 py-0.5 px-2 items-start">
+              <div className="pr-1.5 flex items-start gap-1 text-[6px] leading-[1.22] text-gray-900">
+                <span className="shrink-0 font-bold">•</span>
+                <span>In the event of mechanical failures resulting from misuse (such as engine damage due to overheating, driving in rough areas, or failure to observe road conditions), the renter shall bear the cost of damages and repairs.</span>
+              </div>
+              <div className="pl-1.5 flex items-start gap-1 text-right text-[6.8px] leading-[1.25] font-semibold text-gray-950" dir="rtl">
+                <span className="shrink-0 font-bold">•</span>
+                <span>في حالة الأعطال الميكانيكية الناتجة عن سوء الاستعمال (كـ تلف المحرك بسبب ارتفاع درجة حرارته، القيادة في المناطق الوعرة، عدم مراعاة ظروف الطريق) يتحمل المستأجر قيمة الأضرار وإصلاحها.</span>
+              </div>
+            </div>
+
+            {/* Item 7 */}
+            <div className="grid grid-cols-2 border-b border-gray-100 py-0.5 px-2 items-start">
+              <div className="pr-1.5 flex items-start gap-1 text-[6px] leading-[1.22] text-gray-900">
+                <span className="shrink-0 font-bold">•</span>
+                <div>
+                  <span>By signing below on this page, the renter shall be responsible for the first excess of insurance, which is 10% of the compulsory deductible amount, for any damage or loss (including fire and theft) that occurs to the vehicle during its use, operation, or driving in accordance with this rental contract, despite payment of the stated fees. In the event of using, operating, or driving the vehicle in violation of any of the terms and conditions of this rental contract, the owner shall have the right to apply the provisions stated below/on the back of this page.</span>
+                </div>
+              </div>
+              <div className="pl-1.5 flex items-start gap-1 text-right text-[6.8px] leading-[1.25] font-semibold text-gray-950" dir="rtl">
+                <span className="shrink-0 font-bold">•</span>
+                <span>بالتوقيع أدناه بهذه الصفحة يكون المستأجر مسؤولاً عن الزيادة الأولى في التأمين وهي 10% من قيمة التحمل الإجباري لأي ضرر أو فقد (بما في ذلك الحريق والسرقة) يحدث للمركبة أثناء استعمالها أو تشغيلها أو قيادتها وفقاً لعقد الإيجار هذا بالرغم من سداد الرسوم المذكورة وفي حالة استعمال أو تشغيل أو قيادة المركبة بالمخالفة لأي من أحكام وشروط عقد الإيجار هذا يحق للمالك تطبيق الأحكام المبينة أدناه / خلف هذه الصفحة.</span>
+              </div>
+            </div>
+
+            {/* Item 8 */}
+            <div className="grid grid-cols-2 py-0.5 px-2 items-start">
+              <div className="pr-1.5 flex items-start gap-1 text-[6px] leading-[1.22] text-gray-900">
+                <span className="shrink-0 font-bold">•</span>
+                <span>Payment: The renter agrees, without discussion, to pay and settle all charges related to the vehicle rental to Leon Car Rental L.L.C. (the Company) on or before the date of returning the vehicle. In the event that the contract is open until the end of the month, the renter agrees to pay the rental charges in advance.</span>
+              </div>
+              <div className="pl-1.5 flex items-start gap-1 text-right text-[6.8px] leading-[1.25] font-semibold text-gray-950" dir="rtl">
+                <span className="shrink-0 font-bold">•</span>
+                <span>السداد: يقبل المستأجر بدون مناقشة أن يدفع ويسدد كافة الرسوم المتعلقة بإيجار المركبة إلى ليون لتأجير السيارات ش.ذ.م.م (الشركة) في تاريخ أو قبل إعادة المركبة وفي حالة أن العقد مفتوح لنهاية الشهر ومن لآخر يوافق المستأجر على سداد الإيجار مقدماً.</span>
+              </div>
             </div>
           </div>
         </div>
@@ -943,7 +949,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
       {/* ===== Page 2: Terms & Conditions Container ===== */}
       <div 
         id="contract-page-2" 
-        className="border-[1.5px] border-black px-2.5 pt-2 pb-1.5 mt-6 print:mt-0 relative overflow-hidden bg-white print:min-h-0 print:h-auto flex flex-col box-border" 
+        className="border-[1.5px] border-black px-2.5 pt-2 pb-2 mt-6 print:mt-0 relative bg-white print:min-h-0 print:h-auto flex flex-col box-border print:overflow-visible" 
         style={{ pageBreakBefore: 'always', breakBefore: 'page' }}
       >
         
@@ -962,43 +968,52 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* 45 Terms Dual-Column Grid */}
-          <div className="flex flex-col gap-y-[0.75px] text-[5.9px] leading-[1.14] font-medium text-gray-950">
+          <div className="flex flex-col gap-y-[0.75px] text-[5.8px] leading-[1.12] font-medium text-gray-950">
             {CONTRACT_TERMS.map((term) => (
               <div 
                 key={term.num} 
-                className="grid grid-cols-2 gap-x-2 items-start border-b border-gray-100/60 pb-[0.5px]"
+                className="term-row border-b border-gray-100/60 pb-[0.5px]"
+                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
-                {/* English Clause */}
-                <div className="text-left pr-0.5">
-                  <span className="font-bold mr-0.5 shrink-0">{term.num}-</span>
-                  <span className="text-gray-900 font-normal">{term.en}</span>
-                  {term.subItems && (
-                    <div className="pl-1.5 mt-0.5 space-y-[0.5px]">
-                      {term.subItems.map((sub, sIdx) => (
-                        <div key={sIdx} className="flex items-start gap-0.5">
-                          <span className="font-bold shrink-0">{sub.enKey}</span>
-                          <span>{sub.en}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                {/* Main Term Header / Text */}
+                <div className="grid grid-cols-2 gap-x-2 items-start">
+                  {/* English Clause */}
+                  <div className="text-left pr-0.5 text-[5.8px] leading-[1.12] text-gray-900">
+                    <span className="font-bold mr-0.5 shrink-0">{term.num}-</span>
+                    <span className="font-normal">{term.en}</span>
+                  </div>
+
+                  {/* Arabic Clause */}
+                  <div className="text-right pl-0.5 text-[6.4px] leading-[1.16] font-medium text-gray-950" dir="rtl">
+                    <span dir="ltr" className="font-bold ml-1 inline-block shrink-0">{term.num}-</span>
+                    <span className="font-normal">{term.ar}</span>
+                  </div>
                 </div>
 
-                {/* Arabic Clause */}
-                <div className="text-right pl-0.5" dir="rtl">
-                  <span dir="ltr" className="font-bold ml-1 inline-block shrink-0">{term.num}-</span>
-                  <span className="text-gray-900 font-normal">{term.ar}</span>
-                  {term.subItems && (
-                    <div className="pr-1.5 mt-0.5 space-y-[0.5px]">
-                      {term.subItems.map((sub, sIdx) => (
-                        <div key={sIdx} className="flex items-start gap-0.5">
-                          <span className="font-bold shrink-0">{sub.arKey}</span>
-                          <span>{sub.ar}</span>
+                {/* Sub-items rendered as aligned dual-column pairs (Eliminates vertical whitespace gap) */}
+                {term.subItems && term.subItems.length > 0 && (
+                  <div className="flex flex-col gap-y-[0.5px] mt-[0.5px]">
+                    {term.subItems.map((sub, sIdx) => (
+                      <div 
+                        key={sIdx} 
+                        className="grid grid-cols-2 gap-x-2 items-start py-[0.5px] border-t border-gray-100/40"
+                        style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                      >
+                        {/* English subitem */}
+                        <div className="text-left pl-2 pr-0.5 flex items-start gap-1 text-[5.8px] leading-[1.12] text-gray-800">
+                          <span className="font-bold shrink-0">{sub.enKey}</span>
+                          <span className="font-normal">{sub.en}</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+
+                        {/* Arabic subitem */}
+                        <div className="text-right pr-2 pl-0.5 flex items-start gap-1 text-[6.4px] leading-[1.16] font-medium text-gray-950" dir="rtl">
+                          <span className="font-bold shrink-0" dir="rtl">{sub.arKey}</span>
+                          <span className="font-normal text-right flex-1">{sub.ar}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

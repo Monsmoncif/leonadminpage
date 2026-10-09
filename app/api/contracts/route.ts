@@ -134,6 +134,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     const userName = session?.user?.name || "System";
     const userRole = (session?.user as any)?.role || "admin";
+    const currentUserId = (session?.user as any)?.id;
 
     const body = await req.json();
 
@@ -193,7 +194,9 @@ export async function POST(req: Request) {
       await unitDoc.save();
     }
 
-    const contractType = body.contractType || "Delivery";
+    // Drivers can only create Delivery contracts, and are automatically assigned to themselves
+    const isDriverUser = userRole === "driver";
+    const contractType = isDriverUser ? "Delivery" : (body.contractType || "Delivery");
 
     // For Delivery contracts, clientId is optional (driver will register the client)
     // For Shop contracts, clientId is required
@@ -201,7 +204,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Client is required for Shop contracts." }, { status: 400 });
     }
 
-    const deliveryDriverId = body.deliveryDriverId || body.driverId || null;
+    const deliveryDriverId = isDriverUser 
+      ? (currentUserId || body.deliveryDriverId) 
+      : (body.deliveryDriverId || body.driverId || null);
     const returnDriverId = body.returnDriverId || null;
     const mainDriverId = deliveryDriverId || returnDriverId || null;
 
@@ -211,16 +216,17 @@ export async function POST(req: Request) {
     }
 
     // Contracts are created unconfirmed without a contract number or dispatch notifications.
-    // Sequential contract numbers are ONLY assigned upon Handover confirmation (Shop or Driver).
+    // When created by a driver, isDispatched is automatically true so it appears in driver dashboard.
     const initialStatus = "Draft";
     const initialDeliveryStatus = "Pending";
+    const isDispatched = isDriverUser ? true : Boolean(body.isDispatched);
 
     const contract = await Contract.create({
       contractNumber: undefined,
       clientId: body.clientId || null,
       unitId: body.unitId,
       contractType: contractType,
-      isDispatched: false,
+      isDispatched: isDispatched,
       rentalType: body.rentalType || (days >= 30 ? "Monthly" : "Daily"),
       customerType: body.customerType || "B2C",
       driverId: mainDriverId,

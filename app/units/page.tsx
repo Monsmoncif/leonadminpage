@@ -17,11 +17,13 @@ import {
   Key,
   Wrench,
   Filter,
-  Eye
+  Eye,
+  Gauge
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 import CreateUnitModal from "@/components/modals/CreateUnitModal";
 import StatCard from "@/components/ui/StatCard";
+import TablePagination from "@/components/ui/TablePagination";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 
 // Status badge styling with vibrant, professional colors matching bookings page
@@ -51,7 +53,7 @@ export default function UnitsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const toast = useToast();
 
   const fetchUnits = async (retryCount = 0) => {
@@ -398,14 +400,47 @@ export default function UnitsPage() {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-medium text-text-secondary line-clamp-1 flex items-center gap-1.5">
-                              <Settings size={14} className="text-text-muted" /> {unit.transmission || "Auto"}
-                            </span>
-                            <span className="font-medium text-text-secondary line-clamp-1 flex items-center gap-1.5">
-                              <Fuel size={14} className="text-text-muted" /> {unit.fuelType || "Petrol"}
-                            </span>
-                          </div>
+                          {(() => {
+                            const currentKm = Number(unit.mileage) || 0;
+                            const lastVidange = unit.lastOilChangeMileage != null && unit.lastOilChangeMileage > 0
+                              ? Number(unit.lastOilChangeMileage)
+                              : (unit.initialMileage != null && unit.initialMileage > 0 ? Number(unit.initialMileage) : currentKm);
+                            const nextVidange = lastVidange + 10000;
+                            const remainingVidange = nextVidange - currentKm;
+
+                            return (
+                              <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-text-primary flex items-center gap-1 text-xs">
+                                    <Gauge size={13} className="text-brand" />
+                                    {currentKm.toLocaleString()} km
+                                  </span>
+                                  {remainingVidange <= 0 ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded" title={`Oil change overdue by ${Math.abs(remainingVidange).toLocaleString()} km`}>
+                                      <AlertCircle size={10} className="text-red-500" /> Vidange Overdue
+                                    </span>
+                                  ) : remainingVidange <= 1500 ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded" title={`Oil change due in ${remainingVidange.toLocaleString()} km`}>
+                                      <Wrench size={10} className="text-amber-500" /> Vidange in {remainingVidange.toLocaleString()} km
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded" title={`Next oil change at ${nextVidange.toLocaleString()} km`}>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Vidange {remainingVidange.toLocaleString()} km
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                                  <span className="flex items-center gap-1">
+                                    <Settings size={12} /> {unit.transmission || "Auto"}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="flex items-center gap-1">
+                                    <Fuel size={12} /> {unit.fuelType || "Petrol"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex flex-col gap-1.5 items-start" onClick={(e) => e.stopPropagation()}>
@@ -486,42 +521,14 @@ export default function UnitsPage() {
             </div>
             
             {/* Pagination */}
-            <div className="p-3 border-t border-border flex items-center justify-between text-xs text-text-secondary bg-white">
-              <p>
-                Showing{" "}
-                <span className="font-medium text-text-primary">
-                  {filteredUnits.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-                </span>{" "}
-                to{" "}
-                <span className="font-medium text-text-primary">
-                  {Math.min(currentPage * itemsPerPage, filteredUnits.length)}
-                </span>{" "}
-                of{" "}
-                <span className="font-medium text-text-primary">
-                  {filteredUnits.length}
-                </span>{" "}
-                results
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  Prev
-                </button>
-                <button className="px-2.5 py-1 bg-brand text-white rounded-md font-medium shadow-sm">
-                  {currentPage}
-                </button>
-                <button 
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredUnits.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { 
   User, 
@@ -78,18 +78,47 @@ export function NewRentalAdminPageContent() {
 
   const toast = useToast();
   const { data: session } = useSession();
+  const pathname = usePathname();
+  const isDriver = (session?.user as any)?.role === "driver" || pathname?.startsWith("/driver");
+  const currentUserId = (session?.user as any)?.id;
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
 
-  // Contract Type (defaults to Shop/In-Store)
+  // Contract Type (defaults to Delivery for drivers, Shop for admins)
   const [contractType, setContractType] = useState<"Delivery" | "Shop">("Shop");
 
   // Data State
   const [units, setUnits] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
+
+  const currentDriver = drivers.find(d => 
+    (d._id && String(d._id) === String(currentUserId)) || 
+    (d.userId && String(d.userId) === String(currentUserId)) ||
+    (d.email && session?.user?.email && d.email.toLowerCase() === session.user.email.toLowerCase())
+  );
+  const resolvedDriverId = currentDriver?._id || currentDriver?.userId || currentUserId || "";
+
+  useEffect(() => {
+    if (isDriver) {
+      setContractType("Delivery");
+      const match = drivers.find(d => 
+        (d._id && String(d._id) === String(currentUserId)) || 
+        (d.userId && String(d.userId) === String(currentUserId)) ||
+        (d.email && session?.user?.email && d.email.toLowerCase() === session.user.email.toLowerCase())
+      );
+      const targetId = match?._id || match?.userId || currentUserId || "";
+      if (targetId) {
+        setRentalData(prev => ({
+          ...prev,
+          deliveryDriverId: targetId,
+          driverId: targetId,
+        }));
+      }
+    }
+  }, [isDriver, drivers, currentUserId, session]);
 
   // Search & Filter States
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
@@ -814,6 +843,9 @@ export function NewRentalAdminPageContent() {
         if (!isEditMode) {
           contractPayload.deliveryStatus = "Pending";
           contractPayload.status = "Draft";
+          if (isDriver) {
+            contractPayload.isDispatched = true;
+          }
         }
       } else {
         contractPayload.clientId = selectedClient;
@@ -842,11 +874,15 @@ export function NewRentalAdminPageContent() {
       if (isEditMode) {
         toast.success("Contract updated successfully! (تم حفظ التعديلات بنجاح)");
       } else if (contractType === "Delivery") {
-        toast.success("Delivery Booking Created! Click 'Dispatch' in the contracts table to assign number and send to driver.");
+        toast.success(isDriver ? "Delivery Booking Created! It is now in your active tasks." : "Delivery Booking Created! Click 'Dispatch' in the contracts table to assign number and send to driver.");
       } else {
         toast.success("Shop Booking Created! Click 'Hand Over' in the contracts table when handing the car to the client. (تم إنشاء الحجز بنجاح! اضغط على 'تسليم' عند تسليم السيارة للعميل)");
       }
-      router.push("/bookings");
+      if (isDriver) {
+        router.push("/driver");
+      } else {
+        router.push("/bookings");
+      }
     } catch (error) {
       console.error(error);
       toast.error("An error occurred while creating booking");
@@ -1437,8 +1473,13 @@ export function NewRentalAdminPageContent() {
                 </label>
                 <select
                   value={rentalData.deliveryDriverId}
+                  disabled={isDriver}
                   onChange={e => setRentalData({...rentalData, deliveryDriverId: e.target.value, driverId: e.target.value})}
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none cursor-pointer"
+                  className={`w-full p-2.5 rounded-xl border border-border text-sm outline-none ${
+                    isDriver
+                      ? "bg-gray-100/90 text-gray-800 font-semibold cursor-not-allowed select-none"
+                      : "bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand cursor-pointer"
+                  }`}
                 >
                   <option value="">-- Select Delivery Driver --</option>
                   {drivers.map(d => (
@@ -1446,9 +1487,16 @@ export function NewRentalAdminPageContent() {
                       {d.name} {d.phone ? `(${d.phone})` : ""}
                     </option>
                   ))}
+                  {isDriver && resolvedDriverId && !drivers.some(d => String(d._id || d.userId) === String(resolvedDriverId)) && (
+                    <option value={resolvedDriverId}>
+                      {session?.user?.name || "Driver (You)"}
+                    </option>
+                  )}
                 </select>
                 <p className="text-[11px] text-text-muted mt-1">
-                  The driver will go to the client, register them, and deliver the car at <strong className="text-brand">{rentalData.checkoutTime || "10:00 AM"}</strong>.
+                  {isDriver
+                    ? "Assigned to you automatically. The driver will go to the client, register them, and deliver the car."
+                    : `The driver will go to the client, register them, and deliver the car at ${rentalData.checkoutTime || "10:00 AM"}.`}
                 </p>
               </div>
             )}
@@ -1492,11 +1540,10 @@ export function NewRentalAdminPageContent() {
 
             <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate (AED/day)">
-                  Daily Rate (AED/day)
+                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate">
+                  Daily Rate
                 </label>
                 <div className="relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                   <input 
                     type="number" 
                     value={rentalData.dailyRate === 0 ? "" : rentalData.dailyRate} 
@@ -1509,20 +1556,19 @@ export function NewRentalAdminPageContent() {
                       }));
                     }} 
                     placeholder="e.g. 50"
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                  {selectedVehicle ? `Base vehicle rate (AED/day)` : "Daily rental rate"}
+                  {selectedVehicle ? `Base vehicle rate (/day)` : "Daily rental rate"}
                 </span>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount (AED)">
-                  Collection Amount (AED) <span className="text-red-500">*</span>
+                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount">
+                  Collection Amount <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                   <input 
                     type="number" 
                     value={rentalData.collectionAmount === 0 ? "" : rentalData.collectionAmount} 
@@ -1535,20 +1581,19 @@ export function NewRentalAdminPageContent() {
                       }));
                     }} 
                     placeholder="e.g. 350"
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                  Calculated: AED {rentalData.dailyRate || 0} × {totalDays}d (editable)
+                  Calculated: {rentalData.dailyRate || 0} × {totalDays}d (editable)
                 </span>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance (AED)">
-                  Advance (AED)
+                <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance">
+                  Advance
                 </label>
                 <div className="relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-[10px]">AED</span>
                   <input 
                     type="number" 
                     value={rentalData.advancePayment === 0 ? "" : rentalData.advancePayment} 
@@ -1563,7 +1608,7 @@ export function NewRentalAdminPageContent() {
                       }));
                     }} 
                     placeholder="0"
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
+                    className="w-full px-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
                   />
                 </div>
                 <span className="text-[11px] text-emerald-700/80 mt-0.5 block truncate">
@@ -1572,11 +1617,10 @@ export function NewRentalAdminPageContent() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount (AED)">
-                  Deposit Amount (AED)
+                <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount">
+                  Deposit Amount
                 </label>
                 <div className="relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                   <input 
                     type="number" 
                     value={rentalData.depositAmount === 0 ? "" : rentalData.depositAmount} 
@@ -1585,7 +1629,7 @@ export function NewRentalAdminPageContent() {
                       setRentalData(prev => ({ ...prev, depositAmount: val }));
                     }} 
                     placeholder="0"
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
@@ -1641,7 +1685,7 @@ export function NewRentalAdminPageContent() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Price per Extra KM (AED)</label>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Price per Extra KM</label>
                 <input 
                   type="number" 
                   value={rentalData.pricePerExtraKm} 
@@ -1654,7 +1698,7 @@ export function NewRentalAdminPageContent() {
             {/* Extra Fees Grid (Baby Seat Fee & Delivery Charge) */}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee (AED)</label>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee</label>
                 <input 
                   type="number" 
                   value={rentalData.babySeatFee === 0 ? "" : rentalData.babySeatFee} 
@@ -1664,7 +1708,7 @@ export function NewRentalAdminPageContent() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge (AED)</label>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge</label>
                 <input 
                   type="number" 
                   value={rentalData.deliveryFee === 0 ? "" : rentalData.deliveryFee} 
@@ -2009,10 +2053,10 @@ export function NewRentalAdminPageContent() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
         <div>
           <button
-            onClick={() => router.push("/bookings")}
+            onClick={() => router.push(isDriver ? "/driver" : "/bookings")}
             className="text-xs text-text-muted hover:text-text-primary flex items-center gap-1 mb-2 transition-colors cursor-pointer"
           >
-            <ArrowLeft size={14} /> Back to Bookings
+            <ArrowLeft size={14} /> Back to {isDriver ? "Driver Operations" : "Bookings"}
           </button>
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-bold text-text-primary">
@@ -2040,38 +2084,40 @@ export function NewRentalAdminPageContent() {
           </p>
         </div>
 
-        {/* Contract Type Pill Switcher */}
-        <div className="bg-gray-100 p-1 rounded-2xl flex items-center border border-gray-200/80 shadow-2xs self-start md:self-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              setContractType("Shop");
-              if (currentStep > 4) setCurrentStep(4);
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              contractType === "Shop"
-                ? "bg-white text-brand shadow-xs"
-                : "text-text-muted hover:text-text-primary"
-            }`}
-          >
-            <span>In-Store / Shop Contract (بالمحل)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setContractType("Delivery");
-              if (currentStep === 3) setCurrentStep(2);
-              else if (currentStep > 3) setCurrentStep(3);
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              contractType === "Delivery"
-                ? "bg-white text-brand shadow-xs"
-                : "text-text-muted hover:text-text-primary"
-            }`}
-          >
-            <span>Driver Delivery (توصيل للسائق)</span>
-          </button>
-        </div>
+        {/* Contract Type Pill Switcher (Admins Only) */}
+        {!isDriver && (
+          <div className="bg-gray-100 p-1 rounded-2xl flex items-center border border-gray-200/80 shadow-2xs self-start md:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setContractType("Shop");
+                if (currentStep > 4) setCurrentStep(4);
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                contractType === "Shop"
+                  ? "bg-white text-brand shadow-xs"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              <span>In-Store / Shop Contract (بالمحل)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setContractType("Delivery");
+                if (currentStep === 3) setCurrentStep(2);
+                else if (currentStep > 3) setCurrentStep(3);
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                contractType === "Delivery"
+                  ? "bg-white text-brand shadow-xs"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              <span>Driver Delivery (توصيل للسائق)</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stepper Header */}
@@ -2205,7 +2251,9 @@ export function NewRentalAdminPageContent() {
                   <span>
                     {isEditMode 
                       ? "Save Changes (حفظ التعديلات)" 
-                      : (contractType === "Delivery" ? "Create & Dispatch to Driver" : "Create Shop Contract")}
+                      : (contractType === "Delivery" 
+                          ? (isDriver ? "Create Delivery Contract" : "Create & Dispatch to Driver") 
+                          : "Create Shop Contract")}
                   </span>
                 </>
               )}

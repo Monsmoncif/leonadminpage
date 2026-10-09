@@ -106,6 +106,18 @@ __decorate([
     (0, mongoose_1.Prop)({ default: '' }),
     __metadata("design:type", String)
 ], Unit.prototype, "owner", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Number, default: 0 }),
+    __metadata("design:type", Number)
+], Unit.prototype, "initialMileage", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Number, default: 0 }),
+    __metadata("design:type", Number)
+], Unit.prototype, "lastOilChangeMileage", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Date, required: false }),
+    __metadata("design:type", Date)
+], Unit.prototype, "lastOilChangeDate", void 0);
 exports.Unit = Unit = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], Unit);

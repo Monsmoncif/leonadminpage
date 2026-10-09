@@ -102,43 +102,43 @@ export const CONTRACT_TERMS: ContractTerm[] = [
       {
         enKey: 'b)',
         arKey: 'ب)',
-        en: 'The hirer must obtain an accident report, submit it to the company, and pay the mandatory deductible mentioned in the introduction to the contract.',
+        en: 'The hirer must obtain the accident report, submit it to the company, and pay the mandatory deductible stated in the contract.',
         ar: 'يجب على المستأجر الحصول على تقرير الحادث وتسليمه للشركة وسداد مبلغ التحمل الإجباري المذكور في مقدمة العقد.'
       },
       {
         enKey: 'c)',
         arKey: 'ت)',
-        en: 'In the event that the accident report or the final police report is not obtained, the hirer is responsible for all damages because the insurance company will not compensate the company without obtaining this report. The contract remains open until the vehicle is fully repaired and returned to its pre-accident condition.',
+        en: 'Failing to obtain the police report, the hirer is liable for all damages as insurance will not compensate without it. Contract remains open until fully repaired.',
         ar: 'في حالة عدم الحصول على تقرير الحادث أو التقرير النهائي للشرطة يكون المستأجر مسؤولاً عن كافة الأضرار لأن شركة التأمين لن تقوم بتعويض الشركة بدون الحصول على هذا التقرير، ويبقى العقد مفتوحاً حتى تمام إصلاح المركبة وعودتها إلى حالتها قبل الحادث.'
       },
       {
         enKey: 'd)',
         arKey: 'ث)',
-        en: 'If the accident file is referred to the Public Prosecution and then to the court, the hirer must provide the company with the final judgment and a certificate of finality of the judgment, and pay the mandatory deductible amount mentioned in the introduction to the contract and any other costs that must be paid.',
+        en: 'If referred to Public Prosecution and Court, hirer must provide the final judgment certificate, pay the mandatory deductible, and any required costs.',
         ar: 'في حال تم إحالة ملف الحادث إلى النيابة العامة ومنها إلى المحكمة يتوجب على المستأجر تزويد الشركة بالحكم النهائي وشهادة بنهائية الحكم، وسداد مبلغ التحمل الإجباري المذكور في مقدمة العقد وأي تكاليف أخرى مستوجبة السداد.'
       },
       {
         enKey: 'e)',
         arKey: 'ج)',
-        en: 'If the accident occurs to the hirer while he is under the influence of alcohol or any narcotic substances, he is obligated to pay the rent and the repairs resulting from the accident during the repair period and until the vehicle is fully repaired and returned to operation. In the event that the vehicle is total loss, the hirer is responsible for paying the full value of the vehicle to the company.',
+        en: 'If accident occurs under influence of alcohol or narcotics, hirer pays rent and repair costs until repaired; if written off, hirer pays full vehicle value.',
         ar: 'إذا وقع الحادث للمستأجر وهو تحت تأثير الكحول أو أي مواد مخدرة فإنه يكون ملزماً بسداد قيمة الإيجار وقيمة الإصلاحات الناتجة عن الحادث خلال فترة الإصلاح وحتى تمام إصلاح المركبة وعودتها للعمل، وفي حال شطب المركبة يتحمل المستأجر سداد كامل قيمة المركبة لصالح الشركة.'
       },
       {
         enKey: 'f)',
         arKey: 'ح)',
-        en: 'The hirer shall be obligated to pay the full amount of repairs and daily rentals for the vehicle if it is stopped due to damage or defect resulting from the hirer’s negligence.',
+        en: 'The hirer shall pay full repair costs and daily rental during stoppage if damage resulted from hirer’s negligence.',
         ar: 'يكون المستأجر ملزم بدفع كامل مبلغ الإصلاحات والإيجارات اليومية للمركبة إذ تم إيقافها بسبب الضرر أو العيب الناتج عن إهمال المستأجر.'
       },
       {
         enKey: 'g)',
         arKey: 'خ)',
-        en: 'In the event that the insurance company refuses to compensate the company that owns the vehicle for reasons related to the hirer’s violation of the UAE traffic laws, the hirer shall bear all responsibility for this and shall bear the value of the vehicle mentioned in the insurance policy in the event of its being total loss, or the cost of its repair and the period of its being stopped during the repair.',
+        en: 'If insurance refuses compensation due to traffic law violation, hirer bears full liability, vehicle value if total loss, and repair/downtime costs.',
         ar: 'في حال رفض شركة التأمين تعويض الشركة مالكة المركبة لأسباب خاصة بمخالفة المستأجر لقوانين السير والمرور بالدولة يتحمل المستأجر كافة المسؤولية عن ذلك ويتحمل قيمة المركبة المذكورة في بوليصة التأمين حال شطبها أو قيمة إصلاحها وفترة توقفها خلال الإصلاح.'
       },
       {
         enKey: 'h)',
         arKey: 'د)',
-        en: 'If the hirer’s intentional or unintentional error causes the company to lose the agency warranty on the vehicle, the manufacturer shall bear the responsibility of paying the purchase price of the vehicle’s warranty contract and bearing all expenses related to repairing the vehicle.',
+        en: 'If hirer’s fault voids agency/manufacturer warranty, hirer bears the cost of purchasing the warranty contract and all vehicle repair expenses.',
         ar: 'في حال تسبب خطأ المستأجر المقصود أو غير المقصود في خسارة الشركة لضمان الوكيل والمصنع على المركبة يتحمل مسؤولية سداد قيمة شراء عقد الضمان الخاصة بالمركبة وتحمل كافة المصاريف الخاصة بإصلاح المركبة.'
       }
     ]
@@ -281,7 +281,7 @@ export const CONTRACT_TERMS: ContractTerm[] = [
   {
     num: 40,
     en: 'Smoking is prohibited inside the rented vehicle. If the hirer or passenger smokes inside the vehicle, hirer is liable to pay a fine ranging from AED 200 to AED 400.',
-    ar: 'يحظر التدخين داخل السيارة المستأجرة إذ كان السائق أو الراكب يدخن داخل السيارة، فهم مسؤولون عن دفع غرامة تتراوح بين 200 درهم إلى 400 درهم.'
+    ar: 'حظر التدخين داخل السيارة المستأجرة إذ كان السائق أو الراكب يدخن داخل السيارة، فهم مسؤولون عن دفع غرامة تتراوح بين 200 درهم إلى 400 درهم.'
   },
   {
     num: 41,

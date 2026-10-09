@@ -473,9 +473,9 @@ export class ContractsService {
         .lean();
 
       const nextContractNumber =
-        lastContract && typeof (lastContract as any).contractNumber === 'number' && (lastContract as any).contractNumber >= 2000
+        lastContract && typeof (lastContract as any).contractNumber === 'number' && (lastContract as any).contractNumber >= 2200
           ? (lastContract as any).contractNumber + 1
-          : 2000;
+          : 2200;
 
       updatedData.contractNumber = nextContractNumber;
     }
@@ -903,6 +903,24 @@ export class ContractsService {
 
   async sendClient(payload: { contractId: string; type: string }) {
     const { contractId, type } = payload;
+
+    // 1. Forward to Next.js unified endpoint which generates fresh PDF and sends official real contract email & WhatsApp
+    try {
+      const nextApiUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      const response = await fetch(`${nextApiUrl}/api/contracts/send-client`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractId, type: type || 'initial' }),
+      });
+      if (response.ok) {
+        const resData = await response.json();
+        console.log(`[NestJS sendClient] Successfully sent client contract via unified notification endpoint:`, resData);
+        return resData;
+      }
+    } catch (delegationErr) {
+      console.warn('[NestJS sendClient] Delegation to Next.js notification endpoint failed, using fallback:', delegationErr);
+    }
+
     const contract = (await this.contractModel
       .findById(contractId)
       .populate({ path: 'clientId', strictPopulate: false })
@@ -916,8 +934,12 @@ export class ContractsService {
     }
 
     const clientEmail = contract.clientId.email;
-    const contractNum = contract._id.toString().substring(0, 8).toUpperCase();
+    const clientName = contract.clientId.name || 'Valued Customer';
+    const contractNum = contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase();
     const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : 'Vehicle';
+    const plate = contract.unitId?.plate || '';
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const printUrl = `${baseUrl}/bookings/${contract._id}/print`;
 
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
@@ -925,12 +947,27 @@ export class ContractsService {
         await transporter.sendMail({
           from: `"Leon Rent Car" <${process.env.SMTP_USER}>`,
           to: clientEmail,
-          subject: `Rental Contract #${contractNum} — ${vehicleName} | Leon Rent Car`,
-          html: `<p>Hello ${contract.clientId.name}, your rental contract details are confirmed.</p>`,
+          subject: `Rental Agreement #${contractNum} — ${vehicleName} | Leon Rent Car`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <h2 style="color: #0f172a; margin-top: 0;">Vehicle Handover Confirmation</h2>
+              <p>Dear <strong>${clientName}</strong>,</p>
+              <p>Your vehicle rental agreement <strong>#${contractNum}</strong> has been confirmed and the vehicle has been handed over.</p>
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #fafafa; border: 1px solid #e2e8f0;">
+                <tr><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Vehicle:</td><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">${vehicleName} (${plate})</td></tr>
+                <tr><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Rental Period:</td><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">${new Date(contract.startDate).toLocaleDateString()} to ${new Date(contract.endDate).toLocaleDateString()}</td></tr>
+                <tr><td style="padding: 10px; color: #64748b;">Total Amount:</td><td style="padding: 10px; font-weight: bold;">AED ${(contract.totalAmount || 0).toLocaleString()}</td></tr>
+              </table>
+              <div style="text-align: center; margin: 25px 0;">
+                <a href="${printUrl}" target="_blank" style="padding: 12px 24px; background: #0f172a; color: #fff; text-decoration: none; font-weight: bold; border-radius: 6px; display: inline-block;">View Official Agreement Online</a>
+              </div>
+              <p style="font-size: 12px; color: #64748b;">Leon Rent Car Fleet Operations</p>
+            </div>
+          `,
         });
         return { success: true };
       } catch (err) {
-        console.error('Client send email failed:', err);
+        console.error('Client send email fallback failed:', err);
       }
     }
     return { success: false };

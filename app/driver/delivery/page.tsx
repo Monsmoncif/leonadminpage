@@ -712,6 +712,14 @@ export default function ConfirmDeliveryPage() {
         additionalDriverPhone: additionalDriver.phone.trim(),
         additionalDriverExpiry: additionalDriver.expiry,
         additionalDriverIssuedAt: additionalDriver.issuedAt.trim(),
+        startDate: rentalData.startDate,
+        endDate: rentalData.endDate,
+        rentalType: rentalData.rentalType,
+        customerType: rentalData.customerType,
+        dailyKmLimit: Number(rentalData.dailyKmLimit) || 0,
+        pricePerExtraKm: Number(rentalData.pricePerExtraKm) || 0,
+        babySeatFees: Number(rentalData.babySeatFee) || 0,
+        deliveryCharges: Number(rentalData.deliveryFee) || 0,
         paymentMethod: rentalData.paymentMethod,
         depositAmount: Number(rentalData.depositAmount),
         collectionAmount: Number(rentalData.collectionAmount),
@@ -1226,45 +1234,80 @@ export default function ConfirmDeliveryPage() {
 
       {/* Rental Plan & Customer Type Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/70 p-4 rounded-2xl border border-gray-200/80">
-        {/* Rental Type: Daily vs Monthly (Fixed by Admin) */}
+        {/* Rental Type: Daily vs Monthly */}
         <div>
           <span className="text-xs font-bold text-text-primary block mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Calendar size={14} className="text-brand" />
               <span>Rental Type (نوع الإيجار)</span>
             </span>
-            <span className="text-[11px] font-semibold text-brand">
-              {rentalData.rentalType === "Monthly" ? "Monthly Plan (30+ Days)" : "Daily Rate"}
-            </span>
           </span>
-          <div className="p-2.5 bg-white rounded-xl border border-gray-200 flex items-center justify-between shadow-2xs">
-            <span className="text-xs font-bold text-text-primary">
-              {rentalData.rentalType === "Monthly" ? "Monthly / شهري" : "Daily / يومي"}
-            </span>
-            <span className="text-[10px] text-text-muted font-medium bg-gray-100 px-2 py-0.5 rounded">
-              Contract Terms
-            </span>
+          <div className="grid grid-cols-2 gap-2 p-1 bg-white rounded-xl border border-gray-200">
+            <button
+              type="button"
+              onClick={() => setRentalData(prev => ({ ...prev, rentalType: "Daily" }))}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                rentalData.rentalType === "Daily"
+                  ? "bg-brand text-white shadow-xs"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              Daily / يومي
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const s = new Date(rentalData.startDate);
+                const monthEnd = new Date(s.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+                setRentalData(prev => ({
+                  ...prev,
+                  rentalType: "Monthly",
+                  endDate: monthEnd,
+                  collectionAmount: Math.round(Number(prev.dailyRate || 85) * 30 * 100) / 100
+                }));
+              }}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                rentalData.rentalType === "Monthly"
+                  ? "bg-brand text-white shadow-xs"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              Monthly / شهري
+            </button>
           </div>
         </div>
 
-        {/* Customer Type: B2C vs B2B (Fixed by Admin) */}
+        {/* Customer Type: B2C vs B2B */}
         <div>
           <span className="text-xs font-bold text-text-primary block mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <User size={14} className="text-brand" />
               <span>Customer Type (نوع العميل)</span>
             </span>
-            <span className="text-[11px] font-semibold text-brand">
-              {rentalData.customerType === "B2B" ? "Corporate Account" : "Individual (B2C)"}
-            </span>
           </span>
-          <div className="p-2.5 bg-white rounded-xl border border-gray-200 flex items-center justify-between shadow-2xs">
-            <span className="text-xs font-bold text-text-primary">
-              {rentalData.customerType === "B2B" ? "B2B (Corporate / شركات)" : "B2C (Individual / فردي)"}
-            </span>
-            <span className="text-[10px] text-text-muted font-medium bg-gray-100 px-2 py-0.5 rounded">
-              Contract Terms
-            </span>
+          <div className="grid grid-cols-2 gap-2 p-1 bg-white rounded-xl border border-gray-200">
+            <button
+              type="button"
+              onClick={() => setRentalData(prev => ({ ...prev, customerType: "B2C" }))}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                rentalData.customerType === "B2C"
+                  ? "bg-brand text-white shadow-xs"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              B2C (Individual / فردي)
+            </button>
+            <button
+              type="button"
+              onClick={() => setRentalData(prev => ({ ...prev, customerType: "B2B" }))}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                rentalData.customerType === "B2B"
+                  ? "bg-brand text-white shadow-xs"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              B2B (Corporate / شركات)
+            </button>
           </div>
         </div>
       </div>
@@ -1282,9 +1325,19 @@ export default function ConfirmDeliveryPage() {
               <input
                 type="date"
                 value={rentalData.startDate}
-                readOnly
-                disabled
-                className="w-full p-2.5 rounded-xl border border-border bg-gray-100/80 text-gray-700 text-sm font-medium cursor-not-allowed outline-none select-none"
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  const s = new Date(newStart);
+                  const end = new Date(rentalData.endDate);
+                  const days = Math.max(1, Math.ceil((end.getTime() - s.getTime()) / (1000 * 3600 * 24)));
+                  const rate = Number(rentalData.dailyRate) || 0;
+                  setRentalData(prev => ({
+                    ...prev,
+                    startDate: newStart,
+                    collectionAmount: rate > 0 ? rate * days : prev.collectionAmount
+                  }));
+                }}
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-gray-700 text-sm font-medium outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
             <div>
@@ -1294,13 +1347,22 @@ export default function ConfirmDeliveryPage() {
               <input
                 type="date"
                 value={rentalData.endDate}
-                readOnly
-                disabled
-                className="w-full p-2.5 rounded-xl border border-border bg-gray-100/80 text-gray-700 text-sm font-medium cursor-not-allowed outline-none select-none"
+                onChange={(e) => {
+                  const newEnd = e.target.value;
+                  const start = new Date(rentalData.startDate);
+                  const eDate = new Date(newEnd);
+                  const days = Math.max(1, Math.ceil((eDate.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+                  const rate = Number(rentalData.dailyRate) || 0;
+                  setRentalData(prev => ({
+                    ...prev,
+                    endDate: newEnd,
+                    collectionAmount: rate > 0 ? rate * days : prev.collectionAmount
+                  }));
+                }}
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-gray-700 text-sm font-medium outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
           </div>
-
 
           <div>
             <label className="text-xs font-semibold text-text-secondary block mb-1">Handover Location</label>
@@ -1310,6 +1372,38 @@ export default function ConfirmDeliveryPage() {
               onChange={(e) => setRentalData({ ...rentalData, pickupLocation: e.target.value })}
               className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
             />
+          </div>
+
+          {/* Daily KM Limit & Extra KM Price */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">
+                Daily KM Limit (حد الكيلومتر)
+              </label>
+              <input
+                type="number"
+                value={rentalData.dailyKmLimit}
+                onChange={(e) => setRentalData({ ...rentalData, dailyKmLimit: Number(e.target.value) })}
+                placeholder="0 = Unlimited"
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              />
+              <span className="text-[10px] text-text-muted mt-0.5 block">0 = Unlimited</span>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">
+                Price per Extra KM (سعر كم الزائد)
+              </label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
+                <input
+                  type="number"
+                  value={rentalData.pricePerExtraKm}
+                  onChange={(e) => setRentalData({ ...rentalData, pricePerExtraKm: Number(e.target.value) })}
+                  placeholder="0"
+                  className="w-full pl-9 pr-2.5 py-2.5 rounded-xl border border-border bg-white text-sm outline-none font-bold focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                />
+              </div>
+            </div>
           </div>
 
           <div>
@@ -1324,15 +1418,12 @@ export default function ConfirmDeliveryPage() {
           </div>
         </div>
 
-        {/* Financial Terms & Payment Method (Locked & Non-Editable by Driver) */}
+        {/* Financial Terms & Payment Method (Fully Editable by Driver) */}
         <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
               <DollarSign size={16} className="text-brand" /> Financial Terms &amp; Payment
             </h3>
-            <span className="text-[10px] font-bold text-text-muted bg-gray-200/80 px-2 py-0.5 rounded">
-              Fixed by Admin
-            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1341,19 +1432,19 @@ export default function ConfirmDeliveryPage() {
                 Rental Collection (AED)
               </label>
               <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                 <input
                   type="number"
-                  value={collectionTotal === 0 ? "" : collectionTotal}
-                  readOnly
-                  disabled
+                  value={rentalData.collectionAmount === 0 ? "" : rentalData.collectionAmount}
+                  onChange={(e) => setRentalData({ ...rentalData, collectionAmount: Number(e.target.value) })}
                   placeholder="0"
-                  className="w-full p-2.5 rounded-xl border border-border bg-gray-100/90 text-text-primary text-sm font-bold cursor-not-allowed outline-none select-none"
+                  className="w-full pl-9 pr-2.5 py-2.5 rounded-xl border border-border bg-white text-text-primary text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-brand"
                 />
               </div>
               <span className="text-[10px] text-text-muted mt-0.5 block">
                 {advancePaid > 0
-                  ? `Remaining balance (AED ${advancePaid} prepaid advance)`
-                  : "Fixed by Admin (non-editable)"}
+                  ? `Remaining due (AED ${advancePaid} prepaid advance)`
+                  : "Rental total amount"}
               </span>
             </div>
 
@@ -1362,15 +1453,41 @@ export default function ConfirmDeliveryPage() {
                 Security Deposit (AED)
               </label>
               <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                 <input
                   type="number"
                   value={rentalData.depositAmount === 0 ? "" : rentalData.depositAmount}
-                  readOnly
-                  disabled
+                  onChange={(e) => setRentalData({ ...rentalData, depositAmount: Number(e.target.value) })}
                   placeholder="0"
-                  className="w-full p-2.5 rounded-xl border border-border bg-gray-100/90 text-text-primary text-sm font-bold cursor-not-allowed outline-none select-none"
+                  className="w-full pl-9 pr-2.5 py-2.5 rounded-xl border border-border bg-white text-text-primary text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Extra Services: Baby Seat & Delivery Fee */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">
+                Delivery Charge (AED)
+              </label>
+              <input
+                type="number"
+                value={rentalData.deliveryFee}
+                onChange={(e) => setRentalData({ ...rentalData, deliveryFee: Number(e.target.value) })}
+                className="w-full p-2 rounded-xl border border-border bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">
+                Baby Seat Fee (AED)
+              </label>
+              <input
+                type="number"
+                value={rentalData.babySeatFee}
+                onChange={(e) => setRentalData({ ...rentalData, babySeatFee: Number(e.target.value) })}
+                className="w-full p-2 rounded-xl border border-border bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              />
             </div>
           </div>
 

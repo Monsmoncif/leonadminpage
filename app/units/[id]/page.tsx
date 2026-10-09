@@ -38,12 +38,16 @@ import {
   User,
   X,
   ShieldCheck,
-  Building2
+  Building2,
+  Wrench,
+  AlertTriangle,
+  Sparkles
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CreateUnitModal from "@/components/modals/CreateUnitModal";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
+import StatCard from "@/components/ui/StatCard";
 import { useToast } from "@/components/providers/ToastProvider";
 
 // Helper for generating client initials
@@ -148,6 +152,60 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Vidange (Oil Change 10,000 KM) Modal State
+  const [isVidangeModalOpen, setIsVidangeModalOpen] = useState(false);
+  const [vidangeOdometer, setVidangeOdometer] = useState<number | string>("");
+  const [vidangeDate, setVidangeDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [vidangeNotes, setVidangeNotes] = useState<string>("");
+  const [savingVidange, setSavingVidange] = useState(false);
+
+  const openVidangeModal = () => {
+    setVidangeOdometer(unit?.mileage || 0);
+    setVidangeDate(new Date().toISOString().split("T")[0]);
+    setVidangeNotes("");
+    setIsVidangeModalOpen(true);
+  };
+
+  const handleSaveVidange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const newKm = Number(vidangeOdometer);
+    if (isNaN(newKm) || newKm < 0) {
+      toast.error("Please enter a valid mileage / يرجى إدخال قراءة عداد صالحة");
+      return;
+    }
+
+    try {
+      setSavingVidange(true);
+      const updatePayload: any = {
+        lastOilChangeMileage: newKm,
+        lastOilChangeDate: vidangeDate ? new Date(vidangeDate) : new Date(),
+      };
+      if (newKm > (Number(unit.mileage) || 0)) {
+        updatePayload.mileage = newKm;
+      }
+
+      const res = await fetch(`/api/units/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatePayload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || "Failed to record oil change");
+      }
+
+      toast.success("تم تسجيل تغيير الزيت وإعادة ضبط عداد الـ 10,000 كم بنجاح! ✓ (Oil change recorded successfully)");
+      setIsVidangeModalOpen(false);
+      await fetchUnit();
+    } catch (err: any) {
+      console.error("Vidange record error:", err);
+      toast.error(err.message || "Failed to record oil change");
+    } finally {
+      setSavingVidange(false);
+    }
+  };
 
   // Rental History Modal & Filters State
   const toast = useToast();
@@ -301,10 +359,38 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
     { icon: Palette, label: "Color", value: unit.color || "N/A" },
     { icon: ExecutiveCarIcon, label: "Plate Number", value: unit.plate || "N/A", copyable: true },
     { icon: Hash, label: "VIN Number", value: unit.vin || "N/A", copyable: true },
+    { icon: Gauge, label: "KM Limit (حد الكيلومتر)", value: unit.dailyKmLimit > 0 ? `${unit.dailyKmLimit} km/day` : "Unlimited" },
+    { icon: DollarSign, label: "Price / Extra KM (سعر كم إضافي)", value: unit.pricePerExtraKm > 0 ? `AED ${unit.pricePerExtraKm}/km` : "Free / Included" },
+    { icon: DollarSign, label: "Daily Rate (السعر اليومي)", value: `AED ${unit.dailyRate ?? 0}/day` },
     ...(unit.owner ? [{ icon: Building2, label: "Owner", value: unit.owner }] : []),
     ...(unit.registrationExpiry ? [{ icon: Calendar, label: "Registration Expiry", value: new Date(unit.registrationExpiry).toLocaleDateString() }] : []),
     ...(unit.insuranceExpiry ? [{ icon: ShieldCheck, label: "Insurance Expiry", value: new Date(unit.insuranceExpiry).toLocaleDateString() }] : []),
   ];
+
+  // ===== Vidange (Oil Change - 10,000 KM Interval) Calculations =====
+  // We count 10,000 km starting from the kilometrage the car was created with.
+  // Subsequent recorded vidanges add 10,000 km to the newly serviced odometer.
+  const VIDANGE_INTERVAL = 10000;
+  const currentKm = Number(unit.mileage) || 0;
+
+  // Creation baseline (from initial registration):
+  const creationBaselineKm = unit.initialMileage != null && unit.initialMileage > 0
+    ? Number(unit.initialMileage)
+    : (hasRealHistory && chartData[0]?.km ? Number(chartData[0].km) : currentKm);
+
+  // If a vidange was recorded, use that. Otherwise, start from creation mileage:
+  const lastVidangeKm =
+    unit.lastOilChangeMileage != null && unit.lastOilChangeMileage > 0
+      ? Number(unit.lastOilChangeMileage)
+      : creationBaselineKm;
+
+  const nextVidangeKm = lastVidangeKm + VIDANGE_INTERVAL;
+  const kmDrivenSinceVidange = Math.max(0, currentKm - lastVidangeKm);
+  const remainingKm = nextVidangeKm - currentKm;
+  const progressPct = Math.min(100, Math.max(0, (kmDrivenSinceVidange / VIDANGE_INTERVAL) * 100));
+
+  const isVidangeOverdue = remainingKm <= 0;
+  const isVidangeSoon = !isVidangeOverdue && remainingKm <= 1500;
 
   // Contracts & Rental History calculations
   const contractsList: any[] = (unit.contracts || []).filter((c: any) => c.status !== "Cancelled");
@@ -383,6 +469,20 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
 
         <div className="flex items-center gap-2.5">
           <button 
+            onClick={openVidangeModal}
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-xs ${
+              isVidangeOverdue 
+                ? 'bg-red-50 text-red-700 border-red-300 hover:bg-red-100 animate-pulse'
+                : isVidangeSoon
+                ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                : 'bg-white border-border text-text-primary hover:bg-gray-50'
+            }`}
+            title="Record Oil Change (Vidange 10,000 KM) / تسجيل تغيير الزيت"
+          >
+            <Droplet size={14} className={isVidangeOverdue ? "text-red-600" : isVidangeSoon ? "text-amber-600" : "text-brand"} />
+            <span>Record Vidange</span>
+          </button>
+          <button 
             onClick={() => setIsEditModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-border text-text-primary rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer shadow-xs"
           >
@@ -399,19 +499,98 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
+      {/* ===== Top 4 KPI StatCards (Inspired by Fleet Units Page) ===== */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="stagger-1">
+          <StatCard
+            icon={ExecutiveCarIcon}
+            label="Vehicle Status"
+            value={unit.status}
+            subtitle={
+              activeRental
+                ? `With ${activeRental.clientId?.name || 'Client'}`
+                : pendingRental
+                ? `Pending handover (#${pendingRental.contractNumber})`
+                : "Ready for rental in fleet"
+            }
+            accentColor={
+              unit.status === "Available"
+                ? "#10B981"
+                : unit.status === "Rented"
+                ? "#3B82F6"
+                : "#EF4444"
+            }
+            sparkData={unit.status === "Available" ? [5, 6, 7, 8, 9, 10] : [8, 8, 7, 7, 6, 6]}
+          />
+        </div>
+
+        <div className="stagger-2">
+          <StatCard
+            icon={Gauge}
+            label="Current Odometer"
+            value={`${currentKm.toLocaleString()} km`}
+            subtitle={
+              totalKmDriven > 0
+                ? `+${totalKmDriven.toLocaleString()} km on bookings`
+                : totalTraveled > 0
+                ? `+${totalTraveled.toLocaleString()} km tracked`
+                : "Baseline reading"
+            }
+            accentColor="#8B5CF6"
+            sparkData={chartData.map((d) => d.km)}
+          />
+        </div>
+
+        <div className="stagger-3">
+          <StatCard
+            icon={Wrench}
+            label="Next Vidange (10,000 km)"
+            value={isVidangeOverdue ? "Overdue!" : `${remainingKm.toLocaleString()} km`}
+            subtitle={
+              isVidangeOverdue
+                ? `Exceeded by ${Math.abs(remainingKm).toLocaleString()} km`
+                : `Next due at ${nextVidangeKm.toLocaleString()} km`
+            }
+            accentColor={isVidangeOverdue ? "#EF4444" : isVidangeSoon ? "#F59E0B" : "#10B981"}
+            sparkData={[
+              0,
+              Math.min(10000, kmDrivenSinceVidange * 0.25),
+              Math.min(10000, kmDrivenSinceVidange * 0.5),
+              Math.min(10000, kmDrivenSinceVidange * 0.75),
+              Math.min(10000, kmDrivenSinceVidange),
+            ]}
+          />
+        </div>
+
+        <div className="stagger-4">
+          <StatCard
+            icon={DollarSign}
+            label="Daily Rate & Revenue"
+            value={`AED ${unit.dailyRate ?? 0}/day`}
+            subtitle={
+              totalRevenue > 0
+                ? `AED ${totalRevenue.toLocaleString()} (${totalRentals} rentals)`
+                : "Standard rental pricing"
+            }
+            accentColor="#059669"
+            sparkData={[100, 150, 120, 200, 250, 300]}
+          />
+        </div>
+      </div>
+
       <div className="flex flex-col lg:flex-row gap-8 animate-fade-in-up stagger-2">
         {/* Left Column */}
         <div className="w-full lg:w-[55%] xl:w-[60%] flex flex-col gap-6">
           
-          {/* Hero Image Gallery */}
-          <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
-            {/* Main Image */}
-            <div className="relative w-full aspect-[16/9] bg-gradient-to-b from-gray-50 to-gray-100/50 flex items-center justify-center overflow-hidden">
+          {/* ===== Hero: Gallery + Car Title ===== */}
+          <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm card-hover">
+            {/* Gallery: Alone in one line across full width */}
+            <div className="relative w-full aspect-[16/9] bg-gradient-to-b from-gray-50 to-gray-100/60 flex items-center justify-center overflow-hidden">
               {unit.images && unit.images.length > 0 ? (
-                <img 
-                  src={unit.images[activeImageIndex] || unit.images[0]} 
-                  alt={unit.model} 
-                  className="w-full h-full object-contain p-6 drop-shadow-xl transition-all duration-500" 
+                <img
+                  src={unit.images[activeImageIndex] || unit.images[0]}
+                  alt={unit.model}
+                  className="w-full h-full object-contain p-6 drop-shadow-xl transition-all duration-500"
                 />
               ) : (
                 <div className="flex flex-col items-center gap-3 text-gray-300">
@@ -419,115 +598,107 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                   <span className="text-sm font-medium text-gray-400">No images available</span>
                 </div>
               )}
-              
-              {/* Image counter overlay */}
+
               {unit.images && unit.images.length > 1 && (
-                <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
-                  {activeImageIndex + 1} / {unit.images.length}
-                </div>
+                <>
+                  <button
+                    onClick={() => setActiveImageIndex((activeImageIndex - 1 + unit.images.length) % unit.images.length)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white border border-border shadow-sm flex items-center justify-center text-text-secondary hover:text-brand transition-all cursor-pointer"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    onClick={() => setActiveImageIndex((activeImageIndex + 1) % unit.images.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white border border-border shadow-sm flex items-center justify-center text-text-secondary hover:text-brand transition-all cursor-pointer"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-[11px] font-semibold px-2.5 py-1 rounded-lg">
+                    {activeImageIndex + 1} / {unit.images.length}
+                  </div>
+                </>
               )}
             </div>
-            
+
             {/* Thumbnails */}
             {unit.images && unit.images.length > 1 && (
-              <div className="p-4 border-t border-border bg-white">
-                <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
+              <div className="p-3 border-t border-border bg-white">
+                <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
                   {unit.images.map((img: string, i: number) => (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       onClick={() => setActiveImageIndex(i)}
-                      className={`w-[72px] h-[50px] shrink-0 rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
-                        activeImageIndex === i 
-                          ? 'border-brand ring-2 ring-brand/20 scale-[1.03]' 
+                      className={`w-[68px] h-[48px] shrink-0 rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
+                        activeImageIndex === i
+                          ? 'border-brand ring-2 ring-brand/20'
                           : 'border-transparent hover:border-gray-300 opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <img 
-                        src={img} 
-                        alt={`${unit.model} ${i + 1}`} 
-                        className="w-full h-full object-cover" 
-                      />
+                      <img src={img} alt={`${unit.model} ${i + 1}`} className="w-full h-full object-cover" />
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Price & Quick Info Bar */}
-          <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-6">
-                {/* Price */}
-                <div>
-                  <p className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-1">Daily Rate</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-emerald-600">AED {unit.dailyRate ?? 'N/A'}</span>
-                    <span className="text-sm font-semibold text-text-muted">/day</span>
-                  </div>
-                </div>
-                
-                {/* Divider */}
-                <div className="w-px h-12 bg-border hidden sm:block"></div>
-
-                {/* Quick stats */}
-                <div className="hidden sm:flex items-center gap-5">
-                  <div className="flex items-center gap-2 text-text-secondary">
-                    <Gauge size={16} className="text-text-muted" />
-                    <span className="text-sm font-semibold">{(unit.mileage || 0).toLocaleString()} km</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-text-secondary">
-                    <Fuel size={16} className="text-text-muted" />
-                    <span className="text-sm font-semibold">{unit.fuelType || "Petrol"}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-text-secondary">
-                    <Cog size={16} className="text-text-muted" />
-                    <span className="text-sm font-semibold">{unit.transmission || "Automatic"}</span>
-                  </div>
+            {/* Below images: Just name of car */}
+            <div className="p-5 border-t border-border bg-white flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h2 className="text-2xl font-bold text-text-primary leading-tight">
+                  {unit.make} {unit.model}
+                </h2>
+                <div className="flex items-center gap-2 mt-1.5">
+                  {unit.year && (
+                    <span className="text-xs font-semibold text-text-muted">{unit.year}</span>
+                  )}
+                  {unit.plate && (
+                    <>
+                      <span className="text-text-muted text-xs">•</span>
+                      <span className="text-xs font-bold text-text-secondary bg-gray-100 px-2 py-0.5 rounded-md">
+                        {unit.plate}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
-
-              {(unit.plate || unit.year) && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase tracking-wider font-bold text-text-secondary bg-gray-100 px-3 py-1.5 rounded-lg ring-1 ring-black/5">
-                    {unit.year} • {unit.plate || 'No Plate'}
-                  </span>
-                </div>
+              {unit.description && (
+                <p className="text-xs text-text-secondary max-w-sm line-clamp-2">
+                  {unit.description}
+                </p>
               )}
             </div>
           </div>
 
-          {/* About */}
-          {unit.description && (
-            <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
-              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-3">About This Vehicle</h3>
-              <p className="text-sm text-text-secondary leading-relaxed">
-                {unit.description}
-              </p>
+          {/* ===== Specifications ===== */}
+          <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover">
+            <div className="px-6 py-4 border-b border-border bg-gray-50/50 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center">
+                <Settings size={16} />
+              </div>
+              <h3 className="text-base font-bold text-text-primary">Specifications</h3>
             </div>
-          )}
-
-          {/* Specifications Grid */}
-          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
-            <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-5">Specifications</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 divide-border/60">
               {specs.map((spec, i) => (
-                <div 
-                  key={i} 
-                  className="group relative bg-gray-50/80 hover:bg-white rounded-xl p-4 border border-transparent hover:border-border hover:shadow-sm transition-all duration-200 cursor-default"
+                <div
+                  key={i}
+                  className={`group flex items-center justify-between gap-3 px-6 py-3.5 hover:bg-gray-50/70 transition-colors ${
+                    i >= 2 ? "sm:border-t sm:border-border/60" : ""
+                  } ${i % 2 === 0 ? "sm:border-r sm:border-border/60" : ""}`}
                 >
-                  <div className="flex items-center gap-2.5 mb-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-white group-hover:bg-brand/5 flex items-center justify-center text-text-muted group-hover:text-brand transition-colors shadow-sm border border-border/50">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-white border border-border/60 shadow-sm flex items-center justify-center text-text-muted group-hover:text-brand transition-colors shrink-0">
                       <spec.icon size={15} />
                     </div>
-                    <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">{spec.label}</p>
+                    <span className="text-xs text-text-muted font-semibold">{spec.label}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-bold text-text-primary truncate flex-1" title={spec.value}>{spec.value}</p>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-sm font-bold text-text-primary truncate" title={String(spec.value)}>{spec.value}</span>
                     {spec.copyable && spec.value !== "N/A" && (
-                      <button 
-                        onClick={() => copyToClipboard(spec.value, spec.label)}
-                        className=" p-1 hover:bg-gray-100 rounded-md transition-all cursor-pointer"
+                      <button
+                        onClick={() => copyToClipboard(String(spec.value), spec.label)}
+                        className="p-1 hover:bg-gray-100 rounded-md transition-all cursor-pointer"
                         title={`Copy ${spec.label}`}
                       >
                         {copiedField === spec.label ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} className="text-text-muted" />}
@@ -538,11 +709,12 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               ))}
             </div>
           </div>
+
         </div>
 
         {/* Right Column */}
         <div className="w-full lg:w-[45%] xl:w-[40%] flex flex-col gap-6">
-          
+
           {/* Mileage Activity Chart */}
           <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
             <div className="flex items-center justify-between mb-5">
@@ -633,7 +805,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               </p>
             )}
           </div>
-
+          
           {/* Quick Vehicle Rental Summary KPI Card */}
           <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
             <div className="flex items-center justify-between mb-5">
@@ -754,6 +926,149 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
               </div>
             ) : null}
+          </div>
+
+          {/* ================= Vidange 10,000 KM Maintenance Tracker Card (Specifications Style) ================= */}
+          <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover animate-fade-in-up">
+            {/* Header matching Specifications */}
+            <div className="px-6 py-4 border-b border-border bg-gray-50/50 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                  <Droplet size={16} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">Oil Change (Vidange)</h3>
+                  <p className="text-[11px] text-text-muted">10,000 KM Maintenance Cycle</p>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              {isVidangeOverdue ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-200 animate-pulse">
+                  <AlertTriangle size={13} className="text-red-600" />
+                  Overdue
+                </span>
+              ) : isVidangeSoon ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  <Clock size={13} className="text-amber-600" />
+                  Due Soon
+                </span>
+              ) : null}
+            </div>
+
+            {/* Oil Life Progress strip */}
+            <div className="px-6 py-3.5 bg-gray-50/30 border-b border-border/60">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="font-semibold text-text-secondary">
+                  Oil Life ({progressPct.toFixed(0)}% used)
+                </span>
+                <span className={isVidangeOverdue ? "text-red-600 font-bold" : isVidangeSoon ? "text-amber-600 font-bold" : "text-emerald-600 font-bold"}>
+                  {isVidangeOverdue ? `Overdue by ${Math.abs(remainingKm).toLocaleString()} km` : `${remainingKm.toLocaleString()} km remaining`}
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-gray-200/80 rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, progressPct)}%`,
+                    backgroundColor: isVidangeOverdue ? '#EF4444' : isVidangeSoon ? '#F59E0B' : '#10B981'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Specifications-style key-value list */}
+            <div className="divide-y divide-border/60">
+              {[
+                { 
+                  icon: Gauge, 
+                  label: "Current Odometer (العداد الحالي)", 
+                  value: `${currentKm.toLocaleString()} km` 
+                },
+                { 
+                  icon: History, 
+                  label: "Last Vidange (آخر تغيير زيت)", 
+                  value: `${lastVidangeKm.toLocaleString()} km`,
+                  sub: unit.lastOilChangeMileage && unit.lastOilChangeMileage > 0 && unit.lastOilChangeDate 
+                    ? new Date(unit.lastOilChangeDate).toLocaleDateString() 
+                    : undefined
+                },
+                { 
+                  icon: Calendar, 
+                  label: "Next Due (الموعد القادم)", 
+                  value: `${nextVidangeKm.toLocaleString()} km` 
+                },
+                { 
+                  icon: TrendingUp, 
+                  label: "Driven on Current Oil (المقطوع بالزيت الحالي)", 
+                  value: `${kmDrivenSinceVidange.toLocaleString()} km` 
+                },
+                { 
+                  icon: Activity, 
+                  label: "Remaining Distance (المسافة المتبقية)", 
+                  value: isVidangeOverdue ? `-${Math.abs(remainingKm).toLocaleString()} km` : `${remainingKm.toLocaleString()} km`,
+                  valueColor: isVidangeOverdue ? 'text-red-600' : isVidangeSoon ? 'text-amber-600' : 'text-emerald-600'
+                },
+                { 
+                  icon: Cog, 
+                  label: "Maintenance Cycle (دورة الصيانة)", 
+                  value: "Every 10,000 km" 
+                },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className="group flex items-center justify-between gap-3 px-6 py-3.5 hover:bg-gray-50/70 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-white border border-border/60 shadow-sm flex items-center justify-center text-text-muted group-hover:text-brand transition-colors shrink-0">
+                      <item.icon size={15} />
+                    </div>
+                    <div>
+                      <span className="text-xs text-text-muted font-semibold block">{item.label}</span>
+                      {item.sub && <span className="text-[10px] text-text-muted">{item.sub}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`text-sm font-bold ${item.valueColor || 'text-text-primary'}`}>
+                      {item.value}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Warning Banner if Overdue or Due Soon */}
+            {isVidangeOverdue && (
+              <div className="p-4 bg-red-50 border-t border-red-200 flex items-start gap-2.5 text-xs text-red-900">
+                <AlertTriangle size={15} className="text-red-600 shrink-0 mt-0.5" />
+                <p className="font-semibold leading-relaxed">
+                  🚨 حان موعد تغيير الزيت فوراً! تجاوزت السيارة دورة الـ 10,000 كم بمقدار {Math.abs(remainingKm).toLocaleString()} كم.
+                </p>
+              </div>
+            )}
+            {isVidangeSoon && (
+              <div className="p-4 bg-amber-50 border-t border-amber-200 flex items-start gap-2.5 text-xs text-amber-900">
+                <Clock size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                <p className="font-semibold leading-relaxed">
+                  ⚠️ اقترب موعد تغيير الزيت (متبقي {remainingKm.toLocaleString()} كم). يرجى التجهيز للصيانة قريباً.
+                </p>
+              </div>
+            )}
+
+            {/* Footer with Action Button */}
+            <div className="p-4 bg-gray-50/50 border-t border-border">
+              <button
+                onClick={openVidangeModal}
+                className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs ${
+                  isVidangeOverdue
+                    ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-200'
+                    : 'bg-brand hover:bg-brand-dark text-white'
+                }`}
+              >
+                <Wrench size={14} />
+                <span>Record Oil Change</span>
+              </button>
+            </div>
           </div>
           
         </div>
@@ -1172,6 +1487,151 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
           fetchUnit();
         }}
       />
+
+      {/* ================= Record Oil Change Modal (نافذة تسجيل تغيير الزيت) ================= */}
+      {isVidangeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-border overflow-hidden animate-scale-up">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-border bg-gray-50/70 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
+                  <Droplet size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">
+                    تسجيل تغيير الزيت (Record Vidange)
+                  </h3>
+                  <p className="text-xs text-text-muted">
+                    إعادة ضبط دورة الـ 10,000 كم للمركبة
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsVidangeModalOpen(false)}
+                className="p-1.5 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveVidange} className="p-5 space-y-4">
+              {/* Car details badge */}
+              <div className="bg-gray-50 rounded-xl p-3 border border-border/60 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">
+                    {unit.make} {unit.model} ({unit.year})
+                  </span>
+                  <span className="text-[11px] text-text-muted">
+                    Plate: {unit.plate || 'No Plate'} • Current: {(unit.mileage || 0).toLocaleString()} km
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-1 bg-brand/10 text-brand rounded-lg">
+                  10k Cycle
+                </span>
+              </div>
+
+              {/* Odometer Input */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-text-primary">
+                    عداد الكيلومترات عند التغيير (Odometer km) <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setVidangeOdometer(unit.mileage || 0)}
+                    className="text-[10px] font-bold text-brand hover:underline cursor-pointer"
+                  >
+                    استخدام العداد الحالي ({unit.mileage || 0} km)
+                  </button>
+                </div>
+                <div className="relative">
+                  <Gauge size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={vidangeOdometer}
+                    onChange={(e) => setVidangeOdometer(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-bold"
+                    placeholder="e.g. 50000"
+                  />
+                </div>
+                <p className="text-[10px] text-text-muted mt-1">
+                  سيكون موعد التغيير القادم تلقائياً عند: {(Number(vidangeOdometer) || 0) + 10000} كم
+                </p>
+              </div>
+
+              {/* Date Input */}
+              <div>
+                <label className="block text-xs font-semibold text-text-primary mb-1">
+                  تاريخ تغيير الزيت (Date of Service)
+                </label>
+                <div className="relative">
+                  <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input
+                    type="date"
+                    value={vidangeDate}
+                    onChange={(e) => setVidangeDate(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  />
+                </div>
+              </div>
+
+              {/* Service Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-text-primary mb-1">
+                  ملاحظات الصيانة / نوع الزيت (Notes / Oil Grade)
+                </label>
+                <input
+                  type="text"
+                  value={vidangeNotes}
+                  onChange={(e) => setVidangeNotes(e.target.value)}
+                  placeholder="مثال: زيت 5W-30 تخليقي بالكامل + تغيير الفلتر"
+                  className="w-full px-3.5 py-2.5 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                />
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-start gap-2">
+                <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] leading-relaxed">
+                  تأكيد تغيير الزيت سيبدأ دورة 10,000 كم جديدة للسيارة فوراً وسيقوم بتحديث لوحة المتابعة وتنبيهات الأسطول.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setIsVidangeModalOpen(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-text-secondary rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  إلغاء (Cancel)
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingVidange}
+                  className="px-5 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                >
+                  {savingVidange ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>جاري الحفظ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} />
+                      <span>تأكيد وحفظ (Confirm & Reset)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

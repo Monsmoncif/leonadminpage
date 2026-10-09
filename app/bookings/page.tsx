@@ -26,6 +26,7 @@ import {
   Send
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
+import TablePagination from "@/components/ui/TablePagination";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
 
 import { useToast } from "@/components/providers/ToastProvider";
@@ -105,9 +106,9 @@ export default function ContractsPage() {
   const [selectedContractForDetails, setSelectedContractForDetails] = useState<any | null>(null);
 
   
-  // Pagination (matches clients page UI/UX)
+  // Pagination (matches fleet/clients page UI/UX)
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const router = useRouter();
   const toast = useToast();
   const [deliveringContractId, setDeliveringContractId] = useState<string | null>(null);
@@ -479,13 +480,13 @@ export default function ContractsPage() {
                       <th className="text-left py-3 px-4 text-text-muted font-semibold">
                         Vehicle
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-left py-3 px-4 text-text-muted font-semibold whitespace-nowrap">
                         Period
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-left py-3 px-2 text-text-muted font-semibold whitespace-nowrap w-[120px]">
                         Status
                       </th>
-                      <th className="text-right py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-right py-3 px-4 text-text-muted font-semibold whitespace-nowrap">
                         Actions
                       </th>
                     </tr>
@@ -598,8 +599,8 @@ export default function ContractsPage() {
                             </td>
 
                             {/* Status Column */}
-                            <td className="py-3 px-4">
-                              <div className="flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <td className="py-3 px-2 whitespace-nowrap w-[120px]">
+                              <div className="flex flex-col gap-1 w-[116px] max-w-[116px]" onClick={(e) => e.stopPropagation()}>
                                 <select
                                   value={contract.status}
                                   onChange={async (e) => {
@@ -640,18 +641,18 @@ export default function ContractsPage() {
                                       toast.error(err.message || "Failed to update status");
                                     }
                                   }}
-                                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border focus:outline-none focus:ring-2 cursor-pointer shadow-2xs transition-colors ${getStatusClasses(contract.status)}`}
+                                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getStatusClasses(contract.status)}`}
                                 >
                                   <option value="Draft" className="bg-white text-gray-900">Draft</option>
                                   <option value="Active" className="bg-white text-gray-900">Active</option>
                                   <option value="Completed" className="bg-white text-gray-900">Completed</option>
                                   <option value="Cancelled" className="bg-white text-gray-900">Cancelled</option>
                                 </select>
-                                <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-                                  <span className={`px-1.5 py-0.5 rounded border ${getPaymentBadge(cPaymentStatus)}`}>
+                                <div className="flex items-center gap-1 text-[9px] font-semibold whitespace-nowrap">
+                                  <span className={`px-1 py-0.5 rounded border leading-tight ${getPaymentBadge(cPaymentStatus)}`}>
                                     Pay: {cPaymentStatus}
                                   </span>
-                                  <span className={`px-1.5 py-0.5 rounded border ${getCarStatusBadge(cCarStatus)}`}>
+                                  <span className={`px-1 py-0.5 rounded border leading-tight ${getCarStatusBadge(cCarStatus)}`}>
                                     Car: {cCarStatus}
                                   </span>
                                 </div>
@@ -800,43 +801,15 @@ export default function ContractsPage() {
                 </table>
               </div>
               
-              {/* Pagination (Matches Clients Page exactly) */}
-              <div className="p-3 border-t border-border flex items-center justify-between text-xs text-text-secondary bg-white">
-                <p>
-                  Showing{" "}
-                  <span className="font-medium text-text-primary">
-                    {filteredContracts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-medium text-text-primary">
-                    {Math.min(currentPage * itemsPerPage, filteredContracts.length)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-medium text-text-primary">
-                    {filteredContracts.length}
-                  </span>{" "}
-                  contracts
-                </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Prev
-                  </button>
-                  <button className="px-2.5 py-1 bg-brand text-white rounded-md font-medium shadow-sm">
-                    {currentPage}
-                  </button>
-                  <button 
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
+              {/* Pagination */}
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredContracts.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+              />
             </div>
           </div>
         </div>

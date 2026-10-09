@@ -114,12 +114,12 @@ export async function generateContractPdfFromPrintUrl(
       page = await browser.newPage();
 
       const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-      const printUrl = `${baseUrl}/bookings/${contractId}/print?noprint=1`;
+      const printUrl = `${baseUrl}/bookings/${contractId}/print?noprint=1&fresh=1&t=${Date.now()}`;
 
-      await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 10000 });
-      await page.waitForSelector("#contract-print-content", { timeout: 8000 });
+      await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
+      await page.waitForSelector("#contract-print-content", { timeout: 15000 });
       // Brief pause to allow fonts, signatures, and dynamic layout to settle
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const pdfUint8Array = await page.pdf({
         format: "A4",

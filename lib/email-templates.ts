@@ -127,7 +127,7 @@ export function buildBaseEmailLayout({
                     <div style="font-weight: 600; color: #334155;">Leon Rent Car</div>
                     <div style="color: #64748b; margin-top: 2px;">Fleet Operations & Customer Support</div>
                     <div style="color: #64748b; margin-top: 2px;">
-                      Email: <a href="mailto:ourciahmedmoncif@gmail.com" style="color: #2563eb; text-decoration: none;">ourciahmedmoncif@gmail.com</a>
+                      Email: <a href="mailto:${process.env.SMTP_USER || "info@leonrentcar.com"}" style="color: #2563eb; text-decoration: none;">${process.env.SMTP_USER || "info@leonrentcar.com"}</a>
                     </div>
                   </td>
                 </tr>
@@ -168,77 +168,169 @@ export function buildDetailRow(label: string, value: string, isLast = false): st
 /**
  * 1. Client Contract Email (New Booking, Handover, or Final Return)
  */
-export function buildClientContractEmail(params: {
+export interface ClientContractEmailParams {
   clientName: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientIdNumber?: string;
+  clientLicense?: string;
   contractNumber: string;
   vehicleName: string;
   vehiclePlate?: string;
+  vehicleColor?: string;
+  vehicleYear?: string | number;
+  checkoutMileage?: number;
+  checkoutFuelLevel?: number;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
   pickupLocation?: string;
+  returnLocation?: string;
+  totalDays?: number;
   dailyRate?: number;
+  collectionAmount?: number;
+  advancePayment?: number;
+  depositAmount?: number;
   totalAmount?: number;
+  paymentMethod?: string;
+  notes?: string;
   type: "created" | "initial" | "final";
   contractUrl?: string;
-}): { subject: string; html: string } {
+}
+
+/**
+ * 1. Client Contract Email (New Booking, Handover, or Final Return)
+ * Full official contract layout with vehicle details, hirer info, handover metrics, and AED financials.
+ */
+export function buildClientContractEmail(params: ClientContractEmailParams): { subject: string; html: string } {
   const isFinal = params.type === "final";
-  const title = isFinal ? "Vehicle Return Summary" : "Rental Agreement Confirmation";
-  const subtitle = isFinal
-    ? `Contract #${params.contractNumber} has been completed and closed.`
-    : `Your vehicle rental agreement #${params.contractNumber} is confirmed.`;
+  const isHandover = params.type === "initial";
+
+  let title = "Official Rental Agreement";
+  let subtitle = `Rental Contract #${params.contractNumber} is confirmed and active.`;
+  let statusBadge = "Confirmed Booking";
+
+  if (isHandover) {
+    title = "Vehicle Handover Confirmation";
+    subtitle = `Vehicle has been officially handed over for Contract #${params.contractNumber}.`;
+    statusBadge = "Vehicle Delivered (تم التسليم)";
+  } else if (isFinal) {
+    title = "Vehicle Return Summary";
+    subtitle = `Contract #${params.contractNumber} has been inspected, completed and closed.`;
+    statusBadge = "Contract Closed (عقد مكتمل)";
+  }
 
   const subject = isFinal
-    ? `Rental Return Summary — Contract #${params.contractNumber} | Leon Rent Car`
-    : `Rental Agreement #${params.contractNumber} — ${params.vehicleName} | Leon Rent Car`;
+    ? `Vehicle Return Summary — Contract #${params.contractNumber} | Leon Rent Car`
+    : isHandover
+    ? `Official Handover Agreement #${params.contractNumber} — ${params.vehicleName} | Leon Rent Car`
+    : `Rental Agreement Confirmation #${params.contractNumber} — ${params.vehicleName} | Leon Rent Car`;
 
-  const rows = [
-    buildDetailRow("Contract Number", `#${params.contractNumber}`),
-    buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
-    buildDetailRow("Rental Period", `${params.startDate} to ${params.endDate}`),
-  ];
+  const formatAED = (amount?: number) => {
+    if (amount === undefined || amount === null || isNaN(amount)) return "AED 0";
+    return `AED ${Number(amount).toLocaleString()}`;
+  };
 
-  if (params.pickupLocation && !isFinal) {
-    rows.push(buildDetailRow("Pickup Location", params.pickupLocation));
-  }
-
-  if (params.totalAmount !== undefined && params.totalAmount > 0) {
-    rows.push(buildDetailRow("Total Rental Amount", `${params.totalAmount.toLocaleString()} DZD`));
-  }
+  const vehicleDisplay = `${params.vehicleName}${params.vehicleYear ? ` (${params.vehicleYear})` : ""}${params.vehicleColor ? ` - ${params.vehicleColor}` : ""}`;
+  const rentalPeriod = `${params.startDate}${params.startTime ? ` at ${params.startTime}` : ""} to ${params.endDate}${params.endTime ? ` at ${params.endTime}` : ""}`;
 
   const contentHtml = `
-    <p style="margin: 0 0 16px; font-size: 14px; color: #334155;">
+    <p style="margin: 0 0 14px; font-size: 15px; color: #1e293b;">
       Dear <strong>${params.clientName}</strong>,
     </p>
 
-    <p style="margin: 0 0 20px; font-size: 13px; color: #475569; line-height: 1.6;">
-      ${isFinal
-        ? "Thank you for renting with Leon Rent Car. Your vehicle return has been inspected and processed. Below is the summary of your completed rental agreement."
-        : "Thank you for choosing Leon Rent Car. Your vehicle rental agreement has been registered in our system. Below are your reservation details."}
+    <p style="margin: 0 0 20px; font-size: 13.5px; color: #475569; line-height: 1.6;">
+      ${isHandover
+        ? "Thank you for choosing <strong>Leon Rent Car</strong>. Your vehicle has been officially handed over and inspected. Below are the verified details and handover metrics of your active rental agreement."
+        : isFinal
+        ? "Thank you for renting with <strong>Leon Rent Car</strong>. Your vehicle return inspection has been successfully completed. Below is the final summary of your closed contract."
+        : "Thank you for choosing <strong>Leon Rent Car</strong>. Your rental reservation has been registered in our system. Below are the details of your rental contract."}
     </p>
 
-    <!-- Details Box -->
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px; background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
-      ${rows.join("")}
-    </table>
+    <!-- Status Banner -->
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin: 0 0 22px; display: table; width: 100%; box-sizing: border-box;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="font-size: 13px; font-weight: 700; color: #15803d;">
+            &#10003; Status: ${statusBadge}
+          </td>
+          <td align="right" style="font-size: 12px; font-weight: 600; color: #166534;">
+            Agreement #${params.contractNumber}
+          </td>
+        </tr>
+      </table>
+    </div>
 
-    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 16px; margin: 0 0 24px;">
+    <!-- Section 1: Hirer & Customer Information -->
+    <div style="margin: 0 0 20px;">
+      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+        1. Hirer Details / معلومات المستأجر
+      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+        ${buildDetailRow("Client Name", params.clientName)}
+        ${params.clientPhone ? buildDetailRow("Phone Number", params.clientPhone) : ""}
+        ${params.clientIdNumber ? buildDetailRow("Emirates ID / Passport", params.clientIdNumber) : ""}
+        ${params.clientLicense ? buildDetailRow("Driving License", params.clientLicense, true) : ""}
+      </table>
+    </div>
+
+    <!-- Section 2: Vehicle & Handover Condition -->
+    <div style="margin: 0 0 20px;">
+      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+        2. Vehicle & Handover Condition / بيانات المركبة وحالة الاستلام
+      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+        ${buildDetailRow("Vehicle", vehicleDisplay)}
+        ${params.vehiclePlate ? buildDetailRow("Plate Number", params.vehiclePlate) : ""}
+        ${params.checkoutMileage !== undefined ? buildDetailRow("Checkout Odometer (عداد الاستلام)", `${params.checkoutMileage.toLocaleString()} KM`) : ""}
+        ${params.checkoutFuelLevel !== undefined ? buildDetailRow("Handover Fuel Level (مستوى الوقود)", `${params.checkoutFuelLevel}%`) : ""}
+        ${params.pickupLocation ? buildDetailRow("Handover Location", params.pickupLocation, true) : ""}
+      </table>
+    </div>
+
+    <!-- Section 3: Rental Period & Duration -->
+    <div style="margin: 0 0 20px;">
+      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+        3. Rental Period & Schedule / فترة التأجير
+      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+        ${buildDetailRow("Rental Period", rentalPeriod)}
+        ${params.totalDays ? buildDetailRow("Total Duration", `${params.totalDays} Day${params.totalDays > 1 ? "s" : ""}`, true) : ""}
+      </table>
+    </div>
+
+    <!-- Section 4: Financial Terms & Payment (AED) -->
+    <div style="margin: 0 0 22px;">
+      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+        4. Financial Terms & Payment / الشروط المالية والدفع (AED)
+      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+        ${params.dailyRate !== undefined && params.dailyRate > 0 ? buildDetailRow("Daily Rate", `${formatAED(params.dailyRate)} / day`) : ""}
+        ${params.collectionAmount !== undefined && params.collectionAmount > 0 
+          ? buildDetailRow("Rental Collection Amount", formatAED(params.collectionAmount))
+          : (params.totalAmount !== undefined && params.totalAmount > 0 ? buildDetailRow("Total Rental Amount", formatAED(params.totalAmount)) : "")}
+        ${params.advancePayment !== undefined && params.advancePayment > 0 ? buildDetailRow("Advance Paid", formatAED(params.advancePayment)) : ""}
+        ${params.depositAmount !== undefined ? buildDetailRow("Security Deposit", formatAED(params.depositAmount)) : ""}
+        ${params.paymentMethod ? buildDetailRow("Payment Method", params.paymentMethod, true) : ""}
+      </table>
+    </div>
+
+    <!-- Official PDF Attachment Notice -->
+    <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #0f172a; border-radius: 6px; padding: 14px 16px; margin: 0 0 24px;">
+      <p style="margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #0f172a;">
+        &#128196; Official Signed Contract Attached (PDF)
+      </p>
       <p style="margin: 0; font-size: 12px; color: #475569; line-height: 1.5;">
-        <strong>Document Attached:</strong> A signed, official PDF copy of your rental agreement is attached to this email for your records and vehicle verification.
+        The official, legal PDF copy of your rental contract (<strong>Contract-${params.contractNumber}.pdf</strong>) is attached to this email. It contains the complete terms of hire, vehicle handover inspection checklist, and conditions of carriage.
       </p>
     </div>
 
-    ${params.contractUrl ? `
-    <div style="text-align: center; margin: 28px 0 16px;">
-      <a href="${params.contractUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px; letter-spacing: 0.2px;">
-        View Agreement Online
-      </a>
-    </div>
-    ` : ''}
 
-    <p style="margin: 20px 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">
-      If you require assistance or roadside support, please contact our dispatch team.<br/>
+    <p style="margin: 20px 0 0; font-size: 12.5px; color: #64748b; line-height: 1.6;">
+      For 24/7 Roadside Assistance, vehicle inquiries, or contract extension requests, please reach out to our dispatch desk.<br/>
       Safe travels,<br/>
-      <strong style="color: #334155;">Leon Rent Car Operations</strong>
+      <strong style="color: #1e293b;">Leon Rent Car Operations Team</strong>
     </p>
   `;
 

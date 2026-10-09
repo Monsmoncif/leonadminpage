@@ -8,7 +8,7 @@ async function main() {
   const contractsCol = mongoose.connection.db.collection('contracts');
   const existingContracts = await contractsCol.find().sort({ createdAt: 1 }).toArray();
 
-  let startNumber = 2000;
+  let startNumber = 2200;
   for (const c of existingContracts) {
     if (!c.contractNumber) {
       await contractsCol.updateOne(

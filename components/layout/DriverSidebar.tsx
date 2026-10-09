@@ -11,6 +11,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   X,
+  PlusCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSidebar } from "@/components/layout/SidebarContext";
@@ -22,6 +23,7 @@ const sections = [
     label: "Main",
     items: [
       { name: "Dashboard", href: "/driver", icon: LayoutDashboard },
+      { name: "New Contract", href: "/driver/contracts/new", icon: PlusCircle },
     ],
   },
   {

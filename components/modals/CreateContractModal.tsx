@@ -103,6 +103,13 @@ export default function CreateContractModal({
   const [clients, setClients] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
 
+  const currentDriver = drivers.find(d => 
+    (d._id && String(d._id) === String(currentUserId)) || 
+    (d.userId && String(d.userId) === String(currentUserId)) ||
+    (d.email && session?.user?.email && d.email.toLowerCase() === session.user.email.toLowerCase())
+  );
+  const resolvedDriverId = currentDriver?._id || currentDriver?.userId || currentUserId || "";
+
   // Form State
   const getCurrentFormattedTime = () => {
     return new Intl.DateTimeFormat("en-US", {
@@ -322,9 +329,9 @@ export default function CreateContractModal({
         setFormData({
           unitId: "",
           clientId: "",
-          contractType: "Shop" as "Shop" | "Delivery",
-          driverId: isDriverRole ? currentUserId : "",
-          deliveryDriverId: isDriverRole ? currentUserId : "",
+          contractType: isDriverRole ? "Delivery" : ("Shop" as "Shop" | "Delivery"),
+          driverId: isDriverRole ? (resolvedDriverId || currentUserId) : "",
+          deliveryDriverId: isDriverRole ? (resolvedDriverId || currentUserId) : "",
           returnDriverId: "",
           rentalType: "Daily",
           customerType: "B2C",
@@ -360,6 +367,26 @@ export default function CreateContractModal({
       }
     }
   }, [isOpen, contractToEdit]);
+
+  // Synchronize driver assignment for driver role when drivers list loads
+  useEffect(() => {
+    if (isDriverRole && isOpen) {
+      const match = drivers.find(d => 
+        (d._id && String(d._id) === String(currentUserId)) || 
+        (d.userId && String(d.userId) === String(currentUserId)) ||
+        (d.email && session?.user?.email && d.email.toLowerCase() === session.user.email.toLowerCase())
+      );
+      const targetId = match?._id || match?.userId || currentUserId || "";
+      if (targetId) {
+        setFormData(prev => ({
+          ...prev,
+          contractType: "Delivery",
+          deliveryDriverId: targetId,
+          driverId: targetId,
+        }));
+      }
+    }
+  }, [isDriverRole, isOpen, drivers, currentUserId, session]);
 
   const isCurrentContractUnit = (unitId: string) => {
     if (!contractToEdit) return false;
@@ -646,7 +673,10 @@ export default function CreateContractModal({
       const determinedPaymentStatus = formData.paymentStatus !== "Pending"
         ? formData.paymentStatus
         : (advancePaid >= calculatedTotal ? "Paid" : (advancePaid > 0 ? "Partial" : "Pending"));
-      const determinedContractType = formData.deliveryDriverId ? "Delivery" : "Shop";
+      const determinedContractType = isDriverRole ? "Delivery" : (formData.deliveryDriverId ? "Delivery" : "Shop");
+      const assignedDeliveryDriverId = isDriverRole 
+        ? (resolvedDriverId || currentUserId || formData.deliveryDriverId)
+        : formData.deliveryDriverId;
 
       const payload = {
         ...formData,
@@ -654,6 +684,8 @@ export default function CreateContractModal({
         paymentStatus: determinedPaymentStatus,
         checkoutMileage: Number(formData.checkoutMileage) >= 0 ? Number(formData.checkoutMileage) : 0,
         contractType: determinedContractType,
+        deliveryDriverId: assignedDeliveryDriverId,
+        driverId: assignedDeliveryDriverId,
         dailyRate: calculatedDailyRate,
         totalDays: days,
         totalAmount: calculatedTotal,
@@ -662,7 +694,8 @@ export default function CreateContractModal({
         adminSignature: adminSignatureData || DEFAULT_ADMIN_SIGNATURE,
         ...(!contractToEdit && { 
           status: "Draft",
-          deliveryStatus: "Pending" 
+          deliveryStatus: "Pending",
+          isDispatched: isDriverRole ? true : false,
         })
       };
 
@@ -721,7 +754,7 @@ export default function CreateContractModal({
 
   const selectedVehicleObj = units.find((u) => u._id === formData.unitId);
   const selectedClientObj = clients.find((c) => c._id === formData.clientId);
-  const selectedDeliveryDriverObj = drivers.find((d) => (d._id || d.userId) === formData.deliveryDriverId);
+  const selectedDeliveryDriverObj = drivers.find((d) => (d._id || d.userId) === formData.deliveryDriverId) || (isDriverRole ? currentDriver : undefined);
 
   const durationDays = Math.max(1, Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 3600 * 24)));
   const calculatedTotalRent = (durationDays * Number(formData.dailyRate)) + 
@@ -1350,20 +1383,43 @@ export default function CreateContractModal({
                         <label className="text-xs font-semibold text-text-secondary block mb-1">
                           Assign Delivery Driver (سائق تسليم السيارة للعميل)
                         </label>
-                        <select
-                          value={formData.deliveryDriverId}
-                          onChange={e => setFormData({...formData, deliveryDriverId: e.target.value, driverId: e.target.value})}
-                          className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none cursor-pointer"
-                        >
-                          <option value="">-- Select Delivery Driver (or Client Self-Pickup) --</option>
-                          {drivers.map(d => (
-                            <option key={d._id || d.userId} value={d._id || d.userId}>
-                              {d.name} {d.phone ? `(${d.phone})` : ""}
-                            </option>
-                          ))}
-                        </select>
+                        {isDriverRole ? (
+                          <div className="p-3.5 rounded-xl border border-brand/30 bg-brand/5 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                {(currentDriver?.name || session?.user?.name || "D").charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-text-primary">
+                                  {currentDriver?.name || session?.user?.name || "You (Logged-in Driver)"}
+                                </p>
+                                <p className="text-[11px] text-brand font-semibold">
+                                  Assigned to you automatically (تم اختيارك تلقائياً)
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] bg-brand text-white px-2.5 py-1 rounded-full font-bold shadow-2xs">
+                              Auto-Selected / محدد
+                            </span>
+                          </div>
+                        ) : (
+                          <select
+                            value={formData.deliveryDriverId}
+                            onChange={e => setFormData({...formData, deliveryDriverId: e.target.value, driverId: e.target.value})}
+                            className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none cursor-pointer"
+                          >
+                            <option value="">-- Select Delivery Driver (or Client Self-Pickup) --</option>
+                            {drivers.map(d => (
+                              <option key={d._id || d.userId} value={d._id || d.userId}>
+                                {d.name} {d.phone ? `(${d.phone})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         <p className="text-[11px] text-text-muted mt-1">
-                          The assigned driver will be notified to take and deliver the vehicle to the customer at <strong className="text-brand">{formData.checkoutTime || "10:00 AM"}</strong>.
+                          {isDriverRole 
+                            ? "As a driver, you are automatically assigned to this delivery. You cannot select any other driver." 
+                            : `The assigned driver will be notified to take and deliver the vehicle to the customer at ${formData.checkoutTime || "10:00 AM"}.`}
                         </p>
                       </div>
 
@@ -1437,11 +1493,10 @@ export default function CreateContractModal({
 
                       <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate (AED/day)">
-                            Daily Rate (AED/day)
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate">
+                            Daily Rate
                           </label>
                           <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                             <input 
                               type="number" 
                               value={formData.dailyRate === 0 ? "" : formData.dailyRate} 
@@ -1457,20 +1512,19 @@ export default function CreateContractModal({
                                 }));
                               }} 
                               placeholder="e.g. 50"
-                              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                              className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
                           <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                            {formData.unitId ? `Base vehicle rate (AED/day)` : "Daily rental rate"}
+                            {formData.unitId ? `Base vehicle rate (/day)` : "Daily rental rate"}
                           </span>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount (AED)">
-                            Collection Amount (AED) <span className="text-red-500">*</span>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Collection Amount">
+                            Collection Amount <span className="text-red-500">*</span>
                           </label>
                           <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                             <input 
                               type="number" 
                               value={formData.collectionAmount === 0 ? "" : formData.collectionAmount} 
@@ -1486,20 +1540,19 @@ export default function CreateContractModal({
                                 }));
                               }} 
                               placeholder="e.g. 350"
-                              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                              className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
                           <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                            Calculated: AED {formData.dailyRate || 0} × {Math.max(1, Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 3600 * 24)))}d (editable)
+                            Calculated: {formData.dailyRate || 0} × {Math.max(1, Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 3600 * 24)))}d (editable)
                           </span>
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance (AED)">
-                            Advance (AED)
+                          <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance">
+                            Advance
                           </label>
                           <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-[10px]">AED</span>
                             <input 
                               type="number" 
                               value={formData.advancePayment === 0 ? "" : formData.advancePayment} 
@@ -1514,7 +1567,7 @@ export default function CreateContractModal({
                                 }));
                               }} 
                               placeholder="0"
-                              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
+                              className="w-full px-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950" 
                             />
                           </div>
                           <span className="text-[11px] text-emerald-700/80 mt-0.5 block truncate">
@@ -1523,11 +1576,10 @@ export default function CreateContractModal({
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount (AED)">
-                            Deposit Amount (AED)
+                          <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount">
+                            Deposit Amount
                           </label>
                           <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">AED</span>
                             <input 
                               type="number" 
                               value={formData.depositAmount === 0 ? "" : formData.depositAmount} 
@@ -1536,7 +1588,7 @@ export default function CreateContractModal({
                                 setFormData(prev => ({ ...prev, depositAmount: val }));
                               }} 
                               placeholder="0"
-                              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                              className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
                             />
                           </div>
                           <span className="text-[11px] text-text-muted mt-0.5 block truncate">
@@ -1592,7 +1644,7 @@ export default function CreateContractModal({
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">Price per Extra KM (AED)</label>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1">Price per Extra KM</label>
                           <input 
                             type="number" 
                             value={formData.pricePerExtraKm} 
@@ -1604,7 +1656,7 @@ export default function CreateContractModal({
 
                       <div className="grid grid-cols-2 gap-3 pt-2">
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee (AED)</label>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1">Baby Seat Fee</label>
                           <input 
                             type="number" 
                             value={formData.babySeatFees} 
@@ -1613,7 +1665,7 @@ export default function CreateContractModal({
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge (AED)</label>
+                          <label className="text-xs font-semibold text-text-secondary block mb-1">Delivery Charge</label>
                           <input 
                             type="number" 
                             value={formData.deliveryCharges} 
