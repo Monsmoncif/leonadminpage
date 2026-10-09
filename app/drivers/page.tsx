@@ -369,14 +369,14 @@ export default function DriversPage() {
               {/* Table */}
               <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs sm:text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-gray-50/50">
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold whitespace-nowrap">Driver</th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">Contact</th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">License Info</th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">Status</th>
-                      <th className="text-right py-3 px-4 text-text-muted font-semibold">Actions</th>
+                    <tr className="border-b border-border bg-gray-50/75 text-[11px] sm:text-xs text-text-muted font-semibold uppercase tracking-wider">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">Driver</th>
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">Contact</th>
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">License Info</th>
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">Status</th>
+                      <th className="text-right py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -403,17 +403,17 @@ export default function DriversPage() {
                           className="border-b border-border/50 bg-white animate-fade-in-up"
                           style={{ animationDelay: `${idx * 0.05 + 0.3}s` }}
                         >
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
+                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                            <div className="flex items-center gap-2.5 sm:gap-3">
                               <div
-                                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-sm ${getAvatarColor(
+                                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-xs ${getAvatarColor(
                                   driver.name
                                 )}`}
                               >
                                 {getInitials(driver.name)}
                               </div>
                               <div className="flex flex-col">
-                                <span className="font-semibold text-text-primary group-hover:text-brand transition-colors">
+                                <span className="font-semibold text-text-primary text-xs sm:text-sm group-hover:text-brand transition-colors">
                                   {driver.name}
                                 </span>
                                 <span className="text-xs text-text-muted mt-0.5">

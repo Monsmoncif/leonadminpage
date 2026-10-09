@@ -343,22 +343,22 @@ export default function ClientsPage() {
             {/* Table */}
             <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs sm:text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-gray-50/50">
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold whitespace-nowrap">
+                    <tr className="border-b border-border bg-gray-50/75 text-[11px] sm:text-xs text-text-muted font-semibold uppercase tracking-wider">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
                         Customer
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">
                         Contact
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">
                         License / ID
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">
                         Status
                       </th>
-                      <th className="text-right py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-right py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">
                         Actions
                       </th>
                     </tr>
@@ -387,22 +387,22 @@ export default function ClientsPage() {
                           className="border-b border-border/50 bg-white animate-fade-in-up"
                           style={{ animationDelay: `${idx * 0.05 + 0.3}s` }}
                         >
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
+                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                            <div className="flex items-center gap-2.5 sm:gap-3">
                               <div
-                                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-sm ${getAvatarColor(
+                                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-xs ${getAvatarColor(
                                   client.name
                                 )}`}
                               >
                                 {getInitials(client.name)}
                               </div>
                               <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-text-primary group-hover:text-brand transition-colors">
+                                <div className="flex items-center gap-1.5 sm:gap-2">
+                                  <span className="font-semibold text-text-primary text-xs sm:text-sm group-hover:text-brand transition-colors">
                                     {client.name}
                                   </span>
                                   {client.clientType && (
-                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                    <span className={`text-[9.5px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full ${
                                       client.clientType === "Tourist"
                                         ? "bg-purple-50 text-purple-700 border border-purple-200"
                                         : "bg-blue-50 text-blue-700 border border-blue-200"
@@ -411,27 +411,27 @@ export default function ClientsPage() {
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-xs text-text-muted mt-0.5">
+                                <span className="text-[10px] sm:text-xs text-text-muted mt-0.5">
                                   {client.nationality || (client.idNumber ? `ID: ${client.idNumber}` : "Customer")}
                                 </span>
                               </div>
                             </div>
                           </td>
-                          <td className="py-3 px-4">
-                            <p className="font-medium text-text-secondary flex items-center gap-1.5">
-                              <Phone size={12} className="text-text-muted" />
+                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                            <p className="font-medium text-text-secondary text-xs sm:text-sm flex items-center gap-1.5">
+                              <Phone size={12} className="text-text-muted shrink-0" />
                               {client.phone}
                             </p>
-                            <p className="text-[11px] text-text-muted mt-1 flex items-center gap-1.5">
-                              <Mail size={12} className="text-text-muted" />
+                            <p className="text-[10px] sm:text-[11px] text-text-muted mt-0.5 sm:mt-1 flex items-center gap-1.5">
+                              <Mail size={12} className="text-text-muted shrink-0" />
                               {client.email || "No email"}
                             </p>
                           </td>
-                          <td className="py-3 px-4">
-                            <p className="font-medium text-text-secondary text-xs">
+                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                            <p className="font-medium text-text-secondary text-xs sm:text-sm">
                               {client.licenseNumber || client.idNumber || "N/A"}
                             </p>
-                            <p className="text-text-muted text-[11px] mt-0.5">
+                            <p className="text-text-muted text-[10px] sm:text-[11px] mt-0.5">
                               {client.licenseExpiry
                                 ? `Exp: ${new Date(client.licenseExpiry).toLocaleDateString()}`
                                 : client.idNumber
@@ -439,7 +439,7 @@ export default function ClientsPage() {
                                 : "No expiry"}
                             </p>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
                             <select
                               value={client.status || "Active"}
                               onChange={(e) => handleStatusChange(client, e.target.value)}

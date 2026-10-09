@@ -329,14 +329,14 @@ export default function UnitsPage() {
             {/* Table */}
             <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs sm:text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-gray-50/50">
-                    <th className="text-left py-3 px-4 text-text-muted font-semibold whitespace-nowrap">Vehicle</th>
-                    <th className="text-left py-3 px-4 text-text-muted font-semibold">Details</th>
-                    <th className="text-left py-3 px-4 text-text-muted font-semibold">Specifications</th>
-                    <th className="text-left py-3 px-4 text-text-muted font-semibold">Status & Rate</th>
-                    <th className="text-right py-3 px-4 text-text-muted font-semibold">Actions</th>
+                  <tr className="border-b border-border bg-gray-50/75 text-[11px] sm:text-xs text-text-muted font-semibold uppercase tracking-wider">
+                    <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">Vehicle</th>
+                    <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">Details</th>
+                    <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">Specifications</th>
+                    <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">Status & Rate</th>
+                    <th className="text-right py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -360,21 +360,21 @@ export default function UnitsPage() {
                         className="border-b border-border/50 bg-white animate-fade-in-up"
                         style={{ animationDelay: `${idx * 0.05 + 0.3}s` }}
                       >
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-9 rounded-md bg-white border border-border flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                          <div className="flex items-center gap-2.5 sm:gap-3">
+                            <div className="w-12 h-9 rounded-md bg-white border border-border flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
                               {unit.images && unit.images.length > 0 ? (
                                 <img src={unit.images[0]} alt={unit.model} className="w-full h-full object-cover" />
                               ) : (
                                 <ExecutiveCarIcon size={16} className="text-gray-300" />
                               )}
                             </div>
-                            <span className="font-bold text-text-primary flex items-center gap-2 group-hover:text-brand transition-colors">
+                            <span className="font-bold text-text-primary text-xs sm:text-sm flex items-center gap-2 group-hover:text-brand transition-colors">
                               {unit.make} {unit.model}
                             </span>
                           </div>
                         </td>
-                        <td className="py-4 px-5">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4">
                           <div>
                             <p className="font-semibold text-text-primary">Plate: {unit.plate || "N/A"}</p>
                             <div className="flex flex-wrap items-center gap-1.5 mt-0.5">

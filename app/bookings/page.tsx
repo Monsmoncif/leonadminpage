@@ -274,17 +274,17 @@ export default function ContractsPage() {
   return (
     <div className="space-y-6">
       {/* ===== Summary Header (Matches Clients Page) ===== */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 animate-fade-in-up">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Bookings &amp; Contracts</h1>
-          <p className="text-sm text-text-secondary mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Bookings &amp; Contracts</h1>
+          <p className="text-xs sm:text-sm text-text-secondary mt-1">
             Manage rental agreements, handover deliveries, and vehicle returns.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Link
             href="/bookings/new"
-            className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
             <Plus size={18} />
             <span>New Booking</span>
@@ -412,33 +412,35 @@ export default function ContractsPage() {
           <div className="col-span-12 flex flex-col gap-6">
             
             {/* Toolbar (Matches Clients Page) */}
-            <div className="relative z-20 bg-card rounded-2xl border border-border p-4 shadow-sm flex flex-col sm:flex-row justify-between gap-4 card-hover">
+            <div className="relative z-20 bg-card rounded-xl sm:rounded-2xl border border-border p-3 sm:p-4 shadow-xs sm:shadow-sm flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 card-hover">
               <div className="relative max-w-sm w-full">
                 <input 
                   type="text" 
                   placeholder="Search contract no, customer, vehicle..." 
-                  className="w-full text-sm border border-border rounded-xl pl-10 pr-4 py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm" 
+                  className="w-full text-xs sm:text-sm border border-border rounded-xl pl-9 sm:pl-10 pr-3.5 sm:pr-4 py-2 sm:py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs" 
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
                 />
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                <Search size={15} className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
               </div>
               
-              <div className="flex items-center gap-2 relative">
+              <div className="flex items-center gap-2 relative w-full sm:w-auto">
                 <button 
                   type="button"
                   onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                  className="text-sm border border-border rounded-xl px-3 py-2 text-text-secondary hover:bg-gray-50 flex items-center gap-2 font-medium transition-colors bg-white whitespace-nowrap shadow-sm cursor-pointer"
+                  className="text-xs sm:text-sm border border-border rounded-xl px-3 py-2 text-text-secondary hover:bg-gray-50 flex items-center justify-between sm:justify-start gap-2 font-medium transition-colors bg-white whitespace-nowrap shadow-xs cursor-pointer w-full sm:w-auto"
                 >
-                  <Filter size={14} className="text-text-muted" /> 
-                  {statusFilter === "All" ? "All Statuses" : statusFilter}
+                  <span className="flex items-center gap-2">
+                    <Filter size={14} className="text-text-muted" /> 
+                    {statusFilter === "All" ? "All Statuses" : statusFilter}
+                  </span>
                   <ChevronDown size={14} className="text-text-muted ml-1" />
                 </button>
                 {isStatusDropdownOpen && (
-                  <div className="absolute top-full mt-2 right-0 w-40 bg-white border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                  <div className="absolute top-full mt-2 right-0 w-44 bg-white border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
                     {[
                       { label: "All Statuses", val: "All", dot: "bg-gray-400" },
                       { label: "Active", val: "Active", dot: "bg-blue-500" },
@@ -454,7 +456,7 @@ export default function ContractsPage() {
                           setIsStatusDropdownOpen(false);
                           setCurrentPage(1);
                         }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${statusFilter === item.val ? "text-brand font-semibold bg-brand/5" : "text-text-secondary"}`}
+                        className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${statusFilter === item.val ? "text-brand font-semibold bg-brand/5" : "text-text-secondary"}`}
                       >
                         <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0`} />
                         <span>{item.label}</span>
@@ -466,43 +468,43 @@ export default function ContractsPage() {
             </div>
 
             {/* Table (Matches Clients Page Table Style & Hover) */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover">
+            <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs sm:text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-gray-50/50">
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold whitespace-nowrap">
+                    <tr className="border-b border-border bg-gray-50/75 text-[11px] sm:text-xs text-text-muted font-semibold uppercase tracking-wider">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
                         Contract
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold min-w-[240px]">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 min-w-[200px] sm:min-w-[240px]">
                         Customer / Driver
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4">
                         Vehicle
                       </th>
-                      <th className="text-left py-3 px-4 text-text-muted font-semibold whitespace-nowrap">
+                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
                         Period
                       </th>
-                      <th className="text-left py-3 px-2 text-text-muted font-semibold whitespace-nowrap w-[120px]">
+                      <th className="text-left py-2.5 sm:py-3 px-2 whitespace-nowrap w-[110px] sm:w-[120px]">
                         Status
                       </th>
-                      <th className="text-right py-3 px-4 text-text-muted font-semibold whitespace-nowrap">
+                      <th className="text-right py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/50">
                     {filteredContracts.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 px-5 text-center">
                           <div className="flex flex-col items-center justify-center">
                             <FileText size={32} className="text-gray-300 mb-4" />
-                            <h2 className="text-lg font-bold text-gray-900 mb-2">No contracts found</h2>
-                            <p className="text-gray-500 text-sm mb-4">No contracts match your search criteria.</p>
+                            <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-1.5">No contracts found</h2>
+                            <p className="text-gray-500 text-xs sm:text-sm mb-4">No contracts match your search criteria.</p>
                             <button
                               type="button"
                               onClick={() => { setSearchQuery(""); setStatusFilter("All"); }}
-                              className="px-4 py-2 text-sm font-semibold text-brand border border-brand/20 rounded-lg hover:bg-brand/5 transition-colors cursor-pointer"
+                              className="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-brand border border-brand/20 rounded-lg hover:bg-brand/5 transition-colors cursor-pointer"
                             >
                               Clear Search
                             </button>
@@ -518,35 +520,35 @@ export default function ContractsPage() {
                           <tr 
                             key={contract._id} 
                             onClick={() => setSelectedContractForDetails(contract)}
-                            className="border-b border-border/50 bg-white hover:bg-gray-50/50 transition-colors animate-fade-in-up cursor-pointer"
-                            style={{ animationDelay: `${idx * 0.05 + 0.1}s` }}
+                            className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up cursor-pointer"
+                            style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
                           >
                             {/* Contract Column */}
-                            <td className="py-3 px-4">
+                            <td className="py-2.5 sm:py-3 px-3 sm:px-4">
                               {contract.contractNumber ? (
-                                <span className="font-bold text-text-primary text-sm tabular-nums">
+                                <span className="font-bold text-text-primary text-xs sm:text-sm tabular-nums">
                                   #{contract.contractNumber}
                                 </span>
                               ) : (
                                 <span 
-                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs whitespace-nowrap"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs whitespace-nowrap"
                                   title="Unconfirmed Contract: Contract number will be assigned upon Handover confirmation"
                                 >
-                                  <Clock size={11} className="text-amber-600 animate-pulse shrink-0" />
+                                  <Clock size={10} className="text-amber-600 animate-pulse shrink-0" />
                                   <span>Pending #Handover</span>
                                 </span>
                               )}
                             </td>
 
                             {/* Customer / Driver Column (Shows full customer name & driver name) */}
-                            <td className="py-3 px-4 min-w-[240px]">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-sm ${getAvatarColor(contract.customer)}`}>
+                            <td className="py-2.5 sm:py-3 px-3 sm:px-4 min-w-[200px] sm:min-w-[240px]">
+                              <div className="flex items-center gap-2.5 sm:gap-3">
+                                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-xs ${getAvatarColor(contract.customer)}`}>
                                   {getInitials(contract.customer)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <span 
-                                    className="font-semibold text-text-primary block break-words leading-snug"
+                                    className="font-semibold text-text-primary text-xs sm:text-sm block break-words leading-tight sm:leading-snug"
                                     title={contract.customer}
                                   >
                                     {contract.customer}
@@ -569,7 +571,7 @@ export default function ContractsPage() {
                                     }
 
                                     return (
-                                      <p className="text-xs text-text-muted mt-0.5 break-words leading-tight" title={`Driver: ${driverDisplay}`}>
+                                      <p className="text-[10px] sm:text-xs text-text-muted mt-0.5 break-words leading-tight" title={`Driver: ${driverDisplay}`}>
                                         {driverDisplay}
                                       </p>
                                     );
@@ -579,28 +581,28 @@ export default function ContractsPage() {
                             </td>
 
                             {/* Vehicle Column */}
-                            <td className="py-3 px-4">
-                              <span className="font-medium text-text-primary line-clamp-1" title={contract.vehicle}>
+                            <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                              <span className="font-medium text-text-primary text-xs sm:text-sm line-clamp-1" title={contract.vehicle}>
                                 {contract.vehicle}
                               </span>
                               {contract.vehiclePlate && (
-                                <p className="text-xs text-text-muted mt-0.5">
+                                <p className="text-[10px] sm:text-xs text-text-muted mt-0.5">
                                   {contract.vehiclePlate}
                                 </p>
                               )}
                             </td>
 
                             {/* Period Column (Only the Period) */}
-                            <td className="py-3 px-4">
-                              <p className="font-medium text-text-secondary flex items-center gap-1.5 whitespace-nowrap">
-                                <Calendar size={13} className="text-text-muted shrink-0" />
+                            <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                              <p className="font-medium text-text-secondary text-xs sm:text-sm flex items-center gap-1.5 whitespace-nowrap">
+                                <Calendar size={12} className="text-text-muted shrink-0" />
                                 {contract.startDate} to {contract.endDate}
                               </p>
                             </td>
 
                             {/* Status Column */}
-                            <td className="py-3 px-2 whitespace-nowrap w-[120px]">
-                              <div className="flex flex-col gap-1 w-[116px] max-w-[116px]" onClick={(e) => e.stopPropagation()}>
+                            <td className="py-2.5 sm:py-3 px-2 whitespace-nowrap w-[110px] sm:w-[120px]">
+                              <div className="flex flex-col gap-1 w-[105px] sm:w-[116px] max-w-[116px]" onClick={(e) => e.stopPropagation()}>
                                 <select
                                   value={contract.status}
                                   onChange={async (e) => {
@@ -641,14 +643,14 @@ export default function ContractsPage() {
                                       toast.error(err.message || "Failed to update status");
                                     }
                                   }}
-                                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getStatusClasses(contract.status)}`}
+                                  className={`text-[10px] sm:text-[11px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-md border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getStatusClasses(contract.status)}`}
                                 >
                                   <option value="Draft" className="bg-white text-gray-900">Draft</option>
                                   <option value="Active" className="bg-white text-gray-900">Active</option>
                                   <option value="Completed" className="bg-white text-gray-900">Completed</option>
                                   <option value="Cancelled" className="bg-white text-gray-900">Cancelled</option>
                                 </select>
-                                <div className="flex items-center gap-1 text-[9px] font-semibold whitespace-nowrap">
+                                <div className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-semibold whitespace-nowrap">
                                   <span className={`px-1 py-0.5 rounded border leading-tight ${getPaymentBadge(cPaymentStatus)}`}>
                                     Pay: {cPaymentStatus}
                                   </span>
@@ -660,8 +662,8 @@ export default function ContractsPage() {
                             </td>
 
                             {/* Actions Column (Matches Clients Page) */}
-                            <td className="py-3 px-4">
-                              <div className="flex items-center justify-end gap-1.5 transition-opacity">
+                            <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                              <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
                                 {(contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
                                   const isShop = isShopContract(contract);
 
@@ -688,13 +690,13 @@ export default function ContractsPage() {
                                             ? `Scheduled for ${formattedStart} — Showroom Handover can be activated on start date`
                                             : "Confirm Showroom Vehicle Handover & Activate Contract (تأكيد تسليم السيارة في المعرض وتوليد العقد)"
                                         }
-                                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
+                                        className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
                                           isFuture
                                             ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300"
                                             : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
                                         }`}
                                       >
-                                        <CheckCircle2 size={13} className={isFuture ? "text-amber-600" : "text-white"} />
+                                        <CheckCircle2 size={12} className={isFuture ? "text-amber-600" : "text-white"} />
                                         <span className="hidden sm:inline">
                                           {isFuture ? `Starts ${formattedStart}` : "Hand Over"}
                                         </span>
@@ -714,12 +716,12 @@ export default function ContractsPage() {
                                         }}
                                         disabled={dispatchingContractId === contract._id}
                                         title="Confirm & Dispatch to Driver (إرسال الطلب للسائق وتعيين رقم العقد)"
-                                        className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer bg-brand hover:bg-brand-dark text-white active:scale-95"
+                                        className="px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer bg-brand hover:bg-brand-dark text-white active:scale-95"
                                       >
                                         {dispatchingContractId === contract._id ? (
-                                          <Loader2 size={12} className="animate-spin" />
+                                          <Loader2 size={11} className="animate-spin" />
                                         ) : (
-                                          <Send size={12} />
+                                          <Send size={11} />
                                         )}
                                         <span className="hidden sm:inline">Dispatch</span>
                                       </button>
@@ -727,10 +729,10 @@ export default function ContractsPage() {
                                   } else {
                                     return (
                                       <span 
-                                        className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
+                                        className="px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
                                         title="Dispatched to Driver — Waiting for driver delivery handover"
                                       >
-                                        <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                                        <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
                                         <span className="hidden sm:inline">Dispatched</span>
                                       </span>
                                     );
@@ -739,49 +741,49 @@ export default function ContractsPage() {
 
                                 <button 
                                   type="button"
-                                  className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                  className="p-1.5 sm:p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                   title="View Contract Details & Documentation (عرض تفاصيل العقد وتوثيق الأضرار والدفع)" 
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedContractForDetails(contract);
                                   }}
                                 >
-                                  <Eye size={16} />
+                                  <Eye size={15} />
                                 </button>
 
                                 <Link 
                                   href={`/bookings/edit?contractId=${contract._id}`}
-                                  className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                  className="p-1.5 sm:p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                   title="Edit Contract" 
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <Edit size={16} />
+                                  <Edit size={15} />
                                 </Link>
                                 {contract.status === "Active" && contract.deliveryStatus === "Delivered" && (
                                   <Link 
                                     href={`/bookings/return?contractId=${contract._id}`}
-                                    className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                    className="p-1.5 sm:p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                     title="Return Vehicle" 
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <ArrowLeftRight size={16} />
+                                    <ArrowLeftRight size={15} />
                                   </Link>
                                 )}
                                 {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
                                   <button 
-                                    className="p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
+                                    className="p-1.5 sm:p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
                                     title="Print Contract PDF" 
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       window.open(`/bookings/${contract._id}/print`, '_blank');
                                     }}
                                   >
-                                    <Download size={16} />
+                                    <Download size={15} />
                                   </button>
                                 )}
-                                <div className="w-px h-5 bg-border mx-1" />
+                                <div className="w-px h-4 sm:h-5 bg-border mx-0.5 sm:mx-1" />
                                 <button 
-                                  className="p-2 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
+                                  className="p-1.5 sm:p-2 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
                                   title="Delete Contract" 
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -789,7 +791,7 @@ export default function ContractsPage() {
                                     setIsDeleteDialogOpen(true);
                                   }}
                                 >
-                                  <Trash2 size={16} />
+                                  <Trash2 size={15} />
                                 </button>
                               </div>
                             </td>
