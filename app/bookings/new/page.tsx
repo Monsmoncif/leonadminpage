@@ -2233,28 +2233,28 @@ export function NewRentalAdminPageContent() {
         {renderStepContent()}
 
         {/* Step Navigation Buttons */}
-        <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
           {currentStep > 1 ? (
             <button
               onClick={handleBack}
               disabled={isLoading}
-              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer w-full sm:w-auto"
             >
               <ArrowLeft size={16} />
               Previous Step
             </button>
           ) : (
-            <div />
+            <div className="hidden sm:block" />
           )}
 
           {currentStep < totalSteps ? (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
               {isEditMode && (
                 <button
                   type="button"
                   onClick={handleGenerate}
                   disabled={isLoading}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
                   title="Save all changes immediately"
                 >
                   {isLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
@@ -2264,7 +2264,7 @@ export function NewRentalAdminPageContent() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
               >
                 <span>Next Step</span>
                 <ArrowRight size={16} />
@@ -2275,7 +2275,7 @@ export function NewRentalAdminPageContent() {
               type="button"
               onClick={handleGenerate}
               disabled={isLoading}
-              className="px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer"
+              className="px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer w-full sm:w-auto"
             >
               {isLoading ? (
                 <>

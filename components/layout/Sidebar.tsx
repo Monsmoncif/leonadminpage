@@ -103,18 +103,18 @@ export default function Sidebar() {
 
       <aside
         className={`fixed left-0 top-0 bottom-0 z-50 flex flex-col bg-white border-r border-border transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-[72px]" : "translate-x-0 w-[216px]"
+          collapsed ? "-translate-x-full lg:translate-x-0 lg:w-[78px]" : "translate-x-0 w-[270px] lg:w-[260px]"
         }`}
       >
       {/* ── Brand header ────────────────────────────────────── */}
-      <div className="relative flex items-center px-4 h-[68px] border-b border-border/50 shrink-0 justify-between">
+      <div className="relative flex items-center px-4 h-[64px] sm:h-[68px] border-b border-border/50 shrink-0 justify-between">
         <div
           className={`flex flex-col overflow-hidden transition-all duration-300 ${
             collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
           }`}
         >
           <span className="text-[15px] font-bold text-text-primary tracking-tight whitespace-nowrap">
-            Lean Car
+            Leon Rent Car
           </span>
           <span className="text-[11px] text-text-muted font-medium whitespace-nowrap">
             Fleet Management
@@ -125,7 +125,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={() => setCollapsed(true)}
-          className="lg:hidden p-1.5 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+          className="lg:hidden p-2 min-w-[36px] min-h-[36px] flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           aria-label="Close menu"
         >
           <X size={18} />

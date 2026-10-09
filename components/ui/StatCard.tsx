@@ -97,7 +97,7 @@ export default function StatCard({
       </div>
       <p className="text-xs text-text-secondary font-medium mb-1">{label}</p>
       <div className="flex items-end justify-between">
-        <p className="text-2xl font-bold text-text-primary animate-count-up">
+        <p className="text-xl sm:text-2xl font-bold text-text-primary animate-count-up truncate">
           {value}
         </p>
         {change !== undefined && (

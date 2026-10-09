@@ -1563,27 +1563,27 @@ function ConfirmHandoverPageContent() {
         {renderStepContent()}
 
         {/* Step Navigation Buttons (Matching Driver Handover Footer) */}
-        <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handleBack}
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer w-full sm:w-auto"
             >
               <ArrowLeft size={16} />
               Previous Step
             </button>
           ) : (
-            <div />
+            <div className="hidden sm:block" />
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             {currentStep < totalSteps ? (
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+                className="px-6 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
               >
                 Next Step
                 <ArrowRight size={16} />
@@ -1593,7 +1593,7 @@ function ConfirmHandoverPageContent() {
                 type="button"
                 onClick={handleConfirmHandover}
                 disabled={isSubmitting}
-                className="px-8 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-md cursor-pointer disabled:opacity-50"
+                className="px-8 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md cursor-pointer disabled:opacity-50 w-full sm:w-auto"
               >
                 {isSubmitting ? (
                   <>

@@ -237,24 +237,24 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* ===== Welcome Header ===== */}
       <div className="animate-fade-in-up">
-        <div className="bg-card rounded-2xl border border-border p-6 relative overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border p-4 sm:p-6 relative overflow-hidden">
           {/* Decorative gradient blob */}
           <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-brand/5 via-orange-500/3 to-transparent rounded-full -translate-y-32 translate-x-20 pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-500/5 to-transparent rounded-full translate-y-16 -translate-x-8 pointer-events-none" />
 
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 relative">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
             <div>
-              <h2 className="text-2xl font-bold text-text-primary mb-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-text-primary mb-1">
                 {getGreeting()}, Admin 👋
               </h2>
-              <p className="text-sm text-text-secondary">
+              <p className="text-xs sm:text-sm text-text-secondary">
                 {getFormattedDate()} • Here's your fleet overview
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
               <Link
                 href="/bookings/new"
-                className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer"
+                className="flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer w-full sm:w-auto"
               >
                 <Plus size={18} />
                 <span>New Contract</span>
@@ -265,7 +265,7 @@ export default function Dashboard() {
       </div>
 
       {/* ===== Primary Stats ===== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="stagger-1">
           <StatCard icon={DollarSign} label="Revenue (This Month)" value={stats.totalRevenue} change={stats.changes?.revenue} subtitle="vs last month" accentColor="#22C55E" sparkData={sparklineData.revenue} />
         </div>
@@ -281,7 +281,7 @@ export default function Dashboard() {
       </div>
 
       {/* ===== Secondary Stats ===== */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 animate-fade-in-up stagger-5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 animate-fade-in-up stagger-5">
         {secondaryStats.map((stat) => {
           const IconComp = stat.icon;
           return (

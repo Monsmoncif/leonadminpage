@@ -30,11 +30,11 @@ export default function TablePagination({
 
   return (
     <div
-      className={`p-3 border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs text-text-secondary bg-white ${className}`}
+      className={`p-3 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-secondary bg-white ${className}`}
     >
       {/* Left side: Showing X to Y of Z results + Rows selector */}
-      <div className="flex items-center gap-3">
-        <p>
+      <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-3">
+        <p className="truncate">
           Showing{" "}
           <span className="font-medium text-text-primary">{startItem}</span> to{" "}
           <span className="font-medium text-text-primary">{endItem}</span> of{" "}
@@ -42,7 +42,7 @@ export default function TablePagination({
         </p>
 
         {onItemsPerPageChange && (
-          <div className="flex items-center gap-1.5 pl-2 border-l border-border">
+          <div className="flex items-center gap-1.5 pl-2 border-l border-border shrink-0">
             <span className="text-text-secondary">Rows:</span>
             <select
               value={itemsPerPage}
@@ -63,21 +63,21 @@ export default function TablePagination({
       </div>
 
       {/* Right side: Prev [currentPage] Next */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-center w-full sm:w-auto gap-1.5">
         <button
           onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
           disabled={currentPage === 1}
-          className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+          className="px-3 py-1.5 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-xs font-semibold"
         >
           Prev
         </button>
-        <button className="px-2.5 py-1 bg-brand text-white rounded-md font-medium shadow-sm">
-          {currentPage}
-        </button>
+        <span className="px-3 py-1.5 bg-brand text-white rounded-lg font-bold text-xs shadow-2xs">
+          {currentPage} / {Math.max(1, totalPages)}
+        </span>
         <button
           onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
           disabled={currentPage === totalPages || totalPages === 0}
-          className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold"
         >
           Next
         </button>

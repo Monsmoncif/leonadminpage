@@ -200,10 +200,10 @@ export default function UnitsPage() {
           <h1 className="text-2xl font-bold text-text-primary">Vehicles</h1>
           <p className="text-sm text-text-secondary mt-1">Manage your fleet, specifications, and availability.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
             onClick={() => { setEditTarget(null); setIsUnitModalOpen(true); }}
-            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm flex items-center gap-2"
+            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             <Plus size={16} /> Add Vehicle
           </button>

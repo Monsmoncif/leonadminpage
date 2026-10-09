@@ -120,49 +120,49 @@ export default function TopBar() {
   const displayImage = realAvatar || session?.user?.image;
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-border/50 h-[72px] px-4 sm:px-6 flex items-center justify-between transition-all">
+    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-border/50 h-[60px] sm:h-[72px] px-3 sm:px-6 flex items-center justify-between transition-all">
       {/* ── Left: Page Title ────────────────────────────────────── */}
-      <div className="flex items-center gap-3 sm:gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* Mobile & Tablet Sidebar Toggle */}
         <button 
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="lg:hidden p-2 -ml-2 text-text-secondary hover:bg-surface hover:text-text-primary rounded-xl transition-colors cursor-pointer"
+          className="lg:hidden p-2 -ml-1 text-text-secondary hover:bg-surface hover:text-text-primary rounded-xl transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center shrink-0"
           id="mobile-sidebar-toggle"
           aria-label="Toggle navigation menu"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
-        <h1 className="text-lg sm:text-xl font-bold text-text-primary capitalize tracking-tight">
+        <h1 className="text-base sm:text-xl font-bold text-text-primary capitalize tracking-tight truncate max-w-[160px] sm:max-w-none">
           {title}
         </h1>
       </div>
 
       {/* ── Right: Actions, Profile ─────────────────────── */}
-      <div className="flex items-center gap-2 sm:gap-4">
+      <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
         
         {/* Notifications */}
         <button 
           onClick={() => router.push(pathname.startsWith("/driver") ? "/driver/notifications" : "/notifications")}
-          className="relative w-10 h-10 rounded-xl flex items-center justify-center text-text-secondary hover:bg-surface hover:text-text-primary transition-all duration-200"
+          className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-text-secondary hover:bg-surface hover:text-text-primary transition-all duration-200"
         >
-          <Bell size={19} strokeWidth={2} />
+          <Bell size={18} strokeWidth={2} />
           {unreadCount > 0 && (
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-white shadow-sm ring-2 ring-brand/20 animate-pulse-dot" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-brand rounded-full border-2 border-white shadow-sm ring-2 ring-brand/20 animate-pulse-dot" />
           )}
         </button>
         
         {/* Profile Dropdown */}
-        <div className="relative ml-1" ref={dropdownRef}>
+        <div className="relative ml-0.5 sm:ml-1" ref={dropdownRef}>
           <button 
-            className={`flex items-center gap-2.5 p-1 pr-3 rounded-full border transition-all duration-200 ${
+            className={`flex items-center gap-2 p-1 pr-1.5 sm:pr-3 rounded-full border transition-all duration-200 ${
               dropdownOpen 
                 ? "bg-surface border-border shadow-inner" 
                 : "bg-white border-transparent hover:bg-surface hover:border-border/60"
             }`}
             onClick={() => setDropdownOpen(!dropdownOpen)}
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand/80 to-brand-dark overflow-hidden flex items-center justify-center text-white font-semibold text-xs shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand/80 to-brand-dark overflow-hidden flex items-center justify-center text-white font-semibold text-xs shadow-sm shrink-0">
               {displayImage ? (
                 <img src={displayImage} alt={displayUserName} className="w-full h-full object-cover" />
               ) : (

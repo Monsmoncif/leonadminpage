@@ -482,7 +482,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Center: Segmented Filter Tabs */}
-          <div className="flex items-center p-0.5 bg-white rounded-xl border border-border shadow-2xs shrink-0 overflow-x-auto">
+          <div className="flex items-center p-0.5 bg-white rounded-xl border border-border shadow-2xs shrink-0 max-w-full overflow-x-auto no-scrollbar">
             {([
               { key: "all", label: "All" },
               { key: "pickup", label: "Pickups (Start)" },
@@ -556,71 +556,76 @@ export default function CalendarPage() {
           </span>
         </div>
 
-        {/* Day Headers */}
-        <div className="grid grid-cols-7 bg-gray-50/70 border-b border-border">
-          {days.map((day) => (
-            <div key={day} className="py-2.5 text-[10px] font-black text-text-muted text-center uppercase tracking-wider border-l border-border first:border-l-0">
-              {day}
+        {/* Scrollable Calendar Wrapper for Mobile & Desktop */}
+        <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
+          <div className="min-w-[660px] sm:min-w-0">
+            {/* Day Headers */}
+            <div className="grid grid-cols-7 bg-gray-50/70 border-b border-border">
+              {days.map((day) => (
+                <div key={day} className="py-2.5 text-[10px] font-black text-text-muted text-center uppercase tracking-wider border-l border-border first:border-l-0">
+                  {day}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Calendar Grid — Full Height */}
-        <div className="grid grid-cols-7 grid-rows-6 bg-card" style={{ minHeight: 'calc(100vh - 270px)' }}>
-          {monthDates.map((date, idx) => {
-            const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-            const isToday = date.toDateString() === new Date().toDateString();
+            {/* Calendar Grid — Full Height */}
+            <div className="grid grid-cols-7 grid-rows-6 bg-card" style={{ minHeight: 'calc(100vh - 270px)' }}>
+              {monthDates.map((date, idx) => {
+                const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+                const isToday = date.toDateString() === new Date().toDateString();
 
-            const dayBookings = filteredBookings.filter(
-              (b) => b.date.toDateString() === date.toDateString()
-            );
+                const dayBookings = filteredBookings.filter(
+                  (b) => b.date.toDateString() === date.toDateString()
+                );
 
-            return (
-              <div
-                key={idx}
-                className={`p-1.5 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border transition-colors ${
-                  !isCurrentMonth ? 'bg-gray-50/40' : 'bg-card'
-                } ${isToday ? 'bg-brand/[0.03]' : ''}`}
-              >
-                {/* Date */}
-                <div className={`text-xs font-black mb-1 w-6 h-6 flex items-center justify-center rounded-lg mx-auto md:mx-0 ${
-                  isToday 
-                    ? 'bg-brand text-white shadow-xs' 
-                    : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'
-                }`}>
-                  {date.getDate()}
-                </div>
+                return (
+                  <div
+                    key={idx}
+                    className={`p-1.5 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border transition-colors ${
+                      !isCurrentMonth ? 'bg-gray-50/40' : 'bg-card'
+                    } ${isToday ? 'bg-brand/[0.03]' : ''}`}
+                  >
+                    {/* Date */}
+                    <div className={`text-xs font-black mb-1 w-6 h-6 flex items-center justify-center rounded-lg mx-auto md:mx-0 ${
+                      isToday 
+                        ? 'bg-brand text-white shadow-xs' 
+                        : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'
+                    }`}>
+                      {date.getDate()}
+                    </div>
 
-                {/* Events */}
-                <div className="space-y-1 flex flex-col items-start overflow-hidden w-full">
-                  {dayBookings.slice(0, 5).map((booking, bIdx) => (
-                    <button
-                      key={bIdx}
-                      type="button"
-                      onClick={() => setSelectedContractForDetails(booking.rawContract)}
-                      title={`${booking.tooltipText} • Click to view full details`}
-                      className={`w-full max-w-full text-left px-2 py-1 rounded-lg transition-all border shadow-2xs hover:shadow-xs hover:scale-[1.01] active:scale-[0.99] flex items-center justify-between gap-1.5 cursor-pointer select-none group ${booking.chipClass}`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${booking.dotClass}`} />
-                        <span className="font-sans font-bold text-[11px] tracking-tight tabular-nums truncate text-text-primary">
-                          {booking.displayNum}
+                    {/* Events */}
+                    <div className="space-y-1 flex flex-col items-start overflow-hidden w-full">
+                      {dayBookings.slice(0, 5).map((booking, bIdx) => (
+                        <button
+                          key={bIdx}
+                          type="button"
+                          onClick={() => setSelectedContractForDetails(booking.rawContract)}
+                          title={`${booking.tooltipText} • Click to view full details`}
+                          className={`w-full max-w-full text-left px-2 py-1 rounded-lg transition-all border shadow-2xs hover:shadow-xs hover:scale-[1.01] active:scale-[0.99] flex items-center justify-between gap-1.5 cursor-pointer select-none group ${booking.chipClass}`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${booking.dotClass}`} />
+                            <span className="font-sans font-bold text-[11px] tracking-tight tabular-nums truncate text-text-primary">
+                              {booking.displayNum}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-bold tracking-tight tabular-nums text-text-secondary shrink-0 opacity-80">
+                            {booking.formattedHour}
+                          </span>
+                        </button>
+                      ))}
+                      {dayBookings.length > 5 && (
+                        <span className="text-[9px] font-bold text-brand pl-1">
+                          +{dayBookings.length - 5} more
                         </span>
-                      </div>
-                      <span className="text-[10px] font-bold tracking-tight tabular-nums text-text-secondary shrink-0 opacity-80">
-                        {booking.formattedHour}
-                      </span>
-                    </button>
-                  ))}
-                  {dayBookings.length > 5 && (
-                    <span className="text-[9px] font-bold text-brand pl-1">
-                      +{dayBookings.length - 5} more
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

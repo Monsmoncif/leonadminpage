@@ -180,7 +180,7 @@ export default function NotificationsPage() {
                   </div>
                   
                   <div className="flex-1">
-                    <div className="flex items-start justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1">
                       <div>
                         <h3 className={`text-sm ${notification.read ? "font-medium text-text-primary" : "font-bold text-text-primary"}`}>
                           {notification.title}
@@ -189,7 +189,7 @@ export default function NotificationsPage() {
                           {notification.message}
                         </p>
                       </div>
-                      <span className="text-xs text-text-muted flex items-center gap-1 font-medium whitespace-nowrap">
+                      <span className="text-xs text-text-muted flex items-center gap-1 font-medium whitespace-nowrap shrink-0 sm:pt-0.5">
                         <Clock size={12} /> {formatTime(notification.createdAt)}
                       </span>
                     </div>

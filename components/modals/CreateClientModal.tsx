@@ -835,8 +835,8 @@ export default function CreateClientModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      {/* Widescreen Modal (max-w-5xl) - Height minimized on mobile to fit comfortably */}
-      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[90vh]">
+      {/* Widescreen Modal (max-w-5xl) - Height maximized cleanly on mobile */}
+      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] sm:max-h-[90vh]">
         
         {/* Header */}
         <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">

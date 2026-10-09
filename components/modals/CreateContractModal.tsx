@@ -768,8 +768,8 @@ export default function CreateContractModal({
     (Number(formData.cleaningFees) || 0);
 
   return (
-    <div ref={modalOverlayRef} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-      <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden border border-border flex flex-col max-h-[82vh] sm:max-h-[90vh]">
+    <div ref={modalOverlayRef} className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+      <div className="bg-white w-full max-w-5xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-border flex flex-col max-h-[94dvh] sm:max-h-[90vh]">
         
         {/* ================= MODAL HEADER ================= */}
         <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex justify-between items-center bg-white shrink-0">

@@ -205,13 +205,13 @@ export default function ClientsPage() {
             Manage customer profiles, documents, and rental history.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
             onClick={() => {
               setEditTarget(null);
               setIsModalOpen(true);
             }}
-            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-sm hover:shadow-md cursor-pointer"
+            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm hover:shadow-md cursor-pointer w-full sm:w-auto"
           >
             <Plus size={16} /> Add Customer
           </button>
