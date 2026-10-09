@@ -294,9 +294,10 @@ export async function POST(req: Request) {
         });
         const vehicle = unitDoc ? `${unitDoc.make} ${unitDoc.model} (${unitDoc.plate || ""})`.trim() : "Vehicle";
         
+        const clientNameForNotif = body.clientName || "Client";
         await Notification.create({
-          title: `Handover Reminder: Contract ${contractNum} (Tomorrow)`,
-          message: `Reminder: Contract ${contractNum} starts tomorrow (${dateFormatted}) for ${vehicle}. Please ensure vehicle is ready for delivery.`,
+          title: `Handover Reminder (Tomorrow): ${clientNameForNotif} — ${vehicle}`,
+          message: `Scheduled vehicle handover for ${clientNameForNotif} (${vehicle}) starts tomorrow (${dateFormatted}). Please ensure vehicle is ready for delivery.`,
           type: "reminder",
           read: false,
         });

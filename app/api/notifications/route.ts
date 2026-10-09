@@ -56,8 +56,8 @@ async function checkUpcomingHandoverReminders() {
         });
 
         await Notification.create({
-          title: `Handover Reminder: Contract ${contractNum} (${timingLabel})`,
-          message: `Reminder: Contract ${contractNum} starts ${timingLabel.toLowerCase()} (${dateFormatted}) for ${vehicle} with client ${client}. Please ensure vehicle is ready for delivery.`,
+          title: `Handover Reminder (${timingLabel}): ${client} — ${vehicle}`,
+          message: `Scheduled vehicle handover for ${client} (${vehicle}) starts ${timingLabel.toLowerCase()} (${dateFormatted}). Please ensure vehicle is ready for delivery.`,
           type: "reminder",
           read: false,
         });

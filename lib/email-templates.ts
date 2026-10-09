@@ -595,7 +595,7 @@ export function buildDriverTaskEmail(params: {
  * 3. Admin Handover Reminder Email (Tomorrow / Today)
  */
 export function buildAdminHandoverReminderEmail(params: {
-  contractNumber: string;
+  contractNumber?: string;
   vehicleName: string;
   vehiclePlate?: string;
   clientName: string;
@@ -609,18 +609,28 @@ export function buildAdminHandoverReminderEmail(params: {
 }): { subject: string; html: string } {
   const isTomorrow = params.timingLabel === "Tomorrow";
   const title = `Handover Scheduled: ${isTomorrow ? "Tomorrow" : "Today"}`;
-  const subtitle = `Operational schedule reminder for Contract #${params.contractNumber}`;
+  const subtitle = `Scheduled vehicle handover for ${params.clientName} (${params.vehicleName})`;
 
-  const subject = `[Handover Reminder] ${params.timingLabel}: Contract #${params.contractNumber} — ${params.vehicleName}`;
+  // Display Client Name and Vehicle Name in subject instead of contract number
+  const subject = `[Handover Reminder] ${params.timingLabel}: ${params.clientName} — ${params.vehicleName}`;
+
+  const cleanContractNum = params.contractNumber ? params.contractNumber.replace(/^#+/, "").trim() : "";
+  const isRealContractNumber = cleanContractNum !== "" && !/^[0-9a-fA-F]{8}$/.test(cleanContractNum);
 
   const rows = [
-    buildDetailRow("Contract Number", `#${params.contractNumber}`),
-    buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
     buildDetailRow("Client", `${params.clientName}${params.clientPhone ? ` (${params.clientPhone})` : ''}`),
+    buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
+  ];
+
+  if (isRealContractNumber) {
+    rows.push(buildDetailRow("Contract Number", `#${cleanContractNum}`));
+  }
+
+  rows.push(
     buildDetailRow("Handover Schedule", `${params.startDateFormatted} at ${params.checkoutTime}`),
     buildDetailRow("Return Schedule", params.endDateFormatted),
-    buildDetailRow("Location", params.location, true),
-  ];
+    buildDetailRow("Location", params.location, true)
+  );
 
   const contentHtml = `
     <p style="margin: 0 0 16px; font-size: 14px; color: #334155;">
@@ -628,7 +638,7 @@ export function buildAdminHandoverReminderEmail(params: {
     </p>
 
     <p style="margin: 0 0 20px; font-size: 13px; color: #475569; line-height: 1.6;">
-      This is an automated operational reminder for a scheduled vehicle handover <strong>${isTomorrow ? 'tomorrow' : 'today'}</strong>.
+      This is an automated operational reminder for a scheduled vehicle handover <strong>${isTomorrow ? 'tomorrow' : 'today'}</strong> for client <strong>${params.clientName}</strong>.
     </p>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px; background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">

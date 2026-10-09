@@ -446,9 +446,7 @@ export async function sendHandoverReminderNotification(
 
     const clientName = clientDoc?.name || (contract as any).additionalDriverName || "Client";
     const clientPhone = clientDoc?.phone || (contract as any).additionalDriverPhone || "";
-    const contractNum = contract.contractNumber 
-      ? `#${contract.contractNumber}` 
-      : `#${contract._id.toString().substring(0, 8).toUpperCase()}`;
+    const contractNum = contract.contractNumber ? String(contract.contractNumber) : "";
 
     const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
     const vehiclePlate = contract.unitId?.plate || "";
@@ -529,9 +527,9 @@ export async function sendHandoverReminderNotification(
       const clientChatLink = clientPhone ? `https://wa.me/${formatPhoneNumberForWhatsApp(clientPhone)}` : null;
 
       const whatsappMsg = `⏰ *تذكير بموعد تسليم سيارة ${timingArabic} / Handover Reminder (${timingLabel})*\n\n` +
-        `📄 *رقم العقد / Contract:* ${contractNum}\n` +
-        `🚙 *السيارة / Vehicle:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
         `👤 *العميل / Client:* ${clientName}\n` +
+        `🚙 *السيارة / Vehicle:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+        (contractNum ? `📄 *رقم العقد / Contract:* #${contractNum}\n` : '') +
         `📞 *هاتف العميل / Phone:* ${clientPhone || "N/A"}\n` +
         (clientChatLink ? `💬 *مراسلة العميل:* ${clientChatLink}\n` : '') +
         `📅 *تاريخ التسليم / Start:* ${startDateFormatted} — ${checkoutTime}\n` +
