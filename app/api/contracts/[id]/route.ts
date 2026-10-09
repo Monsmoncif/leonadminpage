@@ -253,16 +253,6 @@ export async function PUT(
       } catch (logErr) {
         console.error("Failed to log delivery:", logErr);
       }
-
-      // Auto-notify admin that vehicle was delivered
-      try {
-        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-        fetch(`${baseUrl}/api/contracts/notify-admin`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contractId: existingContract._id.toString(), type: "vehicle_delivered" }),
-        }).catch(err => console.error("Failed to notify admin on delivery:", err));
-      } catch (e) { console.error("Admin notify trigger failed:", e); }
     }
 
     // Assign sequential contract number ONLY when vehicle handover is confirmed (Handover completed by Driver or Admin)
@@ -315,6 +305,16 @@ export async function PUT(
 
     if (isHandoverConfirmation) {
       sendClientContractNotification(resolvedParams.id, "initial").catch(e => console.error("Client contract send trigger failed (background):", e));
+
+      // Auto-notify admin that vehicle was delivered/handed over
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+        fetch(`${baseUrl}/api/contracts/notify-admin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contractId: updatedContract._id.toString(), type: "vehicle_delivered" }),
+        }).catch(err => console.error("Failed to notify admin on delivery:", err));
+      } catch (e) { console.error("Admin notify trigger failed:", e); }
     }
 
     // Send notifications to driver if newly assigned (delivery or return) in background

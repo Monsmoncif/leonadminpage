@@ -753,20 +753,37 @@ let ContractsService = class ContractsService {
             .lean());
         if (!contract)
             throw new common_1.NotFoundException('Contract not found');
-        const contractNum = contract._id.toString().substring(0, 8).toUpperCase();
+        const contractNum = contract.contractNumber
+            ? String(contract.contractNumber)
+            : contract._id.toString().substring(0, 8).toUpperCase();
         const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : 'Vehicle';
         const vehiclePlate = contract.unitId?.plate || '';
         const clientName = contract.clientId?.name || 'Client';
         const isDelivered = type === 'vehicle_delivered';
         const eventTitle = isDelivered ? 'Vehicle Delivered to Client ✅' : 'Vehicle Returned & Collected ✅';
-        const driverName = isDelivered
-            ? contract.deliveryDriverId?.name || 'Driver'
-            : contract.returnDriverId?.name || 'Driver';
+        const isShop = contract.contractType === 'Shop' || (!contract.deliveryDriverId && !contract.driverId);
+        let driverName = '';
+        if (isShop) {
+            driverName = 'Agency / Shop';
+        }
+        else {
+            const driverDoc = isDelivered ? contract.deliveryDriverId : (contract.returnDriverId || contract.deliveryDriverId);
+            driverName = driverDoc?.name || 'Assigned Driver';
+            if (driverName.toLowerCase() === 'driver') {
+                driverName = 'Assigned Driver';
+            }
+        }
         const adminEmail = process.env.SMTP_USER;
         const results = { email: false, whatsapp: false };
         if (adminEmail && process.env.SMTP_PASS) {
             try {
                 const transporter = this.getMailTransporter();
+                const actionText = isDelivered
+                    ? (isShop ? `Agency / Shop staff has delivered the vehicle to client <strong>${clientName}</strong>.` : `Driver <strong>${driverName}</strong> has delivered the vehicle to client <strong>${clientName}</strong>.`)
+                    : (isShop ? `Client <strong>${clientName}</strong> has returned the vehicle to the Agency / Shop.` : `Driver <strong>${driverName}</strong> has picked up and returned the vehicle from client <strong>${clientName}</strong>.`);
+                const actorRow = isShop
+                    ? `<tr><td style="padding: 8px 0; color: #64748b;">Handover</td><td style="padding: 8px 0; font-weight: 600;">Agency / Shop (${contract.pickupLocation || 'Office'})</td></tr>`
+                    : `<tr><td style="padding: 8px 0; color: #64748b;">Driver</td><td style="padding: 8px 0; font-weight: 600;">${driverName}</td></tr>`;
                 const emailHtml = `
           <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
             <div style="background: ${isDelivered ? '#10b981' : '#3b82f6'}; padding: 24px 30px; border-radius: 12px 12px 0 0;">
@@ -775,11 +792,12 @@ let ContractsService = class ContractsService {
             </div>
             <div style="padding: 28px 30px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: 0; border-radius: 0 0 12px 12px;">
               <p style="font-size: 16px;">Hello <strong>Admin</strong>,</p>
-              <p>${isDelivered ? `Driver <strong>${driverName}</strong> has delivered the vehicle.` : `Driver <strong>${driverName}</strong> has picked up and returned the vehicle.`}</p>
+              <p>${actionText}</p>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+                <tr><td style="padding: 8px 0; color: #64748b;">Contract</td><td style="padding: 8px 0; font-weight: 600;">#${contractNum}</td></tr>
                 <tr><td style="padding: 8px 0; color: #64748b;">Vehicle</td><td style="padding: 8px 0; font-weight: 600;">${vehicleName} (${vehiclePlate})</td></tr>
                 <tr><td style="padding: 8px 0; color: #64748b;">Client</td><td style="padding: 8px 0; font-weight: 600;">${clientName}</td></tr>
-                <tr><td style="padding: 8px 0; color: #64748b;">Driver</td><td style="padding: 8px 0; font-weight: 600;">${driverName}</td></tr>
+                ${actorRow}
               </table>
             </div>
           </div>

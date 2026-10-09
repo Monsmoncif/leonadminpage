@@ -497,13 +497,30 @@ export function buildAdminEventNoticeEmail(params: {
   vehicleName: string;
   vehiclePlate?: string;
   clientName: string;
-  driverName: string;
+  driverName?: string;
+  contractType?: "Shop" | "Delivery" | string;
+  location?: string;
   isDelivered: boolean;
   collectedAmount?: number;
   paymentMethod?: string;
   depositAmount?: number;
 }): { subject: string; html: string } {
-  const title = params.isDelivered ? "Vehicle Handover Completed" : "Vehicle Return Processed";
+  const isShop =
+    params.contractType === "Shop" ||
+    !params.driverName ||
+    params.driverName === "Shop" ||
+    params.driverName === "Agency / Shop";
+
+  // Clean driver name to avoid "Driver Driver"
+  let displayDriverName = params.driverName || "Assigned Driver";
+  if (displayDriverName.toLowerCase() === "driver") {
+    displayDriverName = "Assigned Driver";
+  }
+
+  const title = params.isDelivered 
+    ? (isShop ? "Vehicle Handover Completed (Shop)" : "Vehicle Handover Completed") 
+    : (isShop ? "Vehicle Return Processed (Shop)" : "Vehicle Return Processed");
+
   const subtitle = params.isDelivered
     ? `Vehicle handed over to client for Contract #${params.contractNumber}`
     : `Vehicle collected and returned for Contract #${params.contractNumber}`;
@@ -514,7 +531,9 @@ export function buildAdminEventNoticeEmail(params: {
     buildDetailRow("Contract Number", `#${params.contractNumber}`),
     buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
     buildDetailRow("Client", params.clientName),
-    buildDetailRow("Driver", params.driverName),
+    isShop
+      ? buildDetailRow("Handover", `Shop / Agency (${params.location || "Office"})`)
+      : buildDetailRow("Driver", displayDriverName),
     buildDetailRow("Status", params.isDelivered ? "Handed over to client" : "Returned & inspected"),
   ];
 
@@ -529,15 +548,24 @@ export function buildAdminEventNoticeEmail(params: {
     rows.push(buildDetailRow("Deposit Recorded", `${params.depositAmount.toLocaleString()} DZD`));
   }
 
+  let actorNotice = "";
+  if (params.isDelivered) {
+    actorNotice = isShop
+      ? `Agency / Shop staff has completed the vehicle handover to client <strong>${params.clientName}</strong> at the shop.`
+      : `${displayDriverName.startsWith("Driver") ? displayDriverName : `Driver <strong>${displayDriverName}</strong>`} has completed the vehicle handover to client <strong>${params.clientName}</strong>.`;
+  } else {
+    actorNotice = isShop
+      ? `Client <strong>${params.clientName}</strong> has returned the vehicle to the Agency / Shop.`
+      : `${displayDriverName.startsWith("Driver") ? displayDriverName : `Driver <strong>${displayDriverName}</strong>`} has completed the return inspection and vehicle recovery for client <strong>${params.clientName}</strong>.`;
+  }
+
   const contentHtml = `
     <p style="margin: 0 0 16px; font-size: 14px; color: #334155;">
       Management Notice,
     </p>
 
     <p style="margin: 0 0 20px; font-size: 13px; color: #475569; line-height: 1.6;">
-      ${params.isDelivered
-        ? `Driver <strong>${params.driverName}</strong> has completed the vehicle handover to client <strong>${params.clientName}</strong>.`
-        : `Driver <strong>${params.driverName}</strong> has completed the return inspection and vehicle recovery for client <strong>${params.clientName}</strong>.`}
+      ${actorNotice}
     </p>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 20px; background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">

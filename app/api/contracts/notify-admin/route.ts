@@ -31,15 +31,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Contract not found" }, { status: 404 });
     }
 
-    const contractNum = contract._id.toString().substring(0, 8).toUpperCase();
+    const contractNum = contract.contractNumber 
+      ? String(contract.contractNumber) 
+      : contract._id.toString().substring(0, 8).toUpperCase();
+
     const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
     const vehiclePlate = contract.unitId?.plate || "";
     const clientName = contract.clientId?.name || "Client";
     const isDelivered = type === "vehicle_delivered";
     const eventTitle = isDelivered ? "Vehicle Delivered to Client ✅" : "Vehicle Returned & Collected ✅";
-    const driverName = isDelivered 
-      ? (contract.deliveryDriverId?.name || "Driver") 
-      : (contract.returnDriverId?.name || "Driver");
+
+    const isShop = contract.contractType === "Shop" || (!contract.deliveryDriverId && !contract.driverId);
+    let driverName = "";
+    if (isShop) {
+      driverName = "Agency / Shop";
+    } else {
+      const driverDoc = isDelivered ? contract.deliveryDriverId : (contract.returnDriverId || contract.deliveryDriverId);
+      driverName = driverDoc?.name || "Assigned Driver";
+      if (driverName.toLowerCase() === "driver") {
+        driverName = "Assigned Driver";
+      }
+    }
 
     const adminEmail = process.env.SMTP_USER;
     const results = { email: false, whatsapp: false };
@@ -63,6 +75,8 @@ export async function POST(req: Request) {
           vehiclePlate,
           clientName,
           driverName,
+          contractType: contract.contractType,
+          location: contract.pickupLocation || "Agency Office",
           isDelivered,
           collectedAmount: !isDelivered ? (contract.returnAmountCollected !== undefined ? contract.returnAmountCollected : 0) : undefined,
           paymentMethod: contract.returnPaymentMethod || "Cash",
@@ -89,14 +103,16 @@ export async function POST(req: Request) {
       const admins = await User.find({ role: "admin", phone: { $exists: true, $ne: "" } }).select("phone name").lean();
       
       const moneyLine = isDelivered
-        ? `💵 *Security Deposit Collected:* $${contract.depositAmount || 0}`
-        : `💰 *Rest of Money Collected:* $${contract.returnAmountCollected !== undefined ? contract.returnAmountCollected : 0} (${contract.returnPaymentMethod || "Cash"})`;
+        ? `💵 *Security Deposit Collected:* ${(Number(contract.depositAmount) || 0).toLocaleString()} DZD`
+        : `💰 *Rest of Money Collected:* ${(Number(contract.returnAmountCollected) || 0).toLocaleString()} DZD (${contract.returnPaymentMethod || "Cash"})`;
 
       const whatsappMsg = `${isDelivered ? '✅' : '🔄'} *${eventTitle}*\n\n` +
-        `📄 *Contract:* #${contractNum}\n` +
-        `🚙 *Vehicle:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
-        `👤 *Client:* ${clientName}\n` +
-        `👨‍✈️ *Driver:* ${driverName}\n` +
+        `📄 *Contract / رقم العقد:* #${contractNum}\n` +
+        `🚙 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+        `👤 *Client / العميل:* ${clientName}\n` +
+        (isShop
+          ? `🏢 *Handover / الاستلام:* Agency / Shop (المكتب / الوكالة)\n`
+          : `👨‍✈️ *Driver / السائق:* ${driverName}\n`) +
         `${moneyLine}\n\n` +
         `— *Leon Rent Car*`;
 
