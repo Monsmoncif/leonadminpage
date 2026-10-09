@@ -213,10 +213,7 @@ export async function sendClientContractNotification(
             `Thank you for renting with Leon Rent Car! It was a pleasure serving you, and we hope you had a wonderful driving journey.\n\n` +
             `📄 *Contract / رقم العقد:* #${contractNum}\n` +
             `🚗 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
-            `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
-            `✅ *Return Status / حالة الإرجاع:* Vehicle Inspected & Account Cleared (تم فحص السيارة وتسوية الحساب بنجاح)\n\n` +
-            `🎁 *هدية العميل المميز / VIP Reward:*\n` +
-            `Enjoy *10% OFF* on your next rental with code: *LEONVIP* 🌟\n\n` +
+            `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n\n` +
             `We look forward to welcoming you behind the wheel again very soon!\n` +
             `Safe travels,\n` +
             `— *Leon Rent Car Team*`;
@@ -224,8 +221,7 @@ export async function sendClientContractNotification(
           whatsappMsg = `🎉 *LEON RENT CAR* | تأكيد حجز سيارة\n` +
             `*Vehicle Reservation Confirmed*\n\n` +
             `Hello *${clientName}*,\n` +
-            `Your vehicle reservation has been successfully confirmed and registered! 🚗✨\n\n` +
-            `📄 *Booking Reference / رقم الحجز:* #${contractNum}\n` +
+            `Your vehicle reservation has been successfully confirmed and registered! ✨\n\n` +
             `🚙 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
             (contract.pickupLocation ? `📍 *Pickup Location / موقع الاستلام:* ${contract.pickupLocation}\n` : '') +

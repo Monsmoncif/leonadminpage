@@ -258,29 +258,8 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
         </div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
           ${buildDetailRow("Rented Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ""}`)}
-          ${buildDetailRow("Rental Duration", `${params.startDate} ➔ ${params.endDate}`)}
-          ${params.totalDays ? buildDetailRow("Total Days", `${params.totalDays} Day${params.totalDays > 1 ? "s" : ""}`) : ""}
-          ${buildDetailRow("Inspection Outcome", "Vehicle returned in good condition ✅")}
-          ${buildDetailRow("Security Deposit", "Cleared & Account Settled (تمت التسوية بنجاح) ✅", true)}
-        </table>
-      </div>
-
-      <!-- VIP Customer Loyalty Card -->
-      <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1.5px solid #f59e0b; border-radius: 10px; padding: 18px 20px; margin: 0 0 24px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td>
-              <div style="font-size: 14px; font-weight: 700; color: #92400e; margin-bottom: 4px;">
-                🌟 VIP Customer Loyalty Reward / هدية عميل مميز
-              </div>
-              <div style="font-size: 12.5px; color: #78350f; line-height: 1.5; margin-bottom: 10px;">
-                As a token of our appreciation, enjoy an exclusive <strong>10% Discount</strong> on your next reservation with us!
-              </div>
-              <div style="display: inline-block; background-color: #b45309; color: #ffffff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px;">
-                PROMO CODE: LEONVIP
-              </div>
-            </td>
-          </tr>
+          ${buildDetailRow("Rental Duration", `${params.startDate} ➔ ${params.endDate}`, !params.totalDays)}
+          ${params.totalDays ? buildDetailRow("Total Days", `${params.totalDays} Day${params.totalDays > 1 ? "s" : ""}`, true) : ""}
         </table>
       </div>
 
@@ -306,9 +285,9 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
   // MODE B: NEW BOOKING CONFIRMED (ORDER DONE - NO PDF)
   // ========================================================
   if (isCreated) {
-    const subject = `🎉 Booking Confirmed #${params.contractNumber} — ${params.vehicleName} | Leon Rent Car`;
+    const subject = `🎉 Booking Confirmed — ${params.vehicleName} | Leon Rent Car`;
     const title = "Vehicle Booking Confirmed";
-    const subtitle = `Your rental booking #${params.contractNumber} has been received and confirmed.`;
+    const subtitle = "Your vehicle reservation has been received and confirmed.";
 
     const contentHtml = `
       <p style="margin: 0 0 14px; font-size: 15px; color: #1e293b;">
@@ -327,7 +306,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
               &#10003; Order Status: Confirmed & Reserved (تم تأكيد الطلب وحجز السيارة)
             </td>
             <td align="right" style="font-size: 12px; font-weight: 600; color: #1e40af;">
-              Booking #${params.contractNumber}
+              Confirmed
             </td>
           </tr>
         </table>
@@ -375,7 +354,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
       <!-- Vehicle Preparation Notice -->
       <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #2563eb; border-radius: 6px; padding: 14px 16px; margin: 0 0 22px;">
         <p style="margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #1e293b;">
-          🚗 Your Vehicle Is Being Prepared
+          Your Vehicle Is Being Prepared
         </p>
         <p style="margin: 0; font-size: 12.5px; color: #475569; line-height: 1.55;">
           Our fleet operations team will have your vehicle thoroughly detailed, inspected, and fully prepared for your collection/delivery. Please make sure to present your valid Driving License and Identity document upon handover.
@@ -394,7 +373,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
       html: buildBaseEmailLayout({
         title,
         subtitle,
-        referenceBadge: `#${params.contractNumber}`,
+        referenceBadge: undefined,
         contentHtml,
       }),
     };
