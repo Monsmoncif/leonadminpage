@@ -2161,70 +2161,27 @@ export function NewRentalAdminPageContent() {
     </div>
   );
 
-  // ===================== PERSONALIZED BOOKING (DATES & RECEIVER ONLY, FREE, NO CHARGES) =====================
+  // ===================== PERSONALIZED BOOKING (DATES & RECEIVER ONLY) =====================
 
   const renderPersonalizedData = () => {
-    const start = new Date(rentalData.startDate);
-    const end = new Date(rentalData.endDate);
-    const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
     const selectedUnit = units.find(u => u._id === selectedVehicle);
 
     return (
       <div className="space-y-6 animate-fade-in-up">
         {/* Step Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-gray-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
-                Personalized / شخصي
-              </span>
-              <h2 className="text-lg font-bold text-text-primary">
-                Dates &amp; Receiver (المواعيد والمستلم)
-              </h2>
-            </div>
-            <p className="text-xs text-text-muted mt-1">
-              حجز شخصي مباشر وبدون أي رسوم — حدد المستلم والمواعيد لتأكيد حجز السيارة في الأسطول مباشرة.
-            </p>
-          </div>
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">
+            Dates &amp; Receiver (المواعيد والمستلم)
+          </h2>
         </div>
-
-        {/* Selected Vehicle Preview Banner */}
-        {selectedUnit && (
-          <div className="bg-brand/5 border border-brand/15 rounded-2xl p-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                <ExecutiveCarIcon size={22} />
-              </div>
-              <div>
-                <span className="text-[11px] text-text-muted font-medium block">Selected Vehicle (السيارة المختارة)</span>
-                <strong className="text-sm font-bold text-text-primary block">
-                  {selectedUnit.make} {selectedUnit.model} {selectedUnit.year ? `(${selectedUnit.year})` : ""}
-                </strong>
-                <span className="text-xs text-text-muted font-mono">{selectedUnit.plate} • {selectedUnit.color}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(1)}
-              className="text-xs font-bold text-brand hover:underline px-3 py-1.5 rounded-lg hover:bg-brand/10 transition-colors cursor-pointer"
-            >
-              Change Car (تغيير)
-            </button>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Card 1: Booking Dates & Logistics */}
           <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                <Calendar size={16} className="text-brand" />
-                <span>Booking Dates (تواريخ الحجز)</span>
-              </h3>
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
-                {totalDays} {totalDays === 1 ? "Day" : "Days"} ({totalDays} {totalDays === 1 ? "يوم" : "أيام"})
-              </span>
-            </div>
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+              <Calendar size={16} className="text-brand" />
+              <span>Booking Dates (تواريخ الحجز)</span>
+            </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
@@ -2325,16 +2282,13 @@ export function NewRentalAdminPageContent() {
 
             {/* Vehicle Current Mileage */}
             <div className="pt-2 border-t border-gray-200/70">
-              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-text-muted">
+              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs text-text-muted">
                 <span className="flex items-center gap-1.5 font-medium text-text-secondary">
                   <Gauge size={14} className="text-brand" />
-                  <span>Vehicle Current Mileage:</span>
+                  <span>Current Mileage:</span>
                   <strong className="text-text-primary">
                     {selectedUnit?.mileage ? selectedUnit.mileage.toLocaleString() : 0} km
                   </strong>
-                </span>
-                <span className="text-[11px] text-brand font-semibold">
-                  Personal use / Free reservation
                 </span>
               </div>
             </div>
@@ -2392,10 +2346,6 @@ export function NewRentalAdminPageContent() {
                   />
                 </div>
               )}
-
-              <p className="text-[11px] text-text-muted mt-1">
-                اختر عميلاً مسجلاً أو أدخل اسم المستلم ليتم حجز السيارة باسمه في الأسطول مباشرة.
-              </p>
             </div>
 
             {/* Notes */}
@@ -2404,28 +2354,12 @@ export function NewRentalAdminPageContent() {
                 Booking Purpose / Notes (ملاحظات أو سبب الاستلام)
               </label>
               <textarea
-                rows={3}
+                rows={4}
                 value={rentalData.notes}
                 onChange={e => setRentalData({ ...rentalData, notes: e.target.value })}
                 placeholder="Reason for personal booking, borrower notes, or custom remarks..."
                 className="w-full p-2.5 rounded-xl border border-border bg-white text-xs outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand resize-none"
               />
-            </div>
-
-            {/* Free / Personal Use Banner */}
-            <div className="p-4 bg-purple-50/70 border border-purple-200/80 rounded-xl space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
-                  <span>Personal Use (حجز شخصي)</span>
-                </span>
-                <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
-                  Free / مجاني (0 AED)
-                </span>
-              </div>
-              <p className="text-[11px] text-purple-800/80 leading-relaxed">
-                بدون رسوم يومية أو تأمين أو فحص صور أو توقيع — يتم حجز السيارة وتنشيطها في جدول الحجوزات فور الضغط على زر الحجز بالأسفل.
-              </p>
             </div>
           </div>
         </div>
