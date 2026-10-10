@@ -147,7 +147,7 @@ export default function ContractDetailsModal({
             setContractData((prev: any) => ({
               ...prev,
               ...fresh,
-              customer: fresh.clientId?.name || prev.customer,
+              customer: fresh.personalizedPersonName || fresh.clientId?.name || prev.customer,
               customerPhone: fresh.clientId?.phone || prev.customerPhone,
               customerEmail: fresh.clientId?.email || prev.customerEmail,
               customerLicense: fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev.customerLicense,
@@ -178,7 +178,7 @@ export default function ContractDetailsModal({
               setContractData((prev: any) => ({
                 ...prev,
                 ...fresh,
-                customer: fresh.clientId?.name || prev.customer,
+                customer: fresh.personalizedPersonName || fresh.clientId?.name || prev.customer,
                 customerPhone: fresh.clientId?.phone || prev.customerPhone,
                 customerEmail: fresh.clientId?.email || prev.customerEmail,
                 customerLicense: fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev.customerLicense,
@@ -235,7 +235,7 @@ export default function ContractDetailsModal({
   const contractNum = contractData.contractNumber ? String(contractData.contractNumber) : "Pending";
   const vehicleName = contractData.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || "Vehicle";
   const plateNumber = contractData.vehiclePlate || "";
-  const customerName = contractData.customer || "Customer";
+  const customerName = contractData.personalizedPersonName || contractData.additionalDriverName || contractData.customer || "Customer";
   const pickupLoc = contractData.pickupLocation || "Main Office";
   const dropoffLoc = contractData.dropoffLocation || contractData.pickupLocation || "Main Office";
 
@@ -276,19 +276,27 @@ export default function ContractDetailsModal({
 
   const isDelivered = isHandedOver;
 
+  const isPersonalized = Boolean(
+    contractData.contractType === "Personalized" ||
+    contractData.personalizedPersonName ||
+    contractData.deliveryDriver === "Personal Use"
+  );
+
   const isDriverDelivery = Boolean(
-    contractData.contractType === "Delivery" || 
+    !isPersonalized &&
+    (contractData.contractType === "Delivery" || 
     (contractData.deliveryDriver && 
      contractData.deliveryDriver !== "None" && 
      !contractData.deliveryDriver.toLowerCase().includes("self-drive")) ||
-    (contractData.deliveryDriverId && contractData.deliveryDriverId !== "None")
+    (contractData.deliveryDriverId && contractData.deliveryDriverId !== "None"))
   );
 
   const isDriverReturn = Boolean(
-    (contractData.returnDriver && 
+    !isPersonalized &&
+    ((contractData.returnDriver && 
      contractData.returnDriver !== "None" && 
      !contractData.returnDriver.toLowerCase().includes("self-drive")) ||
-    (contractData.returnDriverId && contractData.returnDriverId !== "None")
+    (contractData.returnDriverId && contractData.returnDriverId !== "None"))
   );
 
   const openGoogleMaps = (location: string) => {
@@ -494,7 +502,7 @@ export default function ContractDetailsModal({
               </div>
 
               {/* ================= AWAITING HANDOVER BANNER (SHOWN WHEN NOT HANDED OVER) ================= */}
-              {!isHandedOver && !isCancelled && (
+              {!isHandedOver && !isCancelled && !isPersonalized && (
                 <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                   <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
@@ -653,21 +661,34 @@ export default function ContractDetailsModal({
                     </span>
                     <div className="min-w-0">
                       <h4 className="text-xs sm:text-sm md:text-base font-bold text-text-primary truncate">
-                        {isDriverDelivery ? "Dispatched to Driver" : "In-Shop Handover (تسليم في المعرض)"}
+                        {isPersonalized
+                          ? "Personalized Booking (حجز شخصي / مخصص)"
+                          : isDriverDelivery 
+                          ? "Dispatched to Driver" 
+                          : "In-Shop Handover (تسليم في المعرض)"}
                       </h4>
                       <p className="text-[10px] sm:text-xs text-text-muted truncate">
-                        {isDriverDelivery 
+                        {isPersonalized
+                          ? "Reserved directly for recipient without inspection requirements"
+                          : isDriverDelivery 
                           ? "Instructions and logistics assigned to the driver"
                           : "Showroom vehicle handover schedule for client pick up"}
                       </p>
                     </div>
                   </div>
                   <span className={`text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border shadow-2xs flex items-center gap-1 shrink-0 ${
-                    isDriverDelivery
+                    isPersonalized
+                      ? "text-purple-700 bg-purple-50 border-purple-200"
+                      : isDriverDelivery
                       ? "text-blue-700 bg-blue-50 border-blue-200"
                       : "text-emerald-700 bg-emerald-50 border-emerald-200"
                   }`}>
-                    {isDriverDelivery ? (
+                    {isPersonalized ? (
+                      <>
+                        <User size={11} className="text-purple-600 shrink-0" />
+                        <span>Personalized</span>
+                      </>
+                    ) : isDriverDelivery ? (
                       <>
                         <Navigation size={11} className="text-blue-600 rotate-45 shrink-0" />
                         <span>Delivery</span>
@@ -686,7 +707,12 @@ export default function ContractDetailsModal({
                   {/* Driver / In-Shop Logistics */}
                   <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-border/70 space-y-2 shadow-2xs">
                     <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                      {isDriverDelivery ? (
+                      {isPersonalized ? (
+                        <>
+                          <User size={14} className="text-purple-600 shrink-0" />
+                          <span>Recipient / Method</span>
+                        </>
+                      ) : isDriverDelivery ? (
                         <>
                           <UserCheck size={14} className="text-brand shrink-0" />
                           <span>Assigned Driver</span>
@@ -701,10 +727,12 @@ export default function ContractDetailsModal({
                     <div className="text-xs space-y-1.5 pt-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-text-muted text-[11px]">
-                          {isDriverDelivery ? "Driver Name:" : "Handover Type:"}
+                          {isPersonalized ? "Receiver:" : isDriverDelivery ? "Driver Name:" : "Handover Type:"}
                         </span>
                         <strong className="text-text-primary font-semibold truncate text-right">
-                          {isDriverDelivery 
+                          {isPersonalized
+                            ? (customerName || "Personal Use")
+                            : isDriverDelivery 
                             ? (contractData.deliveryDriver || "Assigned Driver")
                             : "In-Shop (Client Pick Up)"}
                         </strong>

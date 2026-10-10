@@ -4,7 +4,8 @@ export interface IContract extends Document {
   contractNumber?: number;
   unitId: mongoose.Types.ObjectId;
   clientId?: mongoose.Types.ObjectId;
-  contractType: "Delivery" | "Shop";
+  contractType: "Delivery" | "Shop" | "Personalized";
+  personalizedPersonName?: string;
   rentalType?: "Daily" | "Monthly";
   customerType?: "B2C" | "B2B";
   driverId?: mongoose.Types.ObjectId;
@@ -93,9 +94,10 @@ const contractSchema = new Schema<IContract>(
     clientId: { type: Schema.Types.ObjectId, ref: "Client", required: false },
     contractType: {
       type: String,
-      enum: ["Delivery", "Shop"],
+      enum: ["Delivery", "Shop", "Personalized"],
       default: "Delivery"
     },
+    personalizedPersonName: { type: String, trim: true },
     rentalType: {
       type: String,
       enum: ["Daily", "Monthly"],

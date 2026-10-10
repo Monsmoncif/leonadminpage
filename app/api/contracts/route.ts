@@ -79,10 +79,11 @@ export async function GET(req: Request) {
       driverId: c.driverId?._id?.toString() || c.driverId || "",
       deliveryDriverId: c.deliveryDriverId?._id?.toString() || c.deliveryDriverId || "",
       returnDriverId: c.returnDriverId?._id?.toString() || c.returnDriverId || "",
-      customer: c.clientId?.name || "Unknown",
-      customerPhone: c.clientId?.phone || "",
-      driver: c.deliveryDriverId?.name || c.driverId?.name || "None",
-      deliveryDriver: c.deliveryDriverId?.name || (c.driverId && !c.returnDriverId ? c.driverId?.name : "None"),
+      customer: c.personalizedPersonName || c.clientId?.name || (c.contractType === "Personalized" ? (c.additionalDriverName || "Personal Use") : "Unknown"),
+      personalizedPersonName: c.personalizedPersonName || "",
+      customerPhone: c.clientId?.phone || c.additionalDriverPhone || "",
+      driver: c.contractType === "Personalized" ? "Personal Use" : (c.deliveryDriverId?.name || c.driverId?.name || "None"),
+      deliveryDriver: c.contractType === "Personalized" ? "Personal Use" : (c.deliveryDriverId?.name || (c.driverId && !c.returnDriverId ? c.driverId?.name : "None")),
       returnDriver: c.returnDriverId?.name || "None",
       vehicle: c.unitId ? `${c.unitId.make} ${c.unitId.model} (${c.unitId.plate})` : "Unknown Vehicle",
       vehiclePlate: c.unitId?.plate || "",
@@ -200,8 +201,13 @@ export async function POST(req: Request) {
 
     // For Delivery contracts, clientId is optional (driver will register the client)
     // For Shop contracts, clientId is required
+    // For Personalized contracts, clientId is optional (personalizedPersonName is used)
     if (contractType === "Shop" && !body.clientId) {
       return NextResponse.json({ error: "Client is required for Shop contracts." }, { status: 400 });
+    }
+
+    if (contractType === "Personalized" && !body.personalizedPersonName && !body.additionalDriverName && !body.notes && !body.clientId) {
+      return NextResponse.json({ error: "Please enter who took the car (اسم الشخص المستلم للسيارة)." }, { status: 400 });
     }
 
     const deliveryDriverId = isDriverUser 
@@ -217,13 +223,33 @@ export async function POST(req: Request) {
 
     // Contracts are created unconfirmed without a contract number or dispatch notifications.
     // When created by a driver, isDispatched is automatically true so it appears in driver dashboard.
-    const initialStatus = "Draft";
-    const initialDeliveryStatus = "Pending";
-    const isDispatched = isDriverUser ? true : Boolean(body.isDispatched);
+    let initialStatus: "Draft" | "Active" | "Completed" | "Cancelled" = "Draft";
+    let initialDeliveryStatus: "Pending" | "Delivered" | "Returned" = "Pending";
+    let isDispatched = isDriverUser ? true : Boolean(body.isDispatched);
+    let assignedContractNumber: number | undefined = undefined;
+
+    // Personalized contracts are active and delivered immediately (no pending handover steps)
+    if (contractType === "Personalized") {
+      initialStatus = "Active";
+      initialDeliveryStatus = "Delivered";
+      isDispatched = true;
+
+      const lastContract = await Contract.findOne({ contractNumber: { $exists: true, $ne: null } })
+        .sort({ contractNumber: -1 })
+        .select("contractNumber")
+        .lean();
+
+      const nextContractNumber =
+        lastContract && typeof (lastContract as any).contractNumber === "number" && (lastContract as any).contractNumber >= 2200
+          ? (lastContract as any).contractNumber + 1
+          : 2200;
+      assignedContractNumber = nextContractNumber;
+    }
 
     const contract = await Contract.create({
-      contractNumber: undefined,
+      contractNumber: assignedContractNumber,
       clientId: body.clientId || null,
+      personalizedPersonName: body.personalizedPersonName || (contractType === "Personalized" ? (body.additionalDriverName || body.notes) : undefined),
       unitId: body.unitId,
       contractType: contractType,
       isDispatched: isDispatched,
@@ -268,6 +294,14 @@ export async function POST(req: Request) {
       additionalDriverExpiry: body.additionalDriverExpiry || "",
       additionalDriverIssuedAt: body.additionalDriverIssuedAt || "",
     });
+
+    if (contractType === "Personalized") {
+      try {
+        await syncUnitStatuses(contract.unitId);
+      } catch (syncErr) {
+        console.error("Failed to sync unit status for personalized contract:", syncErr);
+      }
+    }
 
     // Automatically create a Notification for the new contract
     try {

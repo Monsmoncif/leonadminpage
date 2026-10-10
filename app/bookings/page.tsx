@@ -45,7 +45,7 @@ const getInitials = (name: string) => {
 
 // Helper to check if a contract is a Shop/Showroom pickup contract vs Driver delivery
 const isShopContract = (c: any): boolean => {
-  if (c.contractType === "Shop") return true;
+  if (c.contractType === "Shop" || c.contractType === "Personalized") return true;
   if (c.contractType === "Delivery") return false;
   // Fallback for legacy contracts without contractType
   const hasDriver = !!(c.deliveryDriverId || c.driverId || (c.deliveryDriver && c.deliveryDriver !== "None" && c.deliveryDriver !== "Self-drive (Client Pick Up)"));
@@ -558,7 +558,9 @@ export default function ContractsPage() {
                                     const hasReturn = contract.returnDriver && contract.returnDriver !== "None";
                                     let driverDisplay = "Self-drive";
 
-                                    if (hasDelivery && hasReturn) {
+                                    if (contract.contractType === "Personalized" || contract.deliveryDriver === "Personal Use") {
+                                      driverDisplay = "Personal Use (شخصي)";
+                                    } else if (hasDelivery && hasReturn) {
                                       driverDisplay = contract.deliveryDriver === contract.returnDriver 
                                         ? contract.deliveryDriver 
                                         : `${contract.deliveryDriver} / ${contract.returnDriver}`;
