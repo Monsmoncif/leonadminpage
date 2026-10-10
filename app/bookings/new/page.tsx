@@ -73,7 +73,8 @@ const SHOP_STEPS = [
 
 const PERSONALIZED_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Dates & Receiver", icon: User },
+  { id: 2, title: "Client", icon: User },
+  { id: 3, title: "Dates", icon: Calendar },
 ];
 
 export function NewRentalAdminPageContent() {
@@ -410,9 +411,9 @@ export function NewRentalAdminPageContent() {
     toast.success(`Admin signature applied (${adminName})`);
   };
 
-  // Canvas DPI initialization when reaching Review Step (Step 4 for Shop, Step 3 for Delivery and Personalized)
+  // Canvas DPI initialization when reaching Review Step (Step 4 for Shop, Step 3 for Delivery)
   useEffect(() => {
-    const isReviewStep = currentStep === (contractType === "Shop" ? 4 : 3);
+    const isReviewStep = contractType === "Shop" ? currentStep === 4 : contractType === "Delivery" ? currentStep === 3 : false;
     if (isReviewStep) {
       const timer = setTimeout(() => {
         // Customer canvas (Shop only)
@@ -712,20 +713,11 @@ export function NewRentalAdminPageContent() {
       }
     }
 
-    // Personalized flow validation (Step 1: Car -> Step 2: Person & Dates -> Step 3: Review & Confirm)
+    // Personalized flow validation (Step 1: Car -> Step 2: Client -> Step 3: Dates & Create)
     if (contractType === "Personalized") {
       if (currentStep === 2) {
-        if (!personName.trim()) {
-          toast.error("Please enter who took the car (يرجى إدخال اسم المستلم).");
-          return;
-        }
-
-        const vehicle = units.find(u => u._id === selectedVehicle);
-        const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
-        if (conflict && conflict.reason === "Booked") {
-          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          toast.error(`Date Conflict: This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
+        if (!selectedClient) {
+          toast.error("Please select a client first (يرجى اختيار العميل).");
           return;
         }
       }
@@ -803,9 +795,9 @@ export function NewRentalAdminPageContent() {
         return;
       }
 
-      // Personalized contracts require person name
-      if (contractType === "Personalized" && !personName.trim()) {
-        toast.error("Please enter who took the car (يرجى إدخال اسم المستلم).");
+      // Personalized contracts require a client
+      if (contractType === "Personalized" && !selectedClient) {
+        toast.error("Please select a client (يرجى اختيار العميل).");
         setIsLoading(false);
         return;
       }
@@ -880,10 +872,9 @@ export function NewRentalAdminPageContent() {
       };
 
       if (contractType === "Personalized") {
-        contractPayload.personalizedPersonName = personName.trim();
-        if (selectedClient) {
-          contractPayload.clientId = selectedClient;
-        }
+        const clientObj = clients.find(c => c._id === selectedClient);
+        contractPayload.clientId = selectedClient;
+        contractPayload.personalizedPersonName = clientObj?.name || personName.trim() || "Personal Use";
         contractPayload.dailyRate = 0;
         contractPayload.collectionAmount = 0;
         contractPayload.totalAmount = 0;
@@ -2161,22 +2152,37 @@ export function NewRentalAdminPageContent() {
     </div>
   );
 
-  // ===================== PERSONALIZED BOOKING (DATES & RECEIVER ONLY) =====================
+  // ===================== PERSONALIZED BOOKING (DATES & LOGISTICS ONLY) =====================
 
   const renderPersonalizedData = () => {
     const selectedUnit = units.find(u => u._id === selectedVehicle);
+    const selectedClientObj = clients.find(c => c._id === selectedClient);
 
     return (
       <div className="space-y-6 animate-fade-in-up">
         {/* Step Header */}
-        <div>
-          <h2 className="text-lg font-bold text-text-primary">
-            Dates &amp; Receiver (المواعيد والمستلم)
-          </h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-text-primary">
+              Dates &amp; Details (المواعيد وتفاصيل الحجز)
+            </h2>
+            <p className="text-xs text-text-muted mt-0.5">
+              Set booking period and handover details for the selected client
+            </p>
+          </div>
+          {selectedClientObj && (
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-brand/5 border border-brand/20">
+              <User size={15} className="text-brand shrink-0" />
+              <span className="text-xs font-bold text-text-primary">{selectedClientObj.name}</span>
+              {selectedClientObj.phone && (
+                <span className="text-[11px] text-text-muted font-normal font-mono">({selectedClientObj.phone})</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Card 1: Booking Dates & Logistics */}
+          {/* Card 1: Booking Dates & Timing */}
           <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
               <Calendar size={16} className="text-brand" />
@@ -2265,7 +2271,10 @@ export function NewRentalAdminPageContent() {
                 </button>
               </div>
             </div>
+          </div>
 
+          {/* Card 2: Location, Mileage & Notes */}
+          <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
             <div>
               <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
                 <MapPin size={13} className="text-emerald-600" />
@@ -2281,71 +2290,15 @@ export function NewRentalAdminPageContent() {
             </div>
 
             {/* Vehicle Current Mileage */}
-            <div className="pt-2 border-t border-gray-200/70">
-              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs text-text-muted">
-                <span className="flex items-center gap-1.5 font-medium text-text-secondary">
-                  <Gauge size={14} className="text-brand" />
-                  <span>Current Mileage:</span>
-                  <strong className="text-text-primary">
-                    {selectedUnit?.mileage ? selectedUnit.mileage.toLocaleString() : 0} km
-                  </strong>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Receiver & Booking Notes */}
-          <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
-            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-              <User size={16} className="text-brand" /> Receiver &amp; Details (المستلم والملاحظات)
-            </h3>
-
-            {/* Select Client / Receiver — UI UX styled EXACTLY like Assign Delivery Driver */}
             <div>
-              <label className="text-xs font-semibold text-text-secondary block mb-1">
-                Select Client / Receiver (اختيار العميل أو المستلم) <span className="text-red-500">*</span>
+              <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
+                <Gauge size={13} className="text-brand" />
+                <span>Vehicle Current Mileage (العداد الحالي)</span>
               </label>
-              <select
-                value={selectedClient || (personName && !clients.some(c => c._id === selectedClient) ? "__custom__" : "")}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "__custom__") {
-                    setSelectedClient(null);
-                  } else if (val) {
-                    setSelectedClient(val);
-                    const cl = clients.find(c => c._id === val);
-                    if (cl) {
-                      setPersonName(cl.name);
-                    }
-                  } else {
-                    setSelectedClient(null);
-                    setPersonName("");
-                  }
-                }}
-                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none cursor-pointer"
-              >
-                <option value="">-- Select Client / Receiver --</option>
-                {clients.map(c => (
-                  <option key={c._id} value={c._id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ""} {c.licenseNumber ? `• Lic: ${c.licenseNumber}` : ""}
-                  </option>
-                ))}
-                <option value="__custom__">✍️ Other Person / Custom Receiver (شخص آخر غير مسجل)</option>
-              </select>
-
-              {/* If other person / custom receiver or no client chosen, show clean input */}
-              {(!selectedClient || !clients.some(c => c._id === selectedClient)) && (
-                <div className="mt-2.5">
-                  <input
-                    type="text"
-                    value={personName}
-                    onChange={(e) => setPersonName(e.target.value)}
-                    placeholder="Enter receiver name (اكتب اسم الشخص المستلم)..."
-                    className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-                    autoFocus
-                  />
-                </div>
-              )}
+              <div className="p-2.5 rounded-xl border border-border bg-white text-sm font-bold text-text-primary flex items-center gap-2">
+                <Gauge size={14} className="text-brand" />
+                <span>{selectedUnit?.mileage ? selectedUnit.mileage.toLocaleString() : 0} km</span>
+              </div>
             </div>
 
             {/* Notes */}
@@ -2354,7 +2307,7 @@ export function NewRentalAdminPageContent() {
                 Booking Purpose / Notes (ملاحظات أو سبب الاستلام)
               </label>
               <textarea
-                rows={4}
+                rows={3}
                 value={rentalData.notes}
                 onChange={e => setRentalData({ ...rentalData, notes: e.target.value })}
                 placeholder="Reason for personal booking, borrower notes, or custom remarks..."
@@ -2371,9 +2324,10 @@ export function NewRentalAdminPageContent() {
 
   const renderStepContent = () => {
     if (contractType === "Personalized") {
-      // 2 Steps for Personalized: Car (1) → Dates & Receiver (2)
+      // 3 Steps for Personalized: Car (1) → Client (2) → Dates (3)
       if (currentStep === 1) return renderVehicleSelector();
-      if (currentStep === 2) return renderPersonalizedData();
+      if (currentStep === 2) return renderClientSelector();
+      if (currentStep === 3) return renderPersonalizedData();
       return null;
     }
 
@@ -2426,7 +2380,7 @@ export function NewRentalAdminPageContent() {
             {isEditMode 
               ? "Update vehicle, customer, rental schedule, extra fees, inspection photos, and terms."
               : contractType === "Personalized"
-                ? "Personalized booking (مخصص) — select client or receiver, set dates and pricing. No inspection photos or customer signature needed."
+                ? "Personalized booking (مخصص) — select vehicle, choose client, and set dates. Direct booking without charges, photos, or signature."
                 : contractType === "Delivery" 
                   ? "Delivery contract — driver will take the car to the client and register them on-site."
                   : "Shop contract — client is at the shop counter. Complete inspection, sign, and activate."}
