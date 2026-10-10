@@ -103,8 +103,8 @@ export async function POST(req: Request) {
       const admins = await User.find({ role: "admin", phone: { $exists: true, $ne: "" } }).select("phone name").lean();
       
       const moneyLine = isDelivered
-        ? `💵 *Security Deposit Collected:* ${(Number(contract.depositAmount) || 0).toLocaleString()} DZD`
-        : `💰 *Rest of Money Collected:* ${(Number(contract.returnAmountCollected) || 0).toLocaleString()} DZD (${contract.returnPaymentMethod || "Cash"})`;
+        ? `💵 *Security Deposit Collected:* ${(Number(contract.depositAmount) || 0).toLocaleString()} AED`
+        : `💰 *Rest of Money Collected:* ${(Number(contract.returnAmountCollected) || 0).toLocaleString()} AED (${contract.returnPaymentMethod || "Cash"})`;
 
       const whatsappMsg = `${isDelivered ? '✅' : '🔄'} *${eventTitle}*\n\n` +
         `📄 *Contract / رقم العقد:* #${contractNum}\n` +

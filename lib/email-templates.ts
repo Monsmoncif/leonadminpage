@@ -208,9 +208,9 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
   const isHandover = params.type === "initial";
   const isCreated = params.type === "created";
 
-  const formatDZD = (amount?: number) => {
-    if (amount === undefined || amount === null || isNaN(amount)) return "0 DZD";
-    return `${Number(amount).toLocaleString()} DZD`;
+  const formatAED = (amount?: number) => {
+    if (amount === undefined || amount === null || isNaN(amount)) return "0 AED";
+    return `${Number(amount).toLocaleString()} AED`;
   };
 
   const vehicleDisplay = `${params.vehicleName}${params.vehicleYear ? ` (${params.vehicleYear})` : ""}${params.vehicleColor ? ` - ${params.vehicleColor}` : ""}`;
@@ -257,7 +257,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
           Completed Journey Summary / ملخص الرحلة المكتملة
         </div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-          ${buildDetailRow("Rented Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ""}`)}
+          ${buildDetailRow("Rented Vehicle", params.vehicleName)}
           ${buildDetailRow("Rental Duration", `${params.startDate} ➔ ${params.endDate}`, !params.totalDays)}
           ${params.totalDays ? buildDetailRow("Total Days", `${params.totalDays} Day${params.totalDays > 1 ? "s" : ""}`, true) : ""}
         </table>
@@ -319,8 +319,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
         </div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
           ${buildDetailRow("Vehicle", vehicleDisplay)}
-          ${params.vehiclePlate ? buildDetailRow("Plate Number", params.vehiclePlate) : ""}
-          ${params.pickupLocation ? buildDetailRow("Pickup / Delivery Location", params.pickupLocation) : ""}
+                    ${params.pickupLocation ? buildDetailRow("Pickup / Delivery Location", params.pickupLocation) : ""}
           ${params.startTime ? buildDetailRow("Pickup Scheduled Time", params.startTime, true) : ""}
         </table>
       </div>
@@ -343,10 +342,10 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
           3. Estimated Pricing / الشروط المالية
         </div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
-          ${params.dailyRate !== undefined && params.dailyRate > 0 ? buildDetailRow("Daily Rate", `${formatDZD(params.dailyRate)} / day`) : ""}
-          ${params.totalAmount !== undefined && params.totalAmount > 0 ? buildDetailRow("Total Rental Amount", formatDZD(params.totalAmount)) : ""}
-          ${params.advancePayment !== undefined && params.advancePayment > 0 ? buildDetailRow("Advance Deposit Paid", formatDZD(params.advancePayment)) : ""}
-          ${params.depositAmount !== undefined ? buildDetailRow("Security Deposit Required", formatDZD(params.depositAmount)) : ""}
+          ${params.dailyRate !== undefined && params.dailyRate > 0 ? buildDetailRow("Daily Rate", `${formatAED(params.dailyRate)} / day`) : ""}
+          ${params.totalAmount !== undefined && params.totalAmount > 0 ? buildDetailRow("Total Rental Amount", formatAED(params.totalAmount)) : ""}
+          ${params.advancePayment !== undefined && params.advancePayment > 0 ? buildDetailRow("Advance Deposit Paid", formatAED(params.advancePayment)) : ""}
+          ${params.depositAmount !== undefined ? buildDetailRow("Security Deposit Required", formatAED(params.depositAmount)) : ""}
           ${params.paymentMethod ? buildDetailRow("Payment Method", params.paymentMethod, true) : ""}
         </table>
       </div>
@@ -430,8 +429,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
       </div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
         ${buildDetailRow("Vehicle", vehicleDisplay)}
-        ${params.vehiclePlate ? buildDetailRow("Plate Number", params.vehiclePlate) : ""}
-        ${params.checkoutMileage !== undefined ? buildDetailRow("Checkout Odometer (عداد الاستلام)", `${params.checkoutMileage.toLocaleString()} KM`) : ""}
+                ${params.checkoutMileage !== undefined ? buildDetailRow("Checkout Odometer (عداد الاستلام)", `${params.checkoutMileage.toLocaleString()} KM`) : ""}
         ${params.checkoutFuelLevel !== undefined ? buildDetailRow("Handover Fuel Level (مستوى الوقود)", `${params.checkoutFuelLevel}%`) : ""}
         ${params.pickupLocation ? buildDetailRow("Handover Location", params.pickupLocation, true) : ""}
       </table>
@@ -454,12 +452,12 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
         4. Financial Terms & Payment / الشروط المالية والدفع
       </div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
-        ${params.dailyRate !== undefined && params.dailyRate > 0 ? buildDetailRow("Daily Rate", `${formatDZD(params.dailyRate)} / day`) : ""}
+        ${params.dailyRate !== undefined && params.dailyRate > 0 ? buildDetailRow("Daily Rate", `${formatAED(params.dailyRate)} / day`) : ""}
         ${params.collectionAmount !== undefined && params.collectionAmount > 0 
-          ? buildDetailRow("Rental Collection Amount", formatDZD(params.collectionAmount))
-          : (params.totalAmount !== undefined && params.totalAmount > 0 ? buildDetailRow("Total Rental Amount", formatDZD(params.totalAmount)) : "")}
-        ${params.advancePayment !== undefined && params.advancePayment > 0 ? buildDetailRow("Advance Paid", formatDZD(params.advancePayment)) : ""}
-        ${params.depositAmount !== undefined ? buildDetailRow("Security Deposit", formatDZD(params.depositAmount)) : ""}
+          ? buildDetailRow("Rental Collection Amount", formatAED(params.collectionAmount))
+          : (params.totalAmount !== undefined && params.totalAmount > 0 ? buildDetailRow("Total Rental Amount", formatAED(params.totalAmount)) : "")}
+        ${params.advancePayment !== undefined && params.advancePayment > 0 ? buildDetailRow("Advance Paid", formatAED(params.advancePayment)) : ""}
+        ${params.depositAmount !== undefined ? buildDetailRow("Security Deposit", formatAED(params.depositAmount)) : ""}
         ${params.paymentMethod ? buildDetailRow("Payment Method", params.paymentMethod, true) : ""}
       </table>
     </div>
@@ -698,11 +696,11 @@ export function buildAdminEventNoticeEmail(params: {
     rows.push(
       buildDetailRow(
         "Settlement Collected",
-        `${params.collectedAmount.toLocaleString()} DZD (${params.paymentMethod || "Cash"})`
+        `${params.collectedAmount.toLocaleString()} AED (${params.paymentMethod || "Cash"})`
       )
     );
   } else if (params.isDelivered && params.depositAmount !== undefined) {
-    rows.push(buildDetailRow("Deposit Recorded", `${params.depositAmount.toLocaleString()} DZD`));
+    rows.push(buildDetailRow("Deposit Recorded", `${params.depositAmount.toLocaleString()} AED`));
   }
 
   let actorNotice = "";

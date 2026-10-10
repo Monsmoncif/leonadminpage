@@ -212,7 +212,7 @@ export async function sendClientContractNotification(
             `Hello *${clientName}*,\n` +
             `Thank you for renting with Leon Rent Car! It was a pleasure serving you, and we hope you had a wonderful driving journey.\n\n` +
             `📄 *Contract / رقم العقد:* #${contractNum}\n` +
-            `🚗 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+            `🚗 *Vehicle / السيارة:* ${vehicleName}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n\n` +
             `We look forward to welcoming you behind the wheel again very soon!\n` +
             `Safe travels,\n` +
@@ -222,7 +222,7 @@ export async function sendClientContractNotification(
             `*Vehicle Reservation Confirmed*\n\n` +
             `Hello *${clientName}*,\n` +
             `Your vehicle reservation has been successfully confirmed and registered! ✨\n\n` +
-            `🚙 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+            `🚙 *Vehicle / السيارة:* ${vehicleName}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
             (contract.pickupLocation ? `📍 *Pickup Location / موقع الاستلام:* ${contract.pickupLocation}\n` : '') +
             (contract.checkoutTime ? `⏰ *Pickup Time / موعد الاستلام:* ${contract.checkoutTime}\n` : '') +
@@ -235,7 +235,7 @@ export async function sendClientContractNotification(
             `Hello *${clientName}*,\n` +
             `Thank you for choosing Leon Rent Car! Your vehicle handover inspection is complete.\n\n` +
             `📄 *Contract / رقم العقد:* #${contractNum}\n` +
-            `🚗 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
+            `🚗 *Vehicle / السيارة:* ${vehicleName}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
             (contract.pickupLocation ? `📍 *Pickup Location / موقع الاستلام:* ${contract.pickupLocation}\n` : '') +
             `\n📎 *Your official rental contract is attached below (PDF).*\n\n` +

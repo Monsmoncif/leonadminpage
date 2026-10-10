@@ -983,7 +983,7 @@ export class ContractsService {
               <p>Dear <strong>${clientName}</strong>,</p>
               <p>Your vehicle rental agreement <strong>#${contractNum}</strong> has been confirmed and the vehicle has been handed over.</p>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #fafafa; border: 1px solid #e2e8f0;">
-                <tr><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Vehicle:</td><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">${vehicleName} (${plate})</td></tr>
+                <tr><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Vehicle:</td><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">${vehicleName}</td></tr>
                 <tr><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Rental Period:</td><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">${new Date(contract.startDate).toLocaleDateString()} to ${new Date(contract.endDate).toLocaleDateString()}</td></tr>
                 <tr><td style="padding: 10px; color: #64748b;">Total Amount:</td><td style="padding: 10px; font-weight: bold;">AED ${(contract.totalAmount || 0).toLocaleString()}</td></tr>
               </table>
