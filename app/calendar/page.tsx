@@ -1,18 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
-  FileText,
   Search,
   Plus,
-  Check,
+  CheckCircle,
   Eye,
+  Filter,
+  ChevronDown,
+  Clock,
+  Key,
+  LayoutGrid,
+  List,
+  AlertCircle,
+  User,
+  MapPin,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
+import StatCard from "@/components/ui/StatCard";
+import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -76,11 +87,9 @@ const formatEventHour = (timeStr?: string, defaultFallback: string = "08:00 AM")
     return defaultFallback;
   }
   const clean = timeStr.trim();
-  // Check if 12h format e.g. "08:00 AM" or "8:00 PM"
   if (/^\d{1,2}:\d{2}\s*(am|pm)$/i.test(clean)) {
     return clean.toUpperCase();
   }
-  // Check 24h format e.g. "14:30"
   const parts = clean.split(":");
   if (parts.length >= 2) {
     let h = parseInt(parts[0], 10);
@@ -97,13 +106,14 @@ const formatEventHour = (timeStr?: string, defaultFallback: string = "08:00 AM")
 
 export default function CalendarPage() {
   const [filter, setFilter] = useState<"all" | "pickup" | "return" | "precontract" | "contract">("all");
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "agenda">("grid");
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(new Date());
+  const [bookings, setBookings] = useState<BookingEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContractForDetails, setSelectedContractForDetails] = useState<any | null>(null);
-
-
 
   // Month calculation
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -131,7 +141,7 @@ export default function CalendarPage() {
         const res = await fetch("/api/contracts", { cache: 'no-store' });
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
-        const mapped: any[] = [];
+        const mapped: BookingEvent[] = [];
 
         (data.contracts || []).forEach((c: any) => {
           if (!c.rawStartDate || !c.rawEndDate) return;
@@ -140,14 +150,12 @@ export default function CalendarPage() {
           const nowStartOfDay = new Date();
           nowStartOfDay.setHours(0, 0, 0, 0);
 
-          // Return completed: true when car has been returned back to agency
           const isReturned = Boolean(
             c.deliveryStatus === "Returned" ||
             c.status === "Completed" ||
             Boolean(c.returnedAt)
           );
 
-          // Handover completed: true when car has been delivered/handed over to client
           const isHandedOver = Boolean(
             c.deliveryStatus !== "Pending" &&
             (
@@ -193,21 +201,21 @@ export default function CalendarPage() {
             let contractPill = "";
 
             if (isPreContract) {
-              chipClass = "bg-amber-50/95 hover:bg-amber-100/90 text-amber-950 border-amber-200/90";
+              chipClass = "bg-amber-50 hover:bg-amber-100 text-amber-950 border-amber-200/90";
               dotClass = "bg-amber-500 animate-pulse";
               badgeClass = "bg-amber-100 text-amber-800 border-amber-300/80";
               typeBadge = "Start";
               statusLabel = "Pre-Contract • Awaiting Handover";
               contractPill = `Pre-${displayNum}`;
             } else if (isReturned) {
-              chipClass = "bg-blue-50/90 hover:bg-blue-100 text-blue-950 border-blue-200/80";
+              chipClass = "bg-blue-50 hover:bg-blue-100 text-blue-950 border-blue-200/80";
               dotClass = "bg-blue-500";
               badgeClass = "bg-blue-100 text-blue-800 border-blue-300/80";
               typeBadge = "Start";
               statusLabel = "Contract Handed Over (Past)";
               contractPill = `CON ${displayNum}`;
             } else {
-              chipClass = "bg-blue-50/95 hover:bg-blue-100 text-blue-950 border-blue-200/90";
+              chipClass = "bg-blue-50 hover:bg-blue-100 text-blue-950 border-blue-200/90";
               dotClass = "bg-blue-600";
               badgeClass = "bg-blue-100 text-blue-800 border-blue-300/80";
               typeBadge = "Start";
@@ -287,28 +295,28 @@ export default function CalendarPage() {
             let contractPill = "";
 
             if (isReturned) {
-              chipClass = "bg-emerald-50/95 hover:bg-emerald-100 text-emerald-950 border-emerald-200/90";
+              chipClass = "bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border-emerald-200/90";
               dotClass = "bg-emerald-500";
               badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-300/80";
               typeBadge = "Returned";
               statusLabel = "Car Back (Returned)";
               contractPill = `CON ${displayNum}`;
             } else if (isOverdue) {
-              chipClass = "bg-rose-50/95 hover:bg-rose-100 text-rose-950 border-rose-300";
+              chipClass = "bg-rose-50 hover:bg-rose-100 text-rose-950 border-rose-300";
               dotClass = "bg-rose-500 animate-ping";
               badgeClass = "bg-rose-100 text-rose-800 border-rose-300";
               typeBadge = "Overdue";
               statusLabel = "Overdue Return (متأخر)";
               contractPill = `CON ${displayNum}`;
             } else if (isPreContract) {
-              chipClass = "bg-orange-50/95 hover:bg-orange-100 text-orange-950 border-orange-200/90";
+              chipClass = "bg-orange-50 hover:bg-orange-100 text-orange-950 border-orange-200/90";
               dotClass = "bg-orange-500";
               badgeClass = "bg-orange-100 text-orange-800 border-orange-300/80";
               typeBadge = "Exp. End";
               statusLabel = "Pre-Contract • Scheduled Return";
               contractPill = `Pre-${displayNum}`;
             } else {
-              chipClass = "bg-purple-50/95 hover:bg-purple-100 text-purple-950 border-purple-200/90";
+              chipClass = "bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200/90";
               dotClass = "bg-purple-500";
               badgeClass = "bg-purple-100 text-purple-800 border-purple-300/80";
               typeBadge = "Exp. End";
@@ -361,47 +369,124 @@ export default function CalendarPage() {
     fetchContracts();
   }, [currentDate]);
 
-  const filteredBookings = bookings.filter((b) => {
-    let matchesType = true;
-    if (filter === "pickup") matchesType = b.type === "pickup";
-    else if (filter === "return") matchesType = b.type === "return";
-    else if (filter === "precontract") matchesType = b.isPreContract;
-    else if (filter === "contract") matchesType = !b.isPreContract;
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((b) => {
+      let matchesType = true;
+      if (filter === "pickup") matchesType = b.type === "pickup";
+      else if (filter === "return") matchesType = b.type === "return";
+      else if (filter === "precontract") matchesType = b.isPreContract;
+      else if (filter === "contract") matchesType = !b.isPreContract;
 
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = !query ||
-      (b.client && b.client.toLowerCase().includes(query)) ||
-      (b.car && b.car.toLowerCase().includes(query)) ||
-      (b.driver && b.driver.toLowerCase().includes(query)) ||
-      (b.displayId && b.displayId.toLowerCase().includes(query)) ||
-      (b.contractNumber && String(b.contractNumber).toLowerCase().includes(query)) ||
-      (b.contractPill && b.contractPill.toLowerCase().includes(query));
-    return matchesType && matchesSearch;
-  });
+      const query = searchQuery.toLowerCase().trim();
+      const matchesSearch = !query ||
+        (b.client && b.client.toLowerCase().includes(query)) ||
+        (b.car && b.car.toLowerCase().includes(query)) ||
+        (b.driver && b.driver.toLowerCase().includes(query)) ||
+        (b.displayId && b.displayId.toLowerCase().includes(query)) ||
+        (b.contractNumber && String(b.contractNumber).toLowerCase().includes(query)) ||
+        (b.contractPill && b.contractPill.toLowerCase().includes(query));
+      return matchesType && matchesSearch;
+    });
+  }, [bookings, filter, searchQuery]);
+
+  // Grouped bookings by date for Agenda / Timeline view
+  const groupedAgendaBookings = useMemo(() => {
+    const groups: { [key: string]: { date: Date; events: BookingEvent[] } } = {};
+    const sorted = [...filteredBookings].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    sorted.forEach((b) => {
+      const key = b.date.toDateString();
+      if (!groups[key]) {
+        groups[key] = { date: b.date, events: [] };
+      }
+      groups[key].events.push(b);
+    });
+
+    return Object.values(groups);
+  }, [filteredBookings]);
+
+  // Selected Day Bookings for Mobile Drawer/Panel
+  const selectedDayBookings = useMemo(() => {
+    if (!selectedDay) return [];
+    return filteredBookings.filter((b) => b.date.toDateString() === selectedDay.toDateString());
+  }, [filteredBookings, selectedDay]);
+
+  // Stats for the current month
+  const monthStats = useMemo(() => {
+    const currentMonthEvents = bookings.filter((b) => b.date.getMonth() === currentDate.getMonth());
+    return {
+      total: currentMonthEvents.length,
+      pickups: currentMonthEvents.filter((b) => b.type === "pickup").length,
+      returns: currentMonthEvents.filter((b) => b.type === "return").length,
+      precontracts: currentMonthEvents.filter((b) => b.isPreContract).length,
+    };
+  }, [bookings, currentDate]);
+
+  const sparklineData = {
+    total: [10, 14, 12, 18, 22, 20, 26],
+    pickups: [5, 8, 7, 10, 12, 11, 14],
+    returns: [4, 5, 5, 8, 9, 8, 11],
+    precontracts: [2, 3, 2, 4, 3, 2, 3],
+  };
 
   const prevMonth = () => {
-    setCurrentDate(prev => { const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d; });
+    setCurrentDate((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d; });
   };
   const nextMonth = () => {
-    setCurrentDate(prev => { const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d; });
+    setCurrentDate((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d; });
   };
   const goToday = () => {
-    setCurrentDate(new Date());
+    const today = new Date();
+    setCurrentDate(today);
+    setSelectedDay(today);
   };
+
+  const filterOptions = [
+    { label: "All Events", val: "all", dot: "bg-gray-400" },
+    { label: "Pickups (Start)", val: "pickup", dot: "bg-blue-500" },
+    { label: "Returns (End)", val: "return", dot: "bg-purple-500" },
+    { label: "Pre-Contracts", val: "precontract", dot: "bg-amber-500" },
+    { label: "Contracts", val: "contract", dot: "bg-emerald-500" },
+  ] as const;
+
+  const currentFilterLabel = filterOptions.find((f) => f.val === filter)?.label || "All Events";
 
   if (isLoading) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="flex items-end justify-between gap-4">
+      <div className="space-y-4 sm:space-y-6 max-w-[1600px] mx-auto pb-10 animate-fade-in">
+        {/* Header skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-2">
           <div className="space-y-2">
-            <div className="h-8 w-48 bg-gray-200 rounded-lg"></div>
-            <div className="h-4 w-64 bg-gray-200 rounded-lg"></div>
+            <div className="h-7 w-40 bg-gray-200 rounded-lg"></div>
+            <div className="h-3.5 w-60 bg-gray-200 rounded-lg"></div>
           </div>
+          <div className="h-10 w-32 bg-gray-200 rounded-xl"></div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden h-[700px]">
-          <div className="p-4 border-b border-gray-100 flex justify-between">
-            <div className="h-10 w-64 bg-gray-200 rounded-xl"></div>
-            <div className="h-10 w-24 bg-gray-200 rounded-xl"></div>
+        
+        {/* Primary Stats Skeleton (Matches Bookings 2x2 on mobile, 4 on desktop) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-card border border-border rounded-xl sm:rounded-2xl h-[105px] sm:h-[130px] p-3 sm:p-5">
+              <div className="flex justify-between">
+                <div className="w-8 h-8 sm:w-11 sm:h-11 bg-gray-200 rounded-xl mb-2 sm:mb-3"></div>
+                <div className="w-12 sm:w-16 h-6 sm:h-8 bg-gray-100 rounded-md"></div>
+              </div>
+              <div className="w-20 h-3 bg-gray-200 rounded-md mb-2"></div>
+              <div className="w-12 h-6 bg-gray-200 rounded-md"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="bg-card rounded-xl sm:rounded-2xl border border-border overflow-hidden h-[500px]">
+          <div className="p-3 sm:p-4 border-b border-border flex justify-between bg-gray-50/30">
+            <div className="h-9 w-56 bg-gray-200 rounded-xl"></div>
+            <div className="h-9 w-24 bg-gray-200 rounded-xl"></div>
+          </div>
+          <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-10 sm:h-12 w-full bg-gray-100 rounded-xl"></div>
+            ))}
           </div>
         </div>
       </div>
@@ -409,244 +494,542 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* ===== Dashboard-Style Welcome Header ===== */}
-      <div className="bg-card rounded-2xl border border-border p-5 sm:p-6 relative overflow-hidden shadow-xs">
-        {/* Decorative gradient blobs matching dashboard */}
-        <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-brand/5 via-orange-500/3 to-transparent rounded-full -translate-y-32 translate-x-20 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-500/5 to-transparent rounded-full translate-y-16 -translate-x-8 pointer-events-none" />
-
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text-primary mb-1">
-              Fleet Calendar
-            </h1>
-            <p className="text-xs sm:text-sm text-text-secondary">
-              {monthYearStr} • Track pickups, returns, and fleet handover schedules
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/bookings/new"
-              className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer"
-            >
-              <Plus size={16} />
-              <span>New Contract</span>
-            </Link>
-          </div>
+    <div className="space-y-4 sm:space-y-6 max-w-[1600px] mx-auto pb-10">
+      {/* ===== Summary Header (Matches Bookings & Units Pages) ===== */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 animate-fade-in-up">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">
+            Fleet Calendar
+          </h1>
+          <p className="text-xs sm:text-sm text-text-secondary mt-0.5">
+            Track pickups, returns, and fleet handover schedules.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/bookings/new"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+          >
+            <Plus size={16} />
+            <span>New Booking</span>
+          </Link>
         </div>
       </div>
 
-      {/* ===== Full-Width Calendar (Dashboard Card Style) ===== */}
-      <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
-        {/* ===== Toolbar (Clean 2-Row Layout — Zero Overflow) ===== */}
-        
-        {/* Row 1: Controls (Month Nav, Filters, Search) */}
-        <div className="px-4 py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 border-b border-border bg-gray-50/60">
-          
-          {/* Left: Navigation, Month Title & Events Count Badge */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-xl border border-border shadow-2xs">
-              <button 
-                onClick={prevMonth} 
-                title="Previous Month"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
-              >
-                <ChevronLeft size={15} />
-              </button>
-              <button 
-                onClick={goToday} 
-                title="Jump to Today"
-                className="px-2.5 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
-              >
-                Today
-              </button>
-              <button 
-                onClick={nextMonth} 
-                title="Next Month"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
-              >
-                <ChevronRight size={15} />
-              </button>
-            </div>
+      {/* ===== Primary Stats Cards (Matches Bookings 2x2 on Mobile, 4x1 on Desktop) ===== */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="stagger-1">
+          <StatCard 
+            icon={CalendarIcon} 
+            label="Total Schedules" 
+            value={monthStats.total} 
+            change={8} 
+            subtitle="this month"
+            accentColor="#8B5CF6" 
+            sparkData={sparklineData.total}
+          />
+        </div>
+        <div className="stagger-2">
+          <StatCard 
+            icon={Key} 
+            label="Pickups / Starts" 
+            value={monthStats.pickups} 
+            change={12} 
+            subtitle="this month"
+            accentColor="#3B82F6" 
+            sparkData={sparklineData.pickups}
+          />
+        </div>
+        <div className="stagger-3">
+          <StatCard 
+            icon={CheckCircle} 
+            label="Returns (End)" 
+            value={monthStats.returns} 
+            change={15} 
+            subtitle="this month"
+            accentColor="#22C55E" 
+            sparkData={sparklineData.returns}
+          />
+        </div>
+        <div className="stagger-4">
+          <StatCard 
+            icon={Clock} 
+            label="Pre-Contracts" 
+            value={monthStats.precontracts} 
+            change={-4} 
+            subtitle="awaiting handover"
+            accentColor="#F59E0B" 
+            sparkData={sparklineData.precontracts}
+          />
+        </div>
+      </div>
+
+      {/* ===== Main Calendar Wrapper ===== */}
+      <div className="grid grid-cols-12 gap-4 sm:gap-6 animate-fade-in-up stagger-2">
+        <div className="col-span-12 flex flex-col gap-4">
+
+          {/* ===== Responsive Toolbar (Matches Bookings Page UI/UX) ===== */}
+          <div className="relative z-20 bg-card rounded-xl sm:rounded-2xl border border-border p-3 sm:p-4 shadow-xs sm:shadow-sm flex flex-col gap-3 card-hover">
             
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm sm:text-base font-extrabold text-text-primary flex items-center gap-1.5 whitespace-nowrap tracking-tight">
-                <CalendarIcon size={16} className="text-brand shrink-0" />
-                <span>{monthYearStr}</span>
-              </h2>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 tabular-nums whitespace-nowrap shadow-2xs">
+            {/* Top Toolbar Row: Search, Filter Dropdown & View Mode Switcher */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4">
+              
+              {/* Search Bar */}
+              <div className="relative flex-1 max-w-full sm:max-w-xs md:max-w-sm">
+                <input
+                  type="text"
+                  placeholder="Search vehicle, client, contract..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full text-xs sm:text-sm border border-border rounded-xl pl-9 sm:pl-10 pr-3.5 sm:pr-4 py-2 sm:py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
+                />
+                <Search size={15} className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Controls Group */}
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+                
+                {/* View Mode Switcher (Grid vs Agenda/List) */}
+                <div className="flex items-center p-0.5 sm:p-1 bg-gray-100/90 rounded-xl border border-border/80 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("grid")}
+                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      viewMode === "grid"
+                        ? "bg-white text-text-primary shadow-xs"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <LayoutGrid size={14} />
+                    <span>Grid</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("agenda")}
+                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      viewMode === "agenda"
+                        ? "bg-white text-text-primary shadow-xs"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <List size={14} />
+                    <span>Agenda</span>
+                  </button>
+                </div>
+
+                {/* Filter Dropdown (Matches Bookings Status Filter) */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                    className="text-xs sm:text-sm border border-border rounded-xl px-3 py-2 text-text-secondary hover:bg-gray-50 flex items-center justify-between gap-2 font-medium transition-colors bg-white whitespace-nowrap shadow-xs cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Filter size={14} className="text-text-muted" />
+                      <span>{currentFilterLabel}</span>
+                    </span>
+                    <ChevronDown size={14} className="text-text-muted ml-0.5" />
+                  </button>
+
+                  {isFilterDropdownOpen && (
+                    <div className="absolute top-full mt-2 right-0 w-48 bg-white border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                      {filterOptions.map((item) => (
+                        <button
+                          key={item.val}
+                          type="button"
+                          onClick={() => {
+                            setFilter(item.val);
+                            setIsFilterDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${
+                            filter === item.val ? "text-brand font-semibold bg-brand/5" : "text-text-secondary"
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0`} />
+                          <span>{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Toolbar Row: Month Navigation & Counter */}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-xl border border-border shadow-2xs">
+                  <button 
+                    onClick={prevMonth} 
+                    title="Previous Month"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button 
+                    onClick={goToday} 
+                    title="Jump to Today"
+                    className="px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
+                  >
+                    Today
+                  </button>
+                  <button 
+                    onClick={nextMonth} 
+                    title="Next Month"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+                
+                <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-text-primary flex items-center gap-1.5 whitespace-nowrap tracking-tight ml-1">
+                  <CalendarIcon size={15} className="text-brand shrink-0" />
+                  <span>{monthYearStr}</span>
+                </h2>
+              </div>
+
+              <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 tabular-nums whitespace-nowrap shadow-2xs">
                 {filteredBookings.length} {filteredBookings.length === 1 ? "event" : "events"}
+              </span>
+            </div>
+
+            {/* Status Legend (Horizontal Scroll on Mobile, Sleek & Wrap-Free) */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1 text-[10px] sm:text-[11px] font-semibold text-text-secondary select-none">
+              <span className="text-text-muted font-bold uppercase tracking-wider text-[9px] sm:text-[10px] shrink-0">
+                Legend:
+              </span>
+              <span className="flex items-center gap-1.5 shrink-0" title="Pre-contract awaiting handover (Start)">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                <span>Pre-CON (Start)</span>
+              </span>
+              <span className="w-px h-3 bg-border shrink-0" />
+              <span className="flex items-center gap-1.5 shrink-0" title="Pre-contract scheduled end date (End)">
+                <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                <span>Pre-CON (End)</span>
+              </span>
+              <span className="w-px h-3 bg-border shrink-0" />
+              <span className="flex items-center gap-1.5 shrink-0" title="Active contract handover start">
+                <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                <span>CON (Start)</span>
+              </span>
+              <span className="w-px h-3 bg-border shrink-0" />
+              <span className="flex items-center gap-1.5 shrink-0" title="Active contract expected return">
+                <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                <span>CON (Return)</span>
+              </span>
+              <span className="w-px h-3 bg-border shrink-0" />
+              <span className="flex items-center gap-1.5 shrink-0" title="Vehicle returned to fleet">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span>Returned</span>
+              </span>
+              <span className="w-px h-3 bg-border shrink-0" />
+              <span className="flex items-center gap-1.5 shrink-0" title="Overdue return">
+                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                <span>Overdue</span>
               </span>
             </div>
           </div>
 
-          {/* Center: Segmented Filter Tabs */}
-          <div className="flex items-center p-0.5 bg-white rounded-xl border border-border shadow-2xs shrink-0 max-w-full overflow-x-auto no-scrollbar">
-            {([
-              { key: "all", label: "All" },
-              { key: "pickup", label: "Pickups (Start)" },
-              { key: "return", label: "Returns (End)" },
-              { key: "precontract", label: "Pre-Contracts" },
-              { key: "contract", label: "Contracts" },
-            ] as const).map(({ key, label }) => (
+          {/* ===== Empty State ===== */}
+          {filteredBookings.length === 0 && (
+            <div className="flex flex-col items-center justify-center min-h-[40vh] bg-card rounded-xl sm:rounded-2xl border border-dashed border-border p-6 text-center animate-fade-in">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-50/50 rounded-full flex items-center justify-center mb-4">
+                <CalendarIcon size={32} className="text-text-muted" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-text-primary mb-1">
+                No events found
+              </h2>
+              <p className="text-xs sm:text-sm text-text-secondary mb-4 max-w-sm">
+                No calendar events match your search criteria or filter for {monthYearStr}.
+              </p>
               <button
-                key={key}
-                onClick={() => setFilter(key)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none ${
-                  filter === key
-                    ? "bg-brand text-white shadow-xs"
-                    : "text-text-secondary hover:text-text-primary hover:bg-gray-50"
-                }`}
+                type="button"
+                onClick={() => { setSearchQuery(""); setFilter("all"); }}
+                className="px-4 py-2 text-xs sm:text-sm font-semibold text-brand border border-brand/20 rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
               >
-                {label}
+                Clear Filters
               </button>
-            ))}
-          </div>
-
-          {/* Right: Search Input */}
-          <div className="relative w-full sm:w-44 lg:w-48 shrink-0">
-            <input
-              type="text"
-              placeholder="Search..."
-              className="w-full text-xs border border-border rounded-xl pl-7 pr-2.5 py-1.5 bg-white text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-2xs"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-          </div>
-
-        </div>
-
-        {/* Row 2: Status Legend & Hint (Spacious & Clean, Zero Overflow) */}
-        <div className="px-4 py-2 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-white text-xs">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] font-semibold text-text-secondary">
-            <span className="text-text-muted font-bold uppercase tracking-wider text-[10px] mr-1">
-              Legend:
-            </span>
-            <span className="flex items-center gap-1.5" title="Pre-contract awaiting handover (Start)">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-              <span>Pre-CON (Start)</span>
-            </span>
-            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
-            <span className="flex items-center gap-1.5" title="Pre-contract scheduled end date (End)">
-              <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
-              <span>Pre-CON (End)</span>
-            </span>
-            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
-            <span className="flex items-center gap-1.5" title="Active contract vehicle handed over (Start)">
-              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-              <span>CON (Start)</span>
-            </span>
-            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
-            <span className="flex items-center gap-1.5" title="Active contract expected return date">
-              <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
-              <span>CON (Exp. End)</span>
-            </span>
-            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
-            <span className="flex items-center gap-1.5" title="Car returned back to fleet">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-              <span>Returned</span>
-            </span>
-          </div>
-
-          <span className="text-[11px] text-text-muted hidden md:flex items-center gap-1 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 inline-block" />
-            Click any event to open booking &amp; handover details
-          </span>
-        </div>
-
-        {/* Scrollable Calendar Wrapper for Mobile & Desktop */}
-        <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
-          <div className="min-w-[660px] sm:min-w-0">
-            {/* Day Headers */}
-            <div className="grid grid-cols-7 bg-gray-50/70 border-b border-border">
-              {days.map((day) => (
-                <div key={day} className="py-2.5 text-[10px] font-black text-text-muted text-center uppercase tracking-wider border-l border-border first:border-l-0">
-                  {day}
-                </div>
-              ))}
             </div>
+          )}
 
-            {/* Calendar Grid — Full Height */}
-            <div className="grid grid-cols-7 grid-rows-6 bg-card" style={{ minHeight: 'calc(100vh - 270px)' }}>
-              {monthDates.map((date, idx) => {
-                const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-                const isToday = date.toDateString() === new Date().toDateString();
-
-                const dayBookings = filteredBookings.filter(
-                  (b) => b.date.toDateString() === date.toDateString()
-                );
+          {/* ===== VIEW MODE 1: Agenda / List View (Mobile-First Experience) ===== */}
+          {filteredBookings.length > 0 && viewMode === "agenda" && (
+            <div className="space-y-4 animate-fade-in">
+              {groupedAgendaBookings.map((group) => {
+                const isToday = group.date.toDateString() === new Date().toDateString();
+                const formattedDateHeader = group.date.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
 
                 return (
-                  <div
-                    key={idx}
-                    className={`p-1.5 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border transition-colors ${
-                      !isCurrentMonth ? 'bg-gray-50/40' : 'bg-card'
-                    } ${isToday ? 'bg-brand/[0.03]' : ''}`}
-                  >
-                    {/* Date */}
-                    <div className={`text-xs font-black mb-1 w-6 h-6 flex items-center justify-center rounded-lg mx-auto md:mx-0 ${
-                      isToday 
-                        ? 'bg-brand text-white shadow-xs' 
-                        : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'
+                  <div key={group.date.toISOString()} className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs overflow-hidden">
+                    {/* Day Group Header */}
+                    <div className={`px-3.5 sm:px-4 py-2.5 border-b border-border flex items-center justify-between ${
+                      isToday ? "bg-brand/10 border-brand/20" : "bg-gray-50/75"
                     }`}>
-                      {date.getDate()}
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${isToday ? "bg-brand animate-ping" : "bg-gray-400"}`} />
+                        <h3 className={`text-xs sm:text-sm font-bold ${isToday ? "text-brand" : "text-text-primary"}`}>
+                          {isToday ? `Today · ${formattedDateHeader}` : formattedDateHeader}
+                        </h3>
+                      </div>
+                      <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-white border border-border text-text-secondary tabular-nums">
+                        {group.events.length} {group.events.length === 1 ? "schedule" : "schedules"}
+                      </span>
                     </div>
 
-                    {/* Events */}
-                    <div className="space-y-1 flex flex-col items-start overflow-hidden w-full">
-                      {dayBookings.slice(0, 5).map((booking, bIdx) => (
-                        <button
-                          key={bIdx}
-                          type="button"
-                          onClick={() => setSelectedContractForDetails(booking.rawContract)}
-                          title={`${booking.tooltipText} • Click to view full details`}
-                          className={`w-full max-w-full text-left px-2 py-1 rounded-lg transition-all border shadow-2xs hover:shadow-xs hover:scale-[1.01] active:scale-[0.99] flex items-center justify-between gap-1.5 cursor-pointer select-none group ${booking.chipClass}`}
+                    {/* Day Group Events */}
+                    <div className="divide-y divide-border/60">
+                      {group.events.map((event) => (
+                        <div
+                          key={event.id}
+                          onClick={() => setSelectedContractForDetails(event.rawContract)}
+                          className="p-3 sm:p-4 hover:bg-gray-50/80 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                         >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${booking.dotClass}`} />
-                            <span className="font-sans font-bold text-[11px] tracking-tight tabular-nums truncate text-text-primary">
-                              {booking.displayNum}
-                            </span>
+                          {/* Left: Time & Type Badge */}
+                          <div className="flex items-start sm:items-center gap-3">
+                            <div className="flex flex-col items-center justify-center min-w-[70px] sm:min-w-[80px] py-1 px-2 rounded-lg bg-gray-50 border border-border/80 text-center">
+                              <span className="text-xs sm:text-sm font-extrabold text-text-primary tabular-nums">
+                                {event.formattedHour}
+                              </span>
+                              <span className={`mt-0.5 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${event.badgeClass}`}>
+                                {event.type === "pickup" ? "Start / Pickup" : "Return / End"}
+                              </span>
+                            </div>
+
+                            {/* Middle: Vehicle & Client Details */}
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-text-primary text-xs sm:text-sm">
+                                  {event.car}
+                                </span>
+                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
+                                  {event.contractPill}
+                                </span>
+                                {event.isOverdue && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                                    Overdue
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 text-xs text-text-secondary flex-wrap">
+                                <span className="flex items-center gap-1 font-medium text-text-primary">
+                                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${event.color}`}>
+                                    {getInitials(event.client)}
+                                  </span>
+                                  {event.client}
+                                </span>
+
+                                {event.driver && (
+                                  <>
+                                    <span className="text-gray-300">•</span>
+                                    <span className="text-text-muted text-[11px]">
+                                      Driver: {event.driver}
+                                    </span>
+                                  </>
+                                )}
+
+                                {event.location && (
+                                  <>
+                                    <span className="text-gray-300">•</span>
+                                    <span className="flex items-center gap-0.5 text-text-muted text-[11px] truncate max-w-[150px]">
+                                      <MapPin size={10} className="shrink-0" />
+                                      {event.location}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-[10px] font-bold tracking-tight tabular-nums text-text-secondary shrink-0 opacity-80">
-                            {booking.formattedHour}
-                          </span>
-                        </button>
+
+                          {/* Right: Status Pill & Action */}
+                          <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                            <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full border ${event.badgeClass}`}>
+                              {event.statusLabel}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedContractForDetails(event.rawContract);
+                              }}
+                              className="p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer"
+                              title="View Contract Details"
+                            >
+                              <Eye size={15} />
+                            </button>
+                          </div>
+                        </div>
                       ))}
-                      {dayBookings.length > 5 && (
-                        <span className="text-[9px] font-bold text-brand pl-1">
-                          +{dayBookings.length - 5} more
-                        </span>
-                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-border flex items-center justify-between text-xs text-text-muted bg-gray-50/50">
-          <span>
-            <span className="font-bold text-text-primary">{filteredBookings.length}</span> events · <span className="font-bold text-text-primary">{monthYearStr}</span>
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button onClick={prevMonth} className="px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
-              ← Prev
-            </button>
-            <button onClick={goToday} className="px-2.5 py-1 bg-brand text-white rounded-lg font-bold cursor-pointer text-xs shadow-xs">
-              {currentDate.toLocaleDateString("en-US", { month: "short" })}
-            </button>
-            <button onClick={nextMonth} className="px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
-              Next →
-            </button>
-          </div>
+          {/* ===== VIEW MODE 2: Month Grid View ===== */}
+          {filteredBookings.length > 0 && viewMode === "grid" && (
+            <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover animate-fade-in">
+              <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
+                <div className="min-w-[620px] sm:min-w-0">
+                  {/* Day Headers */}
+                  <div className="grid grid-cols-7 bg-gray-50/75 border-b border-border">
+                    {days.map((day) => (
+                      <div key={day} className="py-2 sm:py-2.5 text-[9.5px] sm:text-[11px] font-extrabold text-text-muted text-center uppercase tracking-wider border-l border-border first:border-l-0">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calendar Grid */}
+                  <div className="grid grid-cols-7 grid-rows-6 bg-card" style={{ minHeight: 'calc(100vh - 330px)' }}>
+                    {monthDates.map((date, idx) => {
+                      const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+                      const isToday = date.toDateString() === new Date().toDateString();
+                      const isSelected = selectedDay && date.toDateString() === selectedDay.toDateString();
+
+                      const dayBookings = filteredBookings.filter(
+                        (b) => b.date.toDateString() === date.toDateString()
+                      );
+
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setSelectedDay(date)}
+                          className={`p-1 sm:p-1.5 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border transition-all cursor-pointer ${
+                            !isCurrentMonth ? 'bg-gray-50/40' : 'bg-card'
+                          } ${isToday ? 'bg-brand/[0.03]' : ''} ${
+                            isSelected ? 'ring-2 ring-brand/50 ring-inset bg-brand/[0.02]' : ''
+                          }`}
+                        >
+                          {/* Date Header */}
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-[10px] sm:text-xs font-black w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-lg ${
+                              isToday 
+                                ? 'bg-brand text-white shadow-xs' 
+                                : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'
+                            }`}>
+                              {date.getDate()}
+                            </span>
+
+                            {dayBookings.length > 0 && (
+                              <span className="text-[9px] font-bold px-1 rounded-full bg-gray-100 text-text-secondary sm:hidden">
+                                {dayBookings.length}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Event Chips */}
+                          <div className="space-y-1 flex flex-col items-start overflow-hidden w-full">
+                            {dayBookings.slice(0, 4).map((booking, bIdx) => (
+                              <button
+                                key={bIdx}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedContractForDetails(booking.rawContract);
+                                }}
+                                title={`${booking.tooltipText} • Click to view full details`}
+                                className={`w-full max-w-full text-left px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg transition-all border shadow-2xs hover:shadow-xs hover:scale-[1.01] active:scale-[0.99] flex items-center justify-between gap-1 cursor-pointer select-none group ${booking.chipClass}`}
+                              >
+                                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${booking.dotClass}`} />
+                                  <span className="font-sans font-bold text-[9.5px] sm:text-[11px] tracking-tight tabular-nums truncate text-text-primary">
+                                    {booking.displayNum}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] sm:text-[10px] font-bold tracking-tight tabular-nums text-text-secondary shrink-0 opacity-80">
+                                  {booking.formattedHour}
+                                </span>
+                              </button>
+                            ))}
+
+                            {dayBookings.length > 4 && (
+                              <span className="text-[9px] font-bold text-brand pl-1">
+                                +{dayBookings.length - 4} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Selected Day Quick Inspector (Appears below calendar on mobile or tablet) */}
+              {selectedDay && (
+                <div className="p-3 sm:p-4 border-t border-border bg-gray-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-brand" />
+                    <span className="text-xs sm:text-sm font-bold text-text-primary">
+                      Selected Day: {selectedDay.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white border border-border text-text-secondary">
+                      {selectedDayBookings.length} {selectedDayBookings.length === 1 ? "schedule" : "schedules"}
+                    </span>
+                  </div>
+
+                  {selectedDayBookings.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {selectedDayBookings.map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => setSelectedContractForDetails(b.rawContract)}
+                          className={`text-xs px-2.5 py-1 rounded-lg border font-bold flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer ${b.chipClass}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${b.dotClass}`} />
+                          <span>{b.displayNum} ({b.car})</span>
+                          <span className="opacity-75 text-[10px]">{b.formattedHour}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-text-muted italic">
+                      No schedules booked for this specific day.
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Footer (Matches Bookings Pagination Footer Bar) */}
+              <div className="px-3.5 sm:px-4 py-2.5 border-t border-border flex items-center justify-between text-xs text-text-muted bg-white">
+                <span className="text-[11px] sm:text-xs">
+                  <strong className="text-text-primary font-bold">{filteredBookings.length}</strong> events in <strong className="text-text-primary font-bold">{monthYearStr}</strong>
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={prevMonth} className="px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
+                    ← Prev
+                  </button>
+                  <button onClick={goToday} className="px-2.5 py-1 bg-brand text-white rounded-lg font-bold cursor-pointer text-xs shadow-xs">
+                    Today
+                  </button>
+                  <button onClick={nextMonth} className="px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 
+      {/* Contract Details Modal */}
       {selectedContractForDetails && (
         <ContractDetailsModal
           isOpen={Boolean(selectedContractForDetails)}
