@@ -2289,15 +2289,30 @@ export function NewRentalAdminPageContent() {
               />
             </div>
 
-            {/* Vehicle Current Mileage */}
+            {/* Vehicle Current Mileage (Editable Input) */}
             <div>
-              <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
-                <Gauge size={13} className="text-brand" />
-                <span>Vehicle Current Mileage (العداد الحالي)</span>
+              <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Gauge size={13} className="text-brand" />
+                  <span>Vehicle Current Mileage (العداد الحالي)</span>
+                </span>
+                <span className="text-[11px] text-text-muted font-normal">(km)</span>
               </label>
-              <div className="p-2.5 rounded-xl border border-border bg-white text-sm font-bold text-text-primary flex items-center gap-2">
-                <Gauge size={14} className="text-brand" />
-                <span>{selectedUnit?.mileage ? selectedUnit.mileage.toLocaleString() : 0} km</span>
+              <div className="relative">
+                <Gauge size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                <input
+                  type="number"
+                  value={rentalData.checkoutMileage !== undefined && rentalData.checkoutMileage !== 0 ? rentalData.checkoutMileage : (selectedUnit?.mileage || "")}
+                  onChange={(e) => {
+                    const val = e.target.value === "" ? 0 : Number(e.target.value);
+                    setRentalData(prev => ({ ...prev, checkoutMileage: val }));
+                  }}
+                  placeholder={String(selectedUnit?.mileage || 0)}
+                  className="w-full p-2.5 pl-9 pr-12 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-text-muted pointer-events-none">
+                  km
+                </span>
               </div>
             </div>
 
