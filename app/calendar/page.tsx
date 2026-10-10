@@ -19,10 +19,13 @@ import {
   User,
   MapPin,
   X,
+  FileText,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
 import StatCard from "@/components/ui/StatCard";
+import TablePagination from "@/components/ui/TablePagination";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -107,13 +110,31 @@ const formatEventHour = (timeStr?: string, defaultFallback: string = "08:00 AM")
 export default function CalendarPage() {
   const [filter, setFilter] = useState<"all" | "pickup" | "return" | "precontract" | "contract">("all");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "agenda">("grid");
+  
+  // Default to 'table' on mobile, or user selection
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(new Date());
   const [bookings, setBookings] = useState<BookingEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContractForDetails, setSelectedContractForDetails] = useState<any | null>(null);
+
+  // Pagination matching Bookings & Units pages
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Auto-set viewMode based on screen size on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (window.innerWidth >= 1024) {
+        setViewMode("grid");
+      } else {
+        setViewMode("table");
+      }
+    }
+  }, []);
 
   // Month calculation
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -205,21 +226,21 @@ export default function CalendarPage() {
               dotClass = "bg-amber-500 animate-pulse";
               badgeClass = "bg-amber-100 text-amber-800 border-amber-300/80";
               typeBadge = "Start";
-              statusLabel = "Pre-Contract • Awaiting Handover";
+              statusLabel = "Pre-Contract";
               contractPill = `Pre-${displayNum}`;
             } else if (isReturned) {
               chipClass = "bg-blue-50 hover:bg-blue-100 text-blue-950 border-blue-200/80";
               dotClass = "bg-blue-500";
               badgeClass = "bg-blue-100 text-blue-800 border-blue-300/80";
               typeBadge = "Start";
-              statusLabel = "Contract Handed Over (Past)";
+              statusLabel = "Delivered (Past)";
               contractPill = `CON ${displayNum}`;
             } else {
               chipClass = "bg-blue-50 hover:bg-blue-100 text-blue-950 border-blue-200/90";
               dotClass = "bg-blue-600";
               badgeClass = "bg-blue-100 text-blue-800 border-blue-300/80";
               typeBadge = "Start";
-              statusLabel = "Contract Handover (Active Rental)";
+              statusLabel = "Delivered (Active)";
               contractPill = `CON ${displayNum}`;
             }
 
@@ -299,28 +320,28 @@ export default function CalendarPage() {
               dotClass = "bg-emerald-500";
               badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-300/80";
               typeBadge = "Returned";
-              statusLabel = "Car Back (Returned)";
+              statusLabel = "Returned";
               contractPill = `CON ${displayNum}`;
             } else if (isOverdue) {
               chipClass = "bg-rose-50 hover:bg-rose-100 text-rose-950 border-rose-300";
               dotClass = "bg-rose-500 animate-ping";
               badgeClass = "bg-rose-100 text-rose-800 border-rose-300";
               typeBadge = "Overdue";
-              statusLabel = "Overdue Return (متأخر)";
+              statusLabel = "Overdue";
               contractPill = `CON ${displayNum}`;
             } else if (isPreContract) {
               chipClass = "bg-orange-50 hover:bg-orange-100 text-orange-950 border-orange-200/90";
               dotClass = "bg-orange-500";
               badgeClass = "bg-orange-100 text-orange-800 border-orange-300/80";
               typeBadge = "Exp. End";
-              statusLabel = "Pre-Contract • Scheduled Return";
+              statusLabel = "Pre-Contract";
               contractPill = `Pre-${displayNum}`;
             } else {
               chipClass = "bg-purple-50 hover:bg-purple-100 text-purple-950 border-purple-200/90";
               dotClass = "bg-purple-500";
               badgeClass = "bg-purple-100 text-purple-800 border-purple-300/80";
               typeBadge = "Exp. End";
-              statusLabel = "Active Contract • Expected Return";
+              statusLabel = "Active Return";
               contractPill = `CON ${displayNum}`;
             }
 
@@ -389,23 +410,21 @@ export default function CalendarPage() {
     });
   }, [bookings, filter, searchQuery]);
 
-  // Grouped bookings by date for Agenda / Timeline view
-  const groupedAgendaBookings = useMemo(() => {
-    const groups: { [key: string]: { date: Date; events: BookingEvent[] } } = {};
-    const sorted = [...filteredBookings].sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    sorted.forEach((b) => {
-      const key = b.date.toDateString();
-      if (!groups[key]) {
-        groups[key] = { date: b.date, events: [] };
-      }
-      groups[key].events.push(b);
-    });
-
-    return Object.values(groups);
+  // Sort by date ascending for table view
+  const sortedBookings = useMemo(() => {
+    return [...filteredBookings].sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [filteredBookings]);
 
-  // Selected Day Bookings for Mobile Drawer/Panel
+  // Paginated bookings (Matches Bookings Page Pagination)
+  const totalPages = Math.ceil(sortedBookings.length / itemsPerPage);
+  const paginatedBookings = useMemo(() => {
+    return sortedBookings.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+  }, [sortedBookings, currentPage, itemsPerPage]);
+
+  // Selected Day Bookings for Grid Mode
   const selectedDayBookings = useMemo(() => {
     if (!selectedDay) return [];
     return filteredBookings.filter((b) => b.date.toDateString() === selectedDay.toDateString());
@@ -431,25 +450,28 @@ export default function CalendarPage() {
 
   const prevMonth = () => {
     setCurrentDate((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d; });
+    setCurrentPage(1);
   };
   const nextMonth = () => {
     setCurrentDate((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d; });
+    setCurrentPage(1);
   };
   const goToday = () => {
     const today = new Date();
     setCurrentDate(today);
     setSelectedDay(today);
+    setCurrentPage(1);
   };
 
   const filterOptions = [
-    { label: "All Events", val: "all", dot: "bg-gray-400" },
+    { label: "All Schedules", val: "all", dot: "bg-gray-400" },
     { label: "Pickups (Start)", val: "pickup", dot: "bg-blue-500" },
     { label: "Returns (End)", val: "return", dot: "bg-purple-500" },
     { label: "Pre-Contracts", val: "precontract", dot: "bg-amber-500" },
-    { label: "Contracts", val: "contract", dot: "bg-emerald-500" },
+    { label: "Active Contracts", val: "contract", dot: "bg-emerald-500" },
   ] as const;
 
-  const currentFilterLabel = filterOptions.find((f) => f.val === filter)?.label || "All Events";
+  const currentFilterLabel = filterOptions.find((f) => f.val === filter)?.label || "All Schedules";
 
   if (isLoading) {
     return (
@@ -564,324 +586,352 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ===== Main Calendar Wrapper ===== */}
+      {/* ===== Main Content Area (Matches Bookings Page UI/UX) ===== */}
       <div className="grid grid-cols-12 gap-4 sm:gap-6 animate-fade-in-up stagger-2">
-        <div className="col-span-12 flex flex-col gap-4">
+        <div className="col-span-12 flex flex-col gap-4 sm:gap-6">
 
-          {/* ===== Responsive Toolbar (Matches Bookings Page UI/UX) ===== */}
-          <div className="relative z-20 bg-card rounded-xl sm:rounded-2xl border border-border p-3 sm:p-4 shadow-xs sm:shadow-sm flex flex-col gap-3 card-hover">
+          {/* ===== Responsive Toolbar (Matches Bookings Page) ===== */}
+          <div className="relative z-20 bg-card rounded-xl sm:rounded-2xl border border-border p-3 sm:p-4 shadow-xs sm:shadow-sm flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 card-hover">
             
-            {/* Top Toolbar Row: Search, Filter Dropdown & View Mode Switcher */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4">
+            {/* Search Input */}
+            <div className="relative max-w-sm w-full">
+              <input
+                type="text"
+                placeholder="Search contract no, customer, vehicle..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full text-xs sm:text-sm border border-border rounded-xl pl-9 sm:pl-10 pr-8 sm:pr-9 py-2 sm:py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
+              />
+              <Search size={15} className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Controls Right Section */}
+            <div className="flex items-center gap-2 relative w-full sm:w-auto flex-wrap sm:flex-nowrap justify-between sm:justify-end">
               
-              {/* Search Bar */}
-              <div className="relative flex-1 max-w-full sm:max-w-xs md:max-w-sm">
-                <input
-                  type="text"
-                  placeholder="Search vehicle, client, contract..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full text-xs sm:text-sm border border-border rounded-xl pl-9 sm:pl-10 pr-3.5 sm:pr-4 py-2 sm:py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
-                />
-                <Search size={15} className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5"
-                  >
-                    <X size={13} />
-                  </button>
+              {/* Month Navigation Buttons */}
+              <div className="flex items-center gap-1 bg-white p-0.5 rounded-xl border border-border shadow-2xs">
+                <button 
+                  onClick={prevMonth} 
+                  title="Previous Month"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button 
+                  onClick={goToday} 
+                  title="Jump to Today"
+                  className="px-2 sm:px-2.5 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  Today
+                </button>
+                <button 
+                  onClick={nextMonth} 
+                  title="Next Month"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
+              {/* View Switcher: Table List (Bookings Style) vs Grid */}
+              <div className="flex items-center p-0.5 bg-gray-100 rounded-xl border border-border/80 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("table")}
+                  title="Table / List View (Bookings Style)"
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === "table"
+                      ? "bg-white text-text-primary shadow-xs"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  <List size={14} />
+                  <span>List</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  title="Month Calendar Grid View"
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === "grid"
+                      ? "bg-white text-text-primary shadow-xs"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  <LayoutGrid size={14} />
+                  <span>Grid</span>
+                </button>
+              </div>
+
+              {/* Status / Type Filter Dropdown (Matches Bookings Page) */}
+              <div className="relative">
+                <button 
+                  type="button"
+                  onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                  className="text-xs sm:text-sm border border-border rounded-xl px-3 py-2 text-text-secondary hover:bg-gray-50 flex items-center justify-between gap-2 font-medium transition-colors bg-white whitespace-nowrap shadow-xs cursor-pointer w-full sm:w-auto"
+                >
+                  <span className="flex items-center gap-2">
+                    <Filter size={14} className="text-text-muted" /> 
+                    <span>{currentFilterLabel}</span>
+                  </span>
+                  <ChevronDown size={14} className="text-text-muted ml-1" />
+                </button>
+                
+                {isFilterDropdownOpen && (
+                  <div className="absolute top-full mt-2 right-0 w-48 bg-white border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                    {filterOptions.map((item) => (
+                      <button
+                        key={item.val}
+                        type="button"
+                        onClick={() => {
+                          setFilter(item.val);
+                          setIsFilterDropdownOpen(false);
+                          setCurrentPage(1);
+                        }}
+                        className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${
+                          filter === item.val ? "text-brand font-semibold bg-brand/5" : "text-text-secondary"
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0`} />
+                        <span>{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              {/* Controls Group */}
-              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
-                
-                {/* View Mode Switcher (Grid vs Agenda/List) */}
-                <div className="flex items-center p-0.5 sm:p-1 bg-gray-100/90 rounded-xl border border-border/80 shadow-2xs">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("grid")}
-                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === "grid"
-                        ? "bg-white text-text-primary shadow-xs"
-                        : "text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    <LayoutGrid size={14} />
-                    <span>Grid</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("agenda")}
-                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === "agenda"
-                        ? "bg-white text-text-primary shadow-xs"
-                        : "text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    <List size={14} />
-                    <span>Agenda</span>
-                  </button>
-                </div>
-
-                {/* Filter Dropdown (Matches Bookings Status Filter) */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                    className="text-xs sm:text-sm border border-border rounded-xl px-3 py-2 text-text-secondary hover:bg-gray-50 flex items-center justify-between gap-2 font-medium transition-colors bg-white whitespace-nowrap shadow-xs cursor-pointer"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Filter size={14} className="text-text-muted" />
-                      <span>{currentFilterLabel}</span>
-                    </span>
-                    <ChevronDown size={14} className="text-text-muted ml-0.5" />
-                  </button>
-
-                  {isFilterDropdownOpen && (
-                    <div className="absolute top-full mt-2 right-0 w-48 bg-white border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
-                      {filterOptions.map((item) => (
-                        <button
-                          key={item.val}
-                          type="button"
-                          onClick={() => {
-                            setFilter(item.val);
-                            setIsFilterDropdownOpen(false);
-                          }}
-                          className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${
-                            filter === item.val ? "text-brand font-semibold bg-brand/5" : "text-text-secondary"
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0`} />
-                          <span>{item.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
+          </div>
 
-            {/* Bottom Toolbar Row: Month Navigation & Counter */}
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-xl border border-border shadow-2xs">
-                  <button 
-                    onClick={prevMonth} 
-                    title="Previous Month"
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button 
-                    onClick={goToday} 
-                    title="Jump to Today"
-                    className="px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
-                  >
-                    Today
-                  </button>
-                  <button 
-                    onClick={nextMonth} 
-                    title="Next Month"
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-                
-                <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-text-primary flex items-center gap-1.5 whitespace-nowrap tracking-tight ml-1">
-                  <CalendarIcon size={15} className="text-brand shrink-0" />
-                  <span>{monthYearStr}</span>
-                </h2>
-              </div>
+          {/* ===== Current Month & Schedule Indicator Banner ===== */}
+          <div className="flex items-center justify-between px-1 text-xs text-text-secondary">
+            <span className="flex items-center gap-2 font-bold text-text-primary">
+              <CalendarDays size={15} className="text-brand shrink-0" />
+              <span>{monthYearStr}</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 tabular-nums">
+                {filteredBookings.length} {filteredBookings.length === 1 ? "schedule" : "schedules"}
+              </span>
+            </span>
 
-              <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 tabular-nums whitespace-nowrap shadow-2xs">
-                {filteredBookings.length} {filteredBookings.length === 1 ? "event" : "events"}
+            {/* Legend Indicators */}
+            <div className="hidden sm:flex items-center gap-3 text-[11px] font-medium text-text-secondary">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                <span>Pickup</span>
               </span>
-            </div>
-
-            {/* Status Legend (Horizontal Scroll on Mobile, Sleek & Wrap-Free) */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1 text-[10px] sm:text-[11px] font-semibold text-text-secondary select-none">
-              <span className="text-text-muted font-bold uppercase tracking-wider text-[9px] sm:text-[10px] shrink-0">
-                Legend:
-              </span>
-              <span className="flex items-center gap-1.5 shrink-0" title="Pre-contract awaiting handover (Start)">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                <span>Pre-CON (Start)</span>
-              </span>
-              <span className="w-px h-3 bg-border shrink-0" />
-              <span className="flex items-center gap-1.5 shrink-0" title="Pre-contract scheduled end date (End)">
-                <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
-                <span>Pre-CON (End)</span>
-              </span>
-              <span className="w-px h-3 bg-border shrink-0" />
-              <span className="flex items-center gap-1.5 shrink-0" title="Active contract handover start">
-                <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-                <span>CON (Start)</span>
-              </span>
-              <span className="w-px h-3 bg-border shrink-0" />
-              <span className="flex items-center gap-1.5 shrink-0" title="Active contract expected return">
+              <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
-                <span>CON (Return)</span>
+                <span>Return</span>
               </span>
-              <span className="w-px h-3 bg-border shrink-0" />
-              <span className="flex items-center gap-1.5 shrink-0" title="Vehicle returned to fleet">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                <span>Pre-Contract</span>
+              </span>
+              <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                 <span>Returned</span>
-              </span>
-              <span className="w-px h-3 bg-border shrink-0" />
-              <span className="flex items-center gap-1.5 shrink-0" title="Overdue return">
-                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                <span>Overdue</span>
               </span>
             </div>
           </div>
 
-          {/* ===== Empty State ===== */}
-          {filteredBookings.length === 0 && (
-            <div className="flex flex-col items-center justify-center min-h-[40vh] bg-card rounded-xl sm:rounded-2xl border border-dashed border-border p-6 text-center animate-fade-in">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-50/50 rounded-full flex items-center justify-center mb-4">
-                <CalendarIcon size={32} className="text-text-muted" />
-              </div>
-              <h2 className="text-base sm:text-lg font-bold text-text-primary mb-1">
-                No events found
-              </h2>
-              <p className="text-xs sm:text-sm text-text-secondary mb-4 max-w-sm">
-                No calendar events match your search criteria or filter for {monthYearStr}.
-              </p>
-              <button
-                type="button"
-                onClick={() => { setSearchQuery(""); setFilter("all"); }}
-                className="px-4 py-2 text-xs sm:text-sm font-semibold text-brand border border-brand/20 rounded-xl hover:bg-brand/5 transition-colors cursor-pointer"
-              >
-                Clear Filters
-              </button>
-            </div>
-          )}
+          {/* ===== VIEW MODE 1: Table / List (Bookings Style - Default for Mobile!) ===== */}
+          {viewMode === "table" && (
+            <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover animate-fade-in">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] sm:text-xs md:text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-gray-50/75 text-[9.5px] sm:text-[11px] md:text-xs text-text-muted font-semibold uppercase tracking-wider">
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                        Contract / Type
+                      </th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">
+                        Customer / Driver
+                      </th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4">
+                        Vehicle
+                      </th>
+                      <th className="text-left py-2 sm:py-2.5 px-2 sm:px-4 whitespace-nowrap">
+                        Schedule / Time
+                      </th>
+                      <th className="text-left py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">
+                        Status
+                      </th>
+                      <th className="text-right py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {filteredBookings.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 px-5 text-center">
+                          <div className="flex flex-col items-center justify-center">
+                            <CalendarIcon size={32} className="text-gray-300 mb-4" />
+                            <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-1.5">No schedules found</h2>
+                            <p className="text-gray-500 text-xs sm:text-sm mb-4">No schedules match your search or filter criteria for {monthYearStr}.</p>
+                            <button
+                              type="button"
+                              onClick={() => { setSearchQuery(""); setFilter("all"); setCurrentPage(1); }}
+                              className="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-brand border border-brand/20 rounded-lg hover:bg-brand/5 transition-colors cursor-pointer"
+                            >
+                              Clear Search
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedBookings.map((event, idx) => {
+                        const isToday = event.date.toDateString() === new Date().toDateString();
 
-          {/* ===== VIEW MODE 1: Agenda / List View (Mobile-First Experience) ===== */}
-          {filteredBookings.length > 0 && viewMode === "agenda" && (
-            <div className="space-y-4 animate-fade-in">
-              {groupedAgendaBookings.map((group) => {
-                const isToday = group.date.toDateString() === new Date().toDateString();
-                const formattedDateHeader = group.date.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
-
-                return (
-                  <div key={group.date.toISOString()} className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs overflow-hidden">
-                    {/* Day Group Header */}
-                    <div className={`px-3.5 sm:px-4 py-2.5 border-b border-border flex items-center justify-between ${
-                      isToday ? "bg-brand/10 border-brand/20" : "bg-gray-50/75"
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${isToday ? "bg-brand animate-ping" : "bg-gray-400"}`} />
-                        <h3 className={`text-xs sm:text-sm font-bold ${isToday ? "text-brand" : "text-text-primary"}`}>
-                          {isToday ? `Today · ${formattedDateHeader}` : formattedDateHeader}
-                        </h3>
-                      </div>
-                      <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-white border border-border text-text-secondary tabular-nums">
-                        {group.events.length} {group.events.length === 1 ? "schedule" : "schedules"}
-                      </span>
-                    </div>
-
-                    {/* Day Group Events */}
-                    <div className="divide-y divide-border/60">
-                      {group.events.map((event) => (
-                        <div
-                          key={event.id}
-                          onClick={() => setSelectedContractForDetails(event.rawContract)}
-                          className="p-3 sm:p-4 hover:bg-gray-50/80 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                        >
-                          {/* Left: Time & Type Badge */}
-                          <div className="flex items-start sm:items-center gap-3">
-                            <div className="flex flex-col items-center justify-center min-w-[70px] sm:min-w-[80px] py-1 px-2 rounded-lg bg-gray-50 border border-border/80 text-center">
-                              <span className="text-xs sm:text-sm font-extrabold text-text-primary tabular-nums">
-                                {event.formattedHour}
-                              </span>
-                              <span className={`mt-0.5 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${event.badgeClass}`}>
-                                {event.type === "pickup" ? "Start / Pickup" : "Return / End"}
-                              </span>
-                            </div>
-
-                            {/* Middle: Vehicle & Client Details */}
-                            <div className="space-y-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-text-primary text-xs sm:text-sm">
-                                  {event.car}
+                        return (
+                          <tr 
+                            key={event.id} 
+                            onClick={() => setSelectedContractForDetails(event.rawContract)}
+                            className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up cursor-pointer"
+                            style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
+                          >
+                            {/* Contract / Event Column */}
+                            <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  {event.contractNumber ? (
+                                    <span className="font-bold text-text-primary text-[11px] sm:text-xs md:text-sm tabular-nums">
+                                      #{event.contractNumber}
+                                    </span>
+                                  ) : (
+                                    <span 
+                                      className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs whitespace-nowrap"
+                                      title="Unconfirmed Contract"
+                                    >
+                                      <Clock size={10} className="text-amber-600 animate-pulse shrink-0" />
+                                      <span>Pending</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8.5px] sm:text-[9.5px] font-bold border w-fit leading-tight ${event.badgeClass}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${event.dotClass} shrink-0`} />
+                                  {event.type === "pickup" ? "Pickup (Start)" : "Return (End)"}
                                 </span>
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
-                                  {event.contractPill}
+                              </div>
+                            </td>
+
+                            {/* Customer / Driver Column */}
+                            <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">
+                              <div className="flex items-center gap-2 sm:gap-2.5">
+                                <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${event.color}`}>
+                                  {getInitials(event.client)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <span 
+                                    className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight"
+                                    title={event.client}
+                                  >
+                                    {event.client}
+                                  </span>
+                                  <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 break-words leading-tight">
+                                    {event.driver ? `Driver: ${event.driver}` : "Self-drive"}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Vehicle Column */}
+                            <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
+                              <span className="font-medium text-text-primary text-[11px] sm:text-xs md:text-sm line-clamp-1" title={event.car}>
+                                {event.car}
+                              </span>
+                              {event.rawContract?.vehiclePlate && (
+                                <p className="text-[9.5px] sm:text-[11px] text-brand font-mono font-bold mt-0.5">
+                                  {event.rawContract.vehiclePlate}
+                                </p>
+                              )}
+                            </td>
+
+                            {/* Period / Schedule Column */}
+                            <td className="py-2 sm:py-2.5 px-2 sm:px-4 whitespace-nowrap">
+                              <div className="text-[10px] sm:text-xs leading-tight">
+                                <span className="font-semibold text-text-primary flex items-center gap-1">
+                                  <CalendarIcon size={11} className="text-brand shrink-0 hidden sm:inline" />
+                                  {event.dateStr}
+                                  {isToday && (
+                                    <span className="px-1 py-0.2 rounded-full bg-brand/10 text-brand text-[8.5px] font-bold border border-brand/20">
+                                      Today
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-text-muted text-[9px] sm:text-[10.5px] block font-medium mt-0.5">
+                                  at {event.formattedHour}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Status Column */}
+                            <td className="py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">
+                              <div className="flex flex-col gap-1">
+                                <span className={`px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10.5px] font-bold border w-fit leading-tight ${event.badgeClass}`}>
+                                  {event.statusLabel}
                                 </span>
                                 {event.isOverdue && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                                  <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200 w-fit">
                                     Overdue
                                   </span>
                                 )}
                               </div>
+                            </td>
 
-                              <div className="flex items-center gap-2 text-xs text-text-secondary flex-wrap">
-                                <span className="flex items-center gap-1 font-medium text-text-primary">
-                                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${event.color}`}>
-                                    {getInitials(event.client)}
-                                  </span>
-                                  {event.client}
-                                </span>
-
-                                {event.driver && (
-                                  <>
-                                    <span className="text-gray-300">•</span>
-                                    <span className="text-text-muted text-[11px]">
-                                      Driver: {event.driver}
-                                    </span>
-                                  </>
-                                )}
-
-                                {event.location && (
-                                  <>
-                                    <span className="text-gray-300">•</span>
-                                    <span className="flex items-center gap-0.5 text-text-muted text-[11px] truncate max-w-[150px]">
-                                      <MapPin size={10} className="shrink-0" />
-                                      {event.location}
-                                    </span>
-                                  </>
-                                )}
+                            {/* Actions Column */}
+                            <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
+                                <button 
+                                  type="button"
+                                  className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                  title="View Contract Details" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedContractForDetails(event.rawContract);
+                                  }}
+                                >
+                                  <Eye size={14} />
+                                </button>
                               </div>
-                            </div>
-                          </div>
-
-                          {/* Right: Status Pill & Action */}
-                          <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
-                            <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full border ${event.badgeClass}`}>
-                              {event.statusLabel}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedContractForDetails(event.rawContract);
-                              }}
-                              className="p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer"
-                              title="View Contract Details"
-                            >
-                              <Eye size={15} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination (Matches Bookings Page Pagination) */}
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={sortedBookings.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+              />
             </div>
           )}
 
-          {/* ===== VIEW MODE 2: Month Grid View ===== */}
-          {filteredBookings.length > 0 && viewMode === "grid" && (
+          {/* ===== VIEW MODE 2: Month Grid View (For Desktop / Tablet) ===== */}
+          {viewMode === "grid" && (
             <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover animate-fade-in">
               <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
                 <div className="min-w-[620px] sm:min-w-0">
@@ -970,7 +1020,7 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              {/* Selected Day Quick Inspector (Appears below calendar on mobile or tablet) */}
+              {/* Selected Day Quick Inspector */}
               {selectedDay && (
                 <div className="p-3 sm:p-4 border-t border-border bg-gray-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
@@ -1006,7 +1056,7 @@ export default function CalendarPage() {
                 </div>
               )}
 
-              {/* Footer (Matches Bookings Pagination Footer Bar) */}
+              {/* Footer */}
               <div className="px-3.5 sm:px-4 py-2.5 border-t border-border flex items-center justify-between text-xs text-text-muted bg-white">
                 <span className="text-[11px] sm:text-xs">
                   <strong className="text-text-primary font-bold">{filteredBookings.length}</strong> events in <strong className="text-text-primary font-bold">{monthYearStr}</strong>
