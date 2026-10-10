@@ -38,10 +38,12 @@
   button {
     cursor: pointer;
   }
-  /* Prevent iOS automatic zoom on inputs */
+  /* Prevent iOS automatic zoom on form inputs (exclude compact table elements) */
   @media (max-width: 768px) {
-    input, select, textarea {
-      font-size: 16px !important;
+    input:not(table *):not(.no-zoom-override),
+    select:not(table *):not(.no-zoom-override),
+    textarea {
+      font-size: 16px;
     }
   }
 }

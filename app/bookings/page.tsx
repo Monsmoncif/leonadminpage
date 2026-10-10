@@ -470,25 +470,25 @@ export default function ContractsPage() {
             {/* Table (Matches Clients Page Table Style & Hover) */}
             <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover">
               <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm">
+                <table className="w-full text-[11px] sm:text-xs md:text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-gray-50/75 text-[11px] sm:text-xs text-text-muted font-semibold uppercase tracking-wider">
-                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
+                    <tr className="border-b border-border bg-gray-50/75 text-[9.5px] sm:text-[11px] md:text-xs text-text-muted font-semibold uppercase tracking-wider">
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
                         Contract
                       </th>
-                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 min-w-[200px] sm:min-w-[240px]">
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">
                         Customer / Driver
                       </th>
-                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4">
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4">
                         Vehicle
                       </th>
-                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
+                      <th className="text-left py-2 sm:py-2.5 px-2 sm:px-4 whitespace-nowrap">
                         Period
                       </th>
-                      <th className="text-left py-2.5 sm:py-3 px-2 whitespace-nowrap w-[110px] sm:w-[120px]">
+                      <th className="text-left py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">
                         Status
                       </th>
-                      <th className="text-right py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
+                      <th className="text-right py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
                         Actions
                       </th>
                     </tr>
@@ -524,31 +524,31 @@ export default function ContractsPage() {
                             style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
                           >
                             {/* Contract Column */}
-                            <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                            <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
                               {contract.contractNumber ? (
-                                <span className="font-bold text-text-primary text-xs sm:text-sm tabular-nums">
+                                <span className="font-bold text-text-primary text-[11px] sm:text-xs md:text-sm tabular-nums">
                                   #{contract.contractNumber}
                                 </span>
                               ) : (
                                 <span 
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs whitespace-nowrap"
+                                  className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs whitespace-nowrap"
                                   title="Unconfirmed Contract: Contract number will be assigned upon Handover confirmation"
                                 >
                                   <Clock size={10} className="text-amber-600 animate-pulse shrink-0" />
-                                  <span>Pending #Handover</span>
+                                  <span>Pending</span>
                                 </span>
                               )}
                             </td>
 
                             {/* Customer / Driver Column (Shows full customer name & driver name) */}
-                            <td className="py-2.5 sm:py-3 px-3 sm:px-4 min-w-[200px] sm:min-w-[240px]">
-                              <div className="flex items-center gap-2.5 sm:gap-3">
-                                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-xs ${getAvatarColor(contract.customer)}`}>
+                            <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">
+                              <div className="flex items-center gap-2 sm:gap-2.5">
+                                <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(contract.customer)}`}>
                                   {getInitials(contract.customer)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <span 
-                                    className="font-semibold text-text-primary text-xs sm:text-sm block break-words leading-tight sm:leading-snug"
+                                    className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight"
                                     title={contract.customer}
                                   >
                                     {contract.customer}
@@ -571,7 +571,7 @@ export default function ContractsPage() {
                                     }
 
                                     return (
-                                      <p className="text-[10px] sm:text-xs text-text-muted mt-0.5 break-words leading-tight" title={`Driver: ${driverDisplay}`}>
+                                      <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 break-words leading-tight" title={`Driver: ${driverDisplay}`}>
                                         {driverDisplay}
                                       </p>
                                     );
@@ -581,28 +581,33 @@ export default function ContractsPage() {
                             </td>
 
                             {/* Vehicle Column */}
-                            <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                              <span className="font-medium text-text-primary text-xs sm:text-sm line-clamp-1" title={contract.vehicle}>
+                            <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
+                              <span className="font-medium text-text-primary text-[11px] sm:text-xs md:text-sm line-clamp-1" title={contract.vehicle}>
                                 {contract.vehicle}
                               </span>
                               {contract.vehiclePlate && (
-                                <p className="text-[10px] sm:text-xs text-text-muted mt-0.5">
+                                <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5">
                                   {contract.vehiclePlate}
                                 </p>
                               )}
                             </td>
 
-                            {/* Period Column (Only the Period) */}
-                            <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                              <p className="font-medium text-text-secondary text-xs sm:text-sm flex items-center gap-1.5 whitespace-nowrap">
-                                <Calendar size={12} className="text-text-muted shrink-0" />
-                                {contract.startDate} to {contract.endDate}
-                              </p>
+                            {/* Period Column */}
+                            <td className="py-2 sm:py-2.5 px-2 sm:px-4 whitespace-nowrap">
+                              <div className="text-[10px] sm:text-xs leading-tight">
+                                <span className="font-medium text-text-secondary flex items-center gap-1">
+                                  <Calendar size={11} className="text-text-muted shrink-0 hidden sm:inline" />
+                                  {contract.startDate}
+                                </span>
+                                <span className="text-text-muted text-[9px] sm:text-[10.5px] block sm:inline sm:ml-1">
+                                  to {contract.endDate}
+                                </span>
+                              </div>
                             </td>
 
                             {/* Status Column */}
-                            <td className="py-2.5 sm:py-3 px-2 whitespace-nowrap w-[110px] sm:w-[120px]">
-                              <div className="flex flex-col gap-1 w-[105px] sm:w-[116px] max-w-[116px]" onClick={(e) => e.stopPropagation()}>
+                            <td className="py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">
+                              <div className="flex flex-col gap-0.5 sm:gap-1 w-[92px] sm:w-[116px] max-w-[116px]" onClick={(e) => e.stopPropagation()}>
                                 <select
                                   value={contract.status}
                                   onChange={async (e) => {
@@ -643,18 +648,18 @@ export default function ContractsPage() {
                                       toast.error(err.message || "Failed to update status");
                                     }
                                   }}
-                                  className={`text-[10px] sm:text-[11px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-md border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getStatusClasses(contract.status)}`}
+                                  className={`text-[9.5px] sm:text-[11px] font-semibold px-1 sm:px-2 py-0.5 rounded border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getStatusClasses(contract.status)}`}
                                 >
                                   <option value="Draft" className="bg-white text-gray-900">Draft</option>
                                   <option value="Active" className="bg-white text-gray-900">Active</option>
                                   <option value="Completed" className="bg-white text-gray-900">Completed</option>
                                   <option value="Cancelled" className="bg-white text-gray-900">Cancelled</option>
                                 </select>
-                                <div className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-semibold whitespace-nowrap">
-                                  <span className={`px-1 py-0.5 rounded border leading-tight ${getPaymentBadge(cPaymentStatus)}`}>
+                                <div className="flex items-center gap-1 text-[8px] sm:text-[9px] font-semibold whitespace-nowrap">
+                                  <span className={`px-1 py-0.2 rounded border leading-tight ${getPaymentBadge(cPaymentStatus)}`}>
                                     Pay: {cPaymentStatus}
                                   </span>
-                                  <span className={`px-1 py-0.5 rounded border leading-tight ${getCarStatusBadge(cCarStatus)}`}>
+                                  <span className={`px-1 py-0.2 rounded border leading-tight ${getCarStatusBadge(cCarStatus)}`}>
                                     Car: {cCarStatus}
                                   </span>
                                 </div>
@@ -662,7 +667,7 @@ export default function ContractsPage() {
                             </td>
 
                             {/* Actions Column (Matches Clients Page) */}
-                            <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                            <td className="py-2 sm:py-2.5 px-2 sm:px-4">
                               <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
                                 {(contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
                                   const isShop = isShopContract(contract);
@@ -690,13 +695,13 @@ export default function ContractsPage() {
                                             ? `Scheduled for ${formattedStart} — Showroom Handover can be activated on start date`
                                             : "Confirm Showroom Vehicle Handover & Activate Contract (تأكيد تسليم السيارة في المعرض وتوليد العقد)"
                                         }
-                                        className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
+                                        className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
                                           isFuture
                                             ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300"
                                             : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
                                         }`}
                                       >
-                                        <CheckCircle2 size={12} className={isFuture ? "text-amber-600" : "text-white"} />
+                                        <CheckCircle2 size={11} className={isFuture ? "text-amber-600" : "text-white"} />
                                         <span className="hidden sm:inline">
                                           {isFuture ? `Starts ${formattedStart}` : "Hand Over"}
                                         </span>
@@ -716,12 +721,12 @@ export default function ContractsPage() {
                                         }}
                                         disabled={dispatchingContractId === contract._id}
                                         title="Confirm & Dispatch to Driver (إرسال الطلب للسائق وتعيين رقم العقد)"
-                                        className="px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer bg-brand hover:bg-brand-dark text-white active:scale-95"
+                                        className="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer bg-brand hover:bg-brand-dark text-white active:scale-95"
                                       >
                                         {dispatchingContractId === contract._id ? (
-                                          <Loader2 size={11} className="animate-spin" />
+                                          <Loader2 size={10} className="animate-spin" />
                                         ) : (
-                                          <Send size={11} />
+                                          <Send size={10} />
                                         )}
                                         <span className="hidden sm:inline">Dispatch</span>
                                       </button>
@@ -729,10 +734,10 @@ export default function ContractsPage() {
                                   } else {
                                     return (
                                       <span 
-                                        className="px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
+                                        className="px-1.5 py-0.5 rounded-md text-[9.5px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
                                         title="Dispatched to Driver — Waiting for driver delivery handover"
                                       >
-                                        <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
+                                        <CheckCircle2 size={10} className="text-emerald-600 shrink-0" />
                                         <span className="hidden sm:inline">Dispatched</span>
                                       </span>
                                     );
@@ -741,49 +746,49 @@ export default function ContractsPage() {
 
                                 <button 
                                   type="button"
-                                  className="p-1.5 sm:p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                  className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                   title="View Contract Details & Documentation (عرض تفاصيل العقد وتوثيق الأضرار والدفع)" 
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedContractForDetails(contract);
                                   }}
                                 >
-                                  <Eye size={15} />
+                                  <Eye size={14} />
                                 </button>
 
                                 <Link 
                                   href={`/bookings/edit?contractId=${contract._id}`}
-                                  className="p-1.5 sm:p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                  className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                   title="Edit Contract" 
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <Edit size={15} />
+                                  <Edit size={14} />
                                 </Link>
                                 {contract.status === "Active" && contract.deliveryStatus === "Delivered" && (
                                   <Link 
                                     href={`/bookings/return?contractId=${contract._id}`}
-                                    className="p-1.5 sm:p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                    className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                     title="Return Vehicle" 
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <ArrowLeftRight size={15} />
+                                    <ArrowLeftRight size={14} />
                                   </Link>
                                 )}
                                 {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
                                   <button 
-                                    className="p-1.5 sm:p-2 text-text-muted hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer" 
+                                    className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer" 
                                     title="Print Contract PDF" 
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       window.open(`/bookings/${contract._id}/print`, '_blank');
                                     }}
                                   >
-                                    <Download size={15} />
+                                    <Download size={14} />
                                   </button>
                                 )}
-                                <div className="w-px h-4 sm:h-5 bg-border mx-0.5 sm:mx-1" />
+                                <div className="w-px h-3.5 sm:h-4 bg-border mx-0.5" />
                                 <button 
-                                  className="p-1.5 sm:p-2 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
+                                  className="p-1 sm:p-1.5 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-md sm:rounded-lg transition-colors cursor-pointer" 
                                   title="Delete Contract" 
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -791,7 +796,7 @@ export default function ContractsPage() {
                                     setIsDeleteDialogOpen(true);
                                   }}
                                 >
-                                  <Trash2 size={15} />
+                                  <Trash2 size={14} />
                                 </button>
                               </div>
                             </td>
