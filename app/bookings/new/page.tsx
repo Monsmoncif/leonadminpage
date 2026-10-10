@@ -73,8 +73,7 @@ const SHOP_STEPS = [
 
 const PERSONALIZED_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Rental Data & Receiver", icon: User },
-  { id: 3, title: "Review & Confirm", icon: CheckCircle },
+  { id: 2, title: "Dates & Receiver", icon: User },
 ];
 
 export function NewRentalAdminPageContent() {
@@ -885,6 +884,20 @@ export function NewRentalAdminPageContent() {
         if (selectedClient) {
           contractPayload.clientId = selectedClient;
         }
+        contractPayload.dailyRate = 0;
+        contractPayload.collectionAmount = 0;
+        contractPayload.totalAmount = 0;
+        contractPayload.depositAmount = 0;
+        contractPayload.advancePayment = 0;
+        contractPayload.babySeatFees = 0;
+        contractPayload.deliveryCharges = 0;
+        contractPayload.salikFees = 0;
+        contractPayload.tintingFees = 0;
+        contractPayload.cleaningFees = 0;
+        contractPayload.dailyKmLimit = 0;
+        contractPayload.pricePerExtraKm = 0;
+        contractPayload.paymentMethod = "Personal / Free";
+        contractPayload.paymentStatus = "Paid";
         if (!isEditMode) {
           contractPayload.status = "Active";
           contractPayload.deliveryStatus = "Delivered";
@@ -1351,15 +1364,11 @@ export function NewRentalAdminPageContent() {
           <h2 className="text-lg font-bold text-text-primary">
             {contractType === "Delivery" 
               ? "Driver, Rental Period & Financial Terms" 
-              : contractType === "Personalized"
-              ? "Receiver, Rental Period & Financial Terms (المستلم والمواعيد والأسعار)"
               : "Rental Period & Financial Terms"}
           </h2>
           <p className="text-xs text-text-muted mt-0.5">
             {contractType === "Delivery" 
               ? "Assign delivery driver, specify dates, locations, and pricing"
-              : contractType === "Personalized"
-              ? "Select registered client or enter receiver, specify rental schedule and financial terms"
               : "Specify dates, locations, and pricing"}
           </p>
         </div>
@@ -1599,92 +1608,6 @@ export function NewRentalAdminPageContent() {
               </div>
             )}
 
-            {/* Receiver / Client selection — for Personalized contracts */}
-            {contractType === "Personalized" && (
-              <div className="space-y-2.5 bg-purple-50/60 p-4 rounded-xl border border-purple-200/90 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                    <User size={14} className="text-purple-600" />
-                    <span>Select Client / Receiver (اختيار العميل أو المستلم)</span>
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingForSecondDriver(false);
-                      setIsClientModalOpen(true);
-                    }}
-                    className="text-[11px] font-bold text-brand hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <UserPlus size={12} />
-                    <span>+ New Client</span>
-                  </button>
-                </div>
-
-                <div className="relative">
-                  <select
-                    value={selectedClient || (personName && !clients.some(c => c._id === selectedClient) ? "__custom__" : "")}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === "__custom__") {
-                        setSelectedClient(null);
-                      } else if (val) {
-                        setSelectedClient(val);
-                        const cl = clients.find(c => c._id === val);
-                        if (cl) {
-                          setPersonName(cl.name);
-                        }
-                      } else {
-                        setSelectedClient(null);
-                        setPersonName("");
-                      }
-                    }}
-                    className="w-full p-2.5 rounded-xl border border-border bg-white text-xs sm:text-sm font-medium focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none cursor-pointer"
-                  >
-                    <option value="">-- Select Client from Database (اختيار عميل مسجل) --</option>
-                    {clients.map(c => (
-                      <option key={c._id} value={c._id}>
-                        {c.name} {c.phone ? `(${c.phone})` : ""} {c.licenseNumber ? `• Lic: ${c.licenseNumber}` : ""}
-                      </option>
-                    ))}
-                    <option value="__custom__">✍️ Custom Receiver / Other Person (اسم مستلم آخر غير مسجل بالعملاء)</option>
-                  </select>
-                </div>
-
-                {/* If custom receiver chosen or no client selected, provide text input */}
-                {(!selectedClient || !clients.some(c => c._id === selectedClient)) && (
-                  <div className="pt-1">
-                    <label className="text-[11px] font-semibold text-text-secondary block mb-1">
-                      Receiver Name (اسم الشخص المستلم للسيارة) <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                      <input
-                        type="text"
-                        value={personName}
-                        onChange={(e) => setPersonName(e.target.value)}
-                        placeholder="e.g. Mohamed Ali / Friend / Partner / VIP Guest..."
-                        className="w-full p-2.5 pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {selectedClient && clients.some(c => c._id === selectedClient) && (
-                  <div className="flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 font-medium">
-                    <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                    <span className="truncate">
-                      Selected Client: <strong>{clients.find(c => c._id === selectedClient)?.name}</strong> 
-                      {clients.find(c => c._id === selectedClient)?.phone ? ` (${clients.find(c => c._id === selectedClient)?.phone})` : ""}
-                    </span>
-                  </div>
-                )}
-
-                <p className="text-[10px] sm:text-[11px] text-text-muted leading-tight">
-                  اختر عميلاً مسجلاً من القائمة أو حدد مستلماً مخصصاً لحجز السيارة باسمه وإشغالها في الأسطول مباشرة.
-                </p>
-              </div>
-            )}
 
             <div className="pt-2">
               <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
@@ -1820,9 +1743,7 @@ export function NewRentalAdminPageContent() {
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
                   {contractType === "Delivery" 
                     ? "Driver collects upon car delivery" 
-                    : contractType === "Personalized"
-                      ? "Optional deposit / Personal booking"
-                      : "Collected at shop counter"}
+                    : "Collected at shop counter"}
                 </span>
               </div>
             </div>
@@ -1920,11 +1841,7 @@ export function NewRentalAdminPageContent() {
 
             <div>
               <label className="text-xs font-semibold text-text-secondary block mb-1">
-                {contractType === "Delivery" 
-                  ? "Driver Instructions / Remarks (تعليمات للسائق)" 
-                  : contractType === "Personalized"
-                    ? "Booking Notes & Purpose (ملاحظات الحجز والغرض)"
-                    : "Notes / ملاحظات"}
+                {contractType === "Delivery" ? "Driver Instructions / Remarks (تعليمات للسائق)" : "Notes / ملاحظات"}
               </label>
               <textarea 
                 rows={2}
@@ -1932,9 +1849,7 @@ export function NewRentalAdminPageContent() {
                 onChange={e => setRentalData({...rentalData, notes: e.target.value})} 
                 placeholder={contractType === "Delivery" 
                   ? "Special instructions for driver (e.g. handover details, client preferences)..."
-                  : contractType === "Personalized"
-                    ? "Reason for booking, borrower notes, or custom instructions..."
-                    : "Any notes about this rental..."}
+                  : "Any notes about this rental..."}
                 className="w-full p-2.5 rounded-xl border border-border bg-white text-xs outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand resize-none" 
               />
             </div>
@@ -2246,15 +2161,285 @@ export function NewRentalAdminPageContent() {
     </div>
   );
 
+  // ===================== PERSONALIZED BOOKING (DATES & RECEIVER ONLY, FREE, NO CHARGES) =====================
+
+  const renderPersonalizedData = () => {
+    const start = new Date(rentalData.startDate);
+    const end = new Date(rentalData.endDate);
+    const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+    const selectedUnit = units.find(u => u._id === selectedVehicle);
+
+    return (
+      <div className="space-y-6 animate-fade-in-up">
+        {/* Step Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-gray-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
+                Personalized / شخصي
+              </span>
+              <h2 className="text-lg font-bold text-text-primary">
+                Dates &amp; Receiver (المواعيد والمستلم)
+              </h2>
+            </div>
+            <p className="text-xs text-text-muted mt-1">
+              حجز شخصي مباشر وبدون أي رسوم — حدد المستلم والمواعيد لتأكيد حجز السيارة في الأسطول مباشرة.
+            </p>
+          </div>
+        </div>
+
+        {/* Selected Vehicle Preview Banner */}
+        {selectedUnit && (
+          <div className="bg-brand/5 border border-brand/15 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                <ExecutiveCarIcon size={22} />
+              </div>
+              <div>
+                <span className="text-[11px] text-text-muted font-medium block">Selected Vehicle (السيارة المختارة)</span>
+                <strong className="text-sm font-bold text-text-primary block">
+                  {selectedUnit.make} {selectedUnit.model} {selectedUnit.year ? `(${selectedUnit.year})` : ""}
+                </strong>
+                <span className="text-xs text-text-muted font-mono">{selectedUnit.plate} • {selectedUnit.color}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCurrentStep(1)}
+              className="text-xs font-bold text-brand hover:underline px-3 py-1.5 rounded-lg hover:bg-brand/10 transition-colors cursor-pointer"
+            >
+              Change Car (تغيير)
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Card 1: Booking Dates & Logistics */}
+          <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Calendar size={16} className="text-brand" />
+                <span>Booking Dates (تواريخ الحجز)</span>
+              </h3>
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
+                {totalDays} {totalDays === 1 ? "Day" : "Days"} ({totalDays} {totalDays === 1 ? "يوم" : "أيام"})
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">
+                  Start Date (من تاريخ)
+                </label>
+                <input
+                  type="date"
+                  value={rentalData.startDate}
+                  onChange={(e) => setRentalData(prev => ({ ...prev, startDate: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">
+                  Expected End Date (إلى تاريخ)
+                </label>
+                <input
+                  type="date"
+                  value={rentalData.endDate}
+                  onChange={(e) => setRentalData(prev => ({ ...prev, endDate: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Date Conflict Alert */}
+            {(() => {
+              const conflict = selectedUnit ? getUnitConflict(selectedUnit, rentalData.startDate, rentalData.endDate) : null;
+              if (!conflict || conflict.reason !== "Booked") return null;
+              const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              return (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in shadow-2xs">
+                  <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-600" />
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5 font-bold text-red-800 text-xs">
+                      <span>Date Conflict Detected</span>
+                      <span className="text-[11px] font-normal text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                        تعارض في التواريخ
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-red-700 leading-relaxed">
+                      This car is already booked from <span className="font-semibold underline">{conflictStart}</span> to <span className="font-semibold underline">{conflictEnd}</span>. Please choose different dates.
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Handover Time */}
+            <div>
+              <label className="text-xs font-semibold text-text-secondary flex items-center justify-between mb-1">
+                <span className="flex items-center gap-1">
+                  <Clock size={13} className="text-brand shrink-0" />
+                  <span>Handover Time (وقت الاستلام)</span>
+                  <span className="text-red-500">*</span>
+                </span>
+                <span className="text-[11px] text-text-muted font-normal">(وقت الاستلام)</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input
+                    type="text"
+                    value={rentalData.checkoutTime}
+                    onChange={(e) => setRentalData({ ...rentalData, checkoutTime: e.target.value })}
+                    placeholder="e.g. 10:00 AM"
+                    className="w-full p-2.5 pl-9 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRentalData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
+                  className="px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1.5 shadow-2xs"
+                  title="Set current time"
+                >
+                  <Clock size={13} />
+                  <span>Now</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
+                <MapPin size={13} className="text-emerald-600" />
+                <span>Pickup Location (مكان الاستلام)</span>
+              </label>
+              <input
+                type="text"
+                value={rentalData.pickupLocation}
+                onChange={e => setRentalData({ ...rentalData, pickupLocation: e.target.value })}
+                placeholder="Main Office"
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+              />
+            </div>
+
+            {/* Vehicle Current Mileage */}
+            <div className="pt-2 border-t border-gray-200/70">
+              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-text-muted">
+                <span className="flex items-center gap-1.5 font-medium text-text-secondary">
+                  <Gauge size={14} className="text-brand" />
+                  <span>Vehicle Current Mileage:</span>
+                  <strong className="text-text-primary">
+                    {selectedUnit?.mileage ? selectedUnit.mileage.toLocaleString() : 0} km
+                  </strong>
+                </span>
+                <span className="text-[11px] text-brand font-semibold">
+                  Personal use / Free reservation
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Receiver & Booking Notes */}
+          <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+              <User size={16} className="text-brand" /> Receiver &amp; Details (المستلم والملاحظات)
+            </h3>
+
+            {/* Select Client / Receiver — UI UX styled EXACTLY like Assign Delivery Driver */}
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">
+                Select Client / Receiver (اختيار العميل أو المستلم) <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={selectedClient || (personName && !clients.some(c => c._id === selectedClient) ? "__custom__" : "")}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "__custom__") {
+                    setSelectedClient(null);
+                  } else if (val) {
+                    setSelectedClient(val);
+                    const cl = clients.find(c => c._id === val);
+                    if (cl) {
+                      setPersonName(cl.name);
+                    }
+                  } else {
+                    setSelectedClient(null);
+                    setPersonName("");
+                  }
+                }}
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none cursor-pointer"
+              >
+                <option value="">-- Select Client / Receiver --</option>
+                {clients.map(c => (
+                  <option key={c._id} value={c._id}>
+                    {c.name} {c.phone ? `(${c.phone})` : ""} {c.licenseNumber ? `• Lic: ${c.licenseNumber}` : ""}
+                  </option>
+                ))}
+                <option value="__custom__">✍️ Other Person / Custom Receiver (شخص آخر غير مسجل)</option>
+              </select>
+
+              {/* If other person / custom receiver or no client chosen, show clean input */}
+              {(!selectedClient || !clients.some(c => c._id === selectedClient)) && (
+                <div className="mt-2.5">
+                  <input
+                    type="text"
+                    value={personName}
+                    onChange={(e) => setPersonName(e.target.value)}
+                    placeholder="Enter receiver name (اكتب اسم الشخص المستلم)..."
+                    className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              <p className="text-[11px] text-text-muted mt-1">
+                اختر عميلاً مسجلاً أو أدخل اسم المستلم ليتم حجز السيارة باسمه في الأسطول مباشرة.
+              </p>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="text-xs font-semibold text-text-secondary block mb-1">
+                Booking Purpose / Notes (ملاحظات أو سبب الاستلام)
+              </label>
+              <textarea
+                rows={3}
+                value={rentalData.notes}
+                onChange={e => setRentalData({ ...rentalData, notes: e.target.value })}
+                placeholder="Reason for personal booking, borrower notes, or custom remarks..."
+                className="w-full p-2.5 rounded-xl border border-border bg-white text-xs outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand resize-none"
+              />
+            </div>
+
+            {/* Free / Personal Use Banner */}
+            <div className="p-4 bg-purple-50/70 border border-purple-200/80 rounded-xl space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
+                  <span>Personal Use (حجز شخصي)</span>
+                </span>
+                <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                  Free / مجاني (0 AED)
+                </span>
+              </div>
+              <p className="text-[11px] text-purple-800/80 leading-relaxed">
+                بدون رسوم يومية أو تأمين أو فحص صور أو توقيع — يتم حجز السيارة وتنشيطها في جدول الحجوزات فور الضغط على زر الحجز بالأسفل.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // ===================== DETERMINE WHAT TO RENDER =====================
 
   const renderStepContent = () => {
     if (contractType === "Personalized") {
-      // 3 Clean Steps for Personalized: Car (1) → Rental Data & Receiver (2) → Review & Confirm (3)
+      // 2 Steps for Personalized: Car (1) → Dates & Receiver (2)
       if (currentStep === 1) return renderVehicleSelector();
-      if (currentStep === 2) return renderRentalData();
-      if (currentStep === 3) return renderReview();
+      if (currentStep === 2) return renderPersonalizedData();
       return null;
     }
 
@@ -2350,7 +2535,7 @@ export function NewRentalAdminPageContent() {
               type="button"
               onClick={() => {
                 setContractType("Personalized");
-                if (currentStep > 3) setCurrentStep(3);
+                if (currentStep > 2) setCurrentStep(2);
               }}
               className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 contractType === "Personalized"
@@ -2498,7 +2683,7 @@ export function NewRentalAdminPageContent() {
                       : (contractType === "Delivery" 
                           ? (isDriver ? "Create Delivery Contract" : "Create & Dispatch to Driver") 
                           : contractType === "Personalized"
-                            ? "Confirm & Reserve Car (تأكيد وحجز السيارة)"
+                            ? "Create Booking (حجز السيارة)"
                             : "Create Shop Contract")}
                   </span>
                 </>
