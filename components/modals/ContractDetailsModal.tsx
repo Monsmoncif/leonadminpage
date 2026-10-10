@@ -384,17 +384,6 @@ export default function ContractDetailsModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {isHandedOver && (
-              <button
-                type="button"
-                onClick={() => window.open(`/bookings/${contractData._id || contractData.id}/print`, "_blank")}
-                className="px-2.5 py-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-brand bg-white hover:bg-brand/5 border border-brand/20 active:scale-95 rounded-xl transition-all cursor-pointer shadow-2xs"
-                title="Download / Print Contract PDF"
-              >
-                <Download size={14} />
-                <span className="hidden sm:inline">Print / PDF</span>
-              </button>
-            )}
             <button 
               type="button"
               onClick={onClose}
