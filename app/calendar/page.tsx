@@ -7,18 +7,14 @@ import {
   Calendar as CalendarIcon,
   Search,
   Plus,
-  Check,
   Eye,
   Filter,
   ChevronDown,
   Clock,
-  LayoutGrid,
-  List,
   X,
 } from "lucide-react";
 import Link from "next/link";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
-import TablePagination from "@/components/ui/TablePagination";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -102,16 +98,12 @@ const formatEventHour = (timeStr?: string, defaultFallback: string = "08:00 AM")
 export default function CalendarPage() {
   const [filter, setFilter] = useState<"all" | "pickup" | "return" | "precontract" | "contract">("all");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(new Date());
   const [bookings, setBookings] = useState<BookingEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContractForDetails, setSelectedContractForDetails] = useState<any | null>(null);
-
-  // Mobile-specific state (inspired by Bookings page UI/UX)
-  const [mobileView, setMobileView] = useState<"list" | "grid">("list");
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Month calculation
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -387,42 +379,33 @@ export default function CalendarPage() {
     });
   }, [bookings, filter, searchQuery]);
 
-  // Sorted bookings for mobile table/list view
-  const sortedBookings = useMemo(() => {
-    return [...filteredBookings].sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [filteredBookings]);
-
-  // Pagination for mobile table view (Matches Bookings Page)
-  const totalPages = Math.ceil(sortedBookings.length / itemsPerPage);
-  const paginatedBookings = useMemo(() => {
-    return sortedBookings.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage
-    );
-  }, [sortedBookings, currentPage, itemsPerPage]);
+  // Selected Day Bookings for Mobile Drawer/Inspector
+  const selectedDayBookings = useMemo(() => {
+    if (!selectedDay) return [];
+    return filteredBookings.filter((b) => b.date.toDateString() === selectedDay.toDateString());
+  }, [filteredBookings, selectedDay]);
 
   const prevMonth = () => {
     setCurrentDate((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d; });
-    setCurrentPage(1);
   };
   const nextMonth = () => {
     setCurrentDate((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d; });
-    setCurrentPage(1);
   };
   const goToday = () => {
-    setCurrentDate(new Date());
-    setCurrentPage(1);
+    const today = new Date();
+    setCurrentDate(today);
+    setSelectedDay(today);
   };
 
   const filterOptions = [
-    { label: "All", val: "all", dot: "bg-gray-400" },
-    { label: "Pickups (Start)", val: "pickup", dot: "bg-blue-500" },
-    { label: "Returns (End)", val: "return", dot: "bg-purple-500" },
-    { label: "Pre-Contracts", val: "precontract", dot: "bg-amber-500" },
-    { label: "Contracts", val: "contract", dot: "bg-emerald-500" },
+    { key: "all", label: "All", dot: "bg-gray-400" },
+    { key: "pickup", label: "Pickups (Start)", dot: "bg-blue-500" },
+    { key: "return", label: "Returns (End)", dot: "bg-purple-500" },
+    { key: "precontract", label: "Pre-Contracts", dot: "bg-amber-500" },
+    { key: "contract", label: "Contracts", dot: "bg-emerald-500" },
   ] as const;
 
-  const currentFilterLabel = filterOptions.find((f) => f.val === filter)?.label || "All";
+  const currentFilterLabel = filterOptions.find((f) => f.key === filter)?.label || "All";
 
   if (isLoading) {
     return (
@@ -444,8 +427,8 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* ===== Dashboard-Style Welcome Header (Old Design Intact!) ===== */}
+    <div className="space-y-4 sm:space-y-5">
+      {/* ===== Dashboard-Style Welcome Header (Old Design) ===== */}
       <div className="bg-card rounded-2xl border border-border p-4 sm:p-6 relative overflow-hidden shadow-xs">
         {/* Decorative gradient blobs matching dashboard */}
         <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-brand/5 via-orange-500/3 to-transparent rounded-full -translate-y-32 translate-x-20 pointer-events-none" />
@@ -463,7 +446,7 @@ export default function CalendarPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/bookings/new"
-              className="flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm hover:shadow transition-all cursor-pointer w-full sm:w-auto"
+              className="flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm hover:shadow transition-all cursor-pointer w-full sm:w-auto"
             >
               <Plus size={16} />
               <span>New Contract</span>
@@ -472,344 +455,11 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 📱 MOBILE VIEW (Inspired directly by Bookings page UI/UX for mobile)      */}
-      {/* ========================================================================= */}
-      <div className="block md:hidden space-y-4 animate-fade-in">
-        {/* Mobile Toolbar (Matches Bookings Page Toolbar) */}
-        <div className="relative z-20 bg-card rounded-xl border border-border p-3 shadow-xs flex flex-col gap-2.5 card-hover">
-          {/* Search Bar */}
-          <div className="relative w-full">
-            <input
-              type="text"
-              placeholder="Search contract, customer, car..."
-              className="w-full text-xs border border-border rounded-xl pl-8 pr-8 py-2 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setCurrentPage(1);
-                }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          {/* Controls: Month Jump + View Switcher + Filter Dropdown */}
-          <div className="flex items-center justify-between gap-2">
-            {/* Month Nav */}
-            <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-xl border border-border shadow-2xs">
-              <button
-                onClick={prevMonth}
-                title="Previous Month"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all"
-              >
-                <ChevronLeft size={15} />
-              </button>
-              <button
-                onClick={goToday}
-                title="Today"
-                className="px-2 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all"
-              >
-                Today
-              </button>
-              <button
-                onClick={nextMonth}
-                title="Next Month"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all"
-              >
-                <ChevronRight size={15} />
-              </button>
-            </div>
-
-            {/* View Mode Toggle: List (Bookings style) vs Month Grid */}
-            <div className="flex items-center p-0.5 bg-gray-100 rounded-xl border border-border/80 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setMobileView("list")}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all ${
-                  mobileView === "list"
-                    ? "bg-white text-text-primary shadow-xs"
-                    : "text-text-secondary"
-                }`}
-              >
-                <List size={13} />
-                <span>List</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMobileView("grid")}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all ${
-                  mobileView === "grid"
-                    ? "bg-white text-text-primary shadow-xs"
-                    : "text-text-secondary"
-                }`}
-              >
-                <LayoutGrid size={13} />
-                <span>Grid</span>
-              </button>
-            </div>
-
-            {/* Filter Dropdown (Matches Bookings Filter) */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
-                className="text-xs border border-border rounded-xl px-2.5 py-1.5 text-text-secondary hover:bg-gray-50 flex items-center gap-1.5 font-medium bg-white shadow-xs"
-              >
-                <Filter size={13} className="text-text-muted" />
-                <span className="truncate max-w-[70px]">{currentFilterLabel}</span>
-                <ChevronDown size={12} className="text-text-muted" />
-              </button>
-              {isMobileFilterOpen && (
-                <div className="absolute top-full mt-1.5 right-0 w-44 bg-white border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
-                  {filterOptions.map((item) => (
-                    <button
-                      key={item.val}
-                      type="button"
-                      onClick={() => {
-                        setFilter(item.val);
-                        setIsMobileFilterOpen(false);
-                        setCurrentPage(1);
-                      }}
-                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors flex items-center gap-2 ${
-                        filter === item.val ? "text-brand font-semibold bg-brand/5" : "text-text-secondary"
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0`} />
-                      <span>{item.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* MOBILE VIEW OPTION 1: Table List View (Directly inspired by Bookings Page!) */}
-        {mobileView === "list" && (
-          <div className="bg-card rounded-xl border border-border shadow-xs overflow-hidden card-hover">
-            <div className="overflow-x-auto">
-              <table className="w-full text-[11px] sm:text-xs">
-                <thead>
-                  <tr className="border-b border-border bg-gray-50/75 text-[9.5px] sm:text-[11px] text-text-muted font-semibold uppercase tracking-wider">
-                    <th className="text-left py-2 px-2.5 whitespace-nowrap">
-                      Contract
-                    </th>
-                    <th className="text-left py-2 px-2.5 min-w-[140px]">
-                      Customer / Driver
-                    </th>
-                    <th className="text-left py-2 px-2.5">
-                      Vehicle
-                    </th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap">
-                      Schedule
-                    </th>
-                    <th className="text-left py-2 px-2 whitespace-nowrap w-[90px]">
-                      Status
-                    </th>
-                    <th className="text-right py-2 px-2.5 whitespace-nowrap">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {filteredBookings.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-10 px-4 text-center">
-                        <CalendarIcon size={28} className="text-gray-300 mx-auto mb-2" />
-                        <p className="text-xs font-bold text-gray-800">No schedules found</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5 mb-3">No bookings match your filter for {monthYearStr}</p>
-                        <button
-                          type="button"
-                          onClick={() => { setSearchQuery(""); setFilter("all"); setCurrentPage(1); }}
-                          className="px-3 py-1 text-xs font-semibold text-brand border border-brand/20 rounded-lg hover:bg-brand/5"
-                        >
-                          Clear Filter
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedBookings.map((event) => {
-                      const isToday = event.date.toDateString() === new Date().toDateString();
-
-                      return (
-                        <tr
-                          key={event.id}
-                          onClick={() => setSelectedContractForDetails(event.rawContract)}
-                          className="bg-white hover:bg-gray-50/75 transition-colors cursor-pointer"
-                        >
-                          {/* Contract Column */}
-                          <td className="py-2 px-2.5">
-                            <span className="font-bold text-text-primary text-[11px] tabular-nums block">
-                              {event.displayNum}
-                            </span>
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8.5px] font-bold border mt-0.5 ${event.badgeClass}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${event.dotClass}`} />
-                              {event.type === "pickup" ? "Pickup" : "Return"}
-                            </span>
-                          </td>
-
-                          {/* Customer / Driver Column */}
-                          <td className="py-2 px-2.5 min-w-[140px]">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 shadow-xs ${event.color}`}>
-                                {getInitials(event.client)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <span className="font-semibold text-text-primary text-[11px] block truncate">
-                                  {event.client}
-                                </span>
-                                <p className="text-[9.5px] text-text-muted mt-0.5 truncate">
-                                  {event.driver ? `Driver: ${event.driver}` : "Self-drive"}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Vehicle Column */}
-                          <td className="py-2 px-2.5">
-                            <span className="font-medium text-text-primary text-[11px] block truncate max-w-[110px]">
-                              {event.car}
-                            </span>
-                            {event.rawContract?.vehiclePlate && (
-                              <p className="text-[9.5px] text-brand font-mono font-bold mt-0.5">
-                                {event.rawContract.vehiclePlate}
-                              </p>
-                            )}
-                          </td>
-
-                          {/* Schedule / Time Column */}
-                          <td className="py-2 px-2 whitespace-nowrap">
-                            <span className="font-semibold text-text-primary text-[10px] block">
-                              {event.dateStr}
-                              {isToday && (
-                                <span className="ml-1 px-1 py-0.2 rounded bg-brand/10 text-brand text-[8px] font-bold">
-                                  Today
-                                </span>
-                              )}
-                            </span>
-                            <span className="text-text-muted text-[9px] block">
-                              at {event.formattedHour}
-                            </span>
-                          </td>
-
-                          {/* Status Column */}
-                          <td className="py-2 px-2 whitespace-nowrap">
-                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold border block text-center ${event.badgeClass}`}>
-                              {event.statusLabel}
-                            </span>
-                          </td>
-
-                          {/* Action Column */}
-                          <td className="py-2 px-2.5 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedContractForDetails(event.rawContract);
-                              }}
-                              className="p-1 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md inline-flex items-center justify-center"
-                            >
-                              <Eye size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Table Pagination (Matches Bookings Page) */}
-            <TablePagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={sortedBookings.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-              onItemsPerPageChange={setItemsPerPage}
-            />
-          </div>
-        )}
-
-        {/* MOBILE VIEW OPTION 2: Mobile Month Grid */}
-        {mobileView === "grid" && (
-          <div className="bg-card rounded-xl border border-border shadow-xs overflow-hidden">
-            <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
-              <div className="min-w-[550px]">
-                <div className="grid grid-cols-7 bg-gray-50/70 border-b border-border">
-                  {days.map((day) => (
-                    <div key={day} className="py-2 text-[9.5px] font-black text-text-muted text-center uppercase tracking-wider border-l border-border first:border-l-0">
-                      {day}
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 grid-rows-6 bg-card" style={{ minHeight: '400px' }}>
-                  {monthDates.map((date, idx) => {
-                    const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-                    const isToday = date.toDateString() === new Date().toDateString();
-                    const dayBookings = filteredBookings.filter(
-                      (b) => b.date.toDateString() === date.toDateString()
-                    );
-
-                    return (
-                      <div
-                        key={idx}
-                        className={`p-1 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border ${
-                          !isCurrentMonth ? 'bg-gray-50/40' : 'bg-card'
-                        } ${isToday ? 'bg-brand/[0.03]' : ''}`}
-                      >
-                        <div className={`text-[10px] font-black mb-1 w-5 h-5 flex items-center justify-center rounded-lg ${
-                          isToday ? 'bg-brand text-white' : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'
-                        }`}>
-                          {date.getDate()}
-                        </div>
-                        <div className="space-y-0.5">
-                          {dayBookings.slice(0, 3).map((booking, bIdx) => (
-                            <button
-                              key={bIdx}
-                              type="button"
-                              onClick={() => setSelectedContractForDetails(booking.rawContract)}
-                              className={`w-full text-left px-1 py-0.5 rounded text-[9px] font-bold border truncate flex items-center gap-1 ${booking.chipClass}`}
-                            >
-                              <span className={`w-1 h-1 rounded-full ${booking.dotClass}`} />
-                              <span className="truncate">{booking.displayNum}</span>
-                            </button>
-                          ))}
-                          {dayBookings.length > 3 && (
-                            <span className="text-[8.5px] font-bold text-brand block">
-                              +{dayBookings.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 💻 DESKTOP VIEW (Original Full-Width Calendar Design 100% Intact!)       */}
-      {/* ========================================================================= */}
-      <div className="hidden md:block bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
-        {/* Row 1: Controls (Month Nav, Filters, Search) */}
-        <div className="px-4 py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 border-b border-border bg-gray-50/60">
-          
+      {/* ===== Full-Width Calendar (ALWAYS GRID ON BOTH MOBILE & DESKTOP!) ===== */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
+        
+        {/* ===== Desktop Toolbar (Row 1: Controls for Tablet & Desktop) ===== */}
+        <div className="hidden md:flex px-4 py-3 items-center justify-between gap-3 border-b border-border bg-gray-50/60">
           {/* Left: Navigation, Month Title & Events Count Badge */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-xl border border-border shadow-2xs">
@@ -849,13 +499,7 @@ export default function CalendarPage() {
 
           {/* Center: Segmented Filter Tabs */}
           <div className="flex items-center p-0.5 bg-white rounded-xl border border-border shadow-2xs shrink-0 max-w-full overflow-x-auto no-scrollbar">
-            {([
-              { key: "all", label: "All" },
-              { key: "pickup", label: "Pickups (Start)" },
-              { key: "return", label: "Returns (End)" },
-              { key: "precontract", label: "Pre-Contracts" },
-              { key: "contract", label: "Contracts" },
-            ] as const).map(({ key, label }) => (
+            {filterOptions.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setFilter(key)}
@@ -871,7 +515,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Right: Search Input */}
-          <div className="relative w-full sm:w-44 lg:w-48 shrink-0">
+          <div className="relative w-44 lg:w-48 shrink-0">
             <input
               type="text"
               placeholder="Search..."
@@ -881,64 +525,154 @@ export default function CalendarPage() {
             />
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
           </div>
-
         </div>
 
-        {/* Row 2: Status Legend & Hint (Spacious & Clean, Zero Overflow) */}
-        <div className="px-4 py-2 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-white text-xs">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] font-semibold text-text-secondary">
-            <span className="text-text-muted font-bold uppercase tracking-wider text-[10px] mr-1">
+        {/* ===== Mobile Toolbar (Inspired by Bookings Page Toolbar for Mobile) ===== */}
+        <div className="flex md:hidden p-3 flex-col gap-2.5 border-b border-border bg-gray-50/70">
+          {/* Mobile Search Bar */}
+          <div className="relative w-full">
+            <input
+              type="text"
+              placeholder="Search contract, client, car..."
+              className="w-full text-xs border border-border rounded-xl pl-8 pr-8 py-2 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Controls: Month Nav + Status Filter Dropdown */}
+          <div className="flex items-center justify-between gap-2">
+            {/* Month Nav Buttons & Title */}
+            <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-xl border border-border shadow-2xs">
+                <button
+                  onClick={prevMonth}
+                  title="Previous Month"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+                <button
+                  onClick={goToday}
+                  title="Today"
+                  className="px-2 py-1 text-xs font-bold rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={nextMonth}
+                  title="Next Month"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-gray-100 active:scale-95 transition-all"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+
+              <span className="text-xs font-bold text-text-primary truncate">
+                {monthYearStr}
+              </span>
+            </div>
+
+            {/* Filter Dropdown (Matches Bookings Filter Style) */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
+                className="text-xs border border-border rounded-xl px-2.5 py-1.5 text-text-secondary hover:bg-gray-50 flex items-center gap-1.5 font-medium bg-white shadow-xs"
+              >
+                <Filter size={13} className="text-text-muted" />
+                <span className="truncate max-w-[85px]">{currentFilterLabel}</span>
+                <ChevronDown size={12} className="text-text-muted ml-0.5" />
+              </button>
+              {isMobileFilterOpen && (
+                <div className="absolute top-full mt-1.5 right-0 w-44 bg-white border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                  {filterOptions.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        setFilter(item.key);
+                        setIsMobileFilterOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors flex items-center gap-2 ${
+                        filter === item.key ? "text-brand font-semibold bg-brand/5" : "text-text-secondary"
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${item.dot} shrink-0`} />
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ===== Row 2: Status Legend & Hint ===== */}
+        <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-3 border-b border-border bg-white text-xs overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2.5 sm:gap-4 text-[10px] sm:text-[11px] font-semibold text-text-secondary shrink-0 select-none">
+            <span className="text-text-muted font-bold uppercase tracking-wider text-[9px] sm:text-[10px] mr-0.5">
               Legend:
             </span>
             <span className="flex items-center gap-1.5" title="Pre-contract awaiting handover (Start)">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
               <span>Pre-CON (Start)</span>
             </span>
-            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
+            <span className="w-px h-3 bg-border shrink-0" />
             <span className="flex items-center gap-1.5" title="Pre-contract scheduled end date (End)">
               <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
               <span>Pre-CON (End)</span>
             </span>
-            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
+            <span className="w-px h-3 bg-border shrink-0" />
             <span className="flex items-center gap-1.5" title="Active contract vehicle handed over (Start)">
               <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
               <span>CON (Start)</span>
             </span>
-            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
+            <span className="w-px h-3 bg-border shrink-0" />
             <span className="flex items-center gap-1.5" title="Active contract expected return date">
               <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
               <span>CON (Exp. End)</span>
             </span>
-            <span className="w-px h-3 bg-border hidden sm:inline shrink-0" />
+            <span className="w-px h-3 bg-border shrink-0" />
             <span className="flex items-center gap-1.5" title="Car returned back to fleet">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
               <span>Returned</span>
             </span>
           </div>
 
-          <span className="text-[11px] text-text-muted hidden md:flex items-center gap-1 font-medium">
+          <span className="text-[11px] text-text-muted hidden md:flex items-center gap-1 font-medium shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 inline-block" />
             Click any event to open booking &amp; handover details
           </span>
         </div>
 
-        {/* Scrollable Calendar Wrapper for Desktop */}
+        {/* ===== CALENDAR GRID (ALWAYS GRID!) ===== */}
         <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
-          <div className="min-w-[660px] sm:min-w-0">
+          <div className="min-w-[560px] sm:min-w-0">
             {/* Day Headers */}
             <div className="grid grid-cols-7 bg-gray-50/70 border-b border-border">
               {days.map((day) => (
-                <div key={day} className="py-2.5 text-[10px] font-black text-text-muted text-center uppercase tracking-wider border-l border-border first:border-l-0">
+                <div key={day} className="py-2 sm:py-2.5 text-[9.5px] sm:text-[10px] md:text-xs font-black text-text-muted text-center uppercase tracking-wider border-l border-border first:border-l-0">
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Calendar Grid — Full Height */}
-            <div className="grid grid-cols-7 grid-rows-6 bg-card" style={{ minHeight: 'calc(100vh - 270px)' }}>
+            {/* Calendar Grid Cells */}
+            <div className="grid grid-cols-7 grid-rows-6 bg-card" style={{ minHeight: 'calc(100vh - 290px)' }}>
               {monthDates.map((date, idx) => {
                 const isCurrentMonth = date.getMonth() === currentDate.getMonth();
                 const isToday = date.toDateString() === new Date().toDateString();
+                const isSelected = selectedDay && date.toDateString() === selectedDay.toDateString();
 
                 const dayBookings = filteredBookings.filter(
                   (b) => b.date.toDateString() === date.toDateString()
@@ -947,43 +681,57 @@ export default function CalendarPage() {
                 return (
                   <div
                     key={idx}
-                    className={`p-1.5 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border transition-colors ${
+                    onClick={() => setSelectedDay(date)}
+                    className={`p-1 sm:p-1.5 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border transition-colors cursor-pointer ${
                       !isCurrentMonth ? 'bg-gray-50/40' : 'bg-card'
-                    } ${isToday ? 'bg-brand/[0.03]' : ''}`}
+                    } ${isToday ? 'bg-brand/[0.03]' : ''} ${
+                      isSelected ? 'ring-1 sm:ring-2 ring-brand/50 ring-inset' : ''
+                    }`}
                   >
-                    {/* Date */}
-                    <div className={`text-xs font-black mb-1 w-6 h-6 flex items-center justify-center rounded-lg mx-auto md:mx-0 ${
-                      isToday 
-                        ? 'bg-brand text-white shadow-xs' 
-                        : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'
-                    }`}>
-                      {date.getDate()}
+                    {/* Date Number Badge */}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-[10px] sm:text-xs font-black w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-lg ${
+                        isToday 
+                          ? 'bg-brand text-white shadow-xs' 
+                          : isCurrentMonth ? 'text-text-primary' : 'text-gray-300'
+                      }`}>
+                        {date.getDate()}
+                      </span>
+
+                      {dayBookings.length > 0 && (
+                        <span className="text-[9px] font-bold px-1 rounded-full bg-gray-100 text-text-secondary md:hidden tabular-nums">
+                          {dayBookings.length}
+                        </span>
+                      )}
                     </div>
 
-                    {/* Events */}
-                    <div className="space-y-1 flex flex-col items-start overflow-hidden w-full">
-                      {dayBookings.slice(0, 5).map((booking, bIdx) => (
+                    {/* Events Chips */}
+                    <div className="space-y-0.5 sm:space-y-1 flex flex-col items-start overflow-hidden w-full">
+                      {dayBookings.slice(0, 4).map((booking, bIdx) => (
                         <button
                           key={bIdx}
                           type="button"
-                          onClick={() => setSelectedContractForDetails(booking.rawContract)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedContractForDetails(booking.rawContract);
+                          }}
                           title={`${booking.tooltipText} • Click to view full details`}
-                          className={`w-full max-w-full text-left px-2 py-1 rounded-lg transition-all border shadow-2xs hover:shadow-xs hover:scale-[1.01] active:scale-[0.99] flex items-center justify-between gap-1.5 cursor-pointer select-none group ${booking.chipClass}`}
+                          className={`w-full max-w-full text-left px-1 sm:px-2 py-0.5 sm:py-1 rounded sm:rounded-lg transition-all border shadow-2xs hover:shadow-xs hover:scale-[1.01] active:scale-[0.99] flex items-center justify-between gap-1 cursor-pointer select-none group ${booking.chipClass}`}
                         >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${booking.dotClass}`} />
-                            <span className="font-sans font-bold text-[11px] tracking-tight tabular-nums truncate text-text-primary">
+                          <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                            <span className={`w-1 sm:w-1.5 h-1 sm:h-1.5 rounded-full shrink-0 ${booking.dotClass}`} />
+                            <span className="font-sans font-bold text-[9.5px] sm:text-[11px] tracking-tight tabular-nums truncate text-text-primary">
                               {booking.displayNum}
                             </span>
                           </div>
-                          <span className="text-[10px] font-bold tracking-tight tabular-nums text-text-secondary shrink-0 opacity-80">
+                          <span className="text-[8.5px] sm:text-[10px] font-bold tracking-tight tabular-nums text-text-secondary shrink-0 opacity-80">
                             {booking.formattedHour}
                           </span>
                         </button>
                       ))}
-                      {dayBookings.length > 5 && (
-                        <span className="text-[9px] font-bold text-brand pl-1">
-                          +{dayBookings.length - 5} more
+                      {dayBookings.length > 4 && (
+                        <span className="text-[8.5px] sm:text-[9px] font-bold text-brand pl-0.5 sm:pl-1">
+                          +{dayBookings.length - 4} more
                         </span>
                       )}
                     </div>
@@ -994,19 +742,73 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-border flex items-center justify-between text-xs text-text-muted bg-gray-50/50">
-          <span>
+        {/* ===== Mobile Day Inspector (Appears when day is clicked on Mobile) ===== */}
+        {selectedDay && (
+          <div className="md:hidden p-3 border-t border-border bg-gray-50/75 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <CalendarIcon size={13} className="text-brand" />
+                <span>
+                  {selectedDay.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </span>
+              </span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white border border-border text-text-secondary tabular-nums">
+                {selectedDayBookings.length} {selectedDayBookings.length === 1 ? "schedule" : "schedules"}
+              </span>
+            </div>
+
+            {selectedDayBookings.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {selectedDayBookings.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setSelectedContractForDetails(b.rawContract)}
+                    className={`w-full text-left p-2 rounded-xl border flex items-center justify-between gap-2 shadow-2xs hover:shadow-xs transition-all cursor-pointer ${b.chipClass}`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full ${b.dotClass} shrink-0`} />
+                      <div className="min-w-0">
+                        <span className="font-bold text-xs text-text-primary block truncate">
+                          {b.displayNum} • {b.car}
+                        </span>
+                        <span className="text-[10px] text-text-muted block truncate">
+                          {b.client} {b.driver ? `• Driver: ${b.driver}` : ""}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] font-bold block text-text-primary">
+                        {b.formattedHour}
+                      </span>
+                      <span className="text-[9px] font-semibold text-text-secondary">
+                        {b.typeBadge}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[11px] text-text-muted italic">
+                No bookings scheduled for this day.
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ===== Footer ===== */}
+        <div className="px-3.5 sm:px-4 py-2.5 border-t border-border flex items-center justify-between text-xs text-text-muted bg-gray-50/50">
+          <span className="text-[11px] sm:text-xs">
             <span className="font-bold text-text-primary">{filteredBookings.length}</span> events · <span className="font-bold text-text-primary">{monthYearStr}</span>
           </span>
           <div className="flex items-center gap-1.5">
-            <button onClick={prevMonth} className="px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
+            <button onClick={prevMonth} className="px-2 sm:px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
               ← Prev
             </button>
-            <button onClick={goToday} className="px-2.5 py-1 bg-brand text-white rounded-lg font-bold cursor-pointer text-xs shadow-xs">
+            <button onClick={goToday} className="px-2 sm:px-2.5 py-1 bg-brand text-white rounded-lg font-bold cursor-pointer text-xs shadow-xs">
               {currentDate.toLocaleDateString("en-US", { month: "short" })}
             </button>
-            <button onClick={nextMonth} className="px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
+            <button onClick={nextMonth} className="px-2 sm:px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
               Next →
             </button>
           </div>
