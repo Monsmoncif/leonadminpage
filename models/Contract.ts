@@ -64,6 +64,8 @@ export interface IContract extends Document {
   deliveredAt?: Date | string;
   deliveredBy?: string;
   handoverCompletedAt?: Date | string;
+  reminderSentTomorrow?: boolean;
+  reminderSentToday?: boolean;
 
   // Return Data
   returnOdometer?: number;
@@ -193,6 +195,8 @@ const contractSchema = new Schema<IContract>(
       type: Date,
       required: false
     },
+    reminderSentTomorrow: { type: Boolean, default: false },
+    reminderSentToday: { type: Boolean, default: false },
     returnOdometer: { type: Number, required: false },
     returnFuelLevel: { type: Number, required: false },
     returnPhotos: { type: [String], required: false },

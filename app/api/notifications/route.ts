@@ -35,16 +35,14 @@ async function checkUpcomingHandoverReminders() {
       const isTomorrow = contractStartDate >= tomorrowStart && contractStartDate <= tomorrowEnd;
       const timingLabel = isTomorrow ? "Tomorrow" : "Today";
 
-      // Check if reminder notification already exists for this contract and timing
-      const existing = await Notification.findOne({
-        type: "reminder",
-        $or: [
-          { title: { $regex: `${contractNum}.*${timingLabel}`, $options: "i" } },
-          { message: { $regex: `${contractNum}.*${timingLabel}`, $options: "i" } },
-        ],
-      });
+      // Atomically claim the reminder for this contract/timing so it is only ever sent once
+      const flagField = isTomorrow ? "reminderSentTomorrow" : "reminderSentToday";
+      const claimed = await Contract.findOneAndUpdate(
+        { _id: contract._id, [flagField]: { $ne: true } },
+        { $set: { [flagField]: true } }
+      );
 
-      if (!existing) {
+      if (claimed) {
         const vehicle = (contract.unitId as any)?.make 
           ? `${(contract.unitId as any).make} ${(contract.unitId as any).model || ""} (${(contract.unitId as any).plate || ""})`.trim()
           : "Vehicle";

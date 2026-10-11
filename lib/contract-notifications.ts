@@ -473,8 +473,16 @@ export async function sendHandoverReminderNotification(
         const adminUsers = await User.find({ role: "admin" }).select("email").lean();
         const recipientSet = new Set<string>();
         if (process.env.SMTP_USER) recipientSet.add(process.env.SMTP_USER.trim());
+        (process.env.ADMIN_NOTIFY_EMAILS || "")
+          .split(",")
+          .map((e) => e.trim())
+          .filter((e) => e.includes("@"))
+          .forEach((e) => recipientSet.add(e));
+        // Placeholder/seed addresses that don't exist and cause "Delivery Status Notification (Failure)" bounces
+        const BLOCKED_EMAILS = new Set(["admin@gmail.com", "admin@example.com", "test@test.com"]);
         adminUsers.forEach((a: any) => {
-          if (a.email && a.email.includes("@")) recipientSet.add(a.email.trim());
+          const email = a.email ? String(a.email).trim().toLowerCase() : "";
+          if (email.includes("@") && !BLOCKED_EMAILS.has(email)) recipientSet.add(email);
         });
 
         const recipients = Array.from(recipientSet);

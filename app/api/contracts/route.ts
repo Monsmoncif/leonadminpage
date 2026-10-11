@@ -351,6 +351,11 @@ export async function POST(req: Request) {
         const vehicle = unitDoc ? `${unitDoc.make} ${unitDoc.model} (${unitDoc.plate || ""})`.trim() : "Vehicle";
         
         const clientNameForNotif = body.clientName || "Client";
+        const claimedReminder = await Contract.findOneAndUpdate(
+          { _id: contract._id, reminderSentTomorrow: { $ne: true } },
+          { $set: { reminderSentTomorrow: true } }
+        );
+        if (!claimedReminder) throw new Error("__reminder_already_sent__");
         await Notification.create({
           title: `Handover Reminder (Tomorrow): ${clientNameForNotif} — ${vehicle}`,
           message: `Scheduled vehicle handover for ${clientNameForNotif} (${vehicle}) starts tomorrow (${dateFormatted}). Please ensure vehicle is ready for delivery.`,
