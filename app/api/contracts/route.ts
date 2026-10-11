@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import connectDB from "@/lib/db";
 import { Contract } from "@/models/Contract";
 import { Client } from "@/models/Client";
+import { Driver } from "@/models/Driver";
 import { Unit } from "@/models/Unit";
 import { Log } from "@/models/Log";
 import { Notification } from "@/models/Notification";

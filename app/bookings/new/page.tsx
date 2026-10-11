@@ -248,8 +248,10 @@ export function NewRentalAdminPageContent() {
     const rect = canvas.getBoundingClientRect();
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    let clientX, clientY;
+    let clientX = 0;
+    let clientY = 0;
     if ("touches" in e) {
+      if (e.touches.length === 0) return;
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
@@ -266,8 +268,10 @@ export function NewRentalAdminPageContent() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    let clientX, clientY;
+    let clientX = 0;
+    let clientY = 0;
     if ("touches" in e) {
+      if (e.touches.length === 0) return;
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
@@ -294,6 +298,9 @@ export function NewRentalAdminPageContent() {
 
   const clearSignature = () => {
     setSignatureData(null);
+    if (editingContract) {
+      setEditingContract((prev: any) => prev ? { ...prev, customerSignature: null } : null);
+    }
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext("2d");
@@ -302,6 +309,12 @@ export function NewRentalAdminPageContent() {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
+        const dpr = window.devicePixelRatio || 1;
+        ctx.scale(dpr, dpr);
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = "#0f172a";
       }
     }
   };
@@ -413,18 +426,18 @@ export function NewRentalAdminPageContent() {
 
   // Canvas DPI initialization when reaching Review Step (Step 4 for Shop, Step 3 for Delivery)
   useEffect(() => {
-    const isReviewStep = contractType === "Shop" ? currentStep === 4 : contractType === "Delivery" ? currentStep === 3 : false;
+    const isReviewStep = (contractType === "Shop" && currentStep === 4) || (contractType === "Delivery" && currentStep === 3);
     if (isReviewStep) {
       const timer = setTimeout(() => {
-        // Customer canvas (Shop only)
-        if (contractType === "Shop" && canvasRef.current) {
+        // Customer canvas
+        if (canvasRef.current) {
           const canvas = canvasRef.current;
           const rect = canvas.getBoundingClientRect();
           if (rect.width > 0 && rect.height > 0) {
             const dpr = window.devicePixelRatio || 1;
-            const prevSig = signatureData;
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
+            const prevSig = signatureData || (isEditMode ? editingContract?.customerSignature : null);
+            canvas.width = Math.round(rect.width * dpr);
+            canvas.height = Math.round(rect.height * dpr);
             const ctx = canvas.getContext("2d");
             if (ctx) {
               ctx.scale(dpr, dpr);
@@ -432,7 +445,7 @@ export function NewRentalAdminPageContent() {
               ctx.lineCap = "round";
               ctx.lineJoin = "round";
               ctx.strokeStyle = "#0f172a";
-              if (prevSig) {
+              if (prevSig && typeof prevSig === "string" && prevSig.startsWith("data:image")) {
                 const img = new Image();
                 img.onload = () => {
                   ctx.drawImage(img, 0, 0, rect.width, rect.height);
@@ -812,6 +825,13 @@ export function NewRentalAdminPageContent() {
         return;
       }
 
+      // Driver contracts require customer signature
+      if (isDriver && !signatureData && !editingContract?.customerSignature) {
+        toast.error("يرجى توقيع العميل أولاً قبل إنشاء العقد (Please have the client sign before completing the contract).");
+        setIsLoading(false);
+        return;
+      }
+
       // Delivery contracts require a driver
       if (contractType === "Delivery" && !rentalData.deliveryDriverId) {
         toast.error("Please assign a delivery driver.");
@@ -882,7 +902,7 @@ export function NewRentalAdminPageContent() {
         checkoutMileage: Number(rentalData.checkoutMileage || units.find(u => u._id === selectedVehicle)?.mileage || 0),
         paymentMethod: rentalData.paymentMethod,
         paymentStatus: determinedPaymentStatus,
-        customerSignature: (isEditMode && editingContract?.customerSignature) ? editingContract.customerSignature : (signatureData || null),
+        customerSignature: signatureData || editingContract?.customerSignature || null,
         adminSignature: finalAdminSignature,
         inspectionPhotos: (isEditMode && Array.isArray(editingContract?.inspectionPhotos) && editingContract.inspectionPhotos.length > 0)
           ? editingContract.inspectionPhotos
@@ -2171,27 +2191,81 @@ export function NewRentalAdminPageContent() {
             </div>
           )}
 
-          {/* Signature Box */}
+          {/* Signature Boxes (Customer Digital Signature + Company Official Stamp) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Show existing customer signature in edit mode if already present */}
-            {isEditMode && editingContract?.customerSignature && (
-              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-2">
+            {/* Customer Digital Signature Canvas */}
+            <div id="customer-signature-box" className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
                 <label className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-                  <PenTool size={16} className="text-brand" />
-                  Customer Signature (توقيع العميل المسجل)
+                  <PenTool size={16} className="text-brand shrink-0" />
+                  <span>Customer Signature (توقيع العميل)</span>
+                  {isDriver && <span className="text-red-500 font-bold">*</span>}
                 </label>
-                <div className="h-40 border border-gray-200 rounded-xl p-2 bg-gray-50 flex items-center justify-center">
-                  <img src={editingContract.customerSignature} alt="Customer Signature" className="max-h-full max-w-full object-contain" />
+                {(signatureData || (isEditMode && editingContract?.customerSignature)) && (
+                  <button
+                    type="button"
+                    onClick={clearSignature}
+                    className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Clear (مسح التوقيع)</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-text-muted">
+                {isDriver 
+                  ? "يرجى تسليم الهاتف أو الجهاز للعميل للتوقيع باليد أو القلم قبل إتمام العقد (Client signature on handover)"
+                  : "Customer signature acknowledging vehicle handover and contract terms (توقيع العميل لتأكيد الاستلام)"}
+              </p>
+
+              <div className="relative border-2 border-dashed border-gray-300 rounded-2xl bg-white overflow-hidden shadow-inner touch-none">
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="w-full h-44 cursor-crosshair bg-white block select-none"
+                />
+                {!signatureData && !isDrawing && (!isEditMode || !editingContract?.customerSignature) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1.5 select-none">
+                    <PenTool size={26} className="opacity-40 text-brand" />
+                    <span className="text-xs font-semibold text-gray-500">Please draw customer signature here (finger or stylus)</span>
+                    <span className="text-[11px] text-gray-400 font-medium" dir="rtl">يرجى توقيع العميل هنا باليد أو القلم</span>
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-4 right-4 pointer-events-none flex items-center justify-between border-t border-dashed border-gray-200 pt-1 text-[10px] text-gray-400 uppercase tracking-widest font-semibold select-none">
+                  <span>Customer Signature</span>
+                  <span>توقيع العميل</span>
                 </div>
               </div>
-            )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
+                <span className="text-text-muted">Touch screen or drag mouse/stylus to sign.</span>
+                {(signatureData || (isEditMode && editingContract?.customerSignature)) ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                    <CheckCircle2 size={13} className="text-emerald-600" /> Signature Captured (تم التوقيع بنجاح)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
+                    <AlertCircle size={13} className="text-red-600" /> {isDriver ? "Required (إلزامي)" : "Optional / Touch to Sign"}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {/* Admin / Company Official Stamp & Signature Box */}
-            <div id="admin-signature-box" className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3 ${(!isEditMode || !editingContract?.customerSignature) ? "md:col-span-2" : ""}`}>
+            <div id="admin-signature-box" className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
               <label className="text-sm font-bold text-text-primary flex items-center gap-2">
                 <ShieldCheck size={18} className="text-blue-600 shrink-0" />
                 <span>Company Stamp &amp; Signature (الختم والتوقيع الرسمي للإدارة)</span>
               </label>
+              <p className="text-xs text-text-muted">
+                Official seal and authorized digital signature applied automatically (معتمد ومختوم رسمياً).
+              </p>
 
               <div className="border-2 border-dashed border-gray-200 rounded-2xl overflow-hidden bg-gradient-to-b from-gray-50/70 to-white flex items-center justify-center p-4 h-44 relative shadow-inner">
                 <img 

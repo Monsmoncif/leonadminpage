@@ -211,6 +211,28 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
             </div>
           )}
 
+          {/* Customer Signature Display */}
+          {contractDetails.customerSignature && (
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 border border-gray-200 shadow-2xs space-y-2 mb-4 sm:mb-6">
+              <div className="flex items-center justify-between">
+                <span className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                  <FileSignature size={15} className="text-emerald-600" />
+                  <span>Customer Digital Signature (توقيع العميل الإلكتروني)</span>
+                </span>
+                <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Signed &amp; Verified
+                </span>
+              </div>
+              <div className="h-28 sm:h-36 border border-dashed border-gray-200 rounded-xl bg-gray-50/60 p-2 flex items-center justify-center">
+                <img
+                  src={contractDetails.customerSignature}
+                  alt="Customer Signature"
+                  className="max-h-full max-w-full object-contain select-none"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Document Details */}
           <div className="bg-gray-50 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-gray-200 flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
