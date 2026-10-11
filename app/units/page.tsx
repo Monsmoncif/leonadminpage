@@ -354,10 +354,10 @@ export default function UnitsPage() {
                       <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
                         Vehicle
                       </th>
-                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[140px] sm:min-w-[180px]">
+                      <th className="hidden md:table-cell text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[140px] sm:min-w-[180px]">
                         Details
                       </th>
-                      <th className="text-left py-2 sm:py-2.5 px-2 sm:px-4 min-w-[160px] sm:min-w-[200px]">
+                      <th className="hidden md:table-cell text-left py-2 sm:py-2.5 px-2 sm:px-4 min-w-[160px] sm:min-w-[200px]">
                         Specifications
                       </th>
                       <th className="text-left py-2 sm:py-2.5 px-2 whitespace-nowrap w-[110px] sm:w-[130px]">
@@ -408,6 +408,9 @@ export default function UnitsPage() {
                                 <span className="font-bold text-text-primary text-[11px] sm:text-xs md:text-sm block truncate" title={`${unit.make} ${unit.model}`}>
                                   {unit.make} {unit.model}
                                 </span>
+                                <span className="md:hidden text-[9.5px] font-mono font-bold text-brand block truncate">
+                                  {unit.plate || "N/A"} • {(Number(unit.mileage) || 0).toLocaleString()} km
+                                </span>
                                 {unit.color && (
                                   <span className="text-[9.5px] sm:text-[11px] text-text-muted block truncate">
                                     {unit.color} {unit.year ? `• ${unit.year}` : ""}
@@ -418,7 +421,7 @@ export default function UnitsPage() {
                           </td>
 
                           {/* Details Column */}
-                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[140px] sm:min-w-[180px]">
+                          <td className="hidden md:table-cell py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[140px] sm:min-w-[180px]">
                             <div>
                               <p className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm leading-tight">
                                 Plate: <span className="font-mono text-brand font-bold">{unit.plate || "N/A"}</span>
@@ -444,7 +447,7 @@ export default function UnitsPage() {
                           </td>
 
                           {/* Specifications Column */}
-                          <td className="py-2 sm:py-2.5 px-2 sm:px-4 min-w-[160px] sm:min-w-[200px]">
+                          <td className="hidden md:table-cell py-2 sm:py-2.5 px-2 sm:px-4 min-w-[160px] sm:min-w-[200px]">
                             {(() => {
                               const currentKm = Number(unit.mileage) || 0;
                               const lastVidange = unit.lastOilChangeMileage != null && unit.lastOilChangeMileage > 0
@@ -530,7 +533,7 @@ export default function UnitsPage() {
                             <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
                               <button 
                                 type="button"
-                                className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
+                                className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer hidden sm:inline-flex items-center justify-center" 
                                 title="View Vehicle Details" 
                                 onClick={(e) => {
                                   e.stopPropagation();
