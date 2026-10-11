@@ -181,9 +181,9 @@ export default function VehicleInspectionPhotoCapture({
   };
 
   return (
-    <div className="p-5 rounded-2xl bg-surface border border-border/80 space-y-4 shadow-2xs">
+    <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-surface border border-border/80 space-y-3.5 sm:space-y-4 shadow-2xs">
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pb-3 border-b border-border/60">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5">
             <Camera size={20} />

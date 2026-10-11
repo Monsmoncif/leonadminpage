@@ -1472,9 +1472,9 @@ export default function VehicleReturnPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-16 sm:pb-20">
       {/* Header (Matching Handover Header Exactly) */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4 animate-fade-in-up">
         <div>
           <button
             onClick={() => router.push("/driver")}
@@ -1482,8 +1482,8 @@ export default function VehicleReturnPage() {
           >
             <ArrowLeft size={14} /> Back to Driver Dashboard
           </button>
-          <h1 className="text-2xl font-bold text-text-primary">Process Vehicle Return (استرجاع السيارة)</h1>
-          <p className="text-sm text-text-secondary mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Process Vehicle Return (استرجاع السيارة)</h1>
+          <p className="text-xs sm:text-sm text-text-secondary mt-1">
             Return inspection for contract #{contractNum} — verify mileage &amp; fuel, inspect vehicle condition, and complete check-in.
           </p>
         </div>
@@ -1500,8 +1500,8 @@ export default function VehicleReturnPage() {
       </div>
 
       {/* Stepper Header (100% Matching Confirm Handover) */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-6 animate-fade-in-up stagger-1">
-        <div className="relative w-full max-w-4xl mx-auto px-2 sm:px-4">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 animate-fade-in-up stagger-1">
+        <div className="relative w-full max-w-4xl mx-auto px-1 sm:px-4">
           {/* Background Track Line */}
           <div
             className="absolute top-[18px] -translate-y-1/2 h-[2px] bg-gray-200 z-0 hidden sm:block pointer-events-none"
@@ -1560,11 +1560,17 @@ export default function VehicleReturnPage() {
               </div>
             ))}
           </div>
+
+          {/* Mobile Current Step Indicator */}
+          <div className="sm:hidden text-center mt-2.5 pt-2 border-t border-border/50">
+            <span className="text-[11px] font-bold text-brand uppercase tracking-wider">Step {currentStep} of {totalSteps}:</span>{" "}
+            <span className="text-xs font-semibold text-text-primary">{STEPS[currentStep - 1]?.title}</span>
+          </div>
         </div>
       </div>
 
       {/* Main Wizard Content Card */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-6 sm:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 md:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-xs text-red-700 animate-shake">
             <AlertCircle size={18} className="shrink-0 text-red-600" />
@@ -1575,12 +1581,12 @@ export default function VehicleReturnPage() {
         {renderStepContent()}
 
         {/* Navigation Footer (Inside Card Container) */}
-        <div className="flex items-center justify-between pt-6 mt-8 border-t border-border">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pt-4 sm:pt-6 mt-6 sm:mt-8 border-t border-border">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handleBack}
-              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <ArrowLeft size={16} />
               <span>Previous Step</span>
@@ -1589,41 +1595,43 @@ export default function VehicleReturnPage() {
             <button
               type="button"
               onClick={() => router.push("/driver")}
-              className="px-5 py-2.5 rounded-xl border border-border text-text-muted hover:bg-gray-50 text-sm font-semibold transition-all cursor-pointer"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-border text-text-muted hover:bg-gray-50 text-xs sm:text-sm font-semibold transition-all cursor-pointer text-center"
             >
               Cancel
             </button>
           )}
 
-          {currentStep < totalSteps ? (
-            <button
-              type="button"
-              onClick={handleNext}
-              className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center gap-2 transition-all shadow-md shadow-brand/20 cursor-pointer"
-            >
-              <span>Next Step</span>
-              <ArrowRight size={16} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleCompleteReturn}
-              disabled={isSubmitting}
-              className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Processing Return...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={16} />
-                  <span>Complete Vehicle Return (تأكيد استرجاع السيارة)</span>
-                </>
-              )}
-            </button>
-          )}
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+            {currentStep < totalSteps ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-md shadow-brand/20 cursor-pointer"
+              >
+                <span>Next Step</span>
+                <ArrowRight size={16} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCompleteReturn}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Processing Return...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    <span>Complete Vehicle Return</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {/* Lightbox Preview Modal */}

@@ -89,22 +89,22 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-fade-in-up">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 pb-12 animate-fade-in-up">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <button 
             onClick={() => router.back()}
-            className="p-2 border border-border rounded-xl hover:bg-gray-50 transition-colors bg-white shadow-sm"
+            className="p-2 border border-border rounded-xl hover:bg-gray-50 transition-colors bg-white shadow-2xs"
           >
-            <ChevronLeft size={20} className="text-text-secondary" />
+            <ChevronLeft size={18} className="text-text-secondary" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">Contract Details</h1>
-            <p className="text-sm font-medium text-text-secondary mt-1">#{contractDetails.contractNumber || contractDetails._id?.toString().substring(0,8).toUpperCase()}</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Contract Details</h1>
+            <p className="text-xs sm:text-sm font-medium text-text-secondary mt-0.5">#{contractDetails.contractNumber || contractDetails._id?.toString().substring(0,8).toUpperCase()}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 self-start sm:self-auto">
           <StatusBadge
             variant={contractDetails.status.toLowerCase().replace(" ", "-") as any}
             text={contractDetails.status}
@@ -112,42 +112,42 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
-        <div className="p-6 md:p-8">
+      <div className="bg-white rounded-xl sm:rounded-2xl shadow-xs sm:shadow-sm border border-border overflow-hidden">
+        <div className="p-3.5 sm:p-6 md:p-8">
           {/* Info Grid */}
-          <div className="space-y-4 text-sm bg-gray-50/50 rounded-xl p-6 border border-gray-100 mb-8">
+          <div className="space-y-3.5 sm:space-y-4 text-xs sm:text-sm bg-gray-50/50 rounded-xl p-3.5 sm:p-6 border border-gray-100 mb-6 sm:mb-8">
             <div className="flex items-center justify-between group/row">
               <span className="flex items-center gap-2 text-text-muted font-medium">
-                <User size={16} /> Customer
+                <User size={15} /> Customer
               </span>
-              <span className="font-semibold text-text-primary">
+              <span className="font-semibold text-text-primary text-right">
                 {contractDetails.customer}
               </span>
             </div>
             <div className="w-full h-px bg-border/50" />
             <div className="flex items-center justify-between group/row">
               <span className="flex items-center gap-2 text-text-muted font-medium">
-                <User size={16} /> Driver
+                <User size={15} /> Driver
               </span>
-              <span className="font-semibold text-text-primary">
+              <span className="font-semibold text-text-primary text-right">
                 {contractDetails.driver}
               </span>
             </div>
             <div className="w-full h-px bg-border/50" />
             <div className="flex items-center justify-between group/row">
               <span className="flex items-center gap-2 text-text-muted font-medium">
-                <ExecutiveCarIcon size={16} /> Vehicle
+                <ExecutiveCarIcon size={15} /> Vehicle
               </span>
-              <span className="font-semibold text-text-primary">
+              <span className="font-semibold text-text-primary text-right">
                 {contractDetails.vehicle}
               </span>
             </div>
             <div className="w-full h-px bg-border/50" />
             <div className="flex items-center justify-between group/row">
               <span className="flex items-center gap-2 text-text-muted font-medium">
-                <Calendar size={16} /> Period
+                <Calendar size={15} /> Period
               </span>
-              <span className="font-semibold text-text-primary">
+              <span className="font-semibold text-text-primary text-right">
                 {contractDetails.startDate} - {contractDetails.endDate}
               </span>
             </div>
@@ -155,9 +155,9 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
             <div className="w-full h-px bg-border/50" />
             <div className="flex items-center justify-between group/row">
               <span className="flex items-center gap-2 text-text-muted font-medium">
-                <ExecutiveCarIcon size={16} /> Checkout Mileage
+                <ExecutiveCarIcon size={15} /> Checkout Mileage
               </span>
-              <span className="font-semibold text-text-primary">
+              <span className="font-semibold text-text-primary text-right">
                 {contractDetails?.checkoutMileage !== undefined ? contractDetails.checkoutMileage.toLocaleString() : (contractDetails?.unitId?.mileage?.toLocaleString() || 0)} km
               </span>
             </div>
@@ -165,9 +165,9 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
             <div className="w-full h-px bg-border/50" />
             <div className="flex items-center justify-between group/row">
               <span className="flex items-center gap-2 text-text-muted font-medium">
-                <DollarSign size={16} /> Daily Rate
+                <DollarSign size={15} /> Daily Rate
               </span>
-              <span className="font-semibold text-text-primary">
+              <span className="font-semibold text-text-primary text-right">
                 ${contractDetails?.dailyRate || 0}
               </span>
             </div>
@@ -175,9 +175,9 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
             <div className="w-full h-px bg-border/50" />
             <div className="flex items-center justify-between group/row">
               <span className="flex items-center gap-2 text-text-muted font-medium">
-                <CheckCircle size={16} /> Daily KM Limit
+                <CheckCircle size={15} /> Daily KM Limit
               </span>
-              <span className="font-semibold text-text-primary">
+              <span className="font-semibold text-text-primary text-right">
                 {contractDetails?.dailyKmLimit ? `${contractDetails.dailyKmLimit} km` : "Unlimited"}
               </span>
             </div>
@@ -185,9 +185,9 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
             <div className="w-full h-px bg-border/50" />
             <div className="flex items-center justify-between group/row">
               <span className="flex items-center gap-2 text-text-muted font-medium">
-                <DollarSign size={16} /> Price per Extra KM
+                <DollarSign size={15} /> Price per Extra KM
               </span>
-              <span className="font-semibold text-text-primary">
+              <span className="font-semibold text-text-primary text-right">
                 ${contractDetails?.pricePerExtraKm || 0}
               </span>
             </div>
@@ -195,78 +195,78 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
 
           {/* Damages Section */}
           {damages.length > 0 && (
-            <div className="mb-8">
-              <h4 className="text-base font-bold text-gray-900 mb-4">Damages Related to Contract</h4>
-              <div className="space-y-3">
+            <div className="mb-6 sm:mb-8">
+              <h4 className="text-sm sm:text-base font-bold text-gray-900 mb-3 sm:mb-4">Damages Related to Contract</h4>
+              <div className="space-y-2.5 sm:space-y-3">
                 {damages.map(damage => (
-                  <div key={damage._id} className="bg-red-50/50 rounded-xl p-5 border border-red-100 flex items-start justify-between hover:bg-red-50 transition-colors">
+                  <div key={damage._id} className="bg-red-50/50 rounded-xl p-3.5 sm:p-5 border border-red-100 flex items-start justify-between hover:bg-red-50 transition-colors">
                     <div>
-                      <p className="text-sm font-semibold text-red-900">{damage.description}</p>
-                      <p className="text-xs font-bold uppercase tracking-wider text-red-700 mt-2">Status: {damage.status}</p>
+                      <p className="text-xs sm:text-sm font-semibold text-red-900">{damage.description}</p>
+                      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-red-700 mt-1.5">Status: {damage.status}</p>
                     </div>
-                    <span className="text-base font-bold text-red-600">AED {damage.cost}</span>
+                    <span className="text-sm sm:text-base font-bold text-red-600">AED {damage.cost}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-
-
           {/* Document Details */}
-          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-red-500 shadow-sm border border-gray-100">
-                <FileText size={24} />
+          <div className="bg-gray-50 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl flex items-center justify-center text-red-500 shadow-2xs border border-gray-100 shrink-0">
+                <FileText size={20} className="sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <p className="text-base font-bold text-gray-900">{contractDetails.contractNumber ? `${contractDetails.contractNumber}.pdf` : 'Contract.pdf'}</p>
-                <p className="text-xs font-medium text-gray-500 mt-1">2.4 MB • Signed</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-base font-bold text-gray-900 truncate">{contractDetails.contractNumber ? `${contractDetails.contractNumber}.pdf` : 'Contract.pdf'}</p>
+                <p className="text-[11px] sm:text-xs font-medium text-gray-500 mt-0.5">2.4 MB • Signed</p>
               </div>
             </div>
             <button
               onClick={() => window.open(`/bookings/${contractDetails._id}/print`, "_blank")}
-              className="p-3 bg-white border border-gray-200 rounded-xl hover:text-brand hover:border-brand hover:shadow-md transition-all cursor-pointer text-gray-600"
+              className="p-2.5 sm:p-3 bg-white border border-gray-200 rounded-xl hover:text-brand hover:border-brand hover:shadow-md transition-all cursor-pointer text-gray-600 shrink-0"
+              title="Download or Print PDF"
             >
-              <Download size={18} />
+              <Download size={16} />
             </button>
           </div>
         </div>
 
         {/* Action Footer */}
-        <div className="px-6 py-5 border-t border-gray-100 bg-gray-50 flex flex-col sm:flex-row gap-3 justify-end">
-          <div className="flex items-center gap-2">
-            <button className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-100 hover:border-gray-300 text-gray-700 text-sm font-bold px-4 py-3 rounded-xl transition-all shadow-sm cursor-pointer">
-              <Mail size={16} className="text-gray-400" /> Resend Email
-            </button>
-            {contractDetails.clientId?.phone ? (
-              <a
-                href={`tel:${contractDetails.clientId.phone.replace(/[^0-9+]/g, '')}`}
-                className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-text-primary font-bold px-4 py-3 rounded-xl transition-all shadow-sm"
-              >
-                <Phone size={16} className="text-text-primary" /> Call Client
-              </a>
-            ) : (
-              <button 
-                type="button"
-                onClick={() => toast.error("No phone number available for this customer.")}
-                className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-gray-100 border border-gray-200 text-gray-400 font-bold px-4 py-3 rounded-xl transition-all shadow-sm cursor-not-allowed"
-              >
-                <Phone size={16} /> Call Client
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 text-sm font-bold px-5 py-3 rounded-xl transition-all shadow-sm cursor-pointer">
-              <Send size={16} className="text-gray-400" /> Send PDF
-            </button>
-            <button
-              onClick={() => window.open(`/bookings/${contractDetails._id}/print`, "_blank")}
-              className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-brand text-white text-sm font-bold px-5 py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:bg-brand-dark hover:-translate-y-0.5 cursor-pointer"
+        <div className="px-3.5 sm:px-6 py-3.5 sm:py-5 border-t border-gray-100 bg-gray-50 grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+          <button className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-gray-200 hover:bg-gray-100 hover:border-gray-300 text-gray-700 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs cursor-pointer">
+            <Mail size={15} className="text-gray-400" />
+            <span>Resend Email</span>
+          </button>
+          {contractDetails.clientId?.phone ? (
+            <a
+              href={`tel:${contractDetails.clientId.phone.replace(/[^0-9+]/g, '')}`}
+              className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-text-primary text-xs sm:text-sm font-bold px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs"
             >
-              <Printer size={16} /> Print PDF
+              <Phone size={15} className="text-text-primary" />
+              <span>Call Client</span>
+            </a>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => toast.error("No phone number available for this customer.")}
+              className="flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-100 border border-gray-200 text-gray-400 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs cursor-not-allowed"
+            >
+              <Phone size={15} />
+              <span>Call Client</span>
             </button>
-          </div>
+          )}
+          <button className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs sm:text-sm font-bold px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs cursor-pointer">
+            <Send size={15} className="text-gray-400" />
+            <span>Send PDF</span>
+          </button>
+          <button
+            onClick={() => window.open(`/bookings/${contractDetails._id}/print`, "_blank")}
+            className="flex items-center justify-center gap-1.5 sm:gap-2 bg-brand text-white text-xs sm:text-sm font-bold px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:bg-brand-dark cursor-pointer"
+          >
+            <Printer size={15} />
+            <span>Print PDF</span>
+          </button>
         </div>
       </div>
     </div>

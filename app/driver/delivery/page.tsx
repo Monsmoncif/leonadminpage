@@ -1945,9 +1945,9 @@ export default function ConfirmDeliveryPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-16 sm:pb-20">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4 animate-fade-in-up">
         <div>
           <button
             onClick={() => router.push("/driver")}
@@ -1955,13 +1955,13 @@ export default function ConfirmDeliveryPage() {
           >
             <ArrowLeft size={14} /> Back to Driver Dashboard
           </button>
-          <h1 className="text-2xl font-bold text-text-primary">Confirm Vehicle Handover</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Confirm Vehicle Handover</h1>
         </div>
       </div>
 
       {/* Stepper Header (100% IDENTICAL to Admin Create New Booking) */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-6 animate-fade-in-up stagger-1">
-        <div className="relative w-full max-w-4xl mx-auto px-2 sm:px-4">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 animate-fade-in-up stagger-1">
+        <div className="relative w-full max-w-4xl mx-auto px-1 sm:px-4">
           {/* Background Track Line */}
           <div
             className="absolute top-[18px] -translate-y-1/2 h-[2px] bg-gray-200 z-0 hidden sm:block pointer-events-none"
@@ -2020,11 +2020,17 @@ export default function ConfirmDeliveryPage() {
               </div>
             ))}
           </div>
+
+          {/* Mobile Current Step Indicator */}
+          <div className="sm:hidden text-center mt-2.5 pt-2 border-t border-border/50">
+            <span className="text-[11px] font-bold text-brand uppercase tracking-wider">Step {currentStep} of {totalSteps}:</span>{" "}
+            <span className="text-xs font-semibold text-text-primary">{STEPS[currentStep - 1]?.title}</span>
+          </div>
         </div>
       </div>
 
       {/* Wizard Step Content (Matching Admin Container & Inner Buttons) */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-6 sm:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 md:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-xs text-red-700 animate-shake">
             <AlertCircle size={18} className="shrink-0 text-red-600" />
@@ -2035,29 +2041,29 @@ export default function ConfirmDeliveryPage() {
         {renderStepContent()}
 
         {/* Step Navigation Buttons (Matching Admin Inner Navigation Footer) */}
-        <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handleBack}
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <ArrowLeft size={16} />
               Previous Step
             </button>
           ) : (
-            <div />
+            <div className="hidden sm:block" />
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
             {currentStep < totalSteps ? (
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
               >
-                Next Step
+                <span>Next Step</span>
                 <ArrowRight size={16} />
               </button>
             ) : (
@@ -2065,7 +2071,7 @@ export default function ConfirmDeliveryPage() {
                 type="button"
                 onClick={handleConfirmHandover}
                 disabled={isSubmitting}
-                className="px-8 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-md cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto px-6 sm:px-8 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>

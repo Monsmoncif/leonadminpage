@@ -563,18 +563,18 @@ export default function DriverDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
+      {/* Summary Header (Matches Bookings Page Style) */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 animate-fade-in-up">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Driver Operations Hub</h1>
-          <p className="text-sm text-text-secondary mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Driver Operations Hub</h1>
+          <p className="text-xs sm:text-sm text-text-secondary mt-1">
             Welcome back, {session?.user?.name?.split(" ")[0] || "Driver"}. Manage your assigned delivery handovers and vehicle returns.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Link
             href="/driver/contracts/new"
-            className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:shadow transition-all cursor-pointer shrink-0"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
           >
             <Plus size={18} />
             <span>New Contract</span>
@@ -582,22 +582,22 @@ export default function DriverDashboard() {
         </div>
       </div>
 
-      {/* Stats Cards - Inspired by admin drivers page */}
+      {/* Stats Cards - 2 Columns on Mobile, 4 on Desktop */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-up stagger-1">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 animate-fade-in-up stagger-1">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-card border border-border rounded-2xl h-[130px] p-5 animate-pulse">
+            <div key={i} className="bg-card border border-border rounded-xl sm:rounded-2xl h-[120px] sm:h-[130px] p-3.5 sm:p-5 animate-pulse">
               <div className="flex justify-between">
-                <div className="w-11 h-11 bg-gray-200 rounded-xl mb-3"></div>
-                <div className="w-16 h-8 bg-gray-100 rounded-md"></div>
+                <div className="w-8 h-8 sm:w-11 sm:h-11 bg-gray-200 rounded-xl mb-2 sm:mb-3"></div>
+                <div className="w-12 sm:w-16 h-6 sm:h-8 bg-gray-100 rounded-md"></div>
               </div>
-              <div className="w-24 h-4 bg-gray-200 rounded-md mb-2"></div>
-              <div className="w-16 h-8 bg-gray-200 rounded-md"></div>
+              <div className="w-16 sm:w-24 h-3 sm:h-4 bg-gray-200 rounded-md mb-2"></div>
+              <div className="w-12 sm:w-16 h-5 sm:h-8 bg-gray-200 rounded-md"></div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-up stagger-1">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 animate-fade-in-up stagger-1">
           <div className="stagger-1">
             <StatCard 
               icon={ExecutiveCarIcon} 
@@ -648,8 +648,8 @@ export default function DriverDashboard() {
       {/* Main Content Section with Toolbar & View Switcher (Table or Cards) */}
       <div className="grid grid-cols-12 gap-6 animate-fade-in-up stagger-2">
         <div className="col-span-12 flex flex-col gap-6">
-          {/* Toolbar */}
-          <div className="relative z-20 bg-card rounded-2xl border border-border p-4 shadow-sm flex flex-col sm:flex-row justify-between gap-4 card-hover">
+          {/* Toolbar (Responsive for Mobile & Desktop) */}
+          <div className="relative z-20 bg-card rounded-xl sm:rounded-2xl border border-border p-3 sm:p-4 shadow-xs sm:shadow-sm flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 card-hover">
             <div className="relative max-w-sm w-full">
               <input
                 type="text"
@@ -659,11 +659,11 @@ export default function DriverDashboard() {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full text-sm border border-border rounded-xl pl-10 pr-8 py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm"
+                className="w-full text-xs sm:text-sm border border-border rounded-xl pl-9 sm:pl-10 pr-8 py-2 sm:py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
               />
               <Search
-                size={16}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
+                size={15}
+                className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
               />
               {searchQuery && (
                 <button
@@ -677,45 +677,45 @@ export default function DriverDashboard() {
             </div>
 
             {/* Controls: Filter Tabs + Assignment Filter + View Mode Switcher */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               {/* Filter Tabs */}
-              <div className="bg-gray-100/80 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold shrink-0">
+              <div className="bg-gray-100/80 p-0.5 sm:p-1 rounded-xl flex items-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-semibold shrink-0">
                 <button
                   type="button"
                   onClick={() => { setActiveTab("today"); setCurrentPage(1); }}
-                  className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 ${
                     activeTab === "today"
                       ? "bg-white text-text-primary shadow-xs font-bold"
                       : "text-text-muted hover:text-text-primary"
                   }`}
                 >
                   <span>Active Tasks</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold">
+                  <span className="px-1.5 py-0.2 rounded-full text-[9.5px] sm:text-[10px] bg-amber-100 text-amber-800 font-bold">
                     {todayDeliveries.length}
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => { setActiveTab("all"); setCurrentPage(1); }}
-                  className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 ${
                     activeTab === "all"
                       ? "bg-white text-text-primary shadow-xs font-bold"
                       : "text-text-muted hover:text-text-primary"
                   }`}
                 >
                   <span>All History</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-700 font-bold">
+                  <span className="px-1.5 py-0.2 rounded-full text-[9.5px] sm:text-[10px] bg-gray-200 text-gray-700 font-bold">
                     {historyContracts.length}
                   </span>
                 </button>
               </div>
 
               {/* Assignment Filter */}
-              <div className="bg-gray-100/80 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold shrink-0">
+              <div className="bg-gray-100/80 p-0.5 sm:p-1 rounded-xl flex items-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-semibold shrink-0">
                 <button
                   type="button"
                   onClick={() => { setAssignmentFilter("all"); setCurrentPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
                     assignmentFilter === "all"
                       ? "bg-white text-brand shadow-xs font-bold"
                       : "text-text-muted hover:text-text-primary"
@@ -727,7 +727,7 @@ export default function DriverDashboard() {
                 <button
                   type="button"
                   onClick={() => { setAssignmentFilter("mine"); setCurrentPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
                     assignmentFilter === "mine"
                       ? "bg-white text-brand shadow-xs font-bold"
                       : "text-text-muted hover:text-text-primary"
@@ -736,7 +736,7 @@ export default function DriverDashboard() {
                 >
                   <span>Assigned to Me</span>
                   {myAssignmentsCount > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-brand/10 text-brand font-bold">
+                    <span className="px-1.5 py-0.2 rounded-full text-[9.5px] sm:text-[10px] bg-brand/10 text-brand font-bold">
                       {myAssignmentsCount}
                     </span>
                   )}
@@ -744,21 +744,21 @@ export default function DriverDashboard() {
               </div>
 
               {/* View Switcher: Table or Cards */}
-              <div className="bg-gray-100/80 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold shrink-0">
+              <div className="bg-gray-100/80 p-0.5 sm:p-1 rounded-xl flex items-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-semibold shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setHasManuallyChangedView(true);
                     setViewMode("table");
                   }}
-                  className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-2 sm:px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
                     viewMode === "table"
                       ? "bg-white text-brand shadow-xs font-bold"
                       : "text-text-muted hover:text-text-primary"
                   }`}
                   title="Table View"
                 >
-                  <List size={14} />
+                  <List size={13} />
                   <span className="hidden sm:inline">Table</span>
                 </button>
                 <button
@@ -767,19 +767,20 @@ export default function DriverDashboard() {
                     setHasManuallyChangedView(true);
                     setViewMode("cards");
                   }}
-                  className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-2 sm:px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
                     viewMode === "cards"
                       ? "bg-white text-brand shadow-xs font-bold"
                       : "text-text-muted hover:text-text-primary"
                   }`}
                   title="Cards View"
                 >
-                  <LayoutGrid size={14} />
+                  <LayoutGrid size={13} />
                   <span className="hidden sm:inline">Cards</span>
                 </button>
               </div>
             </div>
           </div>
+
 
           {/* Task Content: Empty State, Cards View, or Table View */}
           {loading ? (
@@ -791,12 +792,12 @@ export default function DriverDashboard() {
               </div>
             </div>
           ) : paginatedContracts.length === 0 ? (
-            <div className="bg-card rounded-2xl border border-border p-16 text-center">
+            <div className="bg-card rounded-xl sm:rounded-2xl border border-border p-8 sm:p-16 text-center">
               <div className="flex flex-col items-center justify-center">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3 border border-dashed border-gray-300">
-                  <ExecutiveCarIcon size={30} className="text-gray-300" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3 border border-dashed border-gray-300">
+                  <ExecutiveCarIcon size={26} className="text-gray-300" />
                 </div>
-                <h2 className="text-base font-bold text-gray-900 mb-1">
+                <h2 className="text-sm sm:text-base font-bold text-gray-900 mb-1">
                   {searchQuery ? "No matching tasks found" : (activeTab === "today" ? "No active tasks right now" : "No contract history found")}
                 </h2>
                 <p className="text-gray-500 text-xs max-w-sm mb-4">
@@ -815,7 +816,7 @@ export default function DriverDashboard() {
           ) : viewMode === "cards" ? (
             /* ================= CARDS VIEW ================= */
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {paginatedContracts.map((contract, idx) => {
                   const driverId = (session?.user as any)?.id;
                   const isDeliveryForMe = matchDriverId(contract.deliveryDriverId, driverId) || (!contract.deliveryDriverId && matchDriverId(contract.driverId, driverId));
@@ -841,7 +842,7 @@ export default function DriverDashboard() {
                   return (
                     <div 
                       key={contract._id || contract.id}
-                      className="bg-white rounded-2xl border border-border shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between gap-4 group animate-fade-in-up card-hover"
+                      className="bg-white rounded-xl sm:rounded-2xl border border-border shadow-xs hover:shadow-md transition-all p-3.5 sm:p-5 flex flex-col justify-between gap-3.5 sm:gap-4 group animate-fade-in-up card-hover"
                       style={{ animationDelay: `${idx * 0.04 + 0.05}s` }}
                     >
                       <div className="space-y-3.5">

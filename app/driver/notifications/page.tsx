@@ -116,39 +116,40 @@ export default function DriverNotificationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
+    <div className="space-y-4 sm:space-y-6 pb-12">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 animate-fade-in-up">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Notifications</h1>
-          <p className="text-sm text-text-secondary mt-1">Stay updated on your contracts and schedules.</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Notifications</h1>
+          <p className="text-xs sm:text-sm text-text-secondary mt-0.5">Stay updated on your contracts and schedules.</p>
         </div>
         <button 
           onClick={handleMarkAllRead}
-          className="flex items-center gap-2 bg-white border border-border text-text-secondary px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors shadow-sm"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white border border-border text-text-secondary px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
         >
-          <CheckCircle size={16} /> Mark all as read
+          <CheckCircle size={15} />
+          <span>Mark all as read</span>
         </button>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-6 animate-fade-in-up stagger-1">
-        <div className="space-y-4">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 animate-fade-in-up stagger-1">
+        <div className="space-y-3 sm:space-y-4">
           {notifications.length === 0 ? (
-            <div className="text-center py-10 text-text-muted">
+            <div className="text-center py-10 sm:py-12 text-text-muted text-xs sm:text-sm font-medium">
               You're all caught up!
             </div>
           ) : (
             notifications.map((notif) => (
-              <div key={notif._id} className={`flex gap-4 p-4 rounded-xl border transition-colors ${notif.read ? 'border-border/50 bg-gray-50/50 opacity-70' : 'border-brand/20 bg-brand-light/20 hover:bg-brand-light/30'}`}>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+              <div key={notif._id} className={`flex gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border transition-colors ${notif.read ? 'border-border/50 bg-gray-50/50 opacity-70' : 'border-brand/20 bg-brand-light/20 hover:bg-brand-light/30'}`}>
+                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${
                   notif.type === 'contract' ? 'bg-emerald-50 text-emerald-500' : 
                   notif.type === 'alert' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-500'
                 }`}>
-                  <Bell size={18} />
+                  <Bell size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </div>
-                <div className="pt-0.5">
-                  <p className="text-sm font-bold text-text-primary mb-0.5">{notif.title}</p>
-                  <p className="text-[13.5px] text-text-secondary font-medium">{notif.message}</p>
-                  <p className="text-xs text-text-muted mt-1.5 font-medium">{formatTime(notif.createdAt)}</p>
+                <div className="pt-0.5 min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-bold text-text-primary mb-0.5">{notif.title}</p>
+                  <p className="text-xs sm:text-[13.5px] text-text-secondary font-medium leading-relaxed">{notif.message}</p>
+                  <p className="text-[11px] sm:text-xs text-text-muted mt-1.5 font-medium">{formatTime(notif.createdAt)}</p>
                 </div>
               </div>
             ))

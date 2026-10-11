@@ -15,6 +15,13 @@ const pageTitles: Record<string, string> = {
   "/drivers": "Drivers",
   "/tracking": "Tracking",
   "/messages": "Messages",
+  "/driver": "Driver Operations",
+  "/driver/delivery": "Vehicle Handover",
+  "/driver/return": "Vehicle Return",
+  "/driver/handover": "Vehicle Handover",
+  "/driver/notifications": "Notifications",
+  "/driver/profile": "Profile",
+  "/driver/contracts/new": "New Contract",
 };
 
 export default function TopBar() {
