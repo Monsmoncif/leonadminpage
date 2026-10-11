@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, ArrowRight } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useToast } from "@/components/providers/ToastProvider";
 
 export default function LoginPage() {
@@ -34,9 +34,8 @@ export default function LoginPage() {
       
       // Check role to direct to correct dashboard
       try {
-        const sessRes = await fetch("/api/auth/session");
-        const sessData = await sessRes.json();
-        if (sessData?.user?.role === "driver") {
+        const session = await getSession();
+        if ((session?.user as any)?.role === "driver") {
           window.location.href = "/driver";
           return;
         }
@@ -51,10 +50,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 items-center justify-center">
+    <div className="flex min-h-screen bg-gray-50 items-center justify-center" suppressHydrationWarning>
       {/* Login Form */}
-      <div className="w-full max-w-md p-6 sm:p-12">
-        <div className="w-full max-w-md space-y-8 animate-fade-in-up">
+      <div className="w-full max-w-md p-6 sm:p-12" suppressHydrationWarning>
+        <div className="w-full max-w-md space-y-8 animate-fade-in-up" suppressHydrationWarning>
           <div className="text-center lg:text-left">
             <h2 className="text-3xl font-bold text-text-primary tracking-tight">Welcome back</h2>
             <p className="text-text-secondary mt-2">Please enter your details to sign in.</p>
@@ -80,12 +79,8 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-text-primary">Password</label>
-                  <a href="#" className="text-xs font-semibold text-brand hover:text-brand-dark transition-colors">
-                    Forgot password?
-                  </a>
-                </div>
+                <label className="block text-sm font-semibold text-text-primary mb-2">Password</label>
+
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                     <Lock size={18} className="text-text-muted" />

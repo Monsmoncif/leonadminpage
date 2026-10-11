@@ -53,17 +53,17 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   if (status === "loading" || (status === "unauthenticated" && !isAuthPage && !isPrintPage)) {
     // Show a clean loading state to prevent flash of content before redirect
-    return <div className="min-h-screen bg-surface flex items-center justify-center" />;
+    return <div className="min-h-screen bg-surface flex items-center justify-center" suppressHydrationWarning />;
   }
 
   if (status === "authenticated") {
     const role = (session?.user as any)?.role;
     // Show a loading state while the useEffect is triggering the redirect
     if (role === "driver" && !isDriverPath && !isPrintPage && !isAuthPage) {
-      return <div className="min-h-screen bg-surface flex items-center justify-center" />;
+      return <div className="min-h-screen bg-surface flex items-center justify-center" suppressHydrationWarning />;
     }
     if (role === "admin" && isDriverPath && !isPrintPage && !isAuthPage) {
-      return <div className="min-h-screen bg-surface flex items-center justify-center" />;
+      return <div className="min-h-screen bg-surface flex items-center justify-center" suppressHydrationWarning />;
     }
   }
 
