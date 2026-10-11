@@ -12,8 +12,6 @@ import {
   Navigation, 
   Search, 
   AlertCircle,
-  LayoutGrid,
-  List,
   Plus
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
@@ -25,6 +23,7 @@ import Link from "next/link";
 import { useToast } from "@/components/providers/ToastProvider";
 import { sparklineData } from "@/data/mock";
 import ConfirmDeliveryModal from "@/components/modals/ConfirmDeliveryModal";
+import TablePagination from "@/components/ui/TablePagination";
 
 const getInitials = (name: string) => {
   if (!name) return "CL";
@@ -118,33 +117,8 @@ export default function DriverDashboard() {
   const [activeTab, setActiveTab] = useState<"today" | "all">("today");
   const [assignmentFilter, setAssignmentFilter] = useState<"all" | "mine">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
-  const [hasManuallyChangedView, setHasManuallyChangedView] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
-  // Automatically select "cards" for phones and tablets (< 1024px), and "table" for laptops (>= 1024px)
-  useEffect(() => {
-    const handleScreenSize = () => {
-      const isPhoneOrTablet = window.innerWidth < 1024;
-      setViewMode(isPhoneOrTablet ? "cards" : "table");
-    };
-
-    handleScreenSize();
-
-    const handleResize = () => {
-      setHasManuallyChangedView((manual) => {
-        if (!manual) {
-          const isPhoneOrTablet = window.innerWidth < 1024;
-          setViewMode(isPhoneOrTablet ? "cards" : "table");
-        }
-        return manual;
-      });
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
   
   const [stats, setStats] = useState({
     total: 0,
@@ -743,41 +717,6 @@ export default function DriverDashboard() {
                 </button>
               </div>
 
-              {/* View Switcher: Table or Cards */}
-              <div className="bg-gray-100/80 p-0.5 sm:p-1 rounded-xl flex items-center gap-0.5 sm:gap-1 text-[11px] sm:text-xs font-semibold shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHasManuallyChangedView(true);
-                    setViewMode("table");
-                  }}
-                  className={`px-2 sm:px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
-                    viewMode === "table"
-                      ? "bg-white text-brand shadow-xs font-bold"
-                      : "text-text-muted hover:text-text-primary"
-                  }`}
-                  title="Table View"
-                >
-                  <List size={13} />
-                  <span className="hidden sm:inline">Table</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHasManuallyChangedView(true);
-                    setViewMode("cards");
-                  }}
-                  className={`px-2 sm:px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
-                    viewMode === "cards"
-                      ? "bg-white text-brand shadow-xs font-bold"
-                      : "text-text-muted hover:text-text-primary"
-                  }`}
-                  title="Cards View"
-                >
-                  <LayoutGrid size={13} />
-                  <span className="hidden sm:inline">Cards</span>
-                </button>
-              </div>
             </div>
           </div>
 
@@ -812,240 +751,6 @@ export default function DriverDashboard() {
                   </button>
                 )}
               </div>
-            </div>
-          ) : viewMode === "cards" ? (
-            /* ================= CARDS VIEW ================= */
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {paginatedContracts.map((contract, idx) => {
-                  const driverId = (session?.user as any)?.id;
-                  const isDeliveryForMe = matchDriverId(contract.deliveryDriverId, driverId) || (!contract.deliveryDriverId && matchDriverId(contract.driverId, driverId));
-                  const isReturnForMe = matchDriverId(contract.returnDriverId, driverId);
-
-                  const isDelivered = contract.deliveryStatus === "Delivered";
-                  const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned";
-                  const isPendingDelivery = !isDelivered && !isReturned;
-
-                  const timeInfo = getTaskTimeAndUrgency(contract, isPendingDelivery, isReturnForMe, activeTab === "all");
-                  const vehicleInfo = getVehicleDisplay(contract);
-                  const assignedDriverName = getAssignedDriverName(contract);
-                  const isReturnTask = activeTab === "today" 
-                    ? (!isPendingDelivery && isReturnForMe) 
-                    : (isReturned && isReturnForMe);
-
-                  const locationText = isReturnTask 
-                    ? (contract.dropoffLocation || contract.pickupLocation || "Main Office")
-                    : (contract.pickupLocation || "Main Office");
-
-                  const locationLabel = isReturnTask ? "Return Location" : "Handover Location";
-
-                  return (
-                    <div 
-                      key={contract._id || contract.id}
-                      className="bg-white rounded-xl sm:rounded-2xl border border-border shadow-xs hover:shadow-md transition-all p-3.5 sm:p-5 flex flex-col justify-between gap-3.5 sm:gap-4 group animate-fade-in-up card-hover"
-                      style={{ animationDelay: `${idx * 0.04 + 0.05}s` }}
-                    >
-                      <div className="space-y-3.5">
-                        {/* Top: Contract #, Task Type, Time badge */}
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-mono font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-md">
-                              #{contract.id || contract._id?.substring(0,8).toUpperCase()}
-                            </span>
-                            
-                            {isPendingDelivery ? (
-                              <span className="text-[11px] font-bold text-amber-800 bg-amber-100/90 px-2.5 py-0.5 rounded-md">
-                                Delivery Handover
-                              </span>
-                            ) : isReturnForMe && !isReturned && activeTab === "today" ? (
-                              <span className="text-[11px] font-bold text-purple-800 bg-purple-100/90 px-2.5 py-0.5 rounded-md">
-                                Assigned Return
-                              </span>
-                            ) : isReturned ? (
-                              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-md">
-                                Completed
-                              </span>
-                            ) : isDelivered ? (
-                              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-md">
-                                Delivered • With Client
-                              </span>
-                            ) : (
-                              <span className="text-[11px] font-semibold text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-md">
-                                Rental Active
-                              </span>
-                            )}
-
-                            {isPendingDelivery && isDeliveryForMe && (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/90 px-2 py-0.5 rounded-md">
-                                Assigned to You
-                              </span>
-                            )}
-                          </div>
-
-                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs border ${timeInfo.badgeColor}`} title={`${timeInfo.label}: ${timeInfo.dayLabel} at ${timeInfo.timeStr}`}>
-                            <Clock size={11} />
-                            <span>{timeInfo.badgeText} • {timeInfo.timeStr}</span>
-                          </div>
-                        </div>
-
-                        {/* Customer & Quick Contact */}
-                        <div className="flex items-center justify-between gap-3 p-3 bg-gray-50/70 rounded-xl border border-border/60">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div
-                              className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${getAvatarColor(
-                                contract.customer
-                              )}`}
-                            >
-                              {getInitials(contract.customer)}
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Client</span>
-                              <strong className="text-xs font-bold text-text-primary truncate block" title={contract.customer}>
-                                {contract.customer || "Unknown Client"}
-                              </strong>
-                            </div>
-                          </div>
-
-                          {contract.customerPhone && (
-                            <div className="flex items-center shrink-0">
-                              <a
-                                href={`tel:${contract.customerPhone.replace(/[^0-9+]/g, '')}`}
-                                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 text-text-primary flex items-center justify-center transition-all border border-border/80 shadow-2xs"
-                                title={`Call ${contract.customerPhone}`}
-                                aria-label={`Call ${contract.customerPhone}`}
-                              >
-                                <Phone size={14} className="text-text-primary" />
-                              </a>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Vehicle & Plate */}
-                        <div className="flex items-center justify-between gap-2 p-3 bg-gray-50/70 rounded-xl border border-border/60">
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Vehicle</span>
-                            <span className="font-bold text-xs text-text-primary truncate block mt-0.5">
-                              {vehicleInfo.name}
-                              {vehicleInfo.year && <span className="text-text-muted font-normal ml-1">({vehicleInfo.year})</span>}
-                            </span>
-                          </div>
-                          {vehicleInfo.plate && (
-                            <div className="shrink-0 text-right">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Plate</span>
-                              <span className="font-bold text-xs text-text-primary block mt-0.5" title="Vehicle License Plate">
-                                {vehicleInfo.plate}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Location & Maps Navigation */}
-                        <div className="flex items-center justify-between gap-2 p-3 bg-gray-50/70 rounded-xl border border-border/60">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-                              <MapPin size={11} className={isReturnTask ? "text-purple-600 shrink-0" : "text-emerald-600 shrink-0"} />
-                              <span>{locationLabel}</span>
-                            </div>
-                            <span className="text-xs font-semibold text-text-primary truncate block mt-0.5" title={`${locationLabel}: ${locationText}`}>
-                              {locationText}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => openGoogleMaps(locationText)}
-                            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
-                            title={`Open ${locationLabel} in Google Maps`}
-                          >
-                            <Navigation size={10} className="rotate-45" />
-                            <span>Maps</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Action Row: Primary Handover / Return */}
-                      <div className="pt-2 border-t border-border/60 flex items-center gap-2">
-
-                        {isPendingDelivery && isDeliveryForMe ? (
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/driver/delivery?contractId=${contract._id || contract.id}`)}
-                            className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer"
-                            title="Confirm vehicle delivery to customer"
-                          >
-                            <CheckCircle2 size={15} />
-                            <span>Confirm Handover</span>
-                          </button>
-                        ) : isPendingDelivery ? (
-                          <div className="flex-1 py-2 px-3 bg-amber-50/90 text-amber-800 text-center rounded-xl text-xs font-semibold border border-amber-200/80 flex items-center justify-center gap-1.5 truncate" title={assignedDriverName ? `Assigned to ${assignedDriverName}` : "Pending Handover"}>
-                            <Clock size={13} className="text-amber-600 shrink-0" />
-                            <span className="truncate">{assignedDriverName ? `Assigned: ${assignedDriverName}` : "Pending Handover"}</span>
-                          </div>
-                        ) : isDelivered && !isReturned && isReturnForMe && activeTab === "today" ? (
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/driver/return?contractId=${contract._id || contract.id}`)}
-                            className="flex-1 py-2.5 px-4 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer"
-                            title="Admin assigned you to pick up this vehicle"
-                          >
-                            <ArrowLeftRight size={15} />
-                            <span>Process Return</span>
-                          </button>
-                        ) : isDelivered && !isReturned ? (
-                          <div className="flex-1 py-2 bg-emerald-50 text-emerald-800 text-center rounded-xl text-xs font-semibold border border-emerald-200/80 flex items-center justify-center gap-1.5">
-                            <CheckCircle2 size={13} className="text-emerald-600" />
-                            <span>Delivered • With Client</span>
-                          </div>
-                        ) : (
-                          <div className="flex-1 py-2 bg-emerald-50 text-emerald-800 text-center rounded-xl text-xs font-semibold border border-emerald-200 flex items-center justify-center gap-1.5">
-                            <CheckCircle2 size={13} />
-                            <span>Completed</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Cards Pagination Footer */}
-              {!loading && filteredContracts.length > 0 && (
-                <div className="p-3.5 bg-white rounded-2xl border border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-secondary shadow-sm">
-                  <p>
-                    Showing{" "}
-                    <span className="font-medium text-text-primary">
-                      {filteredContracts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-                    </span>{" "}
-                    to{" "}
-                    <span className="font-medium text-text-primary">
-                      {Math.min(currentPage * itemsPerPage, filteredContracts.length)}
-                    </span>{" "}
-                    of{" "}
-                    <span className="font-medium text-text-primary">
-                      {filteredContracts.length}
-                    </span>{" "}
-                    tasks
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                      className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
-                    >
-                      Prev
-                    </button>
-                    <button className="px-2.5 py-1 bg-brand text-white rounded-md font-medium shadow-xs">
-                      {currentPage}
-                    </button>
-                    <button 
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages || totalPages === 0}
-                      className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             /* ================= TABLE VIEW ================= */
@@ -1245,42 +950,14 @@ export default function DriverDashboard() {
 
             {/* Table Pagination Footer */}
             {!loading && filteredContracts.length > 0 && (
-              <div className="p-3.5 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-secondary bg-white">
-                <p>
-                  Showing{" "}
-                  <span className="font-medium text-text-primary">
-                    {filteredContracts.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-medium text-text-primary">
-                    {Math.min(currentPage * itemsPerPage, filteredContracts.length)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-medium text-text-primary">
-                    {filteredContracts.length}
-                  </span>{" "}
-                  tasks
-                </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Prev
-                  </button>
-                  <button className="px-2.5 py-1 bg-brand text-white rounded-md font-medium shadow-xs">
-                    {currentPage}
-                  </button>
-                  <button 
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    className="px-2.5 py-1 border border-border rounded-md bg-white hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredContracts.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={(page) => setCurrentPage(page)}
+                itemLabel="tasks"
+              />
             )}
           </div>
         )}
