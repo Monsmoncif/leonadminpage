@@ -62,6 +62,8 @@ export interface IContract extends Document {
   isDispatched?: boolean;
   dispatchedAt?: Date;
   deliveredAt?: Date | string;
+  deliveredBy?: string;
+  handoverCompletedAt?: Date | string;
 
   // Return Data
   returnOdometer?: number;
@@ -180,6 +182,14 @@ const contractSchema = new Schema<IContract>(
       required: false
     },
     deliveredAt: {
+      type: Date,
+      required: false
+    },
+    deliveredBy: {
+      type: String,
+      required: false
+    },
+    handoverCompletedAt: {
       type: Date,
       required: false
     },

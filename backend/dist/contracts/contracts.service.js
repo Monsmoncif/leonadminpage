@@ -205,22 +205,43 @@ let ContractsService = class ContractsService {
             }
         }
         const checkoutMileage = unitDoc.mileage || 0;
-        const contractType = body.contractType || 'Delivery';
-        if (contractType === 'Shop' && !body.clientId) {
+        const isDriverUser = userRole === 'driver' || Boolean(body.isDriver);
+        const contractType = isDriverUser ? (body.contractType || 'Shop') : (body.contractType || 'Delivery');
+        if (contractType === 'Shop' && !isDriverUser && !body.clientId) {
             throw new common_1.BadRequestException('Client is required for Shop contracts.');
         }
-        const deliveryDriverId = body.deliveryDriverId || body.driverId || null;
+        const deliveryDriverId = isDriverUser
+            ? (currentUser?.id || body.deliveryDriverId)
+            : (body.deliveryDriverId || body.driverId || null);
         const returnDriverId = body.returnDriverId || null;
         const mainDriverId = deliveryDriverId || returnDriverId || null;
-        if (contractType === 'Delivery' && !deliveryDriverId) {
+        if (contractType === 'Delivery' && !isDriverUser && !deliveryDriverId) {
             throw new common_1.BadRequestException('A delivery driver must be assigned for Delivery contracts.');
         }
+        let initialStatus = 'Draft';
+        let initialDeliveryStatus = 'Pending';
+        let isDispatched = isDriverUser ? true : false;
+        let assignedContractNumber = undefined;
+        if (isDriverUser || body.deliveryStatus === 'Delivered') {
+            initialStatus = 'Active';
+            initialDeliveryStatus = 'Delivered';
+            isDispatched = true;
+            const lastContract = await this.contractModel
+                .findOne({ contractNumber: { $exists: true, $ne: null } })
+                .sort({ contractNumber: -1 })
+                .select('contractNumber')
+                .lean();
+            const nextContractNumber = lastContract && typeof lastContract.contractNumber === 'number' && lastContract.contractNumber >= 2200
+                ? lastContract.contractNumber + 1
+                : 2200;
+            assignedContractNumber = nextContractNumber;
+        }
         const contract = await this.contractModel.create({
-            contractNumber: undefined,
+            contractNumber: assignedContractNumber,
             clientId: body.clientId || null,
             unitId: body.unitId,
             contractType,
-            isDispatched: false,
+            isDispatched,
             driverId: mainDriverId,
             deliveryDriverId,
             returnDriverId,
@@ -236,7 +257,7 @@ let ContractsService = class ContractsService {
             depositAmount: body.depositAmount || 0,
             pickupLocation: body.pickupLocation || 'Main Office',
             dropoffLocation: body.dropoffLocation || '',
-            status: 'Draft',
+            status: initialStatus,
             notes: body.notes || '',
             returnNotes: body.returnNotes || '',
             checkoutTime: body.checkoutTime || '08:00 AM',
@@ -255,7 +276,10 @@ let ContractsService = class ContractsService {
             cleaningFees,
             customerSignature: body.customerSignature,
             inspectionPhotos: body.inspectionPhotos || [],
-            deliveryStatus: 'Pending',
+            deliveryStatus: initialDeliveryStatus,
+            deliveredBy: isDriverUser ? (userName || 'Driver') : (body.deliveredBy || undefined),
+            deliveredAt: isDriverUser ? new Date() : (body.deliveredAt || undefined),
+            handoverCompletedAt: isDriverUser ? new Date().toISOString() : (body.handoverCompletedAt || undefined),
             paymentMethod: body.paymentMethod || 'Cash',
             paymentStatus: body.paymentStatus || 'Pending',
             additionalDriverName: body.additionalDriverName || '',
@@ -265,6 +289,14 @@ let ContractsService = class ContractsService {
             additionalDriverExpiry: body.additionalDriverExpiry || '',
             additionalDriverIssuedAt: body.additionalDriverIssuedAt || '',
         });
+        if (initialStatus === 'Active') {
+            try {
+                await this.unitModel.findByIdAndUpdate(body.unitId, { status: 'Rented' });
+            }
+            catch (err) {
+                console.error('Failed to update unit status to Rented:', err);
+            }
+        }
         try {
             await this.notificationModel.create({
                 title: 'New Contract Created',

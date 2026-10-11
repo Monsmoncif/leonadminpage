@@ -195,14 +195,18 @@ export async function POST(req: Request) {
       await unitDoc.save();
     }
 
-    // Drivers can only create Delivery contracts, and are automatically assigned to themselves
-    const isDriverUser = userRole === "driver";
-    const contractType = isDriverUser ? "Delivery" : (body.contractType || "Delivery");
+    // Drivers can create contracts directly that are automatically active and delivered with no handover
+    let isDriverUser = userRole === "driver" || Boolean(body.isDriver);
+    if (!isDriverUser && currentUserId) {
+      const driverDoc = await User.findOne({ _id: currentUserId, role: "driver" }).lean();
+      if (driverDoc) isDriverUser = true;
+    }
 
-    // For Delivery contracts, clientId is optional (driver will register the client)
-    // For Shop contracts, clientId is required
-    // For Personalized contracts, clientId is optional (personalizedPersonName is used)
-    if (contractType === "Shop" && !body.clientId) {
+    const contractType = isDriverUser ? (body.contractType || "Shop") : (body.contractType || "Delivery");
+
+    // For Shop contracts created by Admin, clientId is required
+    // For Driver or Personalized, clientId is saved if provided
+    if (contractType === "Shop" && !isDriverUser && !body.clientId) {
       return NextResponse.json({ error: "Client is required for Shop contracts." }, { status: 400 });
     }
 
@@ -216,20 +220,20 @@ export async function POST(req: Request) {
     const returnDriverId = body.returnDriverId || null;
     const mainDriverId = deliveryDriverId || returnDriverId || null;
 
-    // For Delivery contracts, a driver must be assigned
-    if (contractType === "Delivery" && !deliveryDriverId) {
+    // For Delivery contracts created by Admin, a driver must be assigned
+    if (contractType === "Delivery" && !isDriverUser && !deliveryDriverId) {
       return NextResponse.json({ error: "A delivery driver must be assigned for Delivery contracts." }, { status: 400 });
     }
 
-    // Contracts are created unconfirmed without a contract number or dispatch notifications.
-    // When created by a driver, isDispatched is automatically true so it appears in driver dashboard.
+    // Contracts created by Admin start as Draft/Pending until dispatched/handed over.
+    // Contracts created by a Driver or Personalized are Active and Delivered automatically with NO handover required!
     let initialStatus: "Draft" | "Active" | "Completed" | "Cancelled" = "Draft";
     let initialDeliveryStatus: "Pending" | "Delivered" | "Returned" = "Pending";
     let isDispatched = isDriverUser ? true : Boolean(body.isDispatched);
     let assignedContractNumber: number | undefined = undefined;
 
-    // Personalized contracts are active and delivered immediately (no pending handover steps)
-    if (contractType === "Personalized") {
+    // Personalized contracts and Driver-created contracts are active and delivered immediately (no pending handover steps)
+    if (contractType === "Personalized" || isDriverUser) {
       initialStatus = "Active";
       initialDeliveryStatus = "Delivered";
       isDispatched = true;
@@ -285,6 +289,9 @@ export async function POST(req: Request) {
       adminSignature: body.adminSignature || "/images/admin-signature.png",
       inspectionPhotos: body.inspectionPhotos || [],
       deliveryStatus: initialDeliveryStatus,
+      deliveredBy: isDriverUser ? (userName || "Driver") : (body.deliveredBy || undefined),
+      deliveredAt: isDriverUser ? new Date() : (body.deliveredAt || undefined),
+      handoverCompletedAt: isDriverUser ? new Date().toISOString() : (body.handoverCompletedAt || undefined),
       paymentMethod: body.paymentMethod || "Cash",
       paymentStatus: body.paymentStatus || (Number(body.advancePayment) >= totalAmount ? "Paid" : (Number(body.advancePayment) > 0 ? "Partial" : "Pending")),
       additionalDriverName: body.additionalDriverName || "",
@@ -295,11 +302,11 @@ export async function POST(req: Request) {
       additionalDriverIssuedAt: body.additionalDriverIssuedAt || "",
     });
 
-    if (contractType === "Personalized") {
+    if (contractType === "Personalized" || isDriverUser) {
       try {
         await syncUnitStatuses(contract.unitId);
       } catch (syncErr) {
-        console.error("Failed to sync unit status for personalized contract:", syncErr);
+        console.error("Failed to sync unit status for contract:", syncErr);
       }
     }
 

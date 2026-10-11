@@ -113,7 +113,7 @@ export function NewRentalAdminPageContent() {
 
   useEffect(() => {
     if (isDriver) {
-      setContractType("Delivery");
+      setContractType("Shop");
       const match = drivers.find(d => 
         (d._id && String(d._id) === String(currentUserId)) || 
         (d.userId && String(d.userId) === String(currentUserId)) ||
@@ -871,7 +871,20 @@ export function NewRentalAdminPageContent() {
         ...(isEditMode && editingContract?.status && { status: editingContract.status }),
       };
 
-      if (contractType === "Personalized") {
+      if (isDriver) {
+        contractPayload.isDriver = true;
+        contractPayload.driverId = resolvedDriverId || currentUserId;
+        contractPayload.deliveryDriverId = resolvedDriverId || currentUserId;
+        contractPayload.clientId = selectedClient;
+        if (!isEditMode) {
+          contractPayload.status = "Active";
+          contractPayload.deliveryStatus = "Delivered";
+          contractPayload.isDispatched = true;
+          contractPayload.deliveredBy = (session?.user as any)?.name || "Driver";
+          contractPayload.handoverCompletedAt = new Date().toISOString();
+          contractPayload.deliveredAt = new Date().toISOString();
+        }
+      } else if (contractType === "Personalized") {
         const clientObj = clients.find(c => c._id === selectedClient);
         contractPayload.clientId = selectedClient;
         contractPayload.personalizedPersonName = clientObj?.name || personName.trim() || "Personal Use";
@@ -903,9 +916,6 @@ export function NewRentalAdminPageContent() {
         if (!isEditMode) {
           contractPayload.deliveryStatus = "Pending";
           contractPayload.status = "Draft";
-          if (isDriver) {
-            contractPayload.isDispatched = true;
-          }
         }
       } else {
         contractPayload.clientId = selectedClient;
@@ -933,10 +943,12 @@ export function NewRentalAdminPageContent() {
 
       if (isEditMode) {
         toast.success("Contract updated successfully! (تم حفظ التعديلات بنجاح)");
+      } else if (isDriver) {
+        toast.success("Contract created & activated! Car is with client. (تم إنشاء العقد وتفعيله مباشرة بدون تسليم مؤجل)");
       } else if (contractType === "Personalized") {
         toast.success("Personalized Booking Created! The vehicle is now marked as booked in the fleet. (تم إنشاء الحجز الشخصي وحجز السيارة بنجاح)");
       } else if (contractType === "Delivery") {
-        toast.success(isDriver ? "Delivery Booking Created! It is now in your active tasks." : "Delivery Booking Created! Click 'Dispatch' in the contracts table to assign number and send to driver.");
+        toast.success("Delivery Booking Created! Click 'Dispatch' in the contracts table to assign number and send to driver.");
       } else {
         toast.success("Shop Booking Created! Click 'Hand Over' in the contracts table when handing the car to the client. (تم إنشاء الحجز بنجاح! اضغط على 'تسليم' عند تسليم السيارة للعميل)");
       }
@@ -2394,11 +2406,13 @@ export function NewRentalAdminPageContent() {
           <p className="text-sm text-text-secondary mt-1">
             {isEditMode 
               ? "Update vehicle, customer, rental schedule, extra fees, inspection photos, and terms."
-              : contractType === "Personalized"
-                ? "Personalized booking (مخصص) — select vehicle, choose client, and set dates. Direct booking without charges, photos, or signature."
-                : contractType === "Delivery" 
-                  ? "Delivery contract — driver will take the car to the client and register them on-site."
-                  : "Shop contract — client is at the shop counter. Complete inspection, sign, and activate."}
+              : isDriver
+                ? "Driver Contract — select car and customer to create and activate the contract immediately without handover."
+                : contractType === "Personalized"
+                  ? "Personalized booking (مخصص) — select vehicle, choose client, and set dates. Direct booking without charges, photos, or signature."
+                  : contractType === "Delivery" 
+                    ? "Delivery contract — driver will take the car to the client and register them on-site."
+                    : "Shop contract — client is at the shop counter. Complete inspection, sign, and activate."}
           </p>
         </div>
 
@@ -2583,11 +2597,13 @@ export function NewRentalAdminPageContent() {
                   <span>
                     {isEditMode 
                       ? "Save Changes (حفظ التعديلات)" 
-                      : (contractType === "Delivery" 
-                          ? (isDriver ? "Create Delivery Contract" : "Create & Dispatch to Driver") 
-                          : contractType === "Personalized"
-                            ? "Create Booking (حجز السيارة)"
-                            : "Create Shop Contract")}
+                      : isDriver
+                        ? "Create & Activate Contract (إنشاء وتفعيل العقد مباشرة)"
+                        : (contractType === "Delivery" 
+                            ? "Create & Dispatch to Driver" 
+                            : contractType === "Personalized"
+                              ? "Create Booking (حجز السيارة)"
+                              : "Create Shop Contract")}
                   </span>
                 </>
               )}
