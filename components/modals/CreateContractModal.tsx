@@ -637,6 +637,17 @@ export default function CreateContractModal({
       return;
     }
 
+    if (formData.startDate && formData.endDate) {
+      const s = new Date(formData.startDate);
+      s.setHours(0, 0, 0, 0);
+      const e = new Date(formData.endDate);
+      e.setHours(0, 0, 0, 0);
+      if (s > e) {
+        toast.error("Start date cannot be after expected end date. Please adjust the return date. (تاريخ البداية لا يمكن أن يكون بعد تاريخ الإرجاع)");
+        return;
+      }
+    }
+
     const selectedUnit = units.find(u => u._id === formData.unitId);
     const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate) : null;
     if (conflict && !isCurrentContractUnit(formData.unitId)) {
@@ -655,8 +666,10 @@ export default function CreateContractModal({
 
     try {
       const start = new Date(formData.startDate);
+      start.setHours(0, 0, 0, 0);
       const end = new Date(formData.endDate);
-      const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+      end.setHours(0, 0, 0, 0);
+      const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
       const collectionPrice = Number(formData.collectionAmount || (days * Number(formData.dailyRate)));
       const calculatedDailyRate = days > 0 ? Math.round((collectionPrice / days) * 100) / 100 : collectionPrice;
       const calculatedTotal = collectionPrice + 
@@ -1321,13 +1334,33 @@ export default function CreateContractModal({
                             value={formData.startDate} 
                             onChange={e => {
                               const newStart = e.target.value;
+                              if (!newStart) return;
                               const s = new Date(newStart);
-                              const end = new Date(formData.endDate);
-                              const days = Math.max(1, Math.ceil((end.getTime() - s.getTime()) / (1000 * 3600 * 24)));
+                              s.setHours(0, 0, 0, 0);
+
+                              const prevS = new Date(formData.startDate);
+                              prevS.setHours(0, 0, 0, 0);
+                              const prevE = new Date(formData.endDate);
+                              prevE.setHours(0, 0, 0, 0);
+                              const prevDuration = Math.max(1, Math.round((prevE.getTime() - prevS.getTime()) / 86400000));
+
+                              let resolvedEnd = formData.endDate;
+                              if (newStart > formData.endDate) {
+                                const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
+                                const y = updatedEnd.getFullYear();
+                                const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
+                                const d = String(updatedEnd.getDate()).padStart(2, "0");
+                                resolvedEnd = `${y}-${m}-${d}`;
+                              }
+
+                              const end = new Date(resolvedEnd);
+                              end.setHours(0, 0, 0, 0);
+                              const days = Math.max(1, Math.round((end.getTime() - s.getTime()) / 86400000));
                               const rate = Number(formData.dailyRate) || 0;
                               setFormData(prev => ({
                                 ...prev,
                                 startDate: newStart,
+                                endDate: resolvedEnd,
                                 collectionAmount: rate * days,
                               }));
                             }} 
@@ -1340,16 +1373,23 @@ export default function CreateContractModal({
                           </label>
                           <input 
                             type="date" 
+                            min={formData.startDate}
                             value={formData.endDate} 
                             onChange={e => {
                               const newEnd = e.target.value;
-                              const start = new Date(formData.startDate);
-                              const eDate = new Date(newEnd);
-                              const days = Math.max(1, Math.ceil((eDate.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+                              if (!newEnd) return;
+                              const s = new Date(formData.startDate);
+                              s.setHours(0, 0, 0, 0);
+
+                              const validEnd = newEnd < formData.startDate ? formData.startDate : newEnd;
+                              const eDate = new Date(validEnd);
+                              eDate.setHours(0, 0, 0, 0);
+
+                              const days = Math.max(1, Math.round((eDate.getTime() - s.getTime()) / 86400000));
                               const rate = Number(formData.dailyRate) || 0;
                               setFormData(prev => ({
                                 ...prev,
-                                endDate: newEnd,
+                                endDate: validEnd,
                                 collectionAmount: rate * days,
                               }));
                             }} 
@@ -1357,6 +1397,31 @@ export default function CreateContractModal({
                           />
                         </div>
                       </div>
+
+                      {/* Rental Duration and Date Order Helper */}
+                      {(() => {
+                        const s = new Date(formData.startDate);
+                        s.setHours(0, 0, 0, 0);
+                        const e = new Date(formData.endDate);
+                        e.setHours(0, 0, 0, 0);
+                        const calcDays = Math.max(1, Math.round((e.getTime() - s.getTime()) / 86400000));
+                        return (
+                          <div className="flex items-center justify-between text-xs px-1">
+                            <span className="text-text-muted">
+                              Rental Duration:{" "}
+                              <strong className="text-brand font-bold">
+                                {calcDays} {calcDays === 1 ? "day" : "days"} (يوم)
+                              </strong>
+                            </span>
+                            {formData.startDate > formData.endDate && (
+                              <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
+                                <AlertCircle size={13} />
+                                <span>Expected End Date cannot be before Start Date</span>
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Conflict Alert Banner if selected vehicle is booked for these dates */}
                       {(() => {

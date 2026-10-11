@@ -141,8 +141,22 @@ export async function POST(req: Request) {
 
     // Calculate total days
     const start = new Date(body.startDate);
+    start.setHours(0, 0, 0, 0);
     const end = new Date(body.endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24));
+    end.setHours(0, 0, 0, 0);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return NextResponse.json({ error: "Invalid start or end date." }, { status: 400 });
+    }
+
+    if (start > end) {
+      return NextResponse.json(
+        { error: "Start date must be before or equal to expected end date. (تاريخ البداية يجب أن يكون قبل أو نفس تاريخ النهاية)" },
+        { status: 400 }
+      );
+    }
+
+    const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
     
     // Fallback daily rate if not provided in request
     const dailyRate = body.dailyRate || 50; 

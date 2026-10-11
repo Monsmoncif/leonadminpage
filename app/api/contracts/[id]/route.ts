@@ -90,7 +90,21 @@ export async function PUT(
 
     // Recalculate duration & amount if dates or rates are updated
     const startDateVal = body.startDate ? new Date(body.startDate) : new Date(existingContract.startDate);
+    startDateVal.setHours(0, 0, 0, 0);
     const endDateVal = body.endDate ? new Date(body.endDate) : new Date(existingContract.endDate);
+    endDateVal.setHours(0, 0, 0, 0);
+
+    if (isNaN(startDateVal.getTime()) || isNaN(endDateVal.getTime())) {
+      return NextResponse.json({ error: "Invalid start or end date." }, { status: 400 });
+    }
+
+    if (startDateVal > endDateVal) {
+      return NextResponse.json(
+        { error: "Start date must be before or equal to expected end date. (تاريخ البداية يجب أن يكون قبل أو نفس تاريخ النهاية)" },
+        { status: 400 }
+      );
+    }
+
     const dailyRateVal = body.dailyRate !== undefined ? Number(body.dailyRate) : existingContract.dailyRate;
 
     const babySeatFees = body.babySeatFees !== undefined ? Number(body.babySeatFees) : (existingContract.babySeatFees || 0);
@@ -102,8 +116,7 @@ export async function PUT(
     const fuelFees = body.fuelFees !== undefined ? Number(body.fuelFees) : (body.fuelCharge !== undefined ? Number(body.fuelCharge) : (existingContract.fuelFees || existingContract.fuelCharge || 0));
     const cleaningFees = body.cleaningFees !== undefined ? Number(body.cleaningFees) : (existingContract.cleaningFees || 0);
 
-    const diffTime = Math.abs(endDateVal.getTime() - startDateVal.getTime());
-    const totalDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const totalDays = Math.max(1, Math.round((endDateVal.getTime() - startDateVal.getTime()) / (1000 * 60 * 60 * 24)));
     
     const extraKmCharge = body.extraKmCharge !== undefined ? Number(body.extraKmCharge) : (existingContract.extraKmCharge || 0);
     const damageCharge = body.damageCharge !== undefined ? Number(body.damageCharge) : (existingContract.damageCharge || 0);

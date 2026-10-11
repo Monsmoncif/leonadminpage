@@ -713,6 +713,18 @@ export function NewRentalAdminPageContent() {
       }
     }
 
+    // Validate dates order
+    if (rentalData.startDate && rentalData.endDate) {
+      const s = new Date(rentalData.startDate);
+      s.setHours(0, 0, 0, 0);
+      const e = new Date(rentalData.endDate);
+      e.setHours(0, 0, 0, 0);
+      if (s > e) {
+        toast.error("Start date cannot be after expected end date. Please adjust the return date. (تاريخ البداية لا يمكن أن يكون بعد تاريخ الإرجاع)");
+        return;
+      }
+    }
+
     // Personalized flow validation (Step 1: Car -> Step 2: Client -> Step 3: Dates & Create)
     if (contractType === "Personalized") {
       if (currentStep === 2) {
@@ -775,6 +787,18 @@ export function NewRentalAdminPageContent() {
   const handleGenerate = async () => {
     setIsLoading(true);
     try {
+      if (rentalData.startDate && rentalData.endDate) {
+        const s = new Date(rentalData.startDate);
+        s.setHours(0, 0, 0, 0);
+        const e = new Date(rentalData.endDate);
+        e.setHours(0, 0, 0, 0);
+        if (s > e) {
+          toast.error("Start date cannot be after expected end date. (تاريخ البداية لا يمكن أن يكون بعد تاريخ الإرجاع)");
+          setIsLoading(false);
+          return;
+        }
+      }
+
       if (!selectedVehicle) {
         toast.error("Please select a car.");
         setIsLoading(false);
@@ -819,8 +843,10 @@ export function NewRentalAdminPageContent() {
       }
 
       const start = new Date(rentalData.startDate);
+      start.setHours(0, 0, 0, 0);
       const end = new Date(rentalData.endDate);
-      const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+      end.setHours(0, 0, 0, 0);
+      const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
       const collectionPrice = Number(rentalData.collectionAmount || 0);
       const calculatedDailyRate = totalDays > 0 ? Math.round((collectionPrice / totalDays) * 100) / 100 : collectionPrice;
       const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
@@ -1358,8 +1384,10 @@ export function NewRentalAdminPageContent() {
 
   const renderRentalData = () => {
     const start = new Date(rentalData.startDate);
+    start.setHours(0, 0, 0, 0);
     const end = new Date(rentalData.endDate);
-    const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+    end.setHours(0, 0, 0, 0);
+    const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
 
     return (
       <div className="space-y-6 animate-fade-in-up">
@@ -1479,13 +1507,33 @@ export function NewRentalAdminPageContent() {
                   value={rentalData.startDate} 
                   onChange={e => {
                     const newStart = e.target.value;
+                    if (!newStart) return;
                     const s = new Date(newStart);
-                    const end = new Date(rentalData.endDate);
-                    const days = Math.max(1, Math.ceil((end.getTime() - s.getTime()) / (1000 * 3600 * 24)));
+                    s.setHours(0, 0, 0, 0);
+
+                    const prevS = new Date(rentalData.startDate);
+                    prevS.setHours(0, 0, 0, 0);
+                    const prevE = new Date(rentalData.endDate);
+                    prevE.setHours(0, 0, 0, 0);
+                    const prevDuration = Math.max(1, Math.round((prevE.getTime() - prevS.getTime()) / 86400000));
+
+                    let resolvedEnd = rentalData.endDate;
+                    if (newStart > rentalData.endDate) {
+                      const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
+                      const y = updatedEnd.getFullYear();
+                      const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
+                      const d = String(updatedEnd.getDate()).padStart(2, "0");
+                      resolvedEnd = `${y}-${m}-${d}`;
+                    }
+
+                    const end = new Date(resolvedEnd);
+                    end.setHours(0, 0, 0, 0);
+                    const days = Math.max(1, Math.round((end.getTime() - s.getTime()) / 86400000));
                     const rate = Number(rentalData.dailyRate) || 0;
                     setRentalData(prev => ({
                       ...prev,
                       startDate: newStart,
+                      endDate: resolvedEnd,
                       collectionAmount: rate * days
                     }));
                   }} 
@@ -1498,22 +1546,45 @@ export function NewRentalAdminPageContent() {
                 </label>
                 <input 
                   type="date" 
+                  min={rentalData.startDate}
                   value={rentalData.endDate} 
                   onChange={e => {
                     const newEnd = e.target.value;
-                    const start = new Date(rentalData.startDate);
-                    const eDate = new Date(newEnd);
-                    const days = Math.max(1, Math.ceil((eDate.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+                    if (!newEnd) return;
+                    const s = new Date(rentalData.startDate);
+                    s.setHours(0, 0, 0, 0);
+
+                    const validEnd = newEnd < rentalData.startDate ? rentalData.startDate : newEnd;
+                    const eDate = new Date(validEnd);
+                    eDate.setHours(0, 0, 0, 0);
+
+                    const days = Math.max(1, Math.round((eDate.getTime() - s.getTime()) / 86400000));
                     const rate = Number(rentalData.dailyRate) || 0;
                     setRentalData(prev => ({
                       ...prev,
-                      endDate: newEnd,
+                      endDate: validEnd,
                       collectionAmount: rate * days
                     }));
                   }} 
                   className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium" 
                 />
               </div>
+            </div>
+
+            {/* Rental Duration & Order Helper */}
+            <div className="flex items-center justify-between text-xs px-1">
+              <span className="text-text-muted">
+                Rental Duration (مدة الإيجار):{" "}
+                <strong className="text-brand font-bold">
+                  {totalDays} {totalDays === 1 ? "day" : "days"} (يوم)
+                </strong>
+              </span>
+              {rentalData.startDate > rentalData.endDate && (
+                <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
+                  <AlertCircle size={13} />
+                  <span>Expected End Date cannot be before Start Date</span>
+                </span>
+              )}
             </div>
 
             {/* Conflict Alert Banner if selected vehicle is booked for these dates */}
@@ -1864,8 +1935,10 @@ export function NewRentalAdminPageContent() {
 
   const renderReview = () => {
     const start = new Date(rentalData.startDate || Date.now());
+    start.setHours(0, 0, 0, 0);
     const end = new Date(rentalData.endDate || Date.now() + 86400000);
-    const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+    end.setHours(0, 0, 0, 0);
+    const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
 
     const clientObj = contractType === "Shop" ? clients.find(c => c._id === selectedClient) : null;
     const vehicleObj = units.find(u => u._id === selectedVehicle);
@@ -2209,7 +2282,26 @@ export function NewRentalAdminPageContent() {
                 <input
                   type="date"
                   value={rentalData.startDate}
-                  onChange={(e) => setRentalData(prev => ({ ...prev, startDate: e.target.value }))}
+                  onChange={(e) => {
+                    const newStart = e.target.value;
+                    if (!newStart) return;
+                    const s = new Date(newStart);
+                    s.setHours(0, 0, 0, 0);
+                    const prevS = new Date(rentalData.startDate);
+                    prevS.setHours(0, 0, 0, 0);
+                    const prevE = new Date(rentalData.endDate);
+                    prevE.setHours(0, 0, 0, 0);
+                    const prevDuration = Math.max(1, Math.round((prevE.getTime() - prevS.getTime()) / 86400000));
+                    let resolvedEnd = rentalData.endDate;
+                    if (newStart > rentalData.endDate) {
+                      const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
+                      const y = updatedEnd.getFullYear();
+                      const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
+                      const d = String(updatedEnd.getDate()).padStart(2, "0");
+                      resolvedEnd = `${y}-${m}-${d}`;
+                    }
+                    setRentalData(prev => ({ ...prev, startDate: newStart, endDate: resolvedEnd }));
+                  }}
                   className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
                 />
               </div>
@@ -2220,12 +2312,43 @@ export function NewRentalAdminPageContent() {
                 </label>
                 <input
                   type="date"
+                  min={rentalData.startDate}
                   value={rentalData.endDate}
-                  onChange={(e) => setRentalData(prev => ({ ...prev, endDate: e.target.value }))}
+                  onChange={(e) => {
+                    const newEnd = e.target.value;
+                    if (!newEnd) return;
+                    const validEnd = newEnd < rentalData.startDate ? rentalData.startDate : newEnd;
+                    setRentalData(prev => ({ ...prev, endDate: validEnd }));
+                  }}
                   className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
                 />
               </div>
             </div>
+
+            {/* Rental Duration indicator for Personalized */}
+            {(() => {
+              const s = new Date(rentalData.startDate);
+              s.setHours(0, 0, 0, 0);
+              const e = new Date(rentalData.endDate);
+              e.setHours(0, 0, 0, 0);
+              const daysCount = Math.max(1, Math.round((e.getTime() - s.getTime()) / 86400000));
+              return (
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-text-muted">
+                    Rental Duration (مدة الإيجار):{" "}
+                    <strong className="text-brand font-bold">
+                      {daysCount} {daysCount === 1 ? "day" : "days"} (يوم)
+                    </strong>
+                  </span>
+                  {rentalData.startDate > rentalData.endDate && (
+                    <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
+                      <AlertCircle size={13} />
+                      <span>Expected End Date cannot be before Start Date</span>
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Date Conflict Alert */}
             {(() => {
