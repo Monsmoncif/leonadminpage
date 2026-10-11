@@ -197,11 +197,11 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      {/* ===== Summary Header ===== */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
+      {/* ===== Summary Header (Matches Bookings Page) ===== */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 animate-fade-in-up">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Customers</h1>
-          <p className="text-sm text-text-secondary mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Customers</h1>
+          <p className="text-xs sm:text-sm text-text-secondary mt-1">
             Manage customer profiles, documents, and rental history.
           </p>
         </div>
@@ -211,9 +211,10 @@ export default function ClientsPage() {
               setEditTarget(null);
               setIsModalOpen(true);
             }}
-            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm hover:shadow-md cursor-pointer w-full sm:w-auto"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
-            <Plus size={16} /> Add Customer
+            <Plus size={18} />
+            <span>Add Customer</span>
           </button>
         </div>
       </div>
@@ -323,57 +324,48 @@ export default function ClientsPage() {
       {!loading && clients.length > 0 && (
         <div className="grid grid-cols-12 gap-6 animate-fade-in-up stagger-2">
           <div className="col-span-12 flex flex-col gap-6">
-            {/* Toolbar */}
-            <div className="relative z-20 bg-card rounded-2xl border border-border p-4 shadow-sm flex flex-col sm:flex-row justify-between gap-4 card-hover">
+            {/* Toolbar (Matches Bookings Page) */}
+            <div className="relative z-20 bg-card rounded-xl sm:rounded-2xl border border-border p-3 sm:p-4 shadow-xs sm:shadow-sm flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 card-hover">
               <div className="relative max-w-sm w-full">
                 <input
                   type="text"
                   placeholder="Search by name, ID, or license..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full text-sm border border-border rounded-xl pl-10 pr-4 py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-sm"
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full text-xs sm:text-sm border border-border rounded-xl pl-9 sm:pl-10 pr-3.5 sm:pr-4 py-2 sm:py-2.5 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
                 />
-                <Search
-                  size={16}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted"
-                />
+                <Search size={15} className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
               </div>
             </div>
 
-            {/* Table */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover">
+            {/* Table (Matches Bookings Page Table Style & Responsive UX) */}
+            <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover">
               <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm">
+                <table className="w-full text-[11px] sm:text-xs md:text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-gray-50/75 text-[11px] sm:text-xs text-text-muted font-semibold uppercase tracking-wider">
-                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
-                        Customer
-                      </th>
-                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">
-                        Contact
-                      </th>
-                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">
-                        License / ID
-                      </th>
-                      <th className="text-left py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">
-                        Status
-                      </th>
-                      <th className="text-right py-2.5 sm:py-3 px-3 sm:px-4 text-text-muted font-semibold">
-                        Actions
-                      </th>
+                    <tr className="border-b border-border bg-gray-50/75 text-[9.5px] sm:text-[11px] md:text-xs text-text-muted font-semibold uppercase tracking-wider">
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">Customer</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4">Contact</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4">License / ID</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">Status</th>
+                      <th className="text-right py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/50">
                     {filteredClients.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="py-12 px-5 text-center">
                           <div className="flex flex-col items-center justify-center">
                             <Users size={32} className="text-gray-300 mb-4" />
-                            <h2 className="text-lg font-bold text-gray-900 mb-2">No customers found</h2>
-                            <p className="text-gray-500 text-sm mb-4">No customers match your search criteria.</p>
+                            <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-1.5">No customers found</h2>
+                            <p className="text-gray-500 text-xs sm:text-sm mb-4">No customers match your search criteria.</p>
                             <button
-                              onClick={() => setSearchQuery("")}
-                              className="px-4 py-2 text-sm font-semibold text-brand border border-brand/20 rounded-lg hover:bg-brand/5 transition-colors cursor-pointer"
+                              type="button"
+                              onClick={() => { setSearchQuery(""); setCurrentPage(1); }}
+                              className="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-brand border border-brand/20 rounded-lg hover:bg-brand/5 transition-colors cursor-pointer"
                             >
                               Clear Search
                             </button>
@@ -384,25 +376,25 @@ export default function ClientsPage() {
                       paginatedClients.map((client: any, idx: number) => (
                         <tr
                           key={client._id}
-                          className="border-b border-border/50 bg-white animate-fade-in-up"
-                          style={{ animationDelay: `${idx * 0.05 + 0.3}s` }}
+                          onClick={() => router.push(`/clients/${client._id}`)}
+                          className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up cursor-pointer"
+                          style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
                         >
-                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                            <div className="flex items-center gap-2.5 sm:gap-3">
+                          {/* Customer Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">
+                            <div className="flex items-center gap-2 sm:gap-2.5">
                               <div
-                                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 shadow-xs ${getAvatarColor(
-                                  client.name
-                                )}`}
+                                className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(client.name)}`}
                               >
                                 {getInitials(client.name)}
                               </div>
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-1.5 sm:gap-2">
-                                  <span className="font-semibold text-text-primary text-xs sm:text-sm group-hover:text-brand transition-colors">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+                                  <span className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm break-words leading-tight" title={client.name}>
                                     {client.name}
                                   </span>
                                   {client.clientType && (
-                                    <span className={`text-[9.5px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full ${
+                                    <span className={`text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap ${
                                       client.clientType === "Tourist"
                                         ? "bg-purple-50 text-purple-700 border border-purple-200"
                                         : "bg-blue-50 text-blue-700 border border-blue-200"
@@ -411,27 +403,31 @@ export default function ClientsPage() {
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-[10px] sm:text-xs text-text-muted mt-0.5">
+                                <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 break-words leading-tight">
                                   {client.nationality || (client.idNumber ? `ID: ${client.idNumber}` : "Customer")}
-                                </span>
+                                </p>
                               </div>
                             </div>
                           </td>
-                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                            <p className="font-medium text-text-secondary text-xs sm:text-sm flex items-center gap-1.5">
-                              <Phone size={12} className="text-text-muted shrink-0" />
+
+                          {/* Contact Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
+                            <p className="font-medium text-text-secondary text-[11px] sm:text-xs md:text-sm flex items-center gap-1.5 whitespace-nowrap">
+                              <Phone size={11} className="text-text-muted shrink-0" />
                               {client.phone}
                             </p>
-                            <p className="text-[10px] sm:text-[11px] text-text-muted mt-0.5 sm:mt-1 flex items-center gap-1.5">
-                              <Mail size={12} className="text-text-muted shrink-0" />
-                              {client.email || "No email"}
+                            <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 flex items-center gap-1.5">
+                              <Mail size={11} className="text-text-muted shrink-0" />
+                              <span className="truncate max-w-[150px] sm:max-w-[200px]">{client.email || "No email"}</span>
                             </p>
                           </td>
-                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                            <p className="font-medium text-text-secondary text-xs sm:text-sm">
+
+                          {/* License / ID Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                            <p className="font-medium text-text-secondary text-[11px] sm:text-xs md:text-sm">
                               {client.licenseNumber || client.idNumber || "N/A"}
                             </p>
-                            <p className="text-text-muted text-[10px] sm:text-[11px] mt-0.5">
+                            <p className="text-text-muted text-[9.5px] sm:text-[11px] mt-0.5">
                               {client.licenseExpiry
                                 ? `Exp: ${new Date(client.licenseExpiry).toLocaleDateString()}`
                                 : client.idNumber
@@ -439,34 +435,38 @@ export default function ClientsPage() {
                                 : "No expiry"}
                             </p>
                           </td>
-                          <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                            <select
-                              value={client.status || "Active"}
-                              onChange={(e) => handleStatusChange(client, e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className={`text-xs font-semibold px-2.5 py-1 rounded-lg border focus:outline-none focus:ring-2 cursor-pointer shadow-2xs transition-colors ${getClientStatusClasses(
-                                client.status
-                              )}`}
-                            >
-                              <option value="Active" className="bg-white text-gray-900">
-                                Active
-                              </option>
-                              <option value="Deactivated" className="bg-white text-gray-900">
-                                Deactivated
-                              </option>
-                            </select>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center justify-end gap-1 transition-opacity">
-                              <button
-                                className="p-2 text-text-muted hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title="View Details"
-                                onClick={() => router.push(`/clients/${client._id}`)}
+
+                          {/* Status Column */}
+                          <td className="py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">
+                            <div className="w-[92px] sm:w-[116px] max-w-[116px]" onClick={(e) => e.stopPropagation()}>
+                              <select
+                                value={client.status || "Active"}
+                                onChange={(e) => handleStatusChange(client, e.target.value)}
+                                className={`text-[9.5px] sm:text-[11px] font-semibold px-1 sm:px-2 py-0.5 rounded border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getClientStatusClasses(client.status)}`}
                               >
-                                <Eye size={16} />
+                                <option value="Active" className="bg-white text-gray-900">Active</option>
+                                <option value="Deactivated" className="bg-white text-gray-900">Deactivated</option>
+                              </select>
+                            </div>
+                          </td>
+
+                          {/* Actions Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
+                              <button
+                                type="button"
+                                className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                title="View Details"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/clients/${client._id}`);
+                                }}
+                              >
+                                <Eye size={14} />
                               </button>
                               <button
-                                className="p-2 text-text-muted hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                type="button"
+                                className="p-1 sm:p-1.5 text-text-muted hover:text-blue-600 hover:bg-blue-50 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
                                 title="Edit Customer"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -474,18 +474,19 @@ export default function ClientsPage() {
                                   setIsModalOpen(true);
                                 }}
                               >
-                                <Edit size={16} />
+                                <Edit size={14} />
                               </button>
-                              <div className="w-px h-5 bg-border mx-1" />
+                              <div className="w-px h-3.5 sm:h-4 bg-border mx-0.5" />
                               <button
-                                className="p-2 text-text-muted hover:text-brand hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                type="button"
+                                className="p-1 sm:p-1.5 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
                                 title="Delete Customer"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setDeleteTarget(client);
                                 }}
                               >
-                                <Trash2 size={16} />
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </td>
