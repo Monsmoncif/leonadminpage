@@ -135,7 +135,7 @@ export default function UnitsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4 sm:space-y-6 max-w-[1600px] mx-auto pb-10">
+      <div className="space-y-6">
         {/* Header Skeleton */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-2">
           <div className="space-y-2">
@@ -146,15 +146,15 @@ export default function UnitsPage() {
         </div>
         
         {/* Primary Stats Skeleton (Matches Bookings 2x2 on mobile, 4 on desktop) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-up stagger-1">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-card border border-border rounded-xl sm:rounded-2xl h-[105px] sm:h-[130px] p-3 sm:p-5">
+            <div key={i} className="bg-card border border-border rounded-2xl h-[130px] p-5 animate-pulse">
               <div className="flex justify-between">
-                <div className="w-8 h-8 sm:w-11 sm:h-11 bg-gray-200 rounded-xl mb-2 sm:mb-3"></div>
-                <div className="w-12 sm:w-16 h-6 sm:h-8 bg-gray-100 rounded-md"></div>
+                <div className="w-11 h-11 bg-gray-200 rounded-xl mb-3"></div>
+                <div className="w-16 h-8 bg-gray-100 rounded-md"></div>
               </div>
-              <div className="w-20 h-3 bg-gray-200 rounded-md mb-2"></div>
-              <div className="w-12 h-6 bg-gray-200 rounded-md"></div>
+              <div className="w-24 h-4 bg-gray-200 rounded-md mb-2"></div>
+              <div className="w-16 h-8 bg-gray-200 rounded-md"></div>
             </div>
           ))}
         </div>
@@ -190,30 +190,30 @@ export default function UnitsPage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-[1600px] mx-auto pb-10">
+    <div className="space-y-6">
       {/* ===== Summary Header (Matches Bookings Page) ===== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 animate-fade-in-up">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-text-primary">
             Vehicles
           </h1>
-          <p className="text-xs sm:text-sm text-text-secondary mt-0.5">
+          <p className="text-xs sm:text-sm text-text-secondary mt-1">
             Manage your fleet, specifications, and availability.
           </p>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
             onClick={() => { setEditTarget(null); setIsUnitModalOpen(true); }}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
-            <Plus size={16} />
+            <Plus size={18} />
             <span>Add Vehicle</span>
           </button>
         </div>
       </div>
 
       {/* ===== Primary Stats Cards (Matches Bookings Page 2x2 Mobile & 4x1 Desktop) ===== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-up stagger-1">
         <div className="stagger-1">
           <StatCard 
             icon={ExecutiveCarIcon} 
@@ -288,7 +288,7 @@ export default function UnitsPage() {
       {/* ===== Main Content Area (Matches Bookings Page) ===== */}
       {(!loading && (units.length > 0 || searchQuery || statusFilter !== "All")) && (
         <div className="grid grid-cols-12 gap-6 animate-fade-in-up stagger-2">
-          <div className="col-span-12 flex flex-col gap-4 sm:gap-6">
+          <div className="col-span-12 flex flex-col gap-6">
             
             {/* Toolbar (Matches Bookings Page) */}
             <div className="relative z-20 bg-card rounded-xl sm:rounded-2xl border border-border p-3 sm:p-4 shadow-xs sm:shadow-sm flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 card-hover">
@@ -354,10 +354,10 @@ export default function UnitsPage() {
                       <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
                         Vehicle
                       </th>
-                      <th className="hidden md:table-cell text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[140px] sm:min-w-[180px]">
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[140px] sm:min-w-[180px]">
                         Details
                       </th>
-                      <th className="hidden md:table-cell text-left py-2 sm:py-2.5 px-2 sm:px-4 min-w-[160px] sm:min-w-[200px]">
+                      <th className="text-left py-2 sm:py-2.5 px-2 sm:px-4 min-w-[160px] sm:min-w-[200px]">
                         Specifications
                       </th>
                       <th className="text-left py-2 sm:py-2.5 px-2 whitespace-nowrap w-[110px] sm:w-[130px]">
@@ -408,9 +408,6 @@ export default function UnitsPage() {
                                 <span className="font-bold text-text-primary text-[11px] sm:text-xs md:text-sm block truncate" title={`${unit.make} ${unit.model}`}>
                                   {unit.make} {unit.model}
                                 </span>
-                                <span className="md:hidden text-[9.5px] font-mono font-bold text-brand block truncate">
-                                  {unit.plate || "N/A"} • {(Number(unit.mileage) || 0).toLocaleString()} km
-                                </span>
                                 {unit.color && (
                                   <span className="text-[9.5px] sm:text-[11px] text-text-muted block truncate">
                                     {unit.color} {unit.year ? `• ${unit.year}` : ""}
@@ -421,7 +418,7 @@ export default function UnitsPage() {
                           </td>
 
                           {/* Details Column */}
-                          <td className="hidden md:table-cell py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[140px] sm:min-w-[180px]">
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[140px] sm:min-w-[180px]">
                             <div>
                               <p className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm leading-tight">
                                 Plate: <span className="font-mono text-brand font-bold">{unit.plate || "N/A"}</span>
@@ -447,7 +444,7 @@ export default function UnitsPage() {
                           </td>
 
                           {/* Specifications Column */}
-                          <td className="hidden md:table-cell py-2 sm:py-2.5 px-2 sm:px-4 min-w-[160px] sm:min-w-[200px]">
+                          <td className="py-2 sm:py-2.5 px-2 sm:px-4 min-w-[160px] sm:min-w-[200px]">
                             {(() => {
                               const currentKm = Number(unit.mileage) || 0;
                               const lastVidange = unit.lastOilChangeMileage != null && unit.lastOilChangeMileage > 0
@@ -533,7 +530,7 @@ export default function UnitsPage() {
                             <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
                               <button 
                                 type="button"
-                                className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer hidden sm:inline-flex items-center justify-center" 
+                                className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                 title="View Vehicle Details" 
                                 onClick={(e) => {
                                   e.stopPropagation();
