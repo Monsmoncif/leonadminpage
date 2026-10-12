@@ -2477,69 +2477,69 @@ export function NewRentalAdminPageContent() {
             </div>
           )}
 
-          {/* Customer Digital Signature Canvas */}
-          <div id="customer-signature-box" className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-                <PenTool size={16} className="text-brand shrink-0" />
-                <span>Customer Signature (توقيع العميل)</span>
-                {isDriver && <span className="text-red-500 font-bold">*</span>}
-              </label>
-              {(signatureData || (isEditMode && editingContract?.customerSignature)) && (
-                <button
-                  type="button"
-                  onClick={clearSignature}
-                  className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
-                >
-                  <RotateCcw size={12} />
-                  <span>Clear (مسح التوقيع)</span>
-                </button>
-              )}
-            </div>
-            <p className="text-xs text-text-muted">
-              {isDriver 
-                ? "يرجى تسليم الهاتف أو الجهاز للعميل للتوقيع باليد أو القلم قبل إتمام العقد (Client signature on handover)"
-                : "Customer signature acknowledging vehicle handover and contract terms (توقيع العميل لتأكيد الاستلام)"}
-            </p>
+          {/* Customer Digital Signature Canvas (Drivers Only on direct handover) */}
+          {isDriver && (
+            <div id="customer-signature-box" className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+                  <PenTool size={16} className="text-brand shrink-0" />
+                  <span>Customer Signature (توقيع العميل)</span>
+                  <span className="text-red-500 font-bold">*</span>
+                </label>
+                {(signatureData || (isEditMode && editingContract?.customerSignature)) && (
+                  <button
+                    type="button"
+                    onClick={clearSignature}
+                    className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Clear (مسح التوقيع)</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-text-muted">
+                يرجى تسليم الهاتف أو الجهاز للعميل للتوقيع باليد أو القلم قبل إتمام العقد (Client signature on handover)
+              </p>
 
-            <div className="relative border-2 border-dashed border-gray-300 rounded-2xl bg-white overflow-hidden shadow-inner touch-none">
-              <canvas
-                ref={canvasRef}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
-                className="w-full h-48 sm:h-56 cursor-crosshair bg-white block select-none"
-              />
-              {!signatureData && !isDrawing && (!isEditMode || !editingContract?.customerSignature) && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1.5 select-none">
-                  <PenTool size={28} className="opacity-40 text-brand" />
-                  <span className="text-xs sm:text-sm font-semibold text-gray-500">Please draw customer signature here (finger or stylus)</span>
-                  <span className="text-xs text-gray-400 font-medium" dir="rtl">يرجى توقيع العميل هنا باليد أو القلم</span>
+              <div className="relative border-2 border-dashed border-gray-300 rounded-2xl bg-white overflow-hidden shadow-inner touch-none">
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="w-full h-48 sm:h-56 cursor-crosshair bg-white block select-none"
+                />
+                {!signatureData && !isDrawing && (!isEditMode || !editingContract?.customerSignature) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1.5 select-none">
+                    <PenTool size={28} className="opacity-40 text-brand" />
+                    <span className="text-xs sm:text-sm font-semibold text-gray-500">Please draw customer signature here (finger or stylus)</span>
+                    <span className="text-xs text-gray-400 font-medium" dir="rtl">يرجى توقيع العميل هنا باليد أو القلم</span>
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-4 right-4 pointer-events-none flex items-center justify-between border-t border-dashed border-gray-200 pt-1 text-[10px] text-gray-400 uppercase tracking-widest font-semibold select-none">
+                  <span>Customer Signature</span>
+                  <span>توقيع العميل</span>
                 </div>
-              )}
-              <div className="absolute bottom-2 left-4 right-4 pointer-events-none flex items-center justify-between border-t border-dashed border-gray-200 pt-1 text-[10px] text-gray-400 uppercase tracking-widest font-semibold select-none">
-                <span>Customer Signature</span>
-                <span>توقيع العميل</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
+                <span className="text-text-muted">Touch screen or drag mouse/stylus to sign.</span>
+                {(signatureData || (isEditMode && editingContract?.customerSignature)) ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                    <CheckCircle2 size={13} className="text-emerald-600" /> Signature Captured (تم التوقيع بنجاح)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
+                    <AlertCircle size={13} className="text-red-600" /> Required (إلزامي)
+                  </span>
+                )}
               </div>
             </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
-              <span className="text-text-muted">Touch screen or drag mouse/stylus to sign.</span>
-              {(signatureData || (isEditMode && editingContract?.customerSignature)) ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                  <CheckCircle2 size={13} className="text-emerald-600" /> Signature Captured (تم التوقيع بنجاح)
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
-                  <AlertCircle size={13} className="text-red-600" /> {isDriver ? "Required (إلزامي)" : "Optional / Touch to Sign"}
-                </span>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -2885,7 +2885,7 @@ export function NewRentalAdminPageContent() {
                   ? "Personalized booking (مخصص) — select vehicle, choose client, and set dates. Direct booking without charges, photos, or signature."
                   : contractType === "Delivery" 
                     ? "Delivery contract — driver will take the car to the client and register them on-site."
-                    : "Shop contract — client is at the shop counter. Complete inspection, sign, and activate."}
+                    : "Shop contract — counter booking order. Vehicle handover, inspection, and customer signature are completed at handover."}
           </p>
         </div>
 
