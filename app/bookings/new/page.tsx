@@ -71,6 +71,14 @@ const SHOP_STEPS = [
   { id: 4, title: "Review & Create", icon: CheckCircle },
 ];
 
+const DRIVER_STEPS = [
+  { id: 1, title: "Car", icon: ExecutiveCarIcon },
+  { id: 2, title: "Client", icon: User },
+  { id: 3, title: "Rental Data", icon: FileText },
+  { id: 4, title: "Inspection Photos", icon: Camera },
+  { id: 5, title: "Review & Create", icon: CheckCircle },
+];
+
 const PERSONALIZED_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
   { id: 2, title: "Client", icon: User },
@@ -426,7 +434,7 @@ export function NewRentalAdminPageContent() {
 
   // Canvas DPI initialization when reaching Review Step (Step 4 for Shop, Step 3 for Delivery)
   useEffect(() => {
-    const isReviewStep = (contractType === "Shop" && currentStep === 4) || (contractType === "Delivery" && currentStep === 3);
+    const isReviewStep = (contractType === "Shop" && currentStep === (isDriver ? 5 : 4)) || (contractType === "Delivery" && currentStep === 3);
     if (isReviewStep) {
       const timer = setTimeout(() => {
         // Customer canvas
@@ -502,7 +510,7 @@ export function NewRentalAdminPageContent() {
   }, [currentStep]);
 
   const STEPS = contractType === "Shop" 
-    ? SHOP_STEPS 
+    ? (isDriver ? DRIVER_STEPS : SHOP_STEPS)
     : contractType === "Personalized" 
       ? PERSONALIZED_STEPS 
       : DELIVERY_STEPS;
@@ -781,6 +789,23 @@ export function NewRentalAdminPageContent() {
           return;
         }
       }
+
+      // Driver: handover mileage must be recorded before moving to inspection photos
+      if (isDriver && currentStep === 3) {
+        if (!rentalData.checkoutMileage || Number(rentalData.checkoutMileage) <= 0) {
+          toast.error("يرجى إدخال عداد الكيلومترات عند التسليم (Please enter the Handover Mileage).");
+          return;
+        }
+      }
+
+      // Driver: all 8 inspection photos are required before review
+      if (isDriver && currentStep === 4) {
+        const missing = VEHICLE_ANGLES.filter(angle => !inspectionPhotos[angle]);
+        if (missing.length > 0) {
+          toast.error(`يرجى التقاط جميع صور الفحص (${VEHICLE_ANGLES.length - missing.length}/${VEHICLE_ANGLES.length}) — Please capture all inspection photos.`);
+          return;
+        }
+      }
     }
 
     if (currentStep < totalSteps) {
@@ -830,6 +855,20 @@ export function NewRentalAdminPageContent() {
         toast.error("يرجى توقيع العميل أولاً قبل إنشاء العقد (Please have the client sign before completing the contract).");
         setIsLoading(false);
         return;
+      }
+
+      // Driver contracts require handover mileage and all inspection photos
+      if (isDriver && !isEditMode) {
+        if (!rentalData.checkoutMileage || Number(rentalData.checkoutMileage) <= 0) {
+          toast.error("يرجى إدخال عداد الكيلومترات عند التسليم (Please enter the Handover Mileage).");
+          setIsLoading(false);
+          return;
+        }
+        if (VEHICLE_ANGLES.some(angle => !inspectionPhotos[angle])) {
+          toast.error("يرجى التقاط جميع صور الفحص (Please capture all inspection photos).");
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Delivery contracts require a driver
@@ -1706,7 +1745,7 @@ export function NewRentalAdminPageContent() {
             <div className="pt-2">
               <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
                 <MapPin size={13} className="text-emerald-600" /> 
-                {contractType === "Delivery" ? "Delivery Location (مكان التسليم)" : "Pickup Location (مكان الاستلام)"}
+                {contractType === "Delivery" ? "Delivery Location (مكان التسليم)" : isDriver ? "Handover Location (مكان التسليم)" : "Pickup Location (مكان الاستلام)"}
               </label>
               <input 
                 type="text" 
@@ -1717,21 +1756,63 @@ export function NewRentalAdminPageContent() {
               />
             </div>
 
-            {/* Vehicle Mileage Reference */}
-            <div className="pt-2 border-t border-gray-200/70">
-              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-text-muted">
-                <span className="flex items-center gap-1.5 font-medium text-text-secondary">
-                  <Gauge size={14} className="text-brand" />
-                  <span>Vehicle Current Mileage:</span>
-                  <strong className="text-text-primary">
-                    {selectedVehicle ? (units.find(u => u._id === selectedVehicle)?.mileage || 0).toLocaleString() : 0} km
-                  </strong>
-                </span>
-                <span className="text-[11px] text-brand font-semibold">
-                  Handover Odometer &amp; Fuel Level are recorded at vehicle delivery
-                </span>
+            {isDriver ? (
+              <>
+                {/* Handover Mileage (Driver) */}
+                <div className="pt-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-text-secondary flex items-center gap-1.5">
+                      <Gauge size={13} className="text-brand shrink-0" />
+                      <span>Handover Mileage (عداد الكيلومترات عند التسليم)</span>
+                      <span className="text-red-500">*</span>
+                    </label>
+                    {selectedVehicle && (
+                      <span className="text-[10px] text-text-muted bg-gray-100 px-2 py-0.5 rounded font-medium">
+                        Fleet: {(units.find(u => u._id === selectedVehicle)?.mileage || 0).toLocaleString()} km
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Gauge size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="number"
+                      min={0}
+                      value={rentalData.checkoutMileage === 0 ? "" : rentalData.checkoutMileage}
+                      onChange={(e) => setRentalData({ ...rentalData, checkoutMileage: Number(e.target.value) })}
+                      placeholder={String(units.find(u => u._id === selectedVehicle)?.mileage || 0)}
+                      className="w-full pl-9 pr-12 py-2.5 bg-white border border-border rounded-xl text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">KM</span>
+                  </div>
+                  <p className="text-[10px] text-text-muted mt-1">Current vehicle odometer reading recorded at handover to client.</p>
+                </div>
+
+                {/* Handover Fuel Level (Driver) */}
+                <div className="pt-2">
+                  <FuelLevelSelector
+                    value={rentalData.checkoutFuelLevel}
+                    onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
+                    label="Handover Fuel Level (مستوى الوقود عند التسليم)"
+                  />
+                </div>
+              </>
+            ) : (
+              /* Vehicle Mileage Reference */
+              <div className="pt-2 border-t border-gray-200/70">
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-text-muted">
+                  <span className="flex items-center gap-1.5 font-medium text-text-secondary">
+                    <Gauge size={14} className="text-brand" />
+                    <span>Vehicle Current Mileage:</span>
+                    <strong className="text-text-primary">
+                      {selectedVehicle ? (units.find(u => u._id === selectedVehicle)?.mileage || 0).toLocaleString() : 0} km
+                    </strong>
+                  </span>
+                  <span className="text-[11px] text-brand font-semibold">
+                    Handover Odometer &amp; Fuel Level are recorded at vehicle delivery
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* 2. Rates & Deposit */}
@@ -2263,21 +2344,25 @@ export function NewRentalAdminPageContent() {
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 4: Pre-Handover Vehicle Inspection Photos</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step 4: {isDriver ? "Handover Inspection Photos (صور فحص السيارة عند التسليم)" : "Pre-Handover Vehicle Inspection Photos"}</h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Take or upload 8 standard angles to document vehicle condition before client handover at the shop
+            {isDriver
+              ? "Capture all 8 standard angles to document the car condition before handing it over to the client"
+              : "Take or upload 8 standard angles to document vehicle condition before client handover at the shop"}
           </p>
         </div>
       </div>
 
-      {/* Fuel Level at Checkout */}
-      <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
-        <FuelLevelSelector
-          value={rentalData.checkoutFuelLevel}
-          onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
-          label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
-        />
-      </div>
+      {/* Fuel Level at Checkout (drivers set it in Rental Data) */}
+      {!isDriver && (
+        <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+          <FuelLevelSelector
+            value={rentalData.checkoutFuelLevel}
+            onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
+            label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
+          />
+        </div>
+      )}
 
       <VehicleInspectionPhotoCapture
         photos={inspectionPhotos}
@@ -2539,6 +2624,16 @@ export function NewRentalAdminPageContent() {
       if (currentStep === 1) return renderVehicleSelector();
       if (currentStep === 2) return renderRentalData();
       if (currentStep === 3) return renderReview();
+      return null;
+    }
+
+    // Driver: Car (1) → Client (2) → Rental Data (3) → Inspection Photos (4) → Review & Create (5)
+    if (isDriver) {
+      if (currentStep === 1) return renderVehicleSelector();
+      if (currentStep === 2) return renderClientSelector();
+      if (currentStep === 3) return renderRentalData();
+      if (currentStep === 4) return renderInspectionPhotos();
+      if (currentStep === 5) return renderReview();
       return null;
     }
 
