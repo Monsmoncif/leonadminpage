@@ -74,8 +74,8 @@ const SHOP_STEPS = [
 const DRIVER_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
   { id: 2, title: "Client", icon: User },
-  { id: 3, title: "Rental Data", icon: FileText },
-  { id: 4, title: "Inspection Photos", icon: Camera },
+  { id: 3, title: "Inspection Photos", icon: Camera },
+  { id: 4, title: "Rental Data", icon: FileText },
   { id: 5, title: "Review & Create", icon: CheckCircle },
 ];
 
@@ -779,7 +779,7 @@ export function NewRentalAdminPageContent() {
         }
       }
 
-      if (currentStep === 3) {
+      if (currentStep === 3 && !isDriver) {
         const vehicle = units.find(u => u._id === selectedVehicle);
         const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
         if (conflict && conflict.reason === "Booked") {
@@ -790,19 +790,27 @@ export function NewRentalAdminPageContent() {
         }
       }
 
-      // Driver: handover mileage must be recorded before moving to inspection photos
+      // Driver: all 8 inspection photos are required before moving to Rental Data
       if (isDriver && currentStep === 3) {
-        if (!rentalData.checkoutMileage || Number(rentalData.checkoutMileage) <= 0) {
-          toast.error("يرجى إدخال عداد الكيلومترات عند التسليم (Please enter the Handover Mileage).");
+        const missing = VEHICLE_ANGLES.filter(angle => !inspectionPhotos[angle]);
+        if (missing.length > 0) {
+          toast.error(`يرجى التقاط جميع صور الفحص (${VEHICLE_ANGLES.length - missing.length}/${VEHICLE_ANGLES.length}) — Please capture all inspection photos.`);
           return;
         }
       }
 
-      // Driver: all 8 inspection photos are required before review
+      // Driver: Rental Data is step 4 — check date conflict and handover mileage before review
       if (isDriver && currentStep === 4) {
-        const missing = VEHICLE_ANGLES.filter(angle => !inspectionPhotos[angle]);
-        if (missing.length > 0) {
-          toast.error(`يرجى التقاط جميع صور الفحص (${VEHICLE_ANGLES.length - missing.length}/${VEHICLE_ANGLES.length}) — Please capture all inspection photos.`);
+        const vehicle = units.find(u => u._id === selectedVehicle);
+        const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
+        if (conflict && conflict.reason === "Booked") {
+          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
+          return;
+        }
+        if (!rentalData.checkoutMileage || Number(rentalData.checkoutMileage) <= 0) {
+          toast.error("يرجى إدخال عداد الكيلومترات عند التسليم (Please enter the Handover Mileage).");
           return;
         }
       }
@@ -2344,7 +2352,7 @@ export function NewRentalAdminPageContent() {
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 4: {isDriver ? "Handover Inspection Photos (صور فحص السيارة عند التسليم)" : "Pre-Handover Vehicle Inspection Photos"}</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step {isDriver ? 3 : 4}: {isDriver ? "Handover Inspection Photos (صور فحص السيارة عند التسليم)" : "Pre-Handover Vehicle Inspection Photos"}</h2>
           <p className="text-xs text-text-muted mt-0.5">
             {isDriver
               ? "Capture all 8 standard angles to document the car condition before handing it over to the client"
@@ -2627,12 +2635,12 @@ export function NewRentalAdminPageContent() {
       return null;
     }
 
-    // Driver: Car (1) → Client (2) → Rental Data (3) → Inspection Photos (4) → Review & Create (5)
+    // Driver: Car (1) → Client (2) → Inspection Photos (3) → Rental Data (4) → Review & Create (5)
     if (isDriver) {
       if (currentStep === 1) return renderVehicleSelector();
       if (currentStep === 2) return renderClientSelector();
-      if (currentStep === 3) return renderRentalData();
-      if (currentStep === 4) return renderInspectionPhotos();
+      if (currentStep === 3) return renderInspectionPhotos();
+      if (currentStep === 4) return renderRentalData();
       if (currentStep === 5) return renderReview();
       return null;
     }
