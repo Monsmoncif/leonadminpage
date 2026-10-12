@@ -1528,7 +1528,8 @@ export function NewRentalAdminPageContent() {
 
     const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
     const totalCharges = Number(rentalData.collectionAmount || 0) + extraFees;
-    const remainingToCollect = totalCharges;
+    const advancePaid = !isDriver ? Number(rentalData.advancePayment || 0) : 0;
+    const remainingToCollect = Math.max(0, totalCharges - advancePaid);
     const depositTotal = Number(rentalData.depositAmount || 0);
     const grandTotal = remainingToCollect + depositTotal;
 
@@ -1905,7 +1906,7 @@ export function NewRentalAdminPageContent() {
               <DollarSign size={16} className="text-brand" /> Collection Amount &amp; Deposit
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+            <div className={`grid grid-cols-1 ${!isDriver ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-2.5 sm:gap-3`}>
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Daily Rate">
                   Daily Rate
@@ -1916,14 +1917,14 @@ export function NewRentalAdminPageContent() {
                     value={rentalData.dailyRate === 0 ? "" : rentalData.dailyRate} 
                     onChange={e => {
                       const val = Number(e.target.value);
-                      setRentalData(prev => ({
+                      setRentalData(prev => ({ 
                         ...prev, 
                         dailyRate: val,
                         collectionAmount: totalDays > 0 ? Math.round(val * totalDays * 100) / 100 : val
                       }));
                     }} 
                     placeholder="e.g. 50"
-                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
@@ -1941,20 +1942,50 @@ export function NewRentalAdminPageContent() {
                     value={rentalData.collectionAmount === 0 ? "" : rentalData.collectionAmount} 
                     onChange={e => {
                       const val = Number(e.target.value);
-                      setRentalData(prev => ({
+                      setRentalData(prev => ({ 
                         ...prev, 
                         collectionAmount: val,
                         dailyRate: totalDays > 0 && val > 0 ? Math.round((val / totalDays) * 100) / 100 : prev.dailyRate
                       }));
                     }} 
                     placeholder="e.g. 350"
-                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
                   Calculated: {rentalData.dailyRate || 0} × {totalDays}d (editable)
                 </span>
               </div>
+
+              {/* Advance Payment — ONLY for Admin (Shop & Delivery contracts) */}
+              {!isDriver && (
+                <div>
+                  <label className="text-xs font-semibold text-emerald-800 block mb-1 truncate" title="Advance">
+                    Advance
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      value={rentalData.advancePayment === 0 ? "" : rentalData.advancePayment} 
+                      onChange={e => {
+                        const val = Number(e.target.value);
+                        const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
+                        const totalRent = Number(rentalData.collectionAmount || 0) + extraFees;
+                        setRentalData(prev => ({ 
+                          ...prev, 
+                          advancePayment: val,
+                          paymentStatus: val >= totalRent ? "Paid" : (val > 0 ? "Partial" : "Pending")
+                        }));
+                      }} 
+                      placeholder="0"
+                      className="w-full px-3 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-600 outline-none font-bold text-emerald-950 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                    />
+                  </div>
+                  <span className="text-[11px] text-emerald-700/80 mt-0.5 block truncate">
+                    Paid upfront now
+                  </span>
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-semibold text-text-secondary block mb-1 truncate" title="Deposit Amount">
@@ -1969,7 +2000,7 @@ export function NewRentalAdminPageContent() {
                       setRentalData(prev => ({ ...prev, depositAmount: val }));
                     }} 
                     placeholder="0"
-                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary" 
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-bold text-text-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                   />
                 </div>
                 <span className="text-[11px] text-text-muted mt-0.5 block truncate">
@@ -1988,6 +2019,7 @@ export function NewRentalAdminPageContent() {
                 </span>
                 <p className="text-xs text-text-muted mt-0.5">
                   Total Charges: AED {totalCharges}
+                  {advancePaid > 0 ? ` - Prepaid Advance: AED ${advancePaid}` : ""}
                   {rentalData.deliveryFee > 0 ? ` (inc. Delivery AED ${rentalData.deliveryFee})` : ""}
                   {rentalData.babySeatFee > 0 ? ` (inc. Baby Seat AED ${rentalData.babySeatFee})` : ""}
                 </p>
@@ -1996,6 +2028,11 @@ export function NewRentalAdminPageContent() {
                 <span className="text-2xl font-black text-brand">
                   AED {remainingToCollect}
                 </span>
+                {advancePaid > 0 && (
+                  <span className="text-xs font-bold text-emerald-700 block">
+                    ✓ Prepaid Advance: AED {advancePaid}
+                  </span>
+                )}
               </div>
             </div>
 
