@@ -104,8 +104,8 @@ const compressImage = (file: File): Promise<string> => {
 export default function VehicleInspectionPhotoCapture({
   photos = {},
   onChange,
-  title = "Vehicle Inspection Photos (صور فحص السيارة)",
-  subtitle = "Capture or upload 8 standard angles to document the vehicle condition.",
+  title,
+  subtitle,
   badgeLabel,
   allowExtra = false
 }: VehicleInspectionPhotoCaptureProps) {
@@ -198,25 +198,27 @@ export default function VehicleInspectionPhotoCapture({
     <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-surface border border-border/80 space-y-3.5 sm:space-y-4 shadow-2xs">
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pb-3 border-b border-border/60">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5">
-            <Camera size={20} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-text-primary">{title}</h3>
-              {badgeLabel && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand">
-                  {badgeLabel}
-                </span>
-              )}
+        {(title || subtitle || badgeLabel) ? (
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5">
+              <Camera size={20} />
             </div>
-            <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>
+            <div>
+              <div className="flex items-center gap-2">
+                {title && <h3 className="text-sm font-bold text-text-primary">{title}</h3>}
+                {badgeLabel && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand">
+                    {badgeLabel}
+                  </span>
+                )}
+              </div>
+              {subtitle && <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {/* Action Bar: Mode Switcher & Progress Pill */}
-        <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
+        <div className={`flex items-center gap-2.5 self-start sm:self-auto shrink-0 ${!title && !subtitle && !badgeLabel ? "w-full justify-between" : ""}`}>
           {/* Mode Switcher */}
           <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
             <button

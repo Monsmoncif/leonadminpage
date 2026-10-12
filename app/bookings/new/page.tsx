@@ -2381,9 +2381,6 @@ export function NewRentalAdminPageContent() {
       <VehicleInspectionPhotoCapture
         photos={inspectionPhotos}
         onChange={setInspectionPhotos}
-        title="Shop Handover Inspection (فحص تسليم السيارة بالمحل)"
-        subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
-        badgeLabel="Shop Handover"
         allowExtra={isDriver}
       />
     </div>
