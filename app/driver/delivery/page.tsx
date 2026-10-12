@@ -41,7 +41,7 @@ import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
-import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
+import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys } from "@/components/ui/VehicleInspectionPhotoCapture";
 import CreateClientModal from "@/components/modals/CreateClientModal";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -351,9 +351,12 @@ export default function ConfirmDeliveryPage() {
         // Initialize existing inspection photos
         if (Array.isArray(contractData.inspectionPhotos) && contractData.inspectionPhotos.length > 0) {
           const photoMap: Record<string, string> = {};
-          VEHICLE_ANGLES.forEach((angle, idx) => {
-            if (contractData.inspectionPhotos[idx]) {
-              photoMap[angle] = contractData.inspectionPhotos[idx];
+          contractData.inspectionPhotos.forEach((url: string, idx: number) => {
+            if (!url) return;
+            if (VEHICLE_ANGLES[idx]) {
+              photoMap[VEHICLE_ANGLES[idx]] = url;
+            } else if (idx >= VEHICLE_ANGLES.length) {
+              photoMap[`${EXTRA_PHOTO_PREFIX}${idx - VEHICLE_ANGLES.length + 1}`] = url;
             }
           });
           setInspectionPhotos(photoMap);
@@ -698,7 +701,10 @@ export default function ConfirmDeliveryPage() {
       const contractId = contract._id || contract.id;
       const formattedCheckoutTime = formatTimeDisplay(rentalData.checkoutTime);
 
-      const inspectionArray = VEHICLE_ANGLES.map((angle) => inspectionPhotos[angle] || "");
+      const inspectionArray = [
+        ...VEHICLE_ANGLES.map((angle) => inspectionPhotos[angle] || ""),
+        ...getExtraPhotoKeys(inspectionPhotos).map((k) => inspectionPhotos[k]),
+      ];
 
       const payload = {
         deliveryStatus: "Delivered",
@@ -1645,14 +1651,16 @@ export default function ConfirmDeliveryPage() {
     </div>
   );
 
-  // ===================== STEP 4: INSPECTION PHOTOS (Matching Admin renderInspectionPhotos) =====================
+  // ===================== STEP 4: INSPECTION PHOTOS =====================
   const renderInspectionStep = () => (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 4: Pre-Handover Vehicle Inspection Photos</h2>
+          <h2 className="text-lg font-bold text-text-primary">
+            Step 4: Handover Inspection Photos (صور فحص السيارة عند التسليم)
+          </h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Take or upload 8 standard angles to document vehicle condition before client handover
+            Capture vehicle inspection photos to document condition before handover (optional)
           </p>
         </div>
       </div>
@@ -1660,9 +1668,7 @@ export default function ConfirmDeliveryPage() {
       <VehicleInspectionPhotoCapture
         photos={inspectionPhotos}
         onChange={setInspectionPhotos}
-        title="Vehicle Handover Inspection (فحص تسليم السيارة)"
-        subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
-        badgeLabel="Handover Inspection"
+        allowExtra={true}
       />
     </div>
   );
@@ -1803,36 +1809,34 @@ export default function ConfirmDeliveryPage() {
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
             <Camera size={14} className="text-brand" />
-            Pre-Handover Vehicle Inspection ({Object.values(inspectionPhotos).filter(Boolean).length}/8 photos captured)
+            Pre-Handover Vehicle Inspection ({Object.values(inspectionPhotos).filter(Boolean).length} photos captured)
           </span>
           <button
             type="button"
-            onClick={() => setCurrentStep(3)}
+            onClick={() => setCurrentStep(4)}
             className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
           >
             Edit Photos
           </button>
         </div>
         <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-          {VEHICLE_ANGLES.map((angle, idx) => {
-            const url = inspectionPhotos[angle];
-            return (
-              <div
-                key={angle}
-                className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
-              >
-                {url ? (
-                  <img src={url} alt={angle} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-[9px] text-text-muted font-medium leading-tight">
-                    #{idx + 1}
-                    <br />
-                    {angle.split(" ")[0]}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+          {[
+            ...VEHICLE_ANGLES.map((angle, idx) => ({ key: angle, label: `#${idx + 1}\n${angle.split(" ")[0]}`, url: inspectionPhotos[angle] })),
+            ...getExtraPhotoKeys(inspectionPhotos).map((k, i) => ({ key: k, label: `Extra ${i + 1}`, url: inspectionPhotos[k] }))
+          ].map(({ key, label, url }) => (
+            <div
+              key={key}
+              className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
+            >
+              {url ? (
+                <img src={url} alt={key} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[9px] text-text-muted font-medium leading-tight whitespace-pre-line">
+                  {label}
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

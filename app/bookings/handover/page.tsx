@@ -32,7 +32,7 @@ import {
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
-import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
+import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { useToast } from "@/components/providers/ToastProvider";
 
 // 4 steps for Admin Shop Handover (Car -> Inspection Photos -> Rental Data -> Sign & Review)
@@ -340,12 +340,15 @@ function ConfirmHandoverPageContent() {
           paymentStatus: contractData.paymentStatus || "Pending",
         });
 
-        // Initialize existing inspection photos
+        // Initialize existing inspection photos (both standard angles and extra photos)
         if (Array.isArray(contractData.inspectionPhotos) && contractData.inspectionPhotos.length > 0) {
           const photoMap: Record<string, string> = {};
-          VEHICLE_ANGLES.forEach((angle, idx) => {
-            if (contractData.inspectionPhotos[idx]) {
-              photoMap[angle] = contractData.inspectionPhotos[idx];
+          contractData.inspectionPhotos.forEach((url: string, idx: number) => {
+            if (!url) return;
+            if (VEHICLE_ANGLES[idx]) {
+              photoMap[VEHICLE_ANGLES[idx]] = url;
+            } else if (idx >= VEHICLE_ANGLES.length) {
+              photoMap[`${EXTRA_PHOTO_PREFIX}${idx - VEHICLE_ANGLES.length + 1}`] = url;
             }
           });
           setInspectionPhotos(photoMap);
@@ -659,7 +662,10 @@ function ConfirmHandoverPageContent() {
       const contractId = contract._id || contract.id;
       const formattedCheckoutTime = formatTimeDisplay(rentalData.checkoutTime);
 
-      const inspectionArray = VEHICLE_ANGLES.map((angle) => inspectionPhotos[angle] || "");
+      const inspectionArray = [
+        ...VEHICLE_ANGLES.map((angle) => inspectionPhotos[angle] || ""),
+        ...getExtraPhotoKeys(inspectionPhotos).map((k) => inspectionPhotos[k]),
+      ];
 
       const payload = {
         deliveryStatus: "Delivered",
@@ -996,9 +1002,11 @@ function ConfirmHandoverPageContent() {
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 2: Pre-Handover Vehicle Inspection Photos</h2>
+          <h2 className="text-lg font-bold text-text-primary">
+            Step 2: Handover Inspection Photos (صور فحص السيارة عند التسليم)
+          </h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Take or upload 8 standard angles to document vehicle condition before client handover
+            Capture vehicle inspection photos to document condition before handover (optional)
           </p>
         </div>
       </div>
@@ -1006,9 +1014,7 @@ function ConfirmHandoverPageContent() {
       <VehicleInspectionPhotoCapture
         photos={inspectionPhotos}
         onChange={setInspectionPhotos}
-        title="Vehicle Handover Inspection (فحص تسليم السيارة)"
-        subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
-        badgeLabel="Handover Inspection"
+        allowExtra={true}
       />
     </div>
   );
@@ -1407,24 +1413,24 @@ function ConfirmHandoverPageContent() {
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
           <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
             <Camera size={14} className="text-brand" />
-            Handover Vehicle Inspection ({Object.values(inspectionPhotos).filter(Boolean).length}/8 photos)
+            Handover Vehicle Inspection ({Object.values(inspectionPhotos).filter(Boolean).length} photos)
           </span>
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-            {VEHICLE_ANGLES.map((angle, idx) => {
-              const url = inspectionPhotos[angle];
-              return (
-                <div
-                  key={idx}
-                  className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
-                >
-                  {url ? (
-                    <img src={url} alt={angle} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[9px] text-text-muted font-medium leading-tight">{angle.split(" ")[0]}</span>
-                  )}
-                </div>
-              );
-            })}
+            {[
+              ...VEHICLE_ANGLES.map((angle) => ({ key: angle, label: angle.split(" ")[0], url: inspectionPhotos[angle] })),
+              ...getExtraPhotoKeys(inspectionPhotos).map((k, i) => ({ key: k, label: `Extra ${i + 1}`, url: inspectionPhotos[k] }))
+            ].map(({ key, label, url }, idx) => (
+              <div
+                key={key || idx}
+                className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
+              >
+                {url ? (
+                  <img src={url} alt={label} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[9px] text-text-muted font-medium leading-tight">{label}</span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
