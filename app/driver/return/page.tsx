@@ -35,7 +35,11 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { useSession } from "next-auth/react";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
-import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
+import VehicleInspectionPhotoCapture, {
+  VEHICLE_ANGLES,
+  EXTRA_PHOTO_PREFIX,
+  getExtraPhotoKeys,
+} from "@/components/ui/VehicleInspectionPhotoCapture";
 
 const STEPS = [
   { id: 1, title: "Vehicle & Mileage", arTitle: "المركبة والعداد" },
@@ -236,8 +240,12 @@ export default function VehicleReturnPage() {
       const initialPhotos: Record<string, string> = {};
       if (Array.isArray(selectedContractData.returnPhotos)) {
         selectedContractData.returnPhotos.forEach((url: string, idx: number) => {
-          if (url && VEHICLE_ANGLES[idx]) {
-            initialPhotos[VEHICLE_ANGLES[idx]] = url;
+          if (url) {
+            if (VEHICLE_ANGLES[idx]) {
+              initialPhotos[VEHICLE_ANGLES[idx]] = url;
+            } else {
+              initialPhotos[`${EXTRA_PHOTO_PREFIX}${idx - VEHICLE_ANGLES.length + 1}`] = url;
+            }
           }
         });
       }
@@ -460,7 +468,10 @@ export default function VehicleReturnPage() {
     toast.success("Finalizing return inspection and updating vehicle status...");
 
     try {
-      const orderedReturnPhotos = VEHICLE_ANGLES.map((angle) => returnPhotos[angle] || "");
+      const orderedReturnPhotos = [
+        ...VEHICLE_ANGLES.map((angle) => returnPhotos[angle] || ""),
+        ...getExtraPhotoKeys(returnPhotos).map((k) => returnPhotos[k]),
+      ];
       const damageDescription = hasNewDamage && newDamages.trim() ? newDamages.trim() : "None";
 
       const payload = {
@@ -825,9 +836,7 @@ export default function VehicleReturnPage() {
       <VehicleInspectionPhotoCapture
         photos={returnPhotos}
         onChange={setReturnPhotos}
-        title="Vehicle Return Inspection (فحص استرجاع السيارة)"
-        subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
-        badgeLabel="Return Condition"
+        allowExtra={true}
       />
     </div>
   );
@@ -1098,7 +1107,7 @@ export default function VehicleReturnPage() {
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
             <Camera size={14} className="text-brand" />
-            Return Inspection Photos ({Object.values(returnPhotos).filter(Boolean).length}/8 captured)
+            Return Inspection Photos ({Object.values(returnPhotos).filter(Boolean).length} captured)
           </span>
           <button
             type="button"
@@ -1109,25 +1118,25 @@ export default function VehicleReturnPage() {
           </button>
         </div>
         <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-          {VEHICLE_ANGLES.map((angle, idx) => {
-            const url = returnPhotos[angle];
-            return (
-              <div
-                key={angle}
-                className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
-              >
-                {url ? (
-                  <img src={url} alt={angle} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-[9px] text-text-muted font-medium leading-tight">
-                    #{idx + 1}
-                    <br />
-                    {angle.split(" ")[0]}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+          {[
+            ...VEHICLE_ANGLES.map((angle) => ({ key: angle, label: angle.split(" ")[0], url: returnPhotos[angle] })),
+            ...getExtraPhotoKeys(returnPhotos).map((k, i) => ({ key: k, label: `Extra ${i + 1}`, url: returnPhotos[k] }))
+          ].map(({ key, label, url }, idx) => (
+            <div
+              key={key || idx}
+              className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
+            >
+              {url ? (
+                <img src={url} alt={label} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[9px] text-text-muted font-medium leading-tight">
+                  #{idx + 1}
+                  <br />
+                  {label}
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

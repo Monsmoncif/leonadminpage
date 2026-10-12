@@ -20,7 +20,11 @@ import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { useToast } from "@/components/providers/ToastProvider";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
-import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
+import VehicleInspectionPhotoCapture, {
+  VEHICLE_ANGLES,
+  EXTRA_PHOTO_PREFIX,
+  getExtraPhotoKeys,
+} from "@/components/ui/VehicleInspectionPhotoCapture";
 
 interface ReturnVehicleModalProps {
   isOpen: boolean;
@@ -65,8 +69,12 @@ export default function ReturnVehicleModal({
       const initialPhotos: Record<string, string> = {};
       if (Array.isArray(contract.returnPhotos)) {
         contract.returnPhotos.forEach((url: string, idx: number) => {
-          if (url && VEHICLE_ANGLES[idx]) {
-            initialPhotos[VEHICLE_ANGLES[idx]] = url;
+          if (url) {
+            if (VEHICLE_ANGLES[idx]) {
+              initialPhotos[VEHICLE_ANGLES[idx]] = url;
+            } else {
+              initialPhotos[`${EXTRA_PHOTO_PREFIX}${idx - VEHICLE_ANGLES.length + 1}`] = url;
+            }
           }
         });
       }
@@ -141,7 +149,10 @@ export default function ReturnVehicleModal({
     setError("");
 
     try {
-      const orderedReturnPhotos = VEHICLE_ANGLES.map(angle => returnPhotos[angle] || "");
+      const orderedReturnPhotos = [
+        ...VEHICLE_ANGLES.map(angle => returnPhotos[angle] || ""),
+        ...getExtraPhotoKeys(returnPhotos).map(k => returnPhotos[k]),
+      ];
 
       const payload = {
         status: "Completed",
@@ -330,9 +341,7 @@ export default function ReturnVehicleModal({
             <VehicleInspectionPhotoCapture
               photos={returnPhotos}
               onChange={setReturnPhotos}
-              title="Return Inspection Photos (صور فحص الاسترجاع)"
-              subtitle="Capture or upload 8 standard angles to document vehicle condition upon return."
-              badgeLabel="Shop Return"
+              allowExtra={true}
             />
           </div>
         );

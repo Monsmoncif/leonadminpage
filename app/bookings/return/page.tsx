@@ -40,7 +40,11 @@ import Link from "next/link";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
-import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
+import VehicleInspectionPhotoCapture, {
+  VEHICLE_ANGLES,
+  EXTRA_PHOTO_PREFIX,
+  getExtraPhotoKeys,
+} from "@/components/ui/VehicleInspectionPhotoCapture";
 
 // Step definitions matching driver/return and bookings/new pattern
 const SHOP_STEPS = [
@@ -263,8 +267,12 @@ function ReturnPageContent() {
       const initialPhotos: Record<string, string> = {};
       if (Array.isArray(selectedContract.returnPhotos)) {
         selectedContract.returnPhotos.forEach((url: string, idx: number) => {
-          if (url && VEHICLE_ANGLES[idx]) {
-            initialPhotos[VEHICLE_ANGLES[idx]] = url;
+          if (url) {
+            if (VEHICLE_ANGLES[idx]) {
+              initialPhotos[VEHICLE_ANGLES[idx]] = url;
+            } else {
+              initialPhotos[`${EXTRA_PHOTO_PREFIX}${idx - VEHICLE_ANGLES.length + 1}`] = url;
+            }
           }
         });
       }
@@ -504,7 +512,10 @@ function ReturnPageContent() {
 
     try {
       setIsSubmitting(true);
-      const orderedReturnPhotos = VEHICLE_ANGLES.map(angle => returnPhotos[angle] || "");
+      const orderedReturnPhotos = [
+        ...VEHICLE_ANGLES.map(angle => returnPhotos[angle] || ""),
+        ...getExtraPhotoKeys(returnPhotos).map(k => returnPhotos[k]),
+      ];
 
       const payload = {
         status: "Completed",
@@ -1073,8 +1084,7 @@ function ReturnPageContent() {
       <VehicleInspectionPhotoCapture
         photos={returnPhotos}
         onChange={setReturnPhotos}
-        title="Vehicle Return Inspection"
-        subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
+        allowExtra={true}
       />
     </div>
   );
@@ -1347,7 +1357,7 @@ function ReturnPageContent() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
               <Camera size={14} className="text-brand" />
-              Return Inspection Photos ({Object.values(returnPhotos).filter(Boolean).length}/8 captured)
+              Return Inspection Photos ({Object.values(returnPhotos).filter(Boolean).length} captured)
             </span>
             <button
               type="button"
@@ -1358,25 +1368,25 @@ function ReturnPageContent() {
             </button>
           </div>
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-            {VEHICLE_ANGLES.map((angle, idx) => {
-              const url = returnPhotos[angle];
-              return (
-                <div
-                  key={angle}
-                  className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
-                >
-                  {url ? (
-                    <img src={url} alt={angle} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[9px] text-text-muted font-medium leading-tight">
-                      #{idx + 1}
-                      <br />
-                      {angle.split(" ")[0]}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+            {[
+              ...VEHICLE_ANGLES.map((angle) => ({ key: angle, label: angle.split(" ")[0], url: returnPhotos[angle] })),
+              ...getExtraPhotoKeys(returnPhotos).map((k, i) => ({ key: k, label: `Extra ${i + 1}`, url: returnPhotos[k] }))
+            ].map(({ key, label, url }, idx) => (
+              <div
+                key={key || idx}
+                className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
+              >
+                {url ? (
+                  <img src={url} alt={label} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[9px] text-text-muted font-medium leading-tight">
+                    #{idx + 1}
+                    <br />
+                    {label}
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
