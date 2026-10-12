@@ -850,7 +850,8 @@ export default function ConfirmDeliveryPage() {
         (1000 * 3600 * 24)
     )
   );
-  const rawCollectionTotal = Number(rentalData.collectionAmount || 0);
+  const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
+  const rawCollectionTotal = Number(rentalData.collectionAmount || 0) + extraFees;
   const advancePaid = Number(contract?.advancePayment || rentalData.advancePayment || 0);
   const collectionTotal = Math.max(0, rawCollectionTotal - advancePaid);
   const depositTotal = Number(rentalData.depositAmount || 0);
@@ -1445,13 +1446,11 @@ export default function ConfirmDeliveryPage() {
                   value={rentalData.collectionAmount === 0 ? "" : rentalData.collectionAmount}
                   onChange={(e) => setRentalData({ ...rentalData, collectionAmount: Number(e.target.value) })}
                   placeholder="0"
-                  className="w-full pl-9 pr-2.5 py-2.5 rounded-xl border border-border bg-white text-text-primary text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-brand"
+                  className="w-full pl-9 pr-2.5 py-2.5 rounded-xl border border-border bg-white text-text-primary text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand text-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
-              <span className="text-[10px] text-text-muted mt-0.5 block">
-                {advancePaid > 0
-                  ? `Remaining due (AED ${advancePaid} prepaid advance)`
-                  : "Rental total amount"}
+              <span className="text-[11px] text-text-muted mt-0.5 block truncate">
+                Total rent ({totalDays} days{rentalData.dailyRate > 0 ? ` @ AED ${rentalData.dailyRate}/d` : ""})
               </span>
             </div>
 
@@ -1466,9 +1465,39 @@ export default function ConfirmDeliveryPage() {
                   value={rentalData.depositAmount === 0 ? "" : rentalData.depositAmount}
                   onChange={(e) => setRentalData({ ...rentalData, depositAmount: Number(e.target.value) })}
                   placeholder="0"
-                  className="w-full pl-9 pr-2.5 py-2.5 rounded-xl border border-border bg-white text-text-primary text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  className="w-full pl-9 pr-2.5 py-2.5 rounded-xl border border-border bg-white text-text-primary text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
+              <span className="text-[11px] text-text-muted mt-0.5 block truncate">
+                Refundable upon return (مسترد)
+              </span>
+            </div>
+          </div>
+
+          {/* The Rest (الباقي) & The Deposit (التأمين) Breakdown */}
+          <div className="p-3.5 bg-emerald-50/80 rounded-xl border border-emerald-200 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-emerald-950 font-semibold">Total Rent Charges:</span>
+              <span className="font-bold text-emerald-950">AED {rawCollectionTotal.toLocaleString()}</span>
+            </div>
+            {advancePaid > 0 && (
+              <div className="flex items-center justify-between text-xs text-emerald-800">
+                <span className="font-medium flex items-center gap-1">
+                  ✓ Prepaid Advance (الدفعة المقدمة المدفوعة):
+                </span>
+                <span className="font-black text-emerald-700">- AED {advancePaid.toLocaleString()}</span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-emerald-200/90 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-black text-emerald-950 block">The Rest / المبلغ المتبقي للتحصيل:</span>
+                <span className="text-[10px] text-emerald-700 font-medium">Remaining to collect on handover</span>
+              </div>
+              <span className="text-base font-black text-emerald-800">AED {collectionTotal.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs pt-1 border-t border-emerald-200/50">
+              <span className="text-emerald-900 font-semibold">Security Deposit (مبلغ التأمين):</span>
+              <span className="font-bold text-emerald-950">AED {depositTotal.toLocaleString()}</span>
             </div>
           </div>
 
@@ -1482,7 +1511,7 @@ export default function ConfirmDeliveryPage() {
                 type="number"
                 value={rentalData.deliveryFee}
                 onChange={(e) => setRentalData({ ...rentalData, deliveryFee: Number(e.target.value) })}
-                className="w-full p-2 rounded-xl border border-border bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                className="w-full p-2 rounded-xl border border-border bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <div>
@@ -1493,29 +1522,33 @@ export default function ConfirmDeliveryPage() {
                 type="number"
                 value={rentalData.babySeatFee}
                 onChange={(e) => setRentalData({ ...rentalData, babySeatFee: Number(e.target.value) })}
-                className="w-full p-2 rounded-xl border border-border bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                className="w-full p-2 rounded-xl border border-border bg-white text-xs font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
           </div>
 
           {/* Payment Method Selector (Cash, Card, Crypto, Multi-Split) */}
-          <div className="pt-2">
+          <div className="pt-1">
             <PaymentMethodSelector
               value={rentalData.paymentMethod}
               onChange={(pm) => setRentalData({ ...rentalData, paymentMethod: pm })}
               totalAmount={grandTotal}
-              totalLabel="Total Due (Collection + Deposit)"
+              totalLabel="Total Due (The Rest + Deposit)"
               label="Payment Method (طريقة الدفع)"
             />
           </div>
 
           {/* Grand Total Collection Card */}
-          <div className="p-3 bg-brand/5 rounded-xl border border-brand/20 flex items-center justify-between">
+          <div className="p-3.5 bg-brand/5 rounded-xl border border-brand/20 flex items-center justify-between">
             <div>
-              <span className="text-xs font-bold text-brand block">Total Collection Due / المستحق:</span>
-              <span className="text-[10px] text-text-muted">Rent Collection + Security Deposit</span>
+              <span className="text-xs font-bold text-brand block">Total Collection Due / إجمالي التحصيل:</span>
+              <span className="text-[10px] text-text-muted">
+                {advancePaid > 0 
+                  ? `The Rest (AED ${collectionTotal.toLocaleString()}) + Deposit (AED ${depositTotal.toLocaleString()})`
+                  : `Rent (AED ${collectionTotal.toLocaleString()}) + Deposit (AED ${depositTotal.toLocaleString()})`}
+              </span>
             </div>
-            <span className="text-lg font-black text-brand">AED {grandTotal.toLocaleString()}</span>
+            <span className="text-xl font-black text-brand">AED {grandTotal.toLocaleString()}</span>
           </div>
 
           {/* Mandatory Checkbox: Confirm Get All Money */}
@@ -1532,7 +1565,7 @@ export default function ConfirmDeliveryPage() {
                   Confirm Get All Money (تأكيد استلام كامل المبلغ) *
                 </span>
                 <span className="text-[11px] text-amber-800 mt-0.5 block">
-                  I certify that all required money (Rental Collection of AED {collectionTotal.toLocaleString()} + Deposit of AED {depositTotal.toLocaleString()} = Total AED {grandTotal.toLocaleString()}) has been received from the customer.
+                  I certify that all required money (The Rest of AED {collectionTotal.toLocaleString()} + Deposit of AED {depositTotal.toLocaleString()} = Total AED {grandTotal.toLocaleString()}) has been received from the customer.
                 </span>
               </div>
             </label>
