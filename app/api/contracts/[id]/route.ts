@@ -205,9 +205,16 @@ export async function PUT(
       delete updatedData.deliveryStatus;
     }
 
-    // Auto-sync deliveryStatus when completed
+    // Auto-sync deliveryStatus and returnedAt when completed
     if (body.status === "Completed") {
       updatedData.deliveryStatus = "Returned";
+      if (!body.returnedAt && !existingContract.returnedAt) {
+        updatedData.returnedAt = new Date();
+      }
+    } else if (body.status && body.status !== "Completed" && existingContract.status === "Completed") {
+      if (!body.returnedAt) {
+        updatedData.returnedAt = null;
+      }
     }
 
     // Enforce that contract can only be confirmed as Delivered & Active on or after the start date

@@ -170,8 +170,17 @@ export default function CalendarPage() {
           const contractNum = c.contractNumber ? String(c.contractNumber) : (c.id || "Pending");
           const displayNum = contractNum.startsWith("#") ? contractNum : `#${contractNum}`;
 
+          // 2. Return / End Date & Hour
+          const returnDateRaw = (isReturned && c.returnedAt)
+            ? c.returnedAt
+            : (isReturned && (c.status === "Completed" || c.deliveryStatus === "Returned"))
+              ? (c.updatedAt || new Date().toISOString())
+              : c.rawEndDate;
+          const endDate = startOfDay(new Date(returnDateRaw));
+
           // 1. Handover / Pickup Start Date & Hour
-          const startDate = startOfDay(new Date(c.rawStartDate));
+          const rawStart = startOfDay(new Date(c.deliveredAt || c.handoverCompletedAt || c.rawStartDate));
+          const startDate = (isReturned && rawStart > endDate) ? endDate : rawStart;
           const startHour = formatEventHour(c.checkoutTime, "08:00 AM");
 
           if (startDate >= monthDates[0] && startDate <= monthEnd) {
@@ -248,15 +257,10 @@ export default function CalendarPage() {
             });
           }
 
-          // 2. Expected Return / End Date & Hour
-          const endDate = (isReturned && c.returnedAt)
-            ? startOfDay(new Date(c.returnedAt))
-            : startOfDay(new Date(c.rawEndDate));
-
           let endHour = "";
-          if (isReturned && c.returnedAt) {
+          if (isReturned && (c.returnedAt || c.updatedAt)) {
             try {
-              const d = new Date(c.returnedAt);
+              const d = new Date(c.returnedAt || c.updatedAt);
               if (!isNaN(d.getTime())) {
                 endHour = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
               }
