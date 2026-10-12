@@ -793,14 +793,7 @@ export function NewRentalAdminPageContent() {
         }
       }
 
-      // Driver: all 8 inspection photos are required before moving to Rental Data
-      if (isDriver && currentStep === 3) {
-        const missing = VEHICLE_ANGLES.filter(angle => !inspectionPhotos[angle]);
-        if (missing.length > 0) {
-          toast.error(`يرجى التقاط جميع صور الفحص (${VEHICLE_ANGLES.length - missing.length}/${VEHICLE_ANGLES.length}) — Please capture all inspection photos.`);
-          return;
-        }
-      }
+
 
       // Driver: Rental Data is step 4 — check date conflict and handover mileage before review
       if (isDriver && currentStep === 4) {
@@ -868,15 +861,10 @@ export function NewRentalAdminPageContent() {
         return;
       }
 
-      // Driver contracts require handover mileage and all inspection photos
+      // Driver contracts require handover mileage
       if (isDriver && !isEditMode) {
         if (!rentalData.checkoutMileage || Number(rentalData.checkoutMileage) <= 0) {
           toast.error("يرجى إدخال عداد الكيلومترات عند التسليم (Please enter the Handover Mileage).");
-          setIsLoading(false);
-          return;
-        }
-        if (VEHICLE_ANGLES.some(angle => !inspectionPhotos[angle])) {
-          toast.error("يرجى التقاط جميع صور الفحص (Please capture all inspection photos).");
           setIsLoading(false);
           return;
         }
@@ -2361,8 +2349,8 @@ export function NewRentalAdminPageContent() {
           <h2 className="text-lg font-bold text-text-primary">Step {isDriver ? 3 : 4}: {isDriver ? "Handover Inspection Photos (صور فحص السيارة عند التسليم)" : "Pre-Handover Vehicle Inspection Photos"}</h2>
           <p className="text-xs text-text-muted mt-0.5">
             {isDriver
-              ? "Capture all 8 standard angles to document the car condition before handing it over to the client"
-              : "Take or upload 8 standard angles to document vehicle condition before client handover at the shop"}
+              ? "Capture vehicle inspection photos to document condition before handover (optional)"
+              : "Take or upload vehicle inspection photos to document condition before client handover"}
           </p>
         </div>
       </div>
