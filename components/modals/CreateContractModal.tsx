@@ -1778,13 +1778,23 @@ export default function CreateContractModal({
                       </div>
 
                       {/* Payment Method Selector (1, 2, or 3 methods) */}
-                      <PaymentMethodSelector
-                        value={formData.paymentMethod}
-                        onChange={(val) => setFormData({ ...formData, paymentMethod: val })}
-                        totalAmount={Number(formData.depositAmount || 0)}
-                        totalLabel="Deposit Total"
-                        label="Payment Method / طريقة الدفع"
-                      />
+                      {(() => {
+                        const extraCharges = (Number(formData.babySeatFees) || 0) + (Number(formData.deliveryCharges) || 0);
+                        const totalCharges = Number(formData.collectionAmount || 0) + extraCharges;
+                        const advancePaid = Number(formData.advancePayment || 0);
+                        const remainingToCollect = Math.max(0, totalCharges - advancePaid);
+                        const depositAmount = Number(formData.depositAmount || 0);
+                        const totalHandoverDue = remainingToCollect + depositAmount;
+                        return (
+                          <PaymentMethodSelector
+                            value={formData.paymentMethod}
+                            onChange={(val) => setFormData({ ...formData, paymentMethod: val })}
+                            totalAmount={totalHandoverDue}
+                            totalLabel="Total Due (Collection + Deposit)"
+                            label="Payment Method / طريقة الدفع"
+                          />
+                        );
+                      })()}
 
 
                       <div>

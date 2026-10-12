@@ -170,7 +170,10 @@ export default function PaymentMethodSelector({
 
   // Calculate allocated vs total
   const totalAllocated = selectedMethods.reduce((sum, m) => sum + (Number(splitAmounts[m]) || 0), 0);
-  const remaining = totalAmount !== undefined ? Math.max(0, totalAmount - totalAllocated) : undefined;
+  const diff = totalAmount !== undefined ? totalAmount - totalAllocated : undefined;
+  const isExactMatch = totalAmount !== undefined && Math.abs(diff ?? 0) < 0.01;
+  const isUnderAllocated = totalAmount !== undefined && (diff ?? 0) > 0.01;
+  const isOverAllocated = totalAmount !== undefined && (diff ?? 0) < -0.01;
 
   return (
     <div className={`space-y-2.5 ${className}`}>
@@ -281,19 +284,39 @@ export default function PaymentMethodSelector({
           </div>
 
           {/* Split Amount Inputs for Active Methods */}
-          <div className="space-y-2 pt-1 border-t border-border/60">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="space-y-2.5 pt-2 border-t border-border/60">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {selectedMethods.map((m) => {
                 const methodInfo = METHODS.find((item) => item.id === m);
                 const Icon = methodInfo?.icon || Banknote;
+                const pct =
+                  totalAmount !== undefined && totalAmount > 0 && Number(splitAmounts[m]) > 0
+                    ? Math.round((Number(splitAmounts[m]) / totalAmount) * 100)
+                    : null;
                 return (
-                  <div key={m} className="p-2.5 rounded-lg border border-border/80 bg-surface flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Icon size={14} className={methodInfo?.color || "text-brand"} />
-                      <span className="text-xs font-bold text-text-primary truncate">{m} Amount:</span>
+                  <div
+                    key={m}
+                    className="p-2.5 rounded-xl border border-gray-200 bg-white shadow-2xs hover:border-gray-300 transition-all space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center ${methodInfo?.bg || "bg-gray-100"}`}>
+                          <Icon size={12} className={methodInfo?.color || "text-brand"} />
+                        </div>
+                        <span className="text-xs font-bold text-text-primary">{m} Amount</span>
+                        <span className="text-[10px] text-text-muted">({methodInfo?.sublabel})</span>
+                      </div>
+                      {pct !== null && (
+                        <span className="text-[10px] font-bold text-brand bg-brand/10 px-1.5 py-0.2 rounded-full">
+                          {pct}%
+                        </span>
+                      )}
                     </div>
-                    <div className="relative w-32 shrink-0">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-muted">AED</span>
+
+                    <div className="relative flex items-center rounded-lg border border-gray-300 bg-gray-50/50 focus-within:bg-white focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 transition-all overflow-hidden">
+                      <span className="px-2.5 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 border-r border-gray-200 select-none">
+                        AED
+                      </span>
                       <input
                         type="number"
                         min="0"
@@ -301,7 +324,7 @@ export default function PaymentMethodSelector({
                         placeholder="0.00"
                         value={splitAmounts[m] || ""}
                         onChange={(e) => handleAmountChange(m, e.target.value)}
-                        className="w-full pl-9 pr-2 py-1 text-xs font-bold text-text-primary bg-white border border-border rounded-md focus:ring-1 focus:ring-brand focus:border-brand outline-none text-right"
+                        className="w-full px-2.5 py-1.5 text-xs font-black text-text-primary bg-transparent outline-none text-right font-mono"
                       />
                     </div>
                   </div>
@@ -311,17 +334,71 @@ export default function PaymentMethodSelector({
 
             {/* Split summary indicator if totalAmount is given */}
             {totalAmount !== undefined && totalAmount > 0 && (
-              <div className="flex items-center justify-between text-[11px] pt-1 px-1 font-semibold">
-                <span className="text-text-muted">
-                  {totalLabel}: <strong className="text-text-primary font-bold">AED {totalAmount.toFixed(2)}</strong>
-                </span>
-                <span className={Math.abs(totalAllocated - totalAmount) < 0.01 ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-                  Allocated: AED {totalAllocated.toFixed(2)}
-                  {Math.abs(totalAllocated - totalAmount) >= 0.01 && remaining !== undefined && (
-                    <span className="text-red-600 ml-1">(AED {remaining.toFixed(2)} left)</span>
+              <div className="p-3 rounded-xl bg-gray-50/90 border border-gray-200 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-text-secondary font-medium">{totalLabel}:</span>
+                    <strong className="text-text-primary font-black text-sm">
+                      AED {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-text-secondary font-medium">Allocated (الموزع):</span>
+                    <strong
+                      className={`font-black text-sm ${
+                        isExactMatch
+                          ? "text-emerald-700"
+                          : isOverAllocated
+                          ? "text-red-600"
+                          : "text-amber-700"
+                      }`}
+                    >
+                      AED {totalAllocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Status indicator bar */}
+                <div className="flex flex-wrap items-center justify-between pt-2 border-t border-gray-200/80 text-[11px] gap-2">
+                  {isExactMatch && (
+                    <div className="flex items-center gap-1.5 text-emerald-700 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>✓ Fully Allocated &amp; Matched (تم توزيع كامل المبلغ بدقة)</span>
+                    </div>
                   )}
-                  {Math.abs(totalAllocated - totalAmount) < 0.01 && <span className="ml-1 text-emerald-600">✓</span>}
-                </span>
+                  {isUnderAllocated && diff !== undefined && (
+                    <div className="flex items-center gap-1.5 text-amber-700 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span>Remaining to allocate: AED {diff.toFixed(2)} (متبقي للتوزيع)</span>
+                    </div>
+                  )}
+                  {isOverAllocated && diff !== undefined && (
+                    <div className="flex items-center gap-1.5 text-red-600 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      <span>Over allocated by: AED {Math.abs(diff).toFixed(2)} (المبلغ الموزع زائد)</span>
+                    </div>
+                  )}
+
+                  {/* Auto-assign remaining button */}
+                  {isUnderAllocated && diff !== undefined && diff > 0 && selectedMethods.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetMethod =
+                          selectedMethods.find((m) => !splitAmounts[m] || Number(splitAmounts[m]) === 0) ||
+                          selectedMethods[selectedMethods.length - 1];
+                        const current = Number(splitAmounts[targetMethod] || 0);
+                        const next = { ...splitAmounts, [targetMethod]: (current + diff).toFixed(2) };
+                        setSplitAmounts(next);
+                        emitValue(true, selectedMethods, next);
+                      }}
+                      className="text-[10px] font-bold text-brand hover:underline cursor-pointer ml-auto"
+                    >
+                      + Assign remaining (تعيين المتبقي)
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>

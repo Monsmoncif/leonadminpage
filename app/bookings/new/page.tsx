@@ -2033,8 +2033,8 @@ export function NewRentalAdminPageContent() {
               <PaymentMethodSelector
                 value={rentalData.paymentMethod}
                 onChange={(val) => setRentalData({ ...rentalData, paymentMethod: val })}
-                totalAmount={Number(rentalData.depositAmount || 0)}
-                totalLabel="Deposit Total"
+                totalAmount={grandTotal}
+                totalLabel="Total to Collect (Collection + Deposit)"
                 label="Payment Method / طريقة الدفع"
               />
             </div>

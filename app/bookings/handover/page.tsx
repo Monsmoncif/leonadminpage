@@ -1132,7 +1132,8 @@ function ConfirmHandoverPageContent() {
             <PaymentMethodSelector
               value={rentalData.paymentMethod}
               onChange={(pm) => setRentalData({ ...rentalData, paymentMethod: pm })}
-              totalAmount={collectionTotal}
+              totalAmount={grandTotal}
+              totalLabel="Total Due (Collection + Deposit)"
               label="Payment Method (طريقة الدفع)"
             />
           </div>
