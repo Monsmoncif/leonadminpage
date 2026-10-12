@@ -383,7 +383,7 @@ export default function ConfirmDeliveryPage() {
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
     const targetWidth = Math.round(rect.width * dpr);
     const targetHeight = Math.round(rect.height * dpr);
 
@@ -393,15 +393,11 @@ export default function ConfirmDeliveryPage() {
       canvas.height = targetHeight;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.scale(dpr, dpr);
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = "#0f172a";
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         if (prevSig && prevSig.startsWith("data:image")) {
           const img = new Image();
           img.onload = () => {
-            ctx.drawImage(img, 0, 0, rect.width, rect.height);
+            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
           };
           img.src = prevSig;
         }
@@ -478,7 +474,7 @@ export default function ConfirmDeliveryPage() {
   // Canvas Drawing Handlers - Customer Signature
   const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas) return { x: 0, y: 0, scaleRatio: 1 };
     const rect = canvas.getBoundingClientRect();
     let clientX = 0;
     let clientY = 0;
@@ -494,9 +490,13 @@ export default function ConfirmDeliveryPage() {
       clientX = (e as React.MouseEvent).clientX;
       clientY = (e as React.MouseEvent).clientY;
     }
+
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
     return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+      scaleRatio: scaleX,
     };
   };
 
@@ -515,7 +515,12 @@ export default function ConfirmDeliveryPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const { x, y } = getCoordinates(e);
+    const { x, y, scaleRatio } = getCoordinates(e);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.lineWidth = Math.max(2, 2.5 * scaleRatio);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#0f172a";
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
@@ -531,10 +536,6 @@ export default function ConfirmDeliveryPage() {
     if (!ctx) return;
 
     const { x, y } = getCoordinates(e);
-    ctx.strokeStyle = "#0f172a";
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
     ctx.lineTo(x, y);
     ctx.stroke();
     hasDrawnRef.current = true;
@@ -554,8 +555,8 @@ export default function ConfirmDeliveryPage() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     hasDrawnRef.current = false;
     setSignatureData(null);
   };

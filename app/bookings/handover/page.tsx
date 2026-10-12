@@ -371,43 +371,83 @@ function ConfirmHandoverPageContent() {
     scrollToTop();
   }, [currentStep]);
 
-  // Canvas DPI initialization when reaching Review Step (Step 4)
+  // Canvas initialization when reaching Review Step (Step 4)
   useEffect(() => {
     const isReviewStep = currentStep === 4;
-    if (isReviewStep) {
-      const timer = setTimeout(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+    if (!isReviewStep) return;
 
-        const rect = canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
+    const setup = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const targetWidth = Math.round(rect.width * dpr);
+      const targetHeight = Math.round(rect.height * dpr);
+
+      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+        const currentImg = canvas.toDataURL();
+        const toDraw = signatureData || (canvas.width > 0 && currentImg.length > 100 ? currentImg : null);
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
 
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          ctx.scale(dpr, dpr);
-          ctx.lineWidth = 2.5;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-          ctx.strokeStyle = "#0f172a";
-
-          if (signatureData) {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          if (toDraw && typeof toDraw === "string" && toDraw.startsWith("data:image")) {
             const img = new Image();
             img.onload = () => {
-              ctx.drawImage(img, 0, 0, rect.width, rect.height);
+              ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
             };
-            img.src = signatureData;
+            img.src = toDraw;
           }
         }
-      }, 100);
-      return () => clearTimeout(timer);
+      }
+    };
+
+    const t1 = setTimeout(setup, 50);
+    const t2 = setTimeout(setup, 250);
+    window.addEventListener("resize", setup);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener("resize", setup);
+    };
+  }, [currentStep, signatureData]);
+
+  const getCanvasCoords = (canvas: HTMLCanvasElement, e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const rect = canvas.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+    if ("touches" in e) {
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else if ("changedTouches" in e && (e as any).changedTouches?.length > 0) {
+        clientX = (e as any).changedTouches[0].clientX;
+        clientY = (e as any).changedTouches[0].clientY;
+      }
+    } else {
+      clientX = (e as React.MouseEvent).clientX;
+      clientY = (e as React.MouseEvent).clientY;
     }
-  }, [currentStep]);
+
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+      scaleRatio: scaleX,
+    };
+  };
 
   // Canvas drawing handlers
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if ("touches" in e && e.cancelable) {
+      e.preventDefault();
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -415,25 +455,28 @@ function ConfirmHandoverPageContent() {
 
     setIsDrawing(true);
     hasDrawnRef.current = true;
-    const rect = canvas.getBoundingClientRect();
-    const x = "touches" in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-    const y = "touches" in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+    const { x, y, scaleRatio } = getCanvasCoords(canvas, e);
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.lineWidth = Math.max(2, 2.5 * scaleRatio);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#0f172a";
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
+    if ("touches" in e && e.cancelable) {
+      e.preventDefault();
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = "touches" in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-    const y = "touches" in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
-
+    const { x, y } = getCanvasCoords(canvas, e);
     ctx.lineTo(x, y);
     ctx.stroke();
   };
@@ -451,8 +494,8 @@ function ConfirmHandoverPageContent() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     hasDrawnRef.current = false;
     setSignatureData(null);
   };

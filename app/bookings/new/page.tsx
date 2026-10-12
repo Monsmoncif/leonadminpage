@@ -256,49 +256,65 @@ export function NewRentalAdminPageContent() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    setIsDrawing(true);
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const getCanvasCoords = (canvas: HTMLCanvasElement, e: React.MouseEvent | React.TouchEvent) => {
     const rect = canvas.getBoundingClientRect();
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
     let clientX = 0;
     let clientY = 0;
     if ("touches" in e) {
-      if (e.touches.length === 0) return;
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else if ("changedTouches" in e && (e as any).changedTouches?.length > 0) {
+        clientX = (e as any).changedTouches[0].clientX;
+        clientY = (e as any).changedTouches[0].clientY;
+      }
     } else {
       clientX = (e as React.MouseEvent).clientX;
       clientY = (e as React.MouseEvent).clientY;
     }
+
+    // Exact 1:1 mapping from CSS display rect to internal canvas pixel buffer
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+      scaleRatio: scaleX,
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if ("touches" in e && e.cancelable) {
+      e.preventDefault();
+    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    setIsDrawing(true);
+    const { x, y, scaleRatio } = getCanvasCoords(canvas, e);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.lineWidth = Math.max(2, 3 * scaleRatio);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#0f172a";
     ctx.beginPath();
-    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    ctx.moveTo(x, y);
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
+    if ("touches" in e && e.cancelable) {
+      e.preventDefault();
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    let clientX = 0;
-    let clientY = 0;
-    if ("touches" in e) {
-      if (e.touches.length === 0) return;
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = (e as React.MouseEvent).clientX;
-      clientY = (e as React.MouseEvent).clientY;
-    }
-    const rect = canvas.getBoundingClientRect();
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#0f172a";
-    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+
+    const { x, y } = getCanvasCoords(canvas, e);
+    ctx.lineTo(x, y);
     ctx.stroke();
   };
 
@@ -320,16 +336,8 @@ export function NewRentalAdminPageContent() {
     if (canvas) {
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.restore();
-        const dpr = window.devicePixelRatio || 1;
-        ctx.scale(dpr, dpr);
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = "#0f172a";
       }
     }
   };
@@ -340,44 +348,37 @@ export function NewRentalAdminPageContent() {
   const [isDrawingAdmin, setIsDrawingAdmin] = useState(false);
 
   const startDrawingAdmin = (e: React.MouseEvent | React.TouchEvent) => {
-    setIsDrawingAdmin(true);
+    if ("touches" in e && e.cancelable) {
+      e.preventDefault();
+    }
     const canvas = adminCanvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    let clientX, clientY;
-    if ("touches" in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = (e as React.MouseEvent).clientX;
-      clientY = (e as React.MouseEvent).clientY;
-    }
+
+    setIsDrawingAdmin(true);
+    const { x, y, scaleRatio } = getCanvasCoords(canvas, e);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.lineWidth = Math.max(2, 3 * scaleRatio);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#0f172a";
     ctx.beginPath();
-    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    ctx.moveTo(x, y);
   };
 
   const drawAdmin = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawingAdmin) return;
+    if ("touches" in e && e.cancelable) {
+      e.preventDefault();
+    }
     const canvas = adminCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    let clientX, clientY;
-    if ("touches" in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = (e as React.MouseEvent).clientX;
-      clientY = (e as React.MouseEvent).clientY;
-    }
-    const rect = canvas.getBoundingClientRect();
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#0f172a";
-    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+
+    const { x, y } = getCanvasCoords(canvas, e);
+    ctx.lineTo(x, y);
     ctx.stroke();
   };
 
@@ -396,10 +397,8 @@ export function NewRentalAdminPageContent() {
     if (canvas) {
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.restore();
       }
     }
   };
@@ -408,99 +407,117 @@ export function NewRentalAdminPageContent() {
     const canvas = adminCanvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== rect.width * dpr) {
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-    }
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const targetWidth = Math.round(rect.width * dpr);
+    const targetHeight = Math.round(rect.height * dpr);
+
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
 
     const adminName = session?.user?.name || "Leon Car Rental";
-    ctx.font = "italic bold 22px 'Brush Script MT', 'Dancing Script', cursive, sans-serif";
+    ctx.font = `italic bold ${Math.round(22 * dpr)}px 'Brush Script MT', 'Dancing Script', cursive, sans-serif`;
     ctx.fillStyle = "#0f172a";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(adminName, rect.width / 2, rect.height / 2 - 4);
+    ctx.fillText(adminName, targetWidth / 2, targetHeight / 2 - Math.round(4 * dpr));
 
     ctx.beginPath();
-    ctx.lineWidth = 2;
+    ctx.lineWidth = Math.round(2 * dpr);
     ctx.strokeStyle = "#0f172a";
-    ctx.moveTo(rect.width / 2 - 80, rect.height / 2 + 12);
-    ctx.quadraticCurveTo(rect.width / 2, rect.height / 2 + 20, rect.width / 2 + 80, rect.height / 2 + 10);
+    ctx.moveTo(targetWidth / 2 - Math.round(80 * dpr), targetHeight / 2 + Math.round(12 * dpr));
+    ctx.quadraticCurveTo(
+      targetWidth / 2,
+      targetHeight / 2 + Math.round(20 * dpr),
+      targetWidth / 2 + Math.round(80 * dpr),
+      targetHeight / 2 + Math.round(10 * dpr)
+    );
     ctx.stroke();
 
-    ctx.restore();
     setAdminSignatureData(canvas.toDataURL("image/png"));
     toast.success(`Admin signature applied (${adminName})`);
   };
 
-  // Canvas DPI initialization when reaching Review Step (Step 4 for Shop, Step 3 for Delivery)
+  // Canvas initialization when reaching Review Step or when window resizes
   useEffect(() => {
     const isReviewStep = (contractType === "Shop" && currentStep === (isDriver ? 5 : 4)) || (contractType === "Delivery" && currentStep === 3);
-    if (isReviewStep) {
-      const timer = setTimeout(() => {
-        // Customer canvas
-        if (canvasRef.current) {
-          const canvas = canvasRef.current;
-          const rect = canvas.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) {
-            const dpr = window.devicePixelRatio || 1;
+    if (!isReviewStep) return;
+
+    const setupCanvases = () => {
+      // 1. Customer canvas
+      if (canvasRef.current) {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          const dpr = Math.max(1, window.devicePixelRatio || 1);
+          const targetWidth = Math.round(rect.width * dpr);
+          const targetHeight = Math.round(rect.height * dpr);
+
+          if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+            const currentImg = canvas.toDataURL();
             const prevSig = signatureData || (isEditMode ? editingContract?.customerSignature : null);
-            canvas.width = Math.round(rect.width * dpr);
-            canvas.height = Math.round(rect.height * dpr);
+            const toDraw = prevSig || (canvas.width > 0 && currentImg.length > 100 ? currentImg : null);
+
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
             const ctx = canvas.getContext("2d");
             if (ctx) {
-              ctx.scale(dpr, dpr);
-              ctx.lineWidth = 3;
-              ctx.lineCap = "round";
-              ctx.lineJoin = "round";
-              ctx.strokeStyle = "#0f172a";
-              if (prevSig && typeof prevSig === "string" && prevSig.startsWith("data:image")) {
+              ctx.setTransform(1, 0, 0, 1, 0, 0);
+              if (toDraw && typeof toDraw === "string" && toDraw.startsWith("data:image")) {
                 const img = new Image();
                 img.onload = () => {
-                  ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                  ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
                 };
-                img.src = prevSig;
+                img.src = toDraw;
               }
             }
           }
         }
+      }
 
-        // Admin canvas (Shop, Delivery, Personalized)
-        if (adminCanvasRef.current) {
-          const canvas = adminCanvasRef.current;
-          const rect = canvas.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) {
-            const dpr = window.devicePixelRatio || 1;
+      // 2. Admin canvas
+      if (adminCanvasRef.current) {
+        const canvas = adminCanvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          const dpr = Math.max(1, window.devicePixelRatio || 1);
+          const targetWidth = Math.round(rect.width * dpr);
+          const targetHeight = Math.round(rect.height * dpr);
+
+          if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
             const prevAdminSig = adminSignatureData;
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
             const ctx = canvas.getContext("2d");
             if (ctx) {
-              ctx.scale(dpr, dpr);
-              ctx.lineWidth = 3;
-              ctx.lineCap = "round";
-              ctx.lineJoin = "round";
-              ctx.strokeStyle = "#0f172a";
-              if (prevAdminSig) {
+              ctx.setTransform(1, 0, 0, 1, 0, 0);
+              if (prevAdminSig && typeof prevAdminSig === "string" && prevAdminSig.startsWith("data:image")) {
                 const img = new Image();
                 img.onload = () => {
-                  ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                  ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
                 };
                 img.src = prevAdminSig;
               }
             }
           }
         }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [currentStep, contractType]);
+      }
+    };
+
+    const t1 = setTimeout(setupCanvases, 50);
+    const t2 = setTimeout(setupCanvases, 250);
+    window.addEventListener("resize", setupCanvases);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener("resize", setupCanvases);
+    };
+  }, [currentStep, contractType, isDriver, isEditMode]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });

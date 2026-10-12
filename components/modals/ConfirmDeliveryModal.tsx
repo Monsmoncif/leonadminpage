@@ -348,33 +348,43 @@ export default function ConfirmDeliveryModal({
   // Canvas initialization with Retina DPI scaling for iPads and Phones
   useEffect(() => {
     if (step === 5) {
-      const timer = setTimeout(() => {
+      const setup = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        const prevSig = signatureData;
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.scale(dpr, dpr);
-          ctx.lineWidth = 2.5;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-          ctx.strokeStyle = "#0f172a";
-          if (prevSig) {
-            const img = new Image();
-            img.onload = () => {
-              ctx.drawImage(img, 0, 0, rect.width, rect.height);
-            };
-            img.src = prevSig;
+        if (rect.width === 0 || rect.height === 0) return;
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const targetWidth = Math.round(rect.width * dpr);
+        const targetHeight = Math.round(rect.height * dpr);
+
+        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+          const prevSig = signatureData;
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            if (prevSig) {
+              const img = new Image();
+              img.onload = () => {
+                ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+              };
+              img.src = prevSig;
+            }
           }
         }
-      }, 80);
-      return () => clearTimeout(timer);
+      };
+
+      const t1 = setTimeout(setup, 50);
+      const t2 = setTimeout(setup, 250);
+      window.addEventListener("resize", setup);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        window.removeEventListener("resize", setup);
+      };
     }
-  }, [step]);
+  }, [step, signatureData]);
 
   if (!isOpen || !contract) return null;
 
@@ -478,22 +488,29 @@ export default function ConfirmDeliveryModal({
   // Touch & Mouse Signature Handlers
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas) return { x: 0, y: 0, scaleRatio: 1 };
     const rect = canvas.getBoundingClientRect();
     let clientX = 0;
     let clientY = 0;
     if ("touches" in e) {
-      if (e.touches.length > 0) {
+      if (e.touches && e.touches.length > 0) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
+      } else if ("changedTouches" in e && (e as any).changedTouches?.length > 0) {
+        clientX = (e as any).changedTouches[0].clientX;
+        clientY = (e as any).changedTouches[0].clientY;
       }
     } else {
       clientX = (e as React.MouseEvent).clientX;
       clientY = (e as React.MouseEvent).clientY;
     }
+
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
     return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+      scaleRatio: scaleX,
     };
   };
 
@@ -501,13 +518,18 @@ export default function ConfirmDeliveryModal({
     if ("touches" in e && e.cancelable) {
       e.preventDefault();
     }
-    setIsDrawing(true);
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const { x, y } = getCoordinates(e);
+    setIsDrawing(true);
+    const { x, y, scaleRatio } = getCoordinates(e);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.lineWidth = Math.max(2, 2.5 * scaleRatio);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#0f172a";
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
@@ -542,8 +564,8 @@ export default function ConfirmDeliveryModal({
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     hasDrawnRef.current = false;
     setSignatureData(null);
   };
