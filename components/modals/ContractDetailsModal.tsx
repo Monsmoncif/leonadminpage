@@ -1129,7 +1129,7 @@ export default function ContractDetailsModal({
                     <span className="text-xs font-bold text-text-primary flex items-center gap-1.5 min-w-0">
                       <Camera size={14} className="text-brand shrink-0" />
                       <span className="truncate">Pre-Delivery Inspection Photos</span>
-                      <span className="text-[10px] text-text-muted shrink-0">({inspectionPhotos.length}/8)</span>
+                      <span className="text-[10px] text-text-muted shrink-0">({Math.min(inspectionPhotos.length, 8)}/8{inspectionPhotos.length > 8 ? ` + ${inspectionPhotos.length - 8}` : ""})</span>
                     </span>
                     <span className="text-[10px] sm:text-[11px] text-text-muted font-medium shrink-0 hidden xs:inline">
                       Inspection Photos
@@ -1139,7 +1139,7 @@ export default function ContractDetailsModal({
                   {inspectionPhotos.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                       {inspectionPhotos.map((photoUrl, index) => {
-                        const angleLabel = VEHICLE_ANGLES[index] || `Angle #${index + 1}`;
+                        const angleLabel = VEHICLE_ANGLES[index] || `Extra Photo ${index - VEHICLE_ANGLES.length + 1}`;
                         return (
                           <div 
                             key={index}

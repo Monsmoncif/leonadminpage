@@ -42,7 +42,7 @@ import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import { areDatesOverlapping } from "@/lib/date-overlap";
-import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
+import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
 const formatDateToInput = (dateStr: string) => {
@@ -643,8 +643,11 @@ export function NewRentalAdminPageContent() {
       const initialPhotos: Record<string, string> = {};
       if (Array.isArray(c.inspectionPhotos)) {
         c.inspectionPhotos.forEach((url: string, idx: number) => {
-          if (url && VEHICLE_ANGLES[idx]) {
+          if (!url) return;
+          if (VEHICLE_ANGLES[idx]) {
             initialPhotos[VEHICLE_ANGLES[idx]] = url;
+          } else if (idx >= VEHICLE_ANGLES.length) {
+            initialPhotos[`${EXTRA_PHOTO_PREFIX}${idx - VEHICLE_ANGLES.length + 1}`] = url;
           }
         });
       }
@@ -953,7 +956,10 @@ export function NewRentalAdminPageContent() {
         adminSignature: finalAdminSignature,
         inspectionPhotos: (isEditMode && Array.isArray(editingContract?.inspectionPhotos) && editingContract.inspectionPhotos.length > 0)
           ? editingContract.inspectionPhotos
-          : VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
+          : [
+              ...VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
+              ...getExtraPhotoKeys(inspectionPhotos).map(k => inspectionPhotos[k]),
+            ],
         totalAmount,
         additionalDriverName: additionalDriver.name.trim() || (contractType === "Personalized" ? personName.trim() : ""),
         additionalDriverLicense: additionalDriver.license.trim(),
@@ -2378,6 +2384,7 @@ export function NewRentalAdminPageContent() {
         title="Shop Handover Inspection (فحص تسليم السيارة بالمحل)"
         subtitle="Capture photos using direct camera or upload from gallery across all 8 standard angles."
         badgeLabel="Shop Handover"
+        allowExtra={isDriver}
       />
     </div>
   );

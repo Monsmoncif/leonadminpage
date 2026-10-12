@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Camera, Image as ImageIcon, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Camera, Image as ImageIcon, X, Loader2, CheckCircle2, AlertCircle, Plus } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 
 export const VEHICLE_ANGLES = [
@@ -27,12 +27,21 @@ export const VEHICLE_ANGLE_ARABIC: Record<string, string> = {
   "Trunk / Boot": "صندوق الأمتعة"
 };
 
+// Extra (optional) photos beyond the 8 standard angles are stored as "Extra Photo 1", "Extra Photo 2", ...
+export const EXTRA_PHOTO_PREFIX = "Extra Photo ";
+
+export const getExtraPhotoKeys = (photos: Record<string, string> | undefined | null): string[] =>
+  Object.keys(photos || {})
+    .filter((k) => k.startsWith(EXTRA_PHOTO_PREFIX) && photos![k])
+    .sort((a, b) => Number(a.slice(EXTRA_PHOTO_PREFIX.length)) - Number(b.slice(EXTRA_PHOTO_PREFIX.length)));
+
 interface VehicleInspectionPhotoCaptureProps {
   photos: Record<string, string>;
   onChange: (photos: Record<string, string>) => void;
   title?: string;
   subtitle?: string;
   badgeLabel?: string;
+  allowExtra?: boolean;
 }
 
 // Fast client-side image compression to prevent 5-10MB photo timeouts
@@ -97,7 +106,8 @@ export default function VehicleInspectionPhotoCapture({
   onChange,
   title = "Vehicle Inspection Photos (صور فحص السيارة)",
   subtitle = "Capture or upload 8 standard angles to document the vehicle condition.",
-  badgeLabel
+  badgeLabel,
+  allowExtra = false
 }: VehicleInspectionPhotoCaptureProps) {
   const toast = useToast();
   const [uploadMode, setUploadMode] = useState<"camera" | "gallery">("camera");
@@ -113,7 +123,11 @@ export default function VehicleInspectionPhotoCapture({
   }, [photos]);
 
   const mergedPhotos = { ...(photos || {}), ...localPhotos };
-  const capturedCount = Object.values(mergedPhotos).filter(Boolean).length;
+  const capturedCount = VEHICLE_ANGLES.filter((a) => Boolean(mergedPhotos[a])).length;
+  const extraKeys = getExtraPhotoKeys(mergedPhotos);
+  const nextExtraKey = `${EXTRA_PHOTO_PREFIX}${
+    extraKeys.length > 0 ? Number(extraKeys[extraKeys.length - 1].slice(EXTRA_PHOTO_PREFIX.length)) + 1 : 1
+  }`;
 
   const handlePhotoUpload = async (angle: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -243,7 +257,7 @@ export default function VehicleInspectionPhotoCapture({
                 : "bg-gray-100 text-text-muted border-gray-200"
             }`}
           >
-            {capturedCount}/8 angles
+            {capturedCount}/8 angles{extraKeys.length > 0 ? ` + ${extraKeys.length}` : ""}
           </span>
         </div>
       </div>
@@ -308,6 +322,65 @@ export default function VehicleInspectionPhotoCapture({
           );
         })}
       </div>
+
+      {/* Extra photos (+ button) */}
+      {allowExtra && (
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-text-secondary">
+              Additional Photos (صور إضافية)
+            </span>
+            <span className="text-[10px] text-text-muted">Optional — only the first 8 appear in the contract</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {extraKeys.map((key, i) => {
+              const url = localPhotos[key] || photos[key];
+              return (
+                <div key={key} className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-text-secondary text-center truncate">
+                    Extra {i + 1}
+                  </span>
+                  <div className="relative aspect-square rounded-xl border border-border overflow-hidden group shadow-2xs">
+                    <img src={url} alt={key} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(key)}
+                      className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer z-10"
+                    >
+                      <X size={24} className="mb-1 text-red-400" />
+                      <span className="text-xs font-medium">Remove</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold text-text-secondary text-center truncate">Add more</span>
+              {uploadingAngle?.startsWith(EXTRA_PHOTO_PREFIX) ? (
+                <div className="w-full aspect-square rounded-xl border-2 border-brand/40 bg-brand/[0.03] flex flex-col justify-center items-center gap-2 text-center">
+                  <Loader2 size={24} className="animate-spin text-brand" />
+                  <span className="text-[10px] font-semibold text-brand">Uploading...</span>
+                </div>
+              ) : (
+                <label className="w-full aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-text-muted hover:text-brand hover:border-brand hover:bg-brand/5 transition-all cursor-pointer group">
+                  <input
+                    key={`extra-${nextExtraKey}-${uploadMode}`}
+                    type="file"
+                    accept="image/*"
+                    capture={uploadMode === "camera" ? "environment" : undefined}
+                    className="hidden"
+                    onClick={(e) => { e.currentTarget.value = ""; }}
+                    onChange={(e) => handlePhotoUpload(nextExtraKey, e)}
+                  />
+                  <Plus size={28} className="mb-1 group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-semibold">Add Photo</span>
+                </label>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
