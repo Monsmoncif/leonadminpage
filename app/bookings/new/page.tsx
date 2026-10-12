@@ -31,7 +31,9 @@ import {
   Gauge,
   ShieldCheck,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Image as ImageIcon,
+  Trash2
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -42,7 +44,7 @@ import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import { areDatesOverlapping } from "@/lib/date-overlap";
-import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys } from "@/components/ui/VehicleInspectionPhotoCapture";
+import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys, compressImage } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
 const formatDateToInput = (dateStr: string) => {
@@ -243,6 +245,11 @@ export function NewRentalAdminPageContent() {
   });
 
   const [inspectionPhotos, setInspectionPhotos] = useState<Record<string, string>>({});
+
+  // Confirm Get All Money & Proof State (for Drivers)
+  const [isMoneyConfirmed, setIsMoneyConfirmed] = useState(false);
+  const [moneyPhotos, setMoneyPhotos] = useState<string[]>([]);
+  const [isUploadingMoneyPhoto, setIsUploadingMoneyPhoto] = useState(false);
 
   // Customer Signature Canvas State for Shop Contracts
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -653,6 +660,12 @@ export function NewRentalAdminPageContent() {
       }
       setInspectionPhotos(initialPhotos);
 
+      // Money Proof Photos
+      if (Array.isArray(c.moneyPhotos)) {
+        setMoneyPhotos(c.moneyPhotos);
+        if (c.moneyPhotos.length > 0) setIsMoneyConfirmed(true);
+      }
+
       // 6. Signatures
       if (c.customerSignature) {
         setSignatureData(c.customerSignature);
@@ -721,6 +734,42 @@ export function NewRentalAdminPageContent() {
     if (!unit) return false;
     if (unit.status === "Maintenance" || unit.status === "Out of Service") return false;
     return !getUnitConflict(unit, startDateStr, endDateStr);
+  };
+
+  const handleRemoveMoneyPhoto = (index: number) => {
+    setMoneyPhotos((prev) => prev.filter((_, idx) => idx !== index));
+    toast.info("Money photo removed.");
+  };
+
+  const handleMoneyPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploadingMoneyPhoto(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await compressImage(file);
+        if (!base64) continue;
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64, folder: "money_proof" }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            setMoneyPhotos((prev) => [...prev, data.url]);
+          }
+        }
+      }
+      toast.success("Money proof photo attached successfully.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload money photo.");
+    } finally {
+      setIsUploadingMoneyPhoto(false);
+      if (e.target) e.target.value = "";
+    }
   };
 
   const handleNext = () => {
@@ -809,6 +858,10 @@ export function NewRentalAdminPageContent() {
           toast.error("يرجى إدخال عداد الكيلومترات عند التسليم (Please enter the Handover Mileage).");
           return;
         }
+        if (!isMoneyConfirmed) {
+          toast.error("يرجى تأكيد استلام كامل المبلغ (Please check 'Confirm Get All Money' before proceeding).");
+          return;
+        }
       }
     }
 
@@ -861,10 +914,15 @@ export function NewRentalAdminPageContent() {
         return;
       }
 
-      // Driver contracts require handover mileage
+      // Driver contracts require handover mileage and money confirmation
       if (isDriver && !isEditMode) {
         if (!rentalData.checkoutMileage || Number(rentalData.checkoutMileage) <= 0) {
           toast.error("يرجى إدخال عداد الكيلومترات عند التسليم (Please enter the Handover Mileage).");
+          setIsLoading(false);
+          return;
+        }
+        if (!isMoneyConfirmed) {
+          toast.error("يرجى تأكيد استلام كامل المبلغ (Please check 'Confirm Get All Money' before completing the contract).");
           setIsLoading(false);
           return;
         }
@@ -948,6 +1006,7 @@ export function NewRentalAdminPageContent() {
               ...VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
               ...getExtraPhotoKeys(inspectionPhotos).map(k => inspectionPhotos[k]),
             ],
+        moneyPhotos: moneyPhotos || [],
         totalAmount,
         additionalDriverName: additionalDriver.name.trim() || (contractType === "Personalized" ? personName.trim() : ""),
         additionalDriverLicense: additionalDriver.license.trim(),
@@ -1925,35 +1984,147 @@ export function NewRentalAdminPageContent() {
               </div>
             </div>
 
-            {/* Total Handover Collection Card */}
+            {/* Total Handover Collection Card & Confirm Get All Money */}
             {(() => {
               const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
               const totalCharges = Number(rentalData.collectionAmount || 0) + extraFees;
               const advancePaid = Number(rentalData.advancePayment || 0);
               const remainingToCollect = Math.max(0, totalCharges - advancePaid);
+              const depositTotal = Number(rentalData.depositAmount || 0);
+              const grandTotal = remainingToCollect + depositTotal;
               return (
-                <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
-                      Remaining to Collect on Handover
-                    </span>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      Total Charges: AED {totalCharges}
-                      {advancePaid > 0 ? ` - Prepaid Advance: AED ${advancePaid}` : ""}
-                      {rentalData.deliveryFee > 0 ? ` (inc. Delivery AED ${rentalData.deliveryFee})` : ""}
-                      {rentalData.babySeatFee > 0 ? ` (inc. Baby Seat AED ${rentalData.babySeatFee})` : ""}
-                    </p>
-                  </div>
-                  <div className="text-left sm:text-right">
-                    <span className="text-2xl font-black text-brand">
-                      AED {remainingToCollect}
-                    </span>
-                    {advancePaid > 0 && (
-                      <span className="text-xs font-bold text-emerald-700 block">
-                        ✓ Prepaid Advance: AED {advancePaid}
+                <div className="space-y-3">
+                  <div className="bg-brand/5 p-4 rounded-2xl border border-brand/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
+                        Remaining to Collect on Handover
                       </span>
-                    )}
+                      <p className="text-xs text-text-muted mt-0.5">
+                        Total Charges: AED {totalCharges}
+                        {advancePaid > 0 ? ` - Prepaid Advance: AED ${advancePaid}` : ""}
+                        {rentalData.deliveryFee > 0 ? ` (inc. Delivery AED ${rentalData.deliveryFee})` : ""}
+                        {rentalData.babySeatFee > 0 ? ` (inc. Baby Seat AED ${rentalData.babySeatFee})` : ""}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <span className="text-2xl font-black text-brand">
+                        AED {remainingToCollect}
+                      </span>
+                      {advancePaid > 0 && (
+                        <span className="text-xs font-bold text-emerald-700 block">
+                          ✓ Prepaid Advance: AED {advancePaid}
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Mandatory Checkbox: Confirm Get All Money & Proof (Drivers) */}
+                  {isDriver && (
+                    <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-200 space-y-3 shadow-2xs">
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isMoneyConfirmed}
+                          onChange={(e) => setIsMoneyConfirmed(e.target.checked)}
+                          className="mt-0.5 w-4 h-4 rounded border-amber-300 text-brand focus:ring-brand cursor-pointer"
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold text-amber-950 block">
+                            Confirm Get All Money (تأكيد استلام كامل المبلغ) *
+                          </span>
+                          <span className="text-[11px] text-amber-800 mt-0.5 block leading-relaxed">
+                            I certify that all required money (Rental Collection of AED {remainingToCollect.toLocaleString()} + Deposit of AED {depositTotal.toLocaleString()} = Total AED {grandTotal.toLocaleString()}) has been received from the customer.
+                          </span>
+                        </div>
+                      </label>
+
+                      {/* Money Photo Proof Upload */}
+                      <div className="pt-3 border-t border-amber-200/80">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <Banknote size={14} className="text-amber-800" />
+                            <span className="text-xs font-bold text-amber-950">
+                              Money / Payment Proof (صورة استلام المبلغ)
+                            </span>
+                            {moneyPhotos.length > 0 && (
+                              <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {/* Direct Camera Button */}
+                            <label className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                onClick={(e) => { e.currentTarget.value = ""; }}
+                                onChange={handleMoneyPhotoUpload}
+                                disabled={isUploadingMoneyPhoto}
+                              />
+                              <Camera size={13} className="text-amber-800" />
+                              <span>Camera</span>
+                            </label>
+
+                            {/* Upload Gallery Button */}
+                            <label className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                onClick={(e) => { e.currentTarget.value = ""; }}
+                                onChange={handleMoneyPhotoUpload}
+                                disabled={isUploadingMoneyPhoto}
+                              />
+                              <ImageIcon size={13} className="text-amber-800" />
+                              <span>Gallery</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Uploading indicator */}
+                        {isUploadingMoneyPhoto && (
+                          <div className="flex items-center gap-2 p-2 bg-amber-100/60 rounded-lg text-amber-900 text-xs mb-2">
+                            <Loader2 size={14} className="animate-spin text-amber-800" />
+                            <span>Uploading money proof photo...</span>
+                          </div>
+                        )}
+
+                        {/* Photo thumbnails grid */}
+                        {moneyPhotos.length > 0 && (
+                          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-1">
+                            {moneyPhotos.map((url, idx) => (
+                              <div
+                                key={idx}
+                                className="relative group aspect-square rounded-lg overflow-hidden border border-amber-300 bg-white shadow-2xs"
+                              >
+                                <img
+                                  src={url}
+                                  alt={`Money photo ${idx + 1}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMoneyPhoto(idx)}
+                                  className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 text-white rounded-md shadow-xs opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
+                                  title="Delete photo"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                                <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.2 rounded backdrop-blur-xs">
+                                  #{idx + 1}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -2268,6 +2439,23 @@ export function NewRentalAdminPageContent() {
                     ) : (
                       <span className="text-[9px] text-text-muted font-medium leading-tight">#{idx + 1}</span>
                     )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Money / Payment Proof in Review Step */}
+          {moneyPhotos.length > 0 && (
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
+              <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <Banknote size={14} className="text-amber-800" />
+                Payment &amp; Money Proof ({moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"})
+              </span>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                {moneyPhotos.map((url: string, idx: number) => (
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-amber-300 bg-gray-50">
+                    <img src={url} alt={`Money proof ${idx + 1}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>

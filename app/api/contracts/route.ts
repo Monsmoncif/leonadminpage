@@ -303,6 +303,7 @@ export async function POST(req: Request) {
       customerSignature: body.customerSignature,
       adminSignature: body.adminSignature || "/images/admin-signature.png",
       inspectionPhotos: body.inspectionPhotos || [],
+      moneyPhotos: body.moneyPhotos || [],
       deliveryStatus: initialDeliveryStatus,
       deliveredBy: isDriverUser ? (userName || "Driver") : (body.deliveredBy || undefined),
       deliveredAt: isDriverUser ? new Date() : (body.deliveredAt || undefined),

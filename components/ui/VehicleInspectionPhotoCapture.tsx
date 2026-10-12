@@ -45,7 +45,7 @@ interface VehicleInspectionPhotoCaptureProps {
 }
 
 // Fast client-side image compression to prevent 5-10MB photo timeouts
-const compressImage = (file: File): Promise<string> => {
+export const compressImage = (file: File): Promise<string> => {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (event) => {
