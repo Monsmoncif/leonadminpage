@@ -284,101 +284,104 @@ export default function PaymentMethodSelector({
           </div>
 
           {/* Split Amount Inputs for Active Methods */}
-          <div className="space-y-2.5 pt-2 border-t border-border/60">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {selectedMethods.map((m) => {
-                const methodInfo = METHODS.find((item) => item.id === m);
-                const Icon = methodInfo?.icon || Banknote;
-                const pct =
-                  totalAmount !== undefined && totalAmount > 0 && Number(splitAmounts[m]) > 0
-                    ? Math.round((Number(splitAmounts[m]) / totalAmount) * 100)
-                    : null;
-                return (
-                  <div
-                    key={m}
-                    className="p-2.5 rounded-xl border border-gray-200 bg-white shadow-2xs hover:border-gray-300 transition-all space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <div className={`w-5 h-5 rounded-md flex items-center justify-center ${methodInfo?.bg || "bg-gray-100"}`}>
-                          <Icon size={12} className={methodInfo?.color || "text-brand"} />
-                        </div>
-                        <span className="text-xs font-bold text-text-primary">{m} Amount</span>
-                        <span className="text-[10px] text-text-muted">({methodInfo?.sublabel})</span>
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            {selectedMethods.map((m) => {
+              const methodInfo = METHODS.find((item) => item.id === m);
+              const Icon = methodInfo?.icon || Banknote;
+              const pct =
+                totalAmount !== undefined && totalAmount > 0 && Number(splitAmounts[m]) > 0
+                  ? Math.round((Number(splitAmounts[m]) / totalAmount) * 100)
+                  : null;
+              return (
+                <div
+                  key={m}
+                  className="p-2.5 sm:p-3 rounded-xl border border-gray-200 bg-white shadow-2xs hover:border-gray-300 transition-all flex items-center justify-between gap-3"
+                >
+                  {/* Left: Method Icon & Labels */}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${methodInfo?.bg || "bg-gray-100"}`}>
+                      <Icon size={16} className={methodInfo?.color || "text-brand"} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-text-primary">{m}</span>
+                        <span className="text-[11px] text-text-muted">({methodInfo?.sublabel})</span>
+                        {pct !== null && (
+                          <span className="text-[10px] font-bold text-brand bg-brand/10 px-1.5 py-0.2 rounded-full">
+                            {pct}%
+                          </span>
+                        )}
                       </div>
-                      {pct !== null && (
-                        <span className="text-[10px] font-bold text-brand bg-brand/10 px-1.5 py-0.2 rounded-full">
-                          {pct}%
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="relative flex items-center rounded-lg border border-gray-300 bg-gray-50/50 focus-within:bg-white focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 transition-all overflow-hidden">
-                      <span className="px-2.5 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 border-r border-gray-200 select-none">
-                        AED
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder="0.00"
-                        value={splitAmounts[m] || ""}
-                        onChange={(e) => handleAmountChange(m, e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs font-black text-text-primary bg-transparent outline-none text-right font-mono"
-                      />
                     </div>
                   </div>
-                );
-              })}
-            </div>
 
-            {/* Split summary indicator if totalAmount is given */}
-            {totalAmount !== undefined && totalAmount > 0 && (
-              <div className="p-3 rounded-xl bg-gray-50/90 border border-gray-200 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-text-secondary font-medium">{totalLabel}:</span>
-                    <strong className="text-text-primary font-black text-sm">
-                      AED {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </strong>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-text-secondary font-medium">Allocated (الموزع):</span>
-                    <strong
-                      className={`font-black text-sm ${
-                        isExactMatch
-                          ? "text-emerald-700"
-                          : isOverAllocated
-                          ? "text-red-600"
-                          : "text-amber-700"
-                      }`}
-                    >
-                      AED {totalAllocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </strong>
+                  {/* Right: Currency input with standard font and no spinners */}
+                  <div className="relative flex items-center w-36 sm:w-44 shrink-0 rounded-lg border border-gray-300 bg-gray-50/50 focus-within:bg-white focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 transition-all overflow-hidden">
+                    <span className="px-2.5 py-1.5 text-xs font-bold text-gray-500 bg-gray-100 border-r border-gray-200 select-none">
+                      AED
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="0.00"
+                      value={splitAmounts[m] || ""}
+                      onChange={(e) => handleAmountChange(m, e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-sm font-bold text-text-primary bg-transparent outline-none text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                {/* Status indicator bar */}
-                <div className="flex flex-wrap items-center justify-between pt-2 border-t border-gray-200/80 text-[11px] gap-2">
-                  {isExactMatch && (
-                    <div className="flex items-center gap-1.5 text-emerald-700 font-bold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span>✓ Fully Allocated &amp; Matched (تم توزيع كامل المبلغ بدقة)</span>
-                    </div>
-                  )}
-                  {isUnderAllocated && diff !== undefined && (
-                    <div className="flex items-center gap-1.5 text-amber-700 font-bold">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      <span>Remaining to allocate: AED {diff.toFixed(2)} (متبقي للتوزيع)</span>
-                    </div>
-                  )}
-                  {isOverAllocated && diff !== undefined && (
-                    <div className="flex items-center gap-1.5 text-red-600 font-bold">
-                      <span className="w-2 h-2 rounded-full bg-red-500" />
-                      <span>Over allocated by: AED {Math.abs(diff).toFixed(2)} (المبلغ الموزع زائد)</span>
-                    </div>
-                  )}
+          {/* Split summary indicator if totalAmount is given */}
+          {totalAmount !== undefined && totalAmount > 0 && (
+            <div className="p-3.5 rounded-xl bg-gray-50/90 border border-gray-200 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-text-secondary font-medium">{totalLabel}:</span>
+                  <strong className="text-text-primary font-bold text-sm">
+                    AED {totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-text-secondary font-medium">Allocated (الموزع):</span>
+                  <strong
+                    className={`font-bold text-sm ${
+                      isExactMatch
+                        ? "text-emerald-700"
+                        : isOverAllocated
+                        ? "text-red-600"
+                        : "text-amber-700"
+                    }`}
+                  >
+                    AED {totalAllocated.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Status indicator bar */}
+              <div className="flex flex-wrap items-center justify-between pt-2 border-t border-gray-200/80 text-xs gap-2">
+                {isExactMatch && (
+                  <div className="flex items-center gap-1.5 text-emerald-700 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>✓ Fully Allocated &amp; Matched (تم توزيع كامل المبلغ بدقة)</span>
+                  </div>
+                )}
+                {isUnderAllocated && diff !== undefined && (
+                  <div className="flex items-center gap-1.5 text-amber-700 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>Remaining to allocate: AED {diff.toFixed(2)} (متبقي للتوزيع)</span>
+                  </div>
+                )}
+                {isOverAllocated && diff !== undefined && (
+                  <div className="flex items-center gap-1.5 text-red-600 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    <span>Over allocated by: AED {Math.abs(diff).toFixed(2)} (المبلغ الموزع زائد)</span>
+                  </div>
+                )}
 
                   {/* Auto-assign remaining button */}
                   {isUnderAllocated && diff !== undefined && diff > 0 && selectedMethods.length > 0 && (
@@ -401,7 +404,6 @@ export default function PaymentMethodSelector({
                 </div>
               </div>
             )}
-          </div>
         </div>
       )}
     </div>
