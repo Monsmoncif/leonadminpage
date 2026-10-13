@@ -14,8 +14,11 @@ export class Contract {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: false })
   clientId?: mongoose.Types.ObjectId;
 
-  @Prop({ type: String, enum: ['Delivery', 'Shop'], default: 'Delivery' })
-  contractType: 'Delivery' | 'Shop';
+  @Prop({ type: String, enum: ['Delivery', 'Shop', 'Personalized'], default: 'Delivery' })
+  contractType: 'Delivery' | 'Shop' | 'Personalized';
+
+  @Prop({ type: String, trim: true, required: false })
+  personalizedPersonName?: string;
 
   @Prop({ type: String, enum: ['Daily', 'Monthly'], default: 'Daily' })
   rentalType: 'Daily' | 'Monthly';

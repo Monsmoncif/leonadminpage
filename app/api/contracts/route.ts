@@ -160,17 +160,25 @@ export async function POST(req: Request) {
 
     const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
     
-    // Fallback daily rate if not provided in request
-    const dailyRate = body.dailyRate || 50; 
+    const isPersonalized = body.contractType === "Personalized";
 
-    // Retrieve auxiliary fees
-    const babySeatFees = Number(body.babySeatFees) || 0;
-    const tintingFees = Number(body.tintingFees) || 0;
-    const deliveryCharges = Number(body.deliveryCharges) || 0;
-    const salikFees = Number(body.salikFees) || 0;
-    const cleaningFees = Number(body.cleaningFees) || 0;
+    // Fallback daily rate if not provided in request (0 for Personalized contracts)
+    const dailyRate = isPersonalized
+      ? 0
+      : (body.dailyRate !== undefined && body.dailyRate !== null && !isNaN(Number(body.dailyRate)) ? Number(body.dailyRate) : 50);
 
-    const totalAmount = body.totalAmount || ((days * dailyRate) + babySeatFees + tintingFees + deliveryCharges + salikFees + cleaningFees);
+    // Retrieve auxiliary fees (0 for Personalized contracts)
+    const babySeatFees = isPersonalized ? 0 : (Number(body.babySeatFees) || 0);
+    const tintingFees = isPersonalized ? 0 : (Number(body.tintingFees) || 0);
+    const deliveryCharges = isPersonalized ? 0 : (Number(body.deliveryCharges) || 0);
+    const salikFees = isPersonalized ? 0 : (Number(body.salikFees) || 0);
+    const cleaningFees = isPersonalized ? 0 : (Number(body.cleaningFees) || 0);
+
+    const totalAmount = isPersonalized
+      ? 0
+      : (body.totalAmount !== undefined && body.totalAmount !== null && !isNaN(Number(body.totalAmount))
+          ? Number(body.totalAmount)
+          : ((days * dailyRate) + babySeatFees + tintingFees + deliveryCharges + salikFees + cleaningFees));
 
     // Validate that the vehicle exists and is currently Available
     const unitDoc = await Unit.findById(body.unitId);
@@ -282,13 +290,13 @@ export async function POST(req: Request) {
       checkoutFuelLevel: body.checkoutFuelLevel !== undefined ? Number(body.checkoutFuelLevel) : 100,
       startDate: body.startDate,
       endDate: body.endDate,
-      dailyRate: body.dailyRate || dailyRate,
-      dailyKmLimit: body.dailyKmLimit || 0,
-      pricePerExtraKm: body.pricePerExtraKm || 0,
+      dailyRate: isPersonalized ? 0 : (body.dailyRate !== undefined && body.dailyRate !== null ? Number(body.dailyRate) : dailyRate),
+      dailyKmLimit: isPersonalized ? 0 : (body.dailyKmLimit || 0),
+      pricePerExtraKm: isPersonalized ? 0 : (body.pricePerExtraKm || 0),
       totalDays: days,
-      totalAmount: totalAmount,
-      advancePayment: Number(body.advancePayment) || 0,
-      depositAmount: body.depositAmount || 0,
+      totalAmount: isPersonalized ? 0 : totalAmount,
+      advancePayment: isPersonalized ? 0 : (Number(body.advancePayment) || 0),
+      depositAmount: isPersonalized ? 0 : (body.depositAmount || 0),
       pickupLocation: body.pickupLocation || body.deliveryLocation || body.location || "Main Office",
       dropoffLocation: body.dropoffLocation || body.returnLocation || "",
       status: initialStatus,
@@ -309,8 +317,8 @@ export async function POST(req: Request) {
       deliveredBy: isDriverUser ? (userName || "Driver") : (body.deliveredBy || undefined),
       deliveredAt: isDriverUser ? new Date() : (body.deliveredAt || undefined),
       handoverCompletedAt: isDriverUser ? new Date().toISOString() : (body.handoverCompletedAt || undefined),
-      paymentMethod: body.paymentMethod || "Cash",
-      paymentStatus: body.paymentStatus || (Number(body.advancePayment) >= totalAmount ? "Paid" : (Number(body.advancePayment) > 0 ? "Partial" : "Pending")),
+      paymentMethod: isPersonalized ? "Personal / Free" : (body.paymentMethod || "Cash"),
+      paymentStatus: isPersonalized ? "Paid" : (body.paymentStatus || (Number(body.advancePayment) >= totalAmount ? "Paid" : (Number(body.advancePayment) > 0 ? "Partial" : "Pending"))),
       additionalDriverName: body.additionalDriverName || "",
       additionalDriverLicense: body.additionalDriverLicense || "",
       additionalDriverNationality: body.additionalDriverNationality || "",

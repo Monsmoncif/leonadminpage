@@ -255,34 +255,40 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
       doc.font("Helvetica").text(`Total Duration:`, leftColX + 12, itemY);
       doc.font("Helvetica-Bold").text(`${data.totalDays} Days`, leftColX + 100, itemY);
 
+      const isPersonalized = data.dailyRate === 0 && data.totalAmount === 0;
+
       itemY += 16;
       doc.font("Helvetica").text(`Daily Rate:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`AED ${data.dailyRate}/day`, leftColX + 100, itemY);
+      doc.font("Helvetica-Bold").text(isPersonalized ? `AED 0.00 (Personal)` : `AED ${data.dailyRate}/day`, leftColX + 100, itemY);
 
       // Box 4: Financial Settlement
       doc.rect(rightColX, y, colWidth, 120).fillAndStroke(lightBg, borderColor);
-      doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text("4. FINANCIAL SUMMARY", rightColX + 12, y + 10);
+      doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text(isPersonalized ? "4. PERSONAL USE SUMMARY" : "4. FINANCIAL SUMMARY", rightColX + 12, y + 10);
       doc.strokeColor(brandColor).lineWidth(1.5).moveTo(rightColX + 12, y + 24).lineTo(rightColX + 160, y + 24).stroke();
 
       itemY = y + 32;
       doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
       doc.text(`Rental Charges:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`AED ${data.totalAmount}`, rightColX + 110, itemY);
+      doc.font("Helvetica-Bold").text(isPersonalized ? `AED 0.00 (Free)` : `AED ${data.totalAmount}`, rightColX + 110, itemY);
 
       itemY += 16;
       doc.font("Helvetica").text(`Security Deposit:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`AED ${data.depositAmount}`, rightColX + 110, itemY);
+      doc.font("Helvetica-Bold").text(`AED ${data.depositAmount || 0}`, rightColX + 110, itemY);
 
       itemY += 16;
       doc.font("Helvetica").text(`Payment Method:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.paymentMethod || "Cash", rightColX + 110, itemY);
+      doc.font("Helvetica-Bold").text(isPersonalized ? "Personal / Free" : (data.paymentMethod || "Cash"), rightColX + 110, itemY);
 
       const extraCharges = (Number(data.salikCharge) || 0) + (Number(data.parkingCharge) || 0) + (Number(data.finesCharge) || 0) + (Number(data.fuelCharge) || 0);
       const totalDue = Number(data.totalAmount || 0) + extraCharges;
 
       itemY += 18;
       doc.rect(rightColX + 10, itemY - 2, colWidth - 20, 22).fill("#e2e8f0");
-      doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(9.5).text(`AMOUNT DUE: AED ${totalDue.toFixed(2)}`, rightColX + 18, itemY + 3);
+      doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(9.5).text(
+        isPersonalized ? `AMOUNT DUE: AED 0.00 (FREE)` : `AMOUNT DUE: AED ${totalDue.toFixed(2)}`,
+        rightColX + 18,
+        itemY + 3
+      );
 
       y += 135;
 

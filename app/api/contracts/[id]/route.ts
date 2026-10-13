@@ -105,23 +105,32 @@ export async function PUT(
       );
     }
 
-    const dailyRateVal = body.dailyRate !== undefined ? Number(body.dailyRate) : existingContract.dailyRate;
+    const isPersonalized = Boolean(
+      body.contractType === "Personalized" ||
+      existingContract.contractType === "Personalized" ||
+      body.personalizedPersonName ||
+      existingContract.personalizedPersonName
+    );
 
-    const babySeatFees = body.babySeatFees !== undefined ? Number(body.babySeatFees) : (existingContract.babySeatFees || 0);
-    const tintingFees = body.tintingFees !== undefined ? Number(body.tintingFees) : (existingContract.tintingFees || 0);
-    const deliveryCharges = body.deliveryCharges !== undefined ? Number(body.deliveryCharges) : (existingContract.deliveryCharges || 0);
+    const dailyRateVal = isPersonalized ? 0 : (body.dailyRate !== undefined ? Number(body.dailyRate) : existingContract.dailyRate);
+
+    const babySeatFees = isPersonalized ? 0 : (body.babySeatFees !== undefined ? Number(body.babySeatFees) : (existingContract.babySeatFees || 0));
+    const tintingFees = isPersonalized ? 0 : (body.tintingFees !== undefined ? Number(body.tintingFees) : (existingContract.tintingFees || 0));
+    const deliveryCharges = isPersonalized ? 0 : (body.deliveryCharges !== undefined ? Number(body.deliveryCharges) : (existingContract.deliveryCharges || 0));
     const salikFees = body.salikFees !== undefined ? Number(body.salikFees) : (body.salikCharge !== undefined ? Number(body.salikCharge) : (existingContract.salikFees || existingContract.salikCharge || 0));
     const parkingFees = body.parkingFees !== undefined ? Number(body.parkingFees) : (body.parkingCharge !== undefined ? Number(body.parkingCharge) : (existingContract.parkingFees || existingContract.parkingCharge || 0));
     const finesFees = body.finesFees !== undefined ? Number(body.finesFees) : (body.finesCharge !== undefined ? Number(body.finesCharge) : (existingContract.finesFees || existingContract.finesCharge || 0));
     const fuelFees = body.fuelFees !== undefined ? Number(body.fuelFees) : (body.fuelCharge !== undefined ? Number(body.fuelCharge) : (existingContract.fuelFees || existingContract.fuelCharge || 0));
-    const cleaningFees = body.cleaningFees !== undefined ? Number(body.cleaningFees) : (existingContract.cleaningFees || 0);
+    const cleaningFees = isPersonalized ? 0 : (body.cleaningFees !== undefined ? Number(body.cleaningFees) : (existingContract.cleaningFees || 0));
 
     const totalDays = Math.max(1, Math.round((endDateVal.getTime() - startDateVal.getTime()) / (1000 * 60 * 60 * 24)));
     
-    const extraKmCharge = body.extraKmCharge !== undefined ? Number(body.extraKmCharge) : (existingContract.extraKmCharge || 0);
+    const extraKmCharge = isPersonalized ? 0 : (body.extraKmCharge !== undefined ? Number(body.extraKmCharge) : (existingContract.extraKmCharge || 0));
     const damageCharge = body.damageCharge !== undefined ? Number(body.damageCharge) : (existingContract.damageCharge || 0);
 
-    const totalAmount = (totalDays * dailyRateVal) + babySeatFees + tintingFees + deliveryCharges + salikFees + parkingFees + finesFees + fuelFees + cleaningFees + extraKmCharge + damageCharge;
+    const totalAmount = isPersonalized
+      ? (damageCharge + finesFees + salikFees + parkingFees + fuelFees)
+      : ((totalDays * dailyRateVal) + babySeatFees + tintingFees + deliveryCharges + salikFees + parkingFees + finesFees + fuelFees + cleaningFees + extraKmCharge + damageCharge);
 
     const updatedData: any = {
       ...body,

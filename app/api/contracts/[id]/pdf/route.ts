@@ -80,9 +80,15 @@ export async function GET(
     // 2. Prepare fallback data for instant reliability
     const clientDoc = contract.clientId || {};
     const unitDoc = contract.unitId || {};
+    const isPersonalized = Boolean(
+      contract.contractType === "Personalized" ||
+      contract.personalizedPersonName ||
+      contract.deliveryDriver === "Personal Use"
+    );
+
     const fallbackData = {
       contractNumber: contractNum,
-      clientName: clientDoc.name || "Customer",
+      clientName: contract.personalizedPersonName || clientDoc.name || "Customer",
       clientPhone: clientDoc.phone || "",
       clientEmail: clientDoc.email || "",
       clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
@@ -100,14 +106,14 @@ export async function GET(
       deliveryStatus: contract.deliveryStatus,
       returnedAt: contract.returnedAt || contract.updatedAt,
       totalDays: contract.totalDays || 1,
-      dailyRate: contract.dailyRate || (contract.totalDays ? Math.round(contract.totalAmount / contract.totalDays) : contract.totalAmount),
-      depositAmount: contract.depositAmount || 0,
-      totalAmount: contract.totalAmount || 0,
-      paymentMethod: contract.paymentMethod || "Cash",
-      salikCharge: Number(contract.salikCharge || contract.salikFees || 0),
-      parkingCharge: Number(contract.parkingCharge || contract.parkingFees || 0),
-      finesCharge: Number(contract.finesCharge || contract.finesFees || 0),
-      fuelCharge: Number(contract.fuelCharge || contract.fuelFees || 0),
+      dailyRate: isPersonalized ? 0 : (contract.dailyRate || (contract.totalDays ? Math.round(contract.totalAmount / contract.totalDays) : contract.totalAmount)),
+      depositAmount: isPersonalized ? 0 : (contract.depositAmount || 0),
+      totalAmount: isPersonalized ? 0 : (contract.totalAmount || 0),
+      paymentMethod: isPersonalized ? "Personal / Free" : (contract.paymentMethod || "Cash"),
+      salikCharge: isPersonalized ? 0 : Number(contract.salikCharge || contract.salikFees || 0),
+      parkingCharge: isPersonalized ? 0 : Number(contract.parkingCharge || contract.parkingFees || 0),
+      finesCharge: isPersonalized ? 0 : Number(contract.finesCharge || contract.finesFees || 0),
+      fuelCharge: isPersonalized ? 0 : Number(contract.fuelCharge || contract.fuelFees || 0),
       notes: contract.notes || "",
       customerSignature: contract.customerSignature || contract.signature,
       createdAt: new Date(contract.createdAt || Date.now()).toLocaleDateString("en-GB"),

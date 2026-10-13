@@ -28,9 +28,13 @@ __decorate([
     __metadata("design:type", mongoose_2.default.Types.ObjectId)
 ], Contract.prototype, "clientId", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ type: String, enum: ['Delivery', 'Shop'], default: 'Delivery' }),
+    (0, mongoose_1.Prop)({ type: String, enum: ['Delivery', 'Shop', 'Personalized'], default: 'Delivery' }),
     __metadata("design:type", String)
 ], Contract.prototype, "contractType", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, trim: true, required: false }),
+    __metadata("design:type", String)
+], Contract.prototype, "personalizedPersonName", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: String, enum: ['Daily', 'Monthly'], default: 'Daily' }),
     __metadata("design:type", String)

@@ -108,6 +108,11 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   const unit = contract.unitId || {};
   const driver = contract.driverId || {};
   const isResident = client.clientType ? client.clientType === "Resident" : Boolean(client.idNumber || !client.passportNumber);
+  const isPersonalized = Boolean(
+    contract.contractType === "Personalized" ||
+    contract.personalizedPersonName ||
+    contract.deliveryDriver === "Personal Use"
+  );
 
   // Form serial number
   const serialNo = contract.contractNumber
@@ -308,8 +313,12 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
 
           {/* Center Title */}
           <div className="text-center flex flex-col items-center w-[32%]">
-            <span className="text-[14px] font-black tracking-widest uppercase text-gray-900 leading-tight">RENTAL AGREEMENT</span>
-            <span className="text-[9px] font-bold text-gray-700" dir="rtl">عقد إيجار مركبة</span>
+            <span className="text-[14px] font-black tracking-widest uppercase text-gray-900 leading-tight">
+              {isPersonalized ? "PERSONAL AGREEMENT" : "RENTAL AGREEMENT"}
+            </span>
+            <span className="text-[9px] font-bold text-gray-700" dir="rtl">
+              {isPersonalized ? "عقد استخدام شخصي ومخصص" : "عقد إيجار مركبة"}
+            </span>
           </div>
 
           {/* Contact Details Right */}
@@ -387,7 +396,9 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
           </div>
           <div className="px-1 py-0.5 flex flex-col justify-between">
             <span className="text-[6px] text-gray-500 font-bold uppercase">Hire Mode / نوع الاستئجار</span>
-            <span className="font-bold text-[8px] truncate">{contract.driverId ? "Chauffeur Driven" : "Self-Drive"}</span>
+            <span className="font-bold text-[8px] truncate">
+              {isPersonalized ? "Personal Use / شخصي" : contract.driverId ? "Chauffeur Driven" : "Self-Drive"}
+            </span>
           </div>
         </div>
 
@@ -407,7 +418,9 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
             <div className="grid grid-cols-2 border-b border-black text-[6.5px]">
               <div className="col-span-2 px-1 py-[1.5px] border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Name / الاسم</span>
-                <span className="font-bold text-[8.5px] truncate">{client.name || "N/A"}</span>
+                <span className="font-bold text-[8.5px] truncate">
+                  {contract.personalizedPersonName || client.name || contract.customer || "N/A"}
+                </span>
               </div>
               <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Driving License No / رقم الرخصة</span>
@@ -415,7 +428,9 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               </div>
               <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Customer Type / العميل</span>
-                <span className="font-bold truncate">{contract.customerType || (client.companyName ? "B2B" : "B2C")}</span>
+                <span className="font-bold truncate">
+                  {isPersonalized ? "Personal / شخصي" : (contract.customerType || (client.companyName ? "B2B" : "B2C"))}
+                </span>
               </div>
               <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Issued At / صادرة من</span>
@@ -534,37 +549,71 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
 
             {/* HIRE INFORMATION */}
             <div className="bg-gray-100 py-0.5 px-1 border-b border-black border-t border-black flex justify-between items-center">
-              <span className="font-bold text-[7.5px] uppercase">HIRE INFORMATION</span>
-              <span className="font-bold text-[7.5px]">معلومات الاستئجار</span>
+              <span className="font-bold text-[7.5px] uppercase">
+                {isPersonalized ? "HIRE INFORMATION (PERSONAL USE)" : "HIRE INFORMATION"}
+              </span>
+              <span className="font-bold text-[7.5px]">
+                {isPersonalized ? "معلومات الاستخدام (شخصي ومخصص)" : "معلومات الاستئجار"}
+              </span>
             </div>
 
-            <div className="grid grid-cols-3 border-b border-black text-[6.5px]">
-              <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Hire Rate 24H (AED) / الإيجار اليومي</span>
-                <span className="font-bold text-[8px] truncate">AED {contract.dailyRate || 0}</span>
-              </div>
-              <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Deposit Amount / التأمين</span>
-                <span className="font-extrabold text-[8px] text-emerald-600 truncate">AED {contract.depositAmount || 0}</span>
-              </div>
-              <div className="px-1 py-[1.5px] flex flex-col">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Extra KM / كم زائد</span>
-                <span className="font-bold text-[8px] truncate">AED {contract.pricePerExtraKm || 0}</span>
-              </div>
+            {isPersonalized ? (
+              <div className="grid grid-cols-3 border-b border-black text-[6.5px] bg-purple-50/25">
+                <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
+                  <span className="text-[6px] text-gray-500 font-bold uppercase">Rental Mode / نوع الاستخدام</span>
+                  <span className="font-bold text-[8px] text-purple-900 truncate">Personal Use / استخدام شخصي</span>
+                </div>
+                <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
+                  <span className="text-[6px] text-gray-500 font-bold uppercase">Hire Rate 24H / الإيجار اليومي</span>
+                  <span className="font-bold text-[8px] text-gray-600 truncate">AED 0.00 (Complimentary)</span>
+                </div>
+                <div className="px-1 py-[1.5px] flex flex-col">
+                  <span className="text-[6px] text-gray-500 font-bold uppercase">Deposit / التأمين</span>
+                  <span className="font-bold text-[8px] text-gray-600 truncate">AED 0.00</span>
+                </div>
 
-              <div className="px-1 py-[1.5px] border-r border-t border-black flex flex-col">
-                <span className="text-[6px] text-gray-500 font-bold uppercase">Total Charges / الإجمالي</span>
-                <span className="font-black text-[8.5px] text-black truncate">
-                  AED {(Number(contract.totalAmount) || 0).toFixed(2)}
-                </span>
+                <div className="px-1 py-[1.5px] border-r border-t border-black flex flex-col">
+                  <span className="text-[6px] text-gray-500 font-bold uppercase">Total Charges / الإجمالي</span>
+                  <span className="font-black text-[8.5px] text-emerald-700 truncate">
+                    AED 0.00 (No Charges)
+                  </span>
+                </div>
+                <div className="col-span-2 px-1 py-[1.5px] border-t border-black flex flex-col bg-emerald-50/40">
+                  <span className="text-[6px] text-emerald-800 font-extrabold uppercase">Balance Due / المستحق</span>
+                  <span className="font-black text-[8.5px] text-emerald-800 truncate">
+                    AED 0.00 (Free / استخدام شخصي)
+                  </span>
+                </div>
               </div>
-              <div className="col-span-2 px-1 py-[1.5px] border-t border-black flex flex-col bg-brand/5">
-                <span className="text-[6px] text-brand font-extrabold uppercase">Balance Due / المستحق</span>
-                <span className="font-black text-[8.5px] text-brand truncate">
-                  AED {Math.max(0, (Number(contract.totalAmount) || 0) - (Number(contract.advancePayment) || 0)).toFixed(2)}
-                </span>
+            ) : (
+              <div className="grid grid-cols-3 border-b border-black text-[6.5px]">
+                <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
+                  <span className="text-[6px] text-gray-500 font-bold uppercase">Hire Rate 24H (AED) / الإيجار اليومي</span>
+                  <span className="font-bold text-[8px] truncate">AED {contract.dailyRate || 0}</span>
+                </div>
+                <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
+                  <span className="text-[6px] text-gray-500 font-bold uppercase">Deposit Amount / التأمين</span>
+                  <span className="font-extrabold text-[8px] text-emerald-600 truncate">AED {contract.depositAmount || 0}</span>
+                </div>
+                <div className="px-1 py-[1.5px] flex flex-col">
+                  <span className="text-[6px] text-gray-500 font-bold uppercase">Extra KM / كم زائد</span>
+                  <span className="font-bold text-[8px] truncate">AED {contract.pricePerExtraKm || 0}</span>
+                </div>
+
+                <div className="px-1 py-[1.5px] border-r border-t border-black flex flex-col">
+                  <span className="text-[6px] text-gray-500 font-bold uppercase">Total Charges / الإجمالي</span>
+                  <span className="font-black text-[8.5px] text-black truncate">
+                    AED {(Number(contract.totalAmount) || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="col-span-2 px-1 py-[1.5px] border-t border-black flex flex-col bg-brand/5">
+                  <span className="text-[6px] text-brand font-extrabold uppercase">Balance Due / المستحق</span>
+                  <span className="font-black text-[8.5px] text-brand truncate">
+                    AED {Math.max(0, (Number(contract.totalAmount) || 0) - (Number(contract.advancePayment) || 0)).toFixed(2)}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* ADDITIONAL DRIVER DETAILS */}
             <div className="bg-gray-100 py-0.5 px-1 border-b border-black flex justify-between items-center">
@@ -923,13 +972,17 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                 <span className="w-full text-black font-bold text-[8px] tracking-[1.5px] select-none truncate text-center opacity-30">
                   ...................................................................................
                 </span>
-                {contract.customerSignature && (
+                {contract.customerSignature ? (
                   <img 
                     src={contract.customerSignature} 
                     alt="Hirer Sign" 
                     className="absolute inset-0 m-auto max-h-10 max-w-[85%] object-contain mix-blend-multiply pointer-events-none" 
                   />
-                )}
+                ) : isPersonalized ? (
+                  <span className="absolute inset-0 m-auto flex items-center justify-center text-[7.5px] font-bold text-gray-400">
+                    Personal Use / معفى من التوقيع
+                  </span>
+                ) : null}
               </div>
               <span className="font-bold text-[8.5px] text-black shrink-0 whitespace-nowrap" dir="rtl">: توقيع المستأجر</span>
             </div>

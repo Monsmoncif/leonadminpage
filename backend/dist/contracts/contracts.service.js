@@ -174,17 +174,23 @@ let ContractsService = class ContractsService {
         const start = new Date(body.startDate);
         const end = new Date(body.endDate);
         const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
-        const dailyRate = body.dailyRate || 50;
-        const babySeatFees = Number(body.babySeatFees) || 0;
-        const tintingFees = Number(body.tintingFees) || 0;
-        const deliveryCharges = Number(body.deliveryCharges) || 0;
-        const salikFees = Number(body.salikFees !== undefined ? body.salikFees : body.salikCharge) || 0;
-        const parkingFees = Number(body.parkingFees !== undefined ? body.parkingFees : body.parkingCharge) || 0;
-        const finesFees = Number(body.finesFees !== undefined ? body.finesFees : body.finesCharge) || 0;
-        const fuelFees = Number(body.fuelFees !== undefined ? body.fuelFees : body.fuelCharge) || 0;
-        const cleaningFees = Number(body.cleaningFees) || 0;
-        const totalAmount = body.totalAmount ||
-            days * dailyRate + babySeatFees + tintingFees + deliveryCharges + salikFees + parkingFees + finesFees + fuelFees + cleaningFees;
+        const isPersonalized = body.contractType === 'Personalized';
+        const dailyRate = isPersonalized
+            ? 0
+            : (body.dailyRate !== undefined && body.dailyRate !== null && !isNaN(Number(body.dailyRate)) ? Number(body.dailyRate) : 50);
+        const babySeatFees = isPersonalized ? 0 : (Number(body.babySeatFees) || 0);
+        const tintingFees = isPersonalized ? 0 : (Number(body.tintingFees) || 0);
+        const deliveryCharges = isPersonalized ? 0 : (Number(body.deliveryCharges) || 0);
+        const salikFees = isPersonalized ? 0 : (Number(body.salikFees !== undefined ? body.salikFees : body.salikCharge) || 0);
+        const parkingFees = isPersonalized ? 0 : (Number(body.parkingFees !== undefined ? body.parkingFees : body.parkingCharge) || 0);
+        const finesFees = isPersonalized ? 0 : (Number(body.finesFees !== undefined ? body.finesFees : body.finesCharge) || 0);
+        const fuelFees = isPersonalized ? 0 : (Number(body.fuelFees !== undefined ? body.fuelFees : body.fuelCharge) || 0);
+        const cleaningFees = isPersonalized ? 0 : (Number(body.cleaningFees) || 0);
+        const totalAmount = isPersonalized
+            ? 0
+            : (body.totalAmount !== undefined && body.totalAmount !== null && !isNaN(Number(body.totalAmount))
+                ? Number(body.totalAmount)
+                : days * dailyRate + babySeatFees + tintingFees + deliveryCharges + salikFees + parkingFees + finesFees + fuelFees + cleaningFees);
         const unitDoc = await this.unitModel.findById(body.unitId);
         if (!unitDoc) {
             throw new common_1.NotFoundException('Selected vehicle not found.');
@@ -222,7 +228,7 @@ let ContractsService = class ContractsService {
         let initialDeliveryStatus = 'Pending';
         let isDispatched = isDriverUser ? true : false;
         let assignedContractNumber = undefined;
-        if (isDriverUser || body.deliveryStatus === 'Delivered') {
+        if (isPersonalized || isDriverUser || body.deliveryStatus === 'Delivered') {
             initialStatus = 'Active';
             initialDeliveryStatus = 'Delivered';
             isDispatched = true;
@@ -240,6 +246,7 @@ let ContractsService = class ContractsService {
             contractNumber: assignedContractNumber,
             clientId: body.clientId || null,
             unitId: body.unitId,
+            personalizedPersonName: body.personalizedPersonName || undefined,
             contractType,
             isDispatched,
             driverId: mainDriverId,
@@ -249,12 +256,12 @@ let ContractsService = class ContractsService {
             checkoutFuelLevel: body.checkoutFuelLevel !== undefined ? Number(body.checkoutFuelLevel) : 100,
             startDate: body.startDate,
             endDate: body.endDate,
-            dailyRate: body.dailyRate || dailyRate,
-            dailyKmLimit: body.dailyKmLimit || 0,
-            pricePerExtraKm: body.pricePerExtraKm || 0,
+            dailyRate: isPersonalized ? 0 : (body.dailyRate !== undefined && body.dailyRate !== null ? Number(body.dailyRate) : dailyRate),
+            dailyKmLimit: isPersonalized ? 0 : (body.dailyKmLimit || 0),
+            pricePerExtraKm: isPersonalized ? 0 : (body.pricePerExtraKm || 0),
             totalDays: days,
-            totalAmount,
-            depositAmount: body.depositAmount || 0,
+            totalAmount: isPersonalized ? 0 : totalAmount,
+            depositAmount: isPersonalized ? 0 : (body.depositAmount || 0),
             pickupLocation: body.pickupLocation || 'Main Office',
             dropoffLocation: body.dropoffLocation || '',
             status: initialStatus,
