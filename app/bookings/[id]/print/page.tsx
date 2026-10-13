@@ -4,6 +4,17 @@ import { use, useEffect, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { CONTRACT_TERMS } from "@/lib/contractTerms";
 
+const INSPECTION_ANGLES = [
+  { en: "Front View", ar: "الأمام" },
+  { en: "Rear View", ar: "الخلف" },
+  { en: "Left Side", ar: "اليسار" },
+  { en: "Right Side", ar: "اليمين" },
+  { en: "Dashboard / KM", ar: "العداد" },
+  { en: "Front Interior", ar: "الصالون" },
+  { en: "Rear Interior", ar: "المقاعد" },
+  { en: "Trunk / Boot", ar: "الصندوق" },
+];
+
 export default function PrintContractPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = resolvedParams.id;
@@ -847,29 +858,26 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               
               {/* Visual inspection grid (8 angles across 4 columns) */}
               <div className="grid grid-cols-4 gap-1 p-0.5 w-full relative">
-                {contract.inspectionPhotos && contract.inspectionPhotos.length > 0 ? (
-                  contract.inspectionPhotos.slice(0, 8).map((photo: string, idx: number) => (
-                    <div key={idx} className="border border-gray-300 p-0.5 flex flex-col items-center justify-center w-full aspect-[4/3] max-h-12 overflow-hidden relative bg-white rounded-sm shadow-xs">
-                      <img src={photo} alt={`Checkout ${idx + 1}`} className="w-full h-full object-cover" />
+                {INSPECTION_ANGLES.map((angle, idx) => {
+                  const photo = Array.isArray(contract.inspectionPhotos) ? contract.inspectionPhotos[idx] : null;
+                  const hasPhoto = Boolean(photo && typeof photo === "string" && photo.trim() !== "");
+
+                  if (hasPhoto) {
+                    return (
+                      <div key={idx} className="border border-gray-300 p-0.5 flex flex-col items-center justify-center w-full aspect-[4/3] max-h-11 overflow-hidden relative bg-white rounded-sm shadow-xs">
+                        <img src={photo} alt={`Checkout ${angle.en}`} className="w-full h-full object-cover rounded-[2px]" />
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={idx} className="border border-dashed border-gray-300 p-0.5 flex flex-col items-center justify-center w-full aspect-[4/3] max-h-11 overflow-hidden relative bg-gray-50/70 text-center leading-tight rounded-sm">
+                      <span className="font-black text-[6.5px] uppercase tracking-wider text-gray-400">NO IMAGE</span>
+                      <span className="font-bold text-[6px] truncate w-full text-gray-700 leading-tight">{angle.en}</span>
+                      <span className="text-[5px] text-gray-400 leading-tight" dir="rtl">{angle.ar}</span>
                     </div>
-                  ))
-                ) : (
-                  [
-                    { en: 'Front View', ar: 'الأمام' },
-                    { en: 'Rear View', ar: 'الخلف' },
-                    { en: 'Left Side', ar: 'اليسار' },
-                    { en: 'Right Side', ar: 'اليمين' },
-                    { en: 'Dashboard / KM', ar: 'العداد' },
-                    { en: 'Front Interior', ar: 'الصالون' },
-                    { en: 'Rear Interior', ar: 'المقاعد' },
-                    { en: 'Trunk / Boot', ar: 'الصندوق' },
-                  ].map((angle) => (
-                    <div key={angle.en} className="text-[6.5px] text-gray-600 border border-dashed border-gray-300 p-1 flex flex-col items-center justify-center w-full h-8 overflow-hidden relative bg-white text-center leading-tight rounded-sm">
-                      <span className="font-bold truncate w-full text-gray-800">{angle.en}</span>
-                      <span className="text-[5.5px] text-gray-400" dir="rtl">{angle.ar}</span>
-                    </div>
-                  ))
-                )}
+                  );
+                })}
               </div>
 
               {/* Odometer & Fuel Level */}
@@ -894,29 +902,26 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               
               {/* Visual inspection grid (8 angles across 4 columns) */}
               <div className="grid grid-cols-4 gap-1 p-0.5 w-full relative">
-                {contract.status === "Completed" && contract.returnPhotos && contract.returnPhotos.length > 0 ? (
-                  contract.returnPhotos.slice(0, 8).map((photo: string, idx: number) => (
-                    <div key={idx} className="border border-gray-300 p-0.5 flex flex-col items-center justify-center w-full aspect-[4/3] max-h-12 overflow-hidden relative bg-white rounded-sm shadow-xs">
-                      <img src={photo} alt={`Return ${idx + 1}`} className="w-full h-full object-cover" />
+                {INSPECTION_ANGLES.map((angle, idx) => {
+                  const photo = Array.isArray(contract.returnPhotos) ? contract.returnPhotos[idx] : null;
+                  const hasPhoto = Boolean(photo && typeof photo === "string" && photo.trim() !== "");
+
+                  if (hasPhoto) {
+                    return (
+                      <div key={idx} className="border border-gray-300 p-0.5 flex flex-col items-center justify-center w-full aspect-[4/3] max-h-11 overflow-hidden relative bg-white rounded-sm shadow-xs">
+                        <img src={photo} alt={`Return ${angle.en}`} className="w-full h-full object-cover rounded-[2px]" />
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={idx} className="border border-dashed border-gray-300 p-0.5 flex flex-col items-center justify-center w-full aspect-[4/3] max-h-11 overflow-hidden relative bg-gray-50/70 text-center leading-tight rounded-sm">
+                      <span className="font-black text-[6.5px] uppercase tracking-wider text-gray-400">NO IMAGE</span>
+                      <span className="font-bold text-[6px] truncate w-full text-gray-700 leading-tight">{angle.en}</span>
+                      <span className="text-[5px] text-gray-400 leading-tight" dir="rtl">{angle.ar}</span>
                     </div>
-                  ))
-                ) : (
-                  [
-                    { en: 'Front View', ar: 'الأمام' },
-                    { en: 'Rear View', ar: 'الخلف' },
-                    { en: 'Left Side', ar: 'اليسار' },
-                    { en: 'Right Side', ar: 'اليمين' },
-                    { en: 'Dashboard / KM', ar: 'العداد' },
-                    { en: 'Front Interior', ar: 'الصالون' },
-                    { en: 'Rear Interior', ar: 'المقاعد' },
-                    { en: 'Trunk / Boot', ar: 'الصندوق' },
-                  ].map((angle) => (
-                    <div key={angle.en} className="text-[6.5px] text-gray-400 border border-dashed border-gray-200 p-1 flex flex-col items-center justify-center w-full h-8 overflow-hidden relative bg-white text-center leading-tight rounded-sm">
-                      <span className="font-semibold truncate w-full">{angle.en}</span>
-                      <span className="text-[5.5px] text-gray-300" dir="rtl">{angle.ar}</span>
-                    </div>
-                  ))
-                )}
+                  );
+                })}
               </div>
 
               {/* Odometer & Fuel Level */}
