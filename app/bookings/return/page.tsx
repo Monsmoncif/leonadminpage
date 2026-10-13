@@ -223,7 +223,12 @@ function ReturnPageContent() {
   // When selected contract changes, populate fields
   useEffect(() => {
     if (selectedContract) {
-      const isShop = selectedContract.contractType === "Shop" || selectedContract.contractType === "In-Store / Counter";
+      const isPersonalized = Boolean(
+        selectedContract.contractType === "Personalized" ||
+        selectedContract.personalizedPersonName ||
+        selectedContract.deliveryDriver === "Personal Use"
+      );
+      const isShop = selectedContract.contractType === "Shop" || selectedContract.contractType === "In-Store / Counter" || isPersonalized;
       setReturnMode(isShop ? "shop" : "dispatch");
 
       const initialLoc = (selectedContract.dropoffLocation && selectedContract.dropoffLocation !== "Main Office") 
@@ -299,21 +304,27 @@ function ReturnPageContent() {
   const vehicleImage = selectedContract?.vehicleImage || selectedContract?.unitId?.images?.[0] || "";
   const checkoutFuelLevel = selectedContract?.checkoutFuelLevel !== undefined ? Number(selectedContract.checkoutFuelLevel) : 100;
 
-  const customerName = selectedContract?.customer || selectedContract?.clientId?.name || "Customer";
+  const isPersonalized = Boolean(
+    selectedContract?.contractType === "Personalized" ||
+    selectedContract?.personalizedPersonName ||
+    selectedContract?.deliveryDriver === "Personal Use"
+  );
+
+  const customerName = selectedContract?.personalizedPersonName || selectedContract?.customer || selectedContract?.clientId?.name || (isPersonalized ? "Personal Use" : "Customer");
   const customerPhone = selectedContract?.customerPhone || selectedContract?.clientId?.phone || "";
   const handoverLocation = selectedContract?.pickupLocation || "Main Office";
 
-  const depositAmount = Number(selectedContract?.depositAmount) || (selectedContract?.deposit ? Number(String(selectedContract.deposit).replace(/[^0-9.]/g, '')) : 0);
+  const depositAmount = isPersonalized ? 0 : (Number(selectedContract?.depositAmount) || (selectedContract?.deposit ? Number(String(selectedContract.deposit).replace(/[^0-9.]/g, '')) : 0));
 
   const initialMileage = Number(selectedContract?.checkoutMileage || selectedContract?.unitMileage || 0);
   const currentOdometerNum = returnOdometer.trim() !== "" ? (Number(returnOdometer) || 0) : initialMileage;
   const kmDriven = Math.max(0, currentOdometerNum - initialMileage);
-  const dailyKmLimit = Number(selectedContract?.dailyKmLimit || 0);
+  const dailyKmLimit = isPersonalized ? 0 : Number(selectedContract?.dailyKmLimit || 0);
   const totalDays = Number(selectedContract?.totalDays || 1);
   const totalIncludedKm = dailyKmLimit * totalDays;
-  const extraKm = dailyKmLimit > 0 ? Math.max(0, kmDriven - totalIncludedKm) : 0;
-  const pricePerExtraKm = Number(selectedContract?.pricePerExtraKm || 0);
-  const extraKmCharge = extraKm * pricePerExtraKm;
+  const extraKm = (!isPersonalized && dailyKmLimit > 0) ? Math.max(0, kmDriven - totalIncludedKm) : 0;
+  const pricePerExtraKm = isPersonalized ? 0 : Number(selectedContract?.pricePerExtraKm || 0);
+  const extraKmCharge = isPersonalized ? 0 : extraKm * pricePerExtraKm;
   const damageChargeNum = hasDamages ? (Number(damageCost) || 0) : 0;
   const salikChargeNum = Number(salikCharge) || 0;
   const parkingChargeNum = Number(parkingCharge) || 0;
@@ -324,8 +335,8 @@ function ReturnPageContent() {
   const totalReturnCharges = extraKmCharge + damageChargeNum + salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum;
 
   // Breakdown of money collected (Rental collection + deposit + return charges)
-  const contractTotalRent = Number(selectedContract?.totalAmount || 0);
-  const contractAdvance = Number(selectedContract?.advancePayment || 0);
+  const contractTotalRent = isPersonalized ? 0 : Number(selectedContract?.totalAmount || 0);
+  const contractAdvance = isPersonalized ? 0 : Number(selectedContract?.advancePayment || 0);
   const contractRentalCollection = Math.max(0, contractTotalRent - contractAdvance);
   const contractDeposit = depositAmount;
 
@@ -344,7 +355,7 @@ function ReturnPageContent() {
 
   const moneyBreakdownText = moneyBreakdownParts.length > 0
     ? `${moneyBreakdownParts.join(" + ")} = Total AED ${grandTotalMoney.toLocaleString()}`
-    : `Total AED 0`;
+    : (isPersonalized ? "Personal Use (استخدام شخصي) — Total AED 0" : `Total AED 0`);
 
   // Stepper config
   const STEPS = returnMode === "shop" ? SHOP_STEPS : DISPATCH_STEPS;
@@ -501,7 +512,11 @@ function ReturnPageContent() {
     }
 
     if (!isAllMoneyConfirmed) {
-      toast.error("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before completing return.");
+      toast.error(
+        isPersonalized && totalReturnCharges === 0
+          ? "Please check 'Confirm Personal Vehicle Return (تأكيد استرجاع السيارة بدون مستحقات)'"
+          : "Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before completing return."
+      );
       return;
     }
 
@@ -629,6 +644,7 @@ function ReturnPageContent() {
       c.vehicle?.toLowerCase().includes(q) ||
       c.vehiclePlate?.toLowerCase().includes(q) ||
       c.customer?.toLowerCase().includes(q) ||
+      c.personalizedPersonName?.toLowerCase().includes(q) ||
       c.id?.toLowerCase().includes(q) ||
       c._id?.toLowerCase().includes(q)
     );
@@ -692,7 +708,7 @@ function ReturnPageContent() {
                 type="text"
                 value={contractSearchQuery}
                 onChange={(e) => setContractSearchQuery(e.target.value)}
-                placeholder="Search by car make, model, plate, client name, or contract #..."
+                placeholder="Search by car make, model, plate, recipient/client name, or contract #..."
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-sm font-medium text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none shadow-sm"
               />
             </div>
@@ -702,6 +718,11 @@ function ReturnPageContent() {
               {filteredContracts.map(c => {
                 const isSelected = c._id === selectedContractId;
                 const vName = c.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || "Vehicle";
+                const isPersonal = Boolean(
+                  c.contractType === "Personalized" ||
+                  c.personalizedPersonName ||
+                  c.deliveryDriver === "Personal Use"
+                );
                 return (
                   <button
                     key={c._id}
@@ -726,7 +747,11 @@ function ReturnPageContent() {
                           </span>
                         </div>
                         <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
-                          Client: <strong>{c.customer}</strong>
+                          {isPersonal ? (
+                            <>Recipient: <strong className="text-purple-700">{c.personalizedPersonName || c.customer || "Personal Use"}</strong></>
+                          ) : (
+                            <>Client: <strong>{c.customer}</strong></>
+                          )}
                         </p>
                       </div>
                       {isSelected ? (
@@ -742,9 +767,15 @@ function ReturnPageContent() {
 
                     <div className="flex items-center justify-between text-[11px] text-text-muted border-t border-border/60 pt-2">
                       <span>{c.startDate || "—"} → {c.endDate || "—"}</span>
-                      <span className="font-bold text-text-primary">
-                        {c.contractType || "Shop"}
-                      </span>
+                      {isPersonal ? (
+                        <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                          Personalized (مخصص)
+                        </span>
+                      ) : (
+                        <span className="font-bold text-text-primary">
+                          {c.contractType || "Shop"}
+                        </span>
+                      )}
                     </div>
                   </button>
                 );
@@ -757,8 +788,22 @@ function ReturnPageContent() {
             </div>
           </div>
         ) : (
-          /* 2-Column Layout (100% Identical to driver/return and bookings/new) */
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <>
+            {/* Personalized Agreement Banner */}
+            {selectedContract && !isChangingContract && isPersonalized && (
+          <div className="p-3.5 bg-purple-50 rounded-2xl border border-purple-200 flex items-center justify-between text-xs text-purple-900 font-medium shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-600 animate-pulse" />
+              <span>Personalized Agreement (عقد استخدام شخصي ومخصص) — Free / بدون رسوم إيجار</span>
+            </div>
+            <span className="font-bold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-md text-[11px]">
+              Personal Use
+            </span>
+          </div>
+        )}
+
+        {/* 2-Column Layout (100% Identical to driver/return and bookings/new) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Left: Vehicle Profile Card */}
             <div className="bg-card rounded-2xl border border-brand bg-brand-light/10 ring-2 ring-brand/30 p-5 space-y-4 shadow-sm flex flex-col justify-between">
               <div className="space-y-4">
@@ -811,7 +856,7 @@ function ReturnPageContent() {
                   <div className="bg-white p-3 rounded-xl border border-border/80">
                     <span className="text-text-muted text-[11px] block">Daily KM Limit</span>
                     <span className="font-bold text-text-primary text-sm">
-                      {dailyKmLimit > 0 ? `${dailyKmLimit} km / day` : "Unlimited"}
+                      {isPersonalized ? "Unlimited (Personal)" : (dailyKmLimit > 0 ? `${dailyKmLimit} km / day` : "Unlimited")}
                     </span>
                   </div>
                 </div>
@@ -820,7 +865,9 @@ function ReturnPageContent() {
               {/* Customer / Contract Info Pill */}
               <div className="bg-white p-3.5 rounded-xl border border-border/80 space-y-1.5 text-xs mt-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-text-muted text-[11px]">Primary Customer</span>
+                  <span className="text-text-muted text-[11px]">
+                    {isPersonalized ? "Personal Recipient (المستفيد)" : "Primary Customer"}
+                  </span>
                   <span className="font-mono text-[10px] text-brand bg-brand/10 px-2 py-0.5 rounded font-bold">
                     Contract #{contractNum}
                   </span>
@@ -1064,7 +1111,8 @@ function ReturnPageContent() {
               </div>
             )}
           </div>
-        )}
+        </>
+      )}
       </div>
     );
   };
@@ -1406,7 +1454,7 @@ function ReturnPageContent() {
             )}
           </div>
 
-          {extraKm > 0 && (
+          {!isPersonalized && extraKm > 0 && (
             <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
               <div>
                 <span className="font-bold block">Extra Mileage Fee ({extraKm.toLocaleString()} km exceeded limit)</span>
@@ -1517,13 +1565,27 @@ function ReturnPageContent() {
             {totalReturnCharges > 0 ? (
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider block text-brand">
-                  Additional Settlement Due from Client
+                  {isPersonalized ? "Personal Return — Additional Charges Due" : "Additional Settlement Due from Client"}
                 </span>
                 <div className="mt-1 flex items-center justify-center gap-1.5 text-brand">
                   <span className="font-black text-2xl">+AED {totalReturnCharges.toFixed(2)}</span>
                 </div>
                 <p className="text-xs text-red-600 mt-1">
-                  Collect the remaining balance for extra mileage and/or reported damages from the client.
+                  {isPersonalized 
+                    ? "رسوم إضافية مسجلة خلال فترة الاستخدام الشخصي (مخالفات، سالك، وقود، أو أضرار)."
+                    : "Collect the remaining balance for extra mileage and/or reported damages from the client."}
+                </p>
+              </div>
+            ) : isPersonalized ? (
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider block text-emerald-800">
+                  Personal Use Return — Zero Charges Due (استرجاع استخدام شخصي)
+                </span>
+                <div className="mt-1 flex items-center justify-center gap-1.5 text-emerald-700">
+                  <span className="font-black text-2xl">AED 0.00 Due</span>
+                </div>
+                <p className="text-xs text-emerald-700 mt-1">
+                  عقد استخدام شخصي ومخصص - لا توجد رسوم إيجار أو مبالغ مستحقة. سيتم وضع السيارة متاحة في الأسطول مباشرة.
                 </p>
               </div>
             ) : (
@@ -1566,10 +1628,16 @@ function ReturnPageContent() {
             />
             <div className="text-xs">
               <span className="font-bold text-amber-950 block">
-                Confirm Get All Money (تأكيد استلام كامل المبلغ) *
+                {isPersonalized
+                  ? (totalReturnCharges > 0
+                      ? "Confirm Receipt of Additional Fees (تأكيد استلام الرسوم الإضافية) *"
+                      : "Confirm Personal Vehicle Return / No Charges Due (تأكيد استرجاع السيارة بدون مستحقات) *")
+                  : "Confirm Get All Money (تأكيد استلام كامل المبلغ) *"}
               </span>
               <span className="text-[11px] text-amber-800 mt-0.5 block font-medium">
-                I certify that all required money ({moneyBreakdownText}) has been received from the customer.
+                {isPersonalized && totalReturnCharges === 0
+                  ? "أقر بأن السيارة تم استرجاعها وفحصها من الاستخدام الشخصي ولا توجد مبالغ مستحقة للدفع."
+                  : `I certify that all required money (${moneyBreakdownText}) has been received from the customer.`}
               </span>
             </div>
           </label>

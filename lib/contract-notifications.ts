@@ -53,8 +53,8 @@ export async function sendClientContractNotification(
       .populate({ path: "returnDriverId", select: "name phone", strictPopulate: false })
       .lean() as any;
 
-    if (!contract || !contract.clientId) {
-      console.warn(`[ClientNotification] Contract ${contractId} or client not found`);
+    if (!contract || !contract.clientId || contract.contractType === "Personalized" || contract.personalizedPersonName) {
+      console.log(`[ClientNotification] Contract ${contractId} is personalized or client not found - skipping client notification`);
       return results;
     }
 

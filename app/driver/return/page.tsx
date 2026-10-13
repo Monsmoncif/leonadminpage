@@ -265,7 +265,13 @@ export default function VehicleReturnPage() {
   const contractNum = selectedContractData?.contractNumber || selectedContractData?.id || selectedContractData?._id?.substring(0, 8)?.toUpperCase() || "2200";
   const vehicleName = selectedContractData?.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || "Vehicle";
   const plateNumber = selectedContractData?.vehiclePlate || selectedContractData?.unitId?.plate || "";
-  const customerName = selectedContractData?.customer || selectedContractData?.clientId?.name || "Client";
+  const isPersonalized = Boolean(
+    selectedContractData?.contractType === "Personalized" ||
+    selectedContractData?.personalizedPersonName ||
+    selectedContractData?.deliveryDriver === "Personal Use"
+  );
+
+  const customerName = selectedContractData?.personalizedPersonName || selectedContractData?.customer || selectedContractData?.clientId?.name || (isPersonalized ? "Personal Use" : "Client");
   const customerPhone = selectedContractData?.customerPhone || selectedContractData?.clientId?.phone || "";
   const returnLocation = selectedContractData?.dropoffLocation || selectedContractData?.pickupLocation || "Main Office";
   const initialMileage = Number(selectedContractData?.checkoutMileage || selectedContractData?.unitMileage || 0);
@@ -277,12 +283,12 @@ export default function VehicleReturnPage() {
   const vehicleFuel = selectedContractData?.vehicleFuel || selectedContractData?.unitId?.fuelType || "Petrol";
   const vehicleImage = selectedContractData?.vehicleImage || selectedContractData?.unitId?.images?.[0] || "";
   const checkoutFuelLevel = selectedContractData?.checkoutFuelLevel !== undefined ? Number(selectedContractData.checkoutFuelLevel) : 100;
-  const dailyKmLimit = Number(selectedContractData?.dailyKmLimit || 0);
-  const pricePerExtraKm = Number(selectedContractData?.pricePerExtraKm || 0);
+  const dailyKmLimit = isPersonalized ? 0 : Number(selectedContractData?.dailyKmLimit || 0);
+  const pricePerExtraKm = isPersonalized ? 0 : Number(selectedContractData?.pricePerExtraKm || 0);
   const totalDays = Number(selectedContractData?.totalDays || 1);
   const totalIncludedKm = dailyKmLimit * totalDays;
-  const extraKm = dailyKmLimit > 0 ? Math.max(0, kmDriven - totalIncludedKm) : 0;
-  const extraKmCharge = extraKm * pricePerExtraKm;
+  const extraKm = (!isPersonalized && dailyKmLimit > 0) ? Math.max(0, kmDriven - totalIncludedKm) : 0;
+  const extraKmCharge = isPersonalized ? 0 : extraKm * pricePerExtraKm;
   const damageChargeNum = hasNewDamage ? Number(damageCost) || 0 : 0;
   const salikChargeNum = Number(salikCharge) || 0;
   const parkingChargeNum = Number(parkingCharge) || 0;
@@ -291,10 +297,10 @@ export default function VehicleReturnPage() {
   const totalReturnCharges = extraKmCharge + damageChargeNum + salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum;
 
   // Breakdown of money collected (Rental collection + deposit + return charges)
-  const contractTotalRent = Number(selectedContractData?.totalAmount || 0);
-  const contractAdvance = Number(selectedContractData?.advancePayment || 0);
+  const contractTotalRent = isPersonalized ? 0 : Number(selectedContractData?.totalAmount || 0);
+  const contractAdvance = isPersonalized ? 0 : Number(selectedContractData?.advancePayment || 0);
   const contractRentalCollection = Math.max(0, contractTotalRent - contractAdvance);
-  const contractDeposit = Number(selectedContractData?.depositAmount) || (selectedContractData?.deposit ? Number(String(selectedContractData.deposit).replace(/[^0-9.]/g, '')) : 0);
+  const contractDeposit = isPersonalized ? 0 : (Number(selectedContractData?.depositAmount) || (selectedContractData?.deposit ? Number(String(selectedContractData.deposit).replace(/[^0-9.]/g, '')) : 0));
 
   const moneyBreakdownParts: string[] = [];
   if (contractRentalCollection > 0) {
@@ -311,7 +317,7 @@ export default function VehicleReturnPage() {
 
   const moneyBreakdownText = moneyBreakdownParts.length > 0
     ? `${moneyBreakdownParts.join(" + ")} = Total AED ${grandTotalMoney.toLocaleString()}`
-    : `Total AED 0`;
+    : (isPersonalized ? "Personal Use (استخدام شخصي) — Total AED 0" : `Total AED 0`);
 
   // Damage photo uploader
   const handleDamagePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -453,8 +459,11 @@ export default function VehicleReturnPage() {
     }
 
     if (!isAllMoneyConfirmed) {
-      setError("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before finalizing return.");
-      toast.error("Confirm Get All Money is required.");
+      const msg = isPersonalized && totalReturnCharges === 0
+        ? "Please check 'Confirm Personal Vehicle Return (تأكيد استرجاع السيارة بدون مستحقات)'"
+        : "Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before finalizing return.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -603,13 +612,26 @@ export default function VehicleReturnPage() {
             >
               {contracts.map((c) => (
                 <option key={c._id} value={c._id}>
-                  Contract #{c.contractNumber || c.id || c._id.substring(0, 8)} • {c.vehicle || "Vehicle"}
+                  Contract #{c.contractNumber || c.id || c._id.substring(0, 8)} • {c.vehicle || "Vehicle"} {c.contractType === "Personalized" || c.personalizedPersonName ? `(Personal: ${c.personalizedPersonName || "Personal Use"})` : ""}
                 </option>
               ))}
             </select>
           </div>
         )}
       </div>
+
+      {/* Personalized Agreement Banner */}
+      {isPersonalized && (
+        <div className="p-3.5 bg-purple-50 rounded-2xl border border-purple-200 flex items-center justify-between text-xs text-purple-900 font-medium shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-600 animate-pulse" />
+            <span>Personalized Agreement (عقد استخدام شخصي ومخصص) — Free / بدون رسوم إيجار</span>
+          </div>
+          <span className="font-bold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-md text-[11px]">
+            Personal Use
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left: Vehicle Profile Card (Matching Handover / New Booking Car Card Style) */}
@@ -664,7 +686,7 @@ export default function VehicleReturnPage() {
               <div className="bg-white p-3 rounded-xl border border-border/80">
                 <span className="text-text-muted text-[11px] block">Daily KM Limit</span>
                 <span className="font-bold text-text-primary text-sm">
-                  {dailyKmLimit > 0 ? `${dailyKmLimit} km / day` : "Unlimited"}
+                  {isPersonalized ? "Unlimited (Personal)" : (dailyKmLimit > 0 ? `${dailyKmLimit} km / day` : "Unlimited")}
                 </span>
               </div>
             </div>
@@ -673,7 +695,9 @@ export default function VehicleReturnPage() {
           {/* Customer / Contract Info Pill */}
           <div className="bg-white p-3.5 rounded-xl border border-border/80 space-y-1.5 text-xs mt-2">
             <div className="flex items-center justify-between">
-              <span className="text-text-muted text-[11px]">Primary Customer</span>
+              <span className="text-text-muted text-[11px]">
+                {isPersonalized ? "Personal Recipient (المستفيد)" : "Primary Customer"}
+              </span>
               <span className="font-mono text-[10px] text-brand bg-brand/10 px-2 py-0.5 rounded font-bold">
                 Contract #{contractNum}
               </span>
@@ -1156,7 +1180,7 @@ export default function VehicleReturnPage() {
           )}
         </div>
 
-        {extraKm > 0 && (
+        {!isPersonalized && extraKm > 0 && (
           <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
             <div>
               <span className="font-bold block">Extra Mileage Fee ({extraKm.toLocaleString()} km exceeded limit)</span>
@@ -1267,13 +1291,27 @@ export default function VehicleReturnPage() {
           {totalReturnCharges > 0 ? (
             <div>
               <span className="text-xs font-bold uppercase tracking-wider block text-brand">
-                Additional Settlement Due from Client
+                {isPersonalized ? "Personal Return — Additional Charges Due" : "Additional Settlement Due from Client"}
               </span>
               <div className="mt-1 flex items-center justify-center gap-1.5 text-brand">
                 <span className="font-black text-2xl">+AED {totalReturnCharges.toFixed(2)}</span>
               </div>
               <p className="text-xs text-red-600 mt-1">
-                Collect the remaining balance for extra mileage and/or reported damages from the client.
+                {isPersonalized
+                  ? "رسوم إضافية مسجلة خلال فترة الاستخدام الشخصي (مخالفات، سالك، وقود، أو أضرار)."
+                  : "Collect the remaining balance for extra mileage and/or reported damages from the client."}
+              </p>
+            </div>
+          ) : isPersonalized ? (
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider block text-emerald-800">
+                Personal Use Return — Zero Charges Due (استرجاع استخدام شخصي)
+              </span>
+              <div className="mt-1 flex items-center justify-center gap-1.5 text-emerald-700">
+                <span className="font-black text-2xl">AED 0.00 Due</span>
+              </div>
+              <p className="text-xs text-emerald-700 mt-1">
+                عقد استخدام شخصي ومخصص - لا توجد رسوم إيجار أو مبالغ مستحقة. سيتم وضع السيارة متاحة في الأسطول مباشرة.
               </p>
             </div>
           ) : (
@@ -1316,10 +1354,16 @@ export default function VehicleReturnPage() {
           />
           <div className="text-xs">
             <span className="font-bold text-amber-950 block">
-              Confirm Get All Money (تأكيد استلام كامل المبلغ) *
+              {isPersonalized
+                ? (totalReturnCharges > 0
+                    ? "Confirm Receipt of Additional Fees (تأكيد استلام الرسوم الإضافية) *"
+                    : "Confirm Personal Vehicle Return / No Charges Due (تأكيد استرجاع السيارة بدون مستحقات) *")
+                : "Confirm Get All Money (تأكيد استلام كامل المبلغ) *"}
             </span>
             <span className="text-[11px] text-amber-800 mt-0.5 block font-medium">
-              I certify that all required money ({moneyBreakdownText}) has been received from the customer.
+              {isPersonalized && totalReturnCharges === 0
+                ? "أقر بأن السيارة تم استرجاعها وفحصها من الاستخدام الشخصي ولا توجد مبالغ مستحقة للدفع."
+                : `I certify that all required money (${moneyBreakdownText}) has been received from the customer.`}
             </span>
           </div>
         </label>

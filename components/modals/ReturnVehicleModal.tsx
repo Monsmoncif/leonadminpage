@@ -105,15 +105,21 @@ export default function ReturnVehicleModal({
 
   if (!isOpen || !contract) return null;
 
+  const isPersonalized = Boolean(
+    contract.contractType === "Personalized" ||
+    contract.personalizedPersonName ||
+    contract.deliveryDriver === "Personal Use"
+  );
+
   const initialMileage = contract.checkoutMileage || contract.unitMileage || 0;
   const currentOdometer = Number(returnOdometer) || initialMileage;
   
   // Calculate extra KMs
   const totalLimit = (contract.dailyKmLimit || 0) * (contract.totalDays || 1);
   const kmDriven = Math.max(0, currentOdometer - initialMileage);
-  const extraKm = Math.max(0, kmDriven - totalLimit);
-  const pricePerExtraKm = contract.pricePerExtraKm || 0;
-  const extraKmCharge = extraKm * pricePerExtraKm;
+  const extraKm = (!isPersonalized && totalLimit > 0) ? Math.max(0, kmDriven - totalLimit) : 0;
+  const pricePerExtraKm = isPersonalized ? 0 : (contract.pricePerExtraKm || 0);
+  const extraKmCharge = isPersonalized ? 0 : extraKm * pricePerExtraKm;
 
   const damageChargeNum = damages.reduce((sum, d) => sum + (d.cost || 0), 0);
   const salikChargeNum = Number(salikCharge) || 0;
@@ -207,21 +213,38 @@ export default function ReturnVehicleModal({
           <div className="space-y-5 animate-fade-in-up">
             <h3 className="text-lg font-bold flex items-center gap-2"><Gauge size={18} className="text-brand"/> Step 1: Odometer & Mileage</h3>
             
-            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mb-4">
-              <h3 className="text-sm font-bold text-blue-900 mb-2">Contract Data</h3>
-              <div className="flex justify-between text-sm">
-                <span className="text-blue-700 font-medium">Daily Rate</span>
-                <span className="font-semibold text-blue-900">AED {contract.dailyRate || 0}</span>
+            {isPersonalized ? (
+              <div className="bg-purple-50/70 p-4 rounded-xl border border-purple-200 space-y-2.5 mb-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-purple-900">Personal Agreement (عقد شخصي ومخصص)</h3>
+                  <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">Free / مجاني</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-purple-700 font-medium">Recipient</span>
+                  <span className="font-semibold text-purple-900">{contract.personalizedPersonName || contract.customer || "Personal Use"}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-purple-700 font-medium">Rental Charges &amp; KM Limit</span>
+                  <span className="font-semibold text-purple-900">AED 0.00 • Unlimited KM</span>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-blue-700 font-medium">Daily KM Limit</span>
-                <span className="font-semibold text-blue-900">{contract.dailyKmLimit ? `${contract.dailyKmLimit} km` : "Unlimited"}</span>
+            ) : (
+              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mb-4">
+                <h3 className="text-sm font-bold text-blue-900 mb-2">Contract Data</h3>
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-700 font-medium">Daily Rate</span>
+                  <span className="font-semibold text-blue-900">AED {contract.dailyRate || 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-700 font-medium">Daily KM Limit</span>
+                  <span className="font-semibold text-blue-900">{contract.dailyKmLimit ? `${contract.dailyKmLimit} km` : "Unlimited"}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-700 font-medium">Price per Extra KM</span>
+                  <span className="font-semibold text-blue-900">AED {contract.pricePerExtraKm || 0}</span>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-blue-700 font-medium">Price per Extra KM</span>
-                <span className="font-semibold text-blue-900">AED {contract.pricePerExtraKm || 0}</span>
-              </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -456,7 +479,7 @@ export default function ReturnVehicleModal({
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Extra KM Charge</span>
                 <span className={`font-semibold ${extraKmCharge > 0 ? 'text-red-600' : 'text-text-primary'}`}>
-                  {extraKmCharge > 0 ? `+AED ${extraKmCharge.toFixed(2)}` : "AED 0.00"}
+                  {isPersonalized ? "AED 0.00 (Personal)" : (extraKmCharge > 0 ? `+AED ${extraKmCharge.toFixed(2)}` : "AED 0.00")}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
