@@ -54,6 +54,12 @@ const SHOP_STEPS = [
   { id: 4, title: "Settlement & Check-in", icon: CheckCircle2 },
 ];
 
+const PERSONALIZED_SHOP_STEPS = [
+  { id: 1, title: "Vehicle & Mileage", icon: ExecutiveCarIcon },
+  { id: 2, title: "Damage Check", icon: AlertTriangle },
+  { id: 3, title: "Check-in", icon: CheckCircle2 },
+];
+
 const DISPATCH_STEPS = [
   { id: 1, title: "Vehicle & Pickup", icon: ExecutiveCarIcon },
   { id: 2, title: "Assign Driver", icon: UserCheck },
@@ -358,7 +364,9 @@ function ReturnPageContent() {
     : (isPersonalized ? "Personal Use (استخدام شخصي) — Total AED 0" : `Total AED 0`);
 
   // Stepper config
-  const STEPS = returnMode === "shop" ? SHOP_STEPS : DISPATCH_STEPS;
+  const STEPS = returnMode === "shop"
+    ? (isPersonalized ? PERSONALIZED_SHOP_STEPS : SHOP_STEPS)
+    : DISPATCH_STEPS;
   const totalSteps = STEPS.length;
 
   // Damage photo uploader
@@ -473,8 +481,8 @@ function ReturnPageContent() {
       }
     }
 
-    // Step 3: Damage Check (Shop mode)
-    if (returnMode === "shop" && currentStep === 3) {
+    // Step: Damage Check (Shop mode: Step 2 for personalized, Step 3 for regular)
+    if (returnMode === "shop" && ((isPersonalized && currentStep === 2) || (!isPersonalized && currentStep === 3))) {
       if (hasDamages && !damageDescription.trim()) {
         toast.error("Please enter a description for the reported damage.");
         return;
@@ -507,16 +515,12 @@ function ReturnPageContent() {
 
     if (hasDamages && !damageDescription.trim()) {
       toast.error("Please describe the reported damages.");
-      setCurrentStep(3);
+      setCurrentStep(isPersonalized ? 2 : 3);
       return;
     }
 
-    if (!isAllMoneyConfirmed) {
-      toast.error(
-        isPersonalized && totalReturnCharges === 0
-          ? "Please check 'Confirm Personal Vehicle Return (تأكيد استرجاع السيارة بدون مستحقات)'"
-          : "Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before completing return."
-      );
+    if (!isPersonalized && !isAllMoneyConfirmed) {
+      toast.error("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before completing return.");
       return;
     }
 
@@ -789,19 +793,6 @@ function ReturnPageContent() {
           </div>
         ) : (
           <>
-            {/* Personalized Agreement Banner */}
-            {selectedContract && !isChangingContract && isPersonalized && (
-          <div className="p-3.5 bg-purple-50 rounded-2xl border border-purple-200 flex items-center justify-between text-xs text-purple-900 font-medium shadow-2xs">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-purple-600 animate-pulse" />
-              <span>Personalized Agreement (عقد استخدام شخصي ومخصص) — Free / بدون رسوم إيجار</span>
-            </div>
-            <span className="font-bold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-md text-[11px]">
-              Personal Use
-            </span>
-          </div>
-        )}
-
         {/* 2-Column Layout (100% Identical to driver/return and bookings/new) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Left: Vehicle Profile Card */}
@@ -1142,7 +1133,7 @@ function ReturnPageContent() {
     <div className="space-y-6 animate-fade-in-up">
       {/* Header */}
       <div>
-        <h2 className="text-lg font-bold text-text-primary">Step 3: Damage Inspection (فحص الأضرار)</h2>
+        <h2 className="text-lg font-bold text-text-primary">Step {isPersonalized ? 2 : 3}: Damage Inspection (فحص الأضرار)</h2>
         <p className="text-xs text-text-muted mt-0.5">
           Inspect body panels, glass, and interior. Record any new damages discovered during return.
         </p>
@@ -1361,9 +1352,13 @@ function ReturnPageContent() {
     return (
       <div className="space-y-6 animate-fade-in-up">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step 4: Settlement &amp; Complete Return</h2>
+          <h2 className="text-lg font-bold text-text-primary">
+            Step {isPersonalized ? 3 : 4}: {isPersonalized ? "Check-in & Complete Return" : "Settlement & Complete Return"}
+          </h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Review vehicle inspection summary, calculate additional fees, and settle the contract.
+            {isPersonalized
+              ? "Review vehicle return summary and finalize vehicle check-in."
+              : "Review vehicle inspection summary, calculate additional fees, and settle the contract."}
           </p>
         </div>
 
@@ -1401,356 +1396,342 @@ function ReturnPageContent() {
         </div>
 
         {/* Condition & Inspection Photos Summary Strip */}
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-              <Camera size={14} className="text-brand" />
-              Return Inspection Photos ({Object.values(returnPhotos).filter(Boolean).length} captured)
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(2)}
-              className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
-            >
-              Edit Photos
-            </button>
-          </div>
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-            {[
-              ...VEHICLE_ANGLES.map((angle) => ({ key: angle, label: angle.split(" ")[0], url: returnPhotos[angle] })),
-              ...getExtraPhotoKeys(returnPhotos).map((k, i) => ({ key: k, label: `Extra ${i + 1}`, url: returnPhotos[k] }))
-            ].map(({ key, label, url }, idx) => (
-              <div
-                key={key || idx}
-                className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
+        {!isPersonalized && (
+          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <Camera size={14} className="text-brand" />
+                Return Inspection Photos ({Object.values(returnPhotos).filter(Boolean).length} captured)
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                className="text-[11px] text-brand font-semibold hover:underline cursor-pointer"
               >
-                {url ? (
-                  <img src={url} alt={label} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-[9px] text-text-muted font-medium leading-tight">
-                    #{idx + 1}
-                    <br />
-                    {label}
-                  </span>
-                )}
-              </div>
-            ))}
+                Edit Photos
+              </button>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+              {[
+                ...VEHICLE_ANGLES.map((angle) => ({ key: angle, label: angle.split(" ")[0], url: returnPhotos[angle] })),
+                ...getExtraPhotoKeys(returnPhotos).map((k, i) => ({ key: k, label: `Extra ${i + 1}`, url: returnPhotos[k] }))
+              ].map(({ key, label, url }, idx) => (
+                <div
+                  key={key || idx}
+                  className="relative aspect-square rounded-lg overflow-hidden border border-border bg-gray-50 flex flex-col items-center justify-center text-center p-1"
+                >
+                  {url ? (
+                    <img src={url} alt={label} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[9px] text-text-muted font-medium leading-tight">
+                      #{idx + 1}
+                      <br />
+                      {label}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Additional Return Charges Card */}
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <Coins size={16} className="text-brand" />
-              <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider">
-                Additional Return Charges &amp; Penalties (رسوم ومخالفات الإرجاع)
-              </h3>
+        {!isPersonalized && (
+          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Coins size={16} className="text-brand" />
+                <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider">
+                  Additional Return Charges &amp; Penalties (رسوم ومخالفات الإرجاع)
+                </h3>
+              </div>
+              {totalReturnCharges > 0 && (
+                <span className="text-xs font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-full">
+                  +AED {totalReturnCharges.toFixed(2)} Total Due
+                </span>
+              )}
             </div>
+
+            {extraKm > 0 && (
+              <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
+                <div>
+                  <span className="font-bold block">Extra Mileage Fee ({extraKm.toLocaleString()} km exceeded limit)</span>
+                  <span className="text-red-700 text-[11px]">AED {pricePerExtraKm.toFixed(2)} per extra km • {totalIncludedKm.toLocaleString()} km included</span>
+                </div>
+                <strong className="font-bold text-sm text-red-600">+AED {extraKmCharge.toFixed(2)}</strong>
+              </div>
+            )}
+
+            {hasDamages && (
+              <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
+                <div>
+                  <span className="font-bold block">Reported Vehicle Damage ({damagePhotos.length} photos)</span>
+                  <span className="text-red-700 text-[11px] truncate max-w-sm block">{damageDescription || "Damage reported"}</span>
+                </div>
+                <strong className="font-bold text-sm text-red-600">+AED {damageChargeNum.toFixed(2)}</strong>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* SALIK */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-text-primary block">
+                  SALIK (سالك)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={salikCharge}
+                    onChange={(e) => setSalikCharge(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  />
+                </div>
+                <span className="text-[9px] text-text-muted block">Toll gates</span>
+              </div>
+
+              {/* PARKING */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-text-primary block">
+                  PARKING (مواقف)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={parkingCharge}
+                    onChange={(e) => setParkingCharge(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  />
+                </div>
+                <span className="text-[9px] text-text-muted block">Parking tickets</span>
+              </div>
+
+              {/* FINES */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-text-primary block">
+                  FINES (مخالفات)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={finesCharge}
+                    onChange={(e) => setFinesCharge(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-red-600 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  />
+                </div>
+                <span className="text-[9px] text-text-muted block">Traffic violations</span>
+              </div>
+
+              {/* FUEL */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-text-primary block">
+                  FUEL (وقود)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={fuelCharge}
+                    onChange={(e) => setFuelCharge(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+                  />
+                </div>
+                <span className="text-[9px] text-text-muted block">Refueling charge</span>
+              </div>
+            </div>
+
+            {/* Settlement Banner */}
+            <div className={`p-4 rounded-xl border text-center transition-all ${
+              totalReturnCharges > 0
+                ? 'bg-red-50 border-red-200 text-brand'
+                : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+            }`}>
+              {totalReturnCharges > 0 ? (
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider block text-brand">
+                    Additional Settlement Due from Client
+                  </span>
+                  <div className="mt-1 flex items-center justify-center gap-1.5 text-brand">
+                    <span className="font-black text-2xl">+AED {totalReturnCharges.toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs text-red-600 mt-1">
+                    Collect the remaining balance for extra mileage and/or reported damages from the client.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider block text-emerald-800">
+                    Clean Return — Zero Balance Due
+                  </span>
+                  <div className="mt-1 flex items-center justify-center gap-1.5 text-emerald-700">
+                    <span className="font-black text-2xl">AED 0.00 Due</span>
+                  </div>
+                  <p className="text-xs text-emerald-700 mt-1">
+                    No extra mileage or damage fees recorded. The car will be marked Available in fleet.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Method Selector if extra fees are due */}
             {totalReturnCharges > 0 && (
-              <span className="text-xs font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-full">
-                +AED {totalReturnCharges.toFixed(2)} Total Due
-              </span>
-            )}
-          </div>
-
-          {!isPersonalized && extraKm > 0 && (
-            <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
-              <div>
-                <span className="font-bold block">Extra Mileage Fee ({extraKm.toLocaleString()} km exceeded limit)</span>
-                <span className="text-red-700 text-[11px]">AED {pricePerExtraKm.toFixed(2)} per extra km • {totalIncludedKm.toLocaleString()} km included</span>
-              </div>
-              <strong className="font-bold text-sm text-red-600">+AED {extraKmCharge.toFixed(2)}</strong>
-            </div>
-          )}
-
-          {hasDamages && (
-            <div className="p-3 bg-red-50 rounded-xl border border-red-200 flex items-center justify-between text-xs text-red-950">
-              <div>
-                <span className="font-bold block">Reported Vehicle Damage ({damagePhotos.length} photos)</span>
-                <span className="text-red-700 text-[11px] truncate max-w-sm block">{damageDescription || "Damage reported"}</span>
-              </div>
-              <strong className="font-bold text-sm text-red-600">+AED {damageChargeNum.toFixed(2)}</strong>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* SALIK */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-text-primary block">
-                SALIK (سالك)
-              </label>
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={salikCharge}
-                  onChange={(e) => setSalikCharge(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
+              <div className="pt-2 border-t border-border/60">
+                <PaymentMethodSelector
+                  value={returnPaymentMethod}
+                  onChange={(val) => setReturnPaymentMethod(val)}
+                  totalAmount={totalReturnCharges}
+                  totalLabel="Return Charges Due"
+                  label="Payment Method for Extra Charges (طريقة دفع الرسوم الإضافية)"
                 />
-              </div>
-              <span className="text-[9px] text-text-muted block">Toll gates</span>
-            </div>
-
-            {/* PARKING */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-text-primary block">
-                PARKING (مواقف)
-              </label>
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={parkingCharge}
-                  onChange={(e) => setParkingCharge(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-                />
-              </div>
-              <span className="text-[9px] text-text-muted block">Parking tickets</span>
-            </div>
-
-            {/* FINES */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-text-primary block">
-                FINES (مخالفات)
-              </label>
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={finesCharge}
-                  onChange={(e) => setFinesCharge(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-red-600 focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-                />
-              </div>
-              <span className="text-[9px] text-text-muted block">Traffic violations</span>
-            </div>
-
-            {/* FUEL */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-text-primary block">
-                FUEL (وقود)
-              </label>
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] text-text-muted">AED</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={fuelCharge}
-                  onChange={(e) => setFuelCharge(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full pl-9 pr-2 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
-                />
-              </div>
-              <span className="text-[9px] text-text-muted block">Refueling charge</span>
-            </div>
-          </div>
-
-          {/* Settlement Banner */}
-          <div className={`p-4 rounded-xl border text-center transition-all ${
-            totalReturnCharges > 0
-              ? 'bg-red-50 border-red-200 text-brand'
-              : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
-          }`}>
-            {totalReturnCharges > 0 ? (
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider block text-brand">
-                  {isPersonalized ? "Personal Return — Additional Charges Due" : "Additional Settlement Due from Client"}
-                </span>
-                <div className="mt-1 flex items-center justify-center gap-1.5 text-brand">
-                  <span className="font-black text-2xl">+AED {totalReturnCharges.toFixed(2)}</span>
-                </div>
-                <p className="text-xs text-red-600 mt-1">
-                  {isPersonalized 
-                    ? "رسوم إضافية مسجلة خلال فترة الاستخدام الشخصي (مخالفات، سالك، وقود، أو أضرار)."
-                    : "Collect the remaining balance for extra mileage and/or reported damages from the client."}
-                </p>
-              </div>
-            ) : isPersonalized ? (
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider block text-emerald-800">
-                  Personal Use Return — Zero Charges Due (استرجاع استخدام شخصي)
-                </span>
-                <div className="mt-1 flex items-center justify-center gap-1.5 text-emerald-700">
-                  <span className="font-black text-2xl">AED 0.00 Due</span>
-                </div>
-                <p className="text-xs text-emerald-700 mt-1">
-                  عقد استخدام شخصي ومخصص - لا توجد رسوم إيجار أو مبالغ مستحقة. سيتم وضع السيارة متاحة في الأسطول مباشرة.
-                </p>
-              </div>
-            ) : (
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider block text-emerald-800">
-                  Clean Return — Zero Balance Due
-                </span>
-                <div className="mt-1 flex items-center justify-center gap-1.5 text-emerald-700">
-                  <span className="font-black text-2xl">AED 0.00 Due</span>
-                </div>
-                <p className="text-xs text-emerald-700 mt-1">
-                  No extra mileage or damage fees recorded. The car will be marked Available in fleet.
-                </p>
               </div>
             )}
           </div>
-
-          {/* Payment Method Selector if extra fees are due */}
-          {totalReturnCharges > 0 && (
-            <div className="pt-2 border-t border-border/60">
-              <PaymentMethodSelector
-                value={returnPaymentMethod}
-                onChange={(val) => setReturnPaymentMethod(val)}
-                totalAmount={totalReturnCharges}
-                totalLabel="Return Charges Due"
-                label="Payment Method for Extra Charges (طريقة دفع الرسوم الإضافية)"
-              />
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Mandatory Checkbox: Confirm Get All Money & Proof */}
-        <div className="p-3.5 sm:p-4 bg-amber-50/80 rounded-xl border border-amber-200 shadow-2xs">
-          <label className="flex items-start gap-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isAllMoneyConfirmed}
-              onChange={(e) => setIsAllMoneyConfirmed(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
-            />
-            <div className="text-xs">
-              <span className="font-bold text-amber-950 block">
-                {isPersonalized
-                  ? (totalReturnCharges > 0
-                      ? "Confirm Receipt of Additional Fees (تأكيد استلام الرسوم الإضافية) *"
-                      : "Confirm Personal Vehicle Return / No Charges Due (تأكيد استرجاع السيارة بدون مستحقات) *")
-                  : "Confirm Get All Money (تأكيد استلام كامل المبلغ) *"}
-              </span>
-              <span className="text-[11px] text-amber-800 mt-0.5 block font-medium">
-                {isPersonalized && totalReturnCharges === 0
-                  ? "أقر بأن السيارة تم استرجاعها وفحصها من الاستخدام الشخصي ولا توجد مبالغ مستحقة للدفع."
-                  : `I certify that all required money (${moneyBreakdownText}) has been received from the customer.`}
-              </span>
-            </div>
-          </label>
-
-          {/* Money Photo Proof Upload */}
-          <div className="mt-3 pt-3 border-t border-amber-200/80">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-1.5">
-                <Banknote size={15} className="text-amber-800" />
-                <span className="text-xs font-bold text-amber-950">
-                  Money / Payment Proof (صورة استلام المبلغ)
+        {!isPersonalized && (
+          <div className="p-3.5 sm:p-4 bg-amber-50/80 rounded-xl border border-amber-200 shadow-2xs">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isAllMoneyConfirmed}
+                onChange={(e) => setIsAllMoneyConfirmed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer"
+              />
+              <div className="text-xs">
+                <span className="font-bold text-amber-950 block">
+                  Confirm Get All Money (تأكيد استلام كامل المبلغ) *
                 </span>
-                {moneyPhotos.length > 0 && (
-                  <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                    {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
+                <span className="text-[11px] text-amber-800 mt-0.5 block font-medium">
+                  {`I certify that all required money (${moneyBreakdownText}) has been received from the customer.`}
+                </span>
+              </div>
+            </label>
+
+            {/* Money Photo Proof Upload */}
+            <div className="mt-3 pt-3 border-t border-amber-200/80">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Banknote size={15} className="text-amber-800" />
+                  <span className="text-xs font-bold text-amber-950">
+                    Money / Payment Proof (صورة استلام المبلغ)
                   </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {/* Direct Camera Button */}
-                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onClick={(e) => { e.currentTarget.value = ""; }}
-                    onChange={handleMoneyPhotoUpload}
-                    disabled={isUploadingMoneyPhoto}
-                  />
-                  <Camera size={14} className="text-amber-800" />
-                  <span>Camera</span>
-                </label>
-
-                {/* Upload Gallery Button */}
-                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onClick={(e) => { e.currentTarget.value = ""; }}
-                    onChange={handleMoneyPhotoUpload}
-                    disabled={isUploadingMoneyPhoto}
-                  />
-                  <ImageIcon size={14} className="text-amber-800" />
-                  <span>Gallery</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Uploading indicator */}
-            {isUploadingMoneyPhoto && (
-              <div className="flex items-center gap-2 p-2 bg-amber-100/60 rounded-lg text-amber-900 text-xs mb-2">
-                <Loader2 size={14} className="animate-spin text-amber-800" />
-                <span>Uploading payment proof photo...</span>
-              </div>
-            )}
-
-            {/* Photo thumbnails grid */}
-            {moneyPhotos.length > 0 ? (
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-1">
-                {moneyPhotos.map((url, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => setPreviewPhotoUrl(url)}
-                    className="relative group aspect-square rounded-lg overflow-hidden border border-amber-300 bg-white shadow-2xs cursor-pointer hover:border-amber-400 transition-all"
-                  >
-                    <img
-                      src={url}
-                      alt={`Money proof ${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveMoneyPhoto(idx);
-                      }}
-                      className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 text-white rounded-md shadow-xs opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
-                      title="Delete photo"
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                    <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.2 rounded backdrop-blur-xs">
-                      #{idx + 1}
+                  {moneyPhotos.length > 0 && (
+                    <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"}
                     </span>
-                  </div>
-                ))}
+                  )}
+                </div>
 
-                {/* Add more button tile */}
-                <label className="aspect-square rounded-lg border border-dashed border-amber-300 hover:border-amber-400 bg-white/70 hover:bg-amber-100/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onClick={(e) => { e.currentTarget.value = ""; }}
-                    onChange={handleMoneyPhotoUpload}
-                    disabled={isUploadingMoneyPhoto}
-                  />
-                  <Plus size={14} className="text-amber-800" />
-                  <span className="text-[9px] font-bold text-amber-800">+ Add</span>
-                </label>
+                <div className="flex items-center gap-1.5">
+                  {/* Direct Camera Button */}
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onClick={(e) => { e.currentTarget.value = ""; }}
+                      onChange={handleMoneyPhotoUpload}
+                      disabled={isUploadingMoneyPhoto}
+                    />
+                    <Camera size={14} className="text-amber-800" />
+                    <span>Camera</span>
+                  </label>
+
+                  {/* Upload Gallery Button */}
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-semibold rounded-lg border border-amber-300 shadow-2xs cursor-pointer transition-all active:scale-95">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onClick={(e) => { e.currentTarget.value = ""; }}
+                      onChange={handleMoneyPhotoUpload}
+                      disabled={isUploadingMoneyPhoto}
+                    />
+                    <ImageIcon size={14} className="text-amber-800" />
+                    <span>Gallery</span>
+                  </label>
+                </div>
               </div>
-            ) : (
-              <p className="text-[11px] text-amber-800/80 italic pt-0.5">
-                Optional: Take a photo of the cash/payment received or upload receipt here.
-              </p>
-            )}
+
+              {/* Uploading indicator */}
+              {isUploadingMoneyPhoto && (
+                <div className="flex items-center gap-2 p-2 bg-amber-100/60 rounded-lg text-amber-900 text-xs mb-2">
+                  <Loader2 size={14} className="animate-spin text-amber-800" />
+                  <span>Uploading payment proof photo...</span>
+                </div>
+              )}
+
+              {/* Photo thumbnails grid */}
+              {moneyPhotos.length > 0 ? (
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-1">
+                  {moneyPhotos.map((url, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setPreviewPhotoUrl(url)}
+                      className="relative group aspect-square rounded-lg overflow-hidden border border-amber-300 bg-white shadow-2xs cursor-pointer hover:border-amber-400 transition-all"
+                    >
+                      <img
+                        src={url}
+                        alt={`Money proof ${idx + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveMoneyPhoto(idx);
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 text-white rounded-md shadow-xs opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
+                        title="Delete photo"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                      <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.2 rounded backdrop-blur-xs">
+                        #{idx + 1}
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Add more button tile */}
+                  <label className="aspect-square rounded-lg border border-dashed border-amber-300 hover:border-amber-400 bg-white/70 hover:bg-amber-100/50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onClick={(e) => { e.currentTarget.value = ""; }}
+                      onChange={handleMoneyPhotoUpload}
+                      disabled={isUploadingMoneyPhoto}
+                    />
+                    <Plus size={14} className="text-amber-800" />
+                    <span className="text-[9px] font-bold text-amber-800">+ Add</span>
+                  </label>
+                </div>
+              ) : (
+                <p className="text-[11px] text-amber-800/80 italic pt-0.5">
+                  Optional: Take a photo of the cash/payment received or upload receipt here.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Staff Remarks */}
         <div className="space-y-1.5">
@@ -1778,10 +1759,14 @@ function ReturnPageContent() {
             />
             <div className="text-xs">
               <strong className="font-bold text-text-primary block">
-                Confirm Vehicle Return &amp; Settlement (تأكيد استلام السيارة وإتمام التسوية) *
+                {isPersonalized
+                  ? "Confirm Personal Vehicle Return (تأكيد استلام السيارة وإتمام الإرجاع) *"
+                  : "Confirm Vehicle Return & Settlement (تأكيد استلام السيارة وإتمام التسوية) *"}
               </strong>
               <span className="text-text-muted mt-0.5 block">
-                I certify that the vehicle has been physically received and inspected, recorded return odometer is {Number(returnOdometer).toLocaleString()} km, return fuel level is {returnFuelLevel}%, and all settlements are verified.
+                {isPersonalized
+                  ? `أقر بأن السيارة تم استلامها وفحصها، والعداد المسجل ${Number(returnOdometer).toLocaleString()} كم ومستوى الوقود ${returnFuelLevel}%.`
+                  : `I certify that the vehicle has been physically received and inspected, recorded return odometer is ${Number(returnOdometer).toLocaleString()} km, return fuel level is ${returnFuelLevel}%, and all settlements are verified.`}
               </span>
             </div>
           </label>
@@ -1902,10 +1887,16 @@ function ReturnPageContent() {
   // Determine what to render based on current step and return mode
   const renderStepContent = () => {
     if (returnMode === "shop") {
-      if (currentStep === 1) return renderVehicleStep();
-      if (currentStep === 2) return renderPhotosStep();
-      if (currentStep === 3) return renderDamageStep();
-      if (currentStep === 4) return renderSettlementStep();
+      if (isPersonalized) {
+        if (currentStep === 1) return renderVehicleStep();
+        if (currentStep === 2) return renderDamageStep();
+        if (currentStep === 3) return renderSettlementStep();
+      } else {
+        if (currentStep === 1) return renderVehicleStep();
+        if (currentStep === 2) return renderPhotosStep();
+        if (currentStep === 3) return renderDamageStep();
+        if (currentStep === 4) return renderSettlementStep();
+      }
     } else {
       if (currentStep === 1) return renderVehicleStep();
       if (currentStep === 2) return renderDispatchDriverStep();
@@ -1940,7 +1931,8 @@ function ReturnPageContent() {
             type="button"
             onClick={() => {
               setReturnMode("shop");
-              if (currentStep > 4) setCurrentStep(4);
+              const maxSteps = isPersonalized ? 3 : 4;
+              if (currentStep > maxSteps) setCurrentStep(maxSteps);
             }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               returnMode === "shop"
