@@ -84,7 +84,7 @@ const DRIVER_STEPS = [
 const PERSONALIZED_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
   { id: 2, title: "Client", icon: User },
-  { id: 3, title: "Dates", icon: Calendar },
+  { id: 3, title: "Dates & Sign", icon: Calendar },
 ];
 
 export function NewRentalAdminPageContent() {
@@ -442,9 +442,12 @@ export function NewRentalAdminPageContent() {
     toast.success(`Admin signature applied (${adminName})`);
   };
 
-  // Canvas initialization when reaching Review Step or when window resizes
+  // Canvas initialization when reaching Review Step or Personalized Step 3 or when window resizes
   useEffect(() => {
-    const isReviewStep = (contractType === "Shop" && currentStep === (isDriver ? 5 : 4)) || (contractType === "Delivery" && currentStep === 3);
+    const isReviewStep = 
+      (contractType === "Shop" && currentStep === (isDriver ? 5 : 4)) || 
+      (contractType === "Delivery" && currentStep === 3) ||
+      (contractType === "Personalized" && currentStep === 3);
     if (!isReviewStep) return;
 
     const setupCanvases = () => {
@@ -2806,6 +2809,161 @@ export function NewRentalAdminPageContent() {
             </div>
           </div>
         </div>
+
+        {/* Card 3: Signatures (التوقيعات الرقمية) */}
+        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-200 shadow-2xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <PenTool size={16} className="text-brand" />
+                <span>Signatures (التوقيعات الرقمية)</span>
+              </h3>
+              <p className="text-xs text-text-muted mt-0.5">
+                توقيع مستلم السيارة وتوقيع الموظف المعتمد لإرفاقهما بعقد الاستخدام الشخصي (Digital Signatures for Personalized Contract)
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 1. Hirer / Receiver Signature */}
+            <div id="personalized-customer-signature-box" className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                  <PenTool size={14} className="text-brand shrink-0" />
+                  <span>Receiver / Hirer Sign (توقيع المستلم / العميل)</span>
+                </label>
+                {(signatureData || (isEditMode && editingContract?.customerSignature)) && (
+                  <button
+                    type="button"
+                    onClick={clearSignature}
+                    className="text-[11px] text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                  >
+                    <RotateCcw size={11} />
+                    <span>Clear (مسح)</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="relative border-2 border-dashed border-gray-300 rounded-xl bg-white overflow-hidden shadow-inner touch-none">
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="w-full h-36 sm:h-40 cursor-crosshair bg-white block select-none"
+                />
+                {!signatureData && !isDrawing && (!isEditMode || !editingContract?.customerSignature) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1 select-none">
+                    <PenTool size={22} className="opacity-40 text-brand" />
+                    <span className="text-[11px] font-semibold text-gray-500">Draw receiver signature here (finger, mouse, stylus)</span>
+                    <span className="text-[10px] text-gray-400 font-medium" dir="rtl">توقيع المستلم هنا باليد أو القلم</span>
+                  </div>
+                )}
+                <div className="absolute bottom-1.5 left-3 right-3 pointer-events-none flex items-center justify-between border-t border-dashed border-gray-200 pt-0.5 text-[9px] text-gray-400 uppercase tracking-widest font-semibold select-none">
+                  <span>Hirer Signature</span>
+                  <span>توقيع المستلم</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-text-muted">Touch screen or mouse to sign.</span>
+                {(signatureData || (isEditMode && editingContract?.customerSignature)) ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                    <CheckCircle2 size={12} className="text-emerald-600" /> Signed (تم التوقيع)
+                  </span>
+                ) : (
+                  <span className="text-text-muted text-[10px]">Optional / اختياري</span>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Staff / Admin Signature */}
+            <div id="personalized-admin-signature-box" className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                  <CheckCircle size={14} className="text-brand shrink-0" />
+                  <span>Staff / Company Sign (توقيع الموظف / الختم)</span>
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={autoSignAdmin}
+                    className="text-[11px] text-brand hover:text-brand-dark bg-brand/10 hover:bg-brand/20 px-2 py-0.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                    title="Auto generate staff signature"
+                  >
+                    <span>Auto Sign</span>
+                  </button>
+                  {adminSignatureData && (
+                    <button
+                      type="button"
+                      onClick={clearAdminSignature}
+                      className="text-[11px] text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                    >
+                      <RotateCcw size={11} />
+                      <span>Clear</span>
+                    </button>
+                  )}
+                  {adminSignatureData !== DEFAULT_ADMIN_SIGNATURE && (
+                    <button
+                      type="button"
+                      onClick={() => setAdminSignatureData(DEFAULT_ADMIN_SIGNATURE)}
+                      className="text-[11px] text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                      title="Use official company seal"
+                    >
+                      <span>Default Seal</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative border-2 border-dashed border-gray-300 rounded-xl bg-white overflow-hidden shadow-inner touch-none">
+                <canvas
+                  ref={adminCanvasRef}
+                  onMouseDown={startDrawingAdmin}
+                  onMouseMove={drawAdmin}
+                  onMouseUp={stopDrawingAdmin}
+                  onMouseLeave={stopDrawingAdmin}
+                  onTouchStart={startDrawingAdmin}
+                  onTouchMove={drawAdmin}
+                  onTouchEnd={stopDrawingAdmin}
+                  className="w-full h-36 sm:h-40 cursor-crosshair bg-white block select-none"
+                />
+                {!adminSignatureData && !isDrawingAdmin && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1 select-none">
+                    <PenTool size={22} className="opacity-40 text-brand" />
+                    <span className="text-[11px] font-semibold text-gray-500">Draw staff signature or use Auto Sign</span>
+                    <span className="text-[10px] text-gray-400 font-medium" dir="rtl">توقيع الموظف أو اضغط Auto Sign</span>
+                  </div>
+                )}
+                {adminSignatureData === DEFAULT_ADMIN_SIGNATURE && !isDrawingAdmin && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-2 bg-white/95">
+                    <img 
+                      src={DEFAULT_ADMIN_SIGNATURE} 
+                      alt="Official Seal" 
+                      className="max-h-28 object-contain mix-blend-multiply opacity-90" 
+                    />
+                  </div>
+                )}
+                <div className="absolute bottom-1.5 left-3 right-3 pointer-events-none flex items-center justify-between border-t border-dashed border-gray-200 pt-0.5 text-[9px] text-gray-400 uppercase tracking-widest font-semibold select-none">
+                  <span>Staff Signature</span>
+                  <span>توقيع الموظف والختم</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-text-muted">Staff signature &amp; official stamp.</span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  <CheckCircle2 size={12} className="text-emerald-600" />
+                  {adminSignatureData === DEFAULT_ADMIN_SIGNATURE ? "Official Seal (ختم معتمد)" : "Custom Signed (موقّع)"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -2882,7 +3040,7 @@ export function NewRentalAdminPageContent() {
               : isDriver
                 ? "Driver Contract — select car and customer to create and activate the contract immediately without handover."
                 : contractType === "Personalized"
-                  ? "Personalized booking (مخصص) — select vehicle, choose client, and set dates. Direct booking without charges, photos, or signature."
+                  ? "Personalized booking (مخصص) — select vehicle, choose client, set dates, and capture signatures. Direct booking without rental charges."
                   : contractType === "Delivery" 
                     ? "Delivery contract — driver will take the car to the client and register them on-site."
                     : "Shop contract — counter booking order. Vehicle handover, inspection, and customer signature are completed at handover."}
