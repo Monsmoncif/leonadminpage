@@ -75,8 +75,8 @@ const SHOP_STEPS = [
 
 const DRIVER_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Client", icon: User },
-  { id: 3, title: "Inspection Photos", icon: Camera },
+  { id: 2, title: "Inspection Photos", icon: Camera },
+  { id: 3, title: "Client", icon: User },
   { id: 4, title: "Rental Data", icon: FileText },
   { id: 5, title: "Review & Create", icon: CheckCircle },
 ];
@@ -851,10 +851,12 @@ export function NewRentalAdminPageContent() {
         }
       }
     } else {
-      // Shop flow validation (Step 1: Car -> Step 2: Client -> Step 3: Rental Data -> Step 4: Review & Create)
-      if (currentStep === 2) {
+      // Client validation:
+      // - For Admin Shop, Client is step 2
+      // - For Driver, Client is step 3 (Step 2 is Inspection Photos)
+      if ((!isDriver && currentStep === 2) || (isDriver && currentStep === 3)) {
         if (!selectedClient) {
-          toast.error("Please select a client first.");
+          toast.error("Please select a client first. (يرجى اختيار العميل أولاً)");
           return;
         }
       }
@@ -2550,7 +2552,7 @@ export function NewRentalAdminPageContent() {
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step {isDriver ? 3 : 4}: {isDriver ? "Handover Inspection Photos (صور فحص السيارة عند التسليم)" : "Pre-Handover Vehicle Inspection Photos"}</h2>
+          <h2 className="text-lg font-bold text-text-primary">Step {isDriver ? 2 : 4}: {isDriver ? "Handover Inspection Photos (صور فحص السيارة عند التسليم)" : "Pre-Handover Vehicle Inspection Photos"}</h2>
           <p className="text-xs text-text-muted mt-0.5">
             {isDriver
               ? "Capture vehicle inspection photos to document condition before handover (optional)"
@@ -2894,11 +2896,11 @@ export function NewRentalAdminPageContent() {
       return null;
     }
 
-    // Driver: Car (1) → Client (2) → Inspection Photos (3) → Rental Data (4) → Review & Create (5)
+    // Driver: Car (1) → Inspection Photos (2) → Client (3) → Rental Data (4) → Review & Create (5)
     if (isDriver) {
       if (currentStep === 1) return renderVehicleSelector();
-      if (currentStep === 2) return renderClientSelector();
-      if (currentStep === 3) return renderInspectionPhotos();
+      if (currentStep === 2) return renderInspectionPhotos();
+      if (currentStep === 3) return renderClientSelector();
       if (currentStep === 4) return renderRentalData();
       if (currentStep === 5) return renderReview();
       return null;
