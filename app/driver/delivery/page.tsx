@@ -743,6 +743,7 @@ export default function ConfirmDeliveryPage() {
         customerSignature: signatureData,
         adminSignature: contract.adminSignature || null,
         inspectionPhotos: inspectionArray,
+        notifyClient: true,
         handoverCompletedAt: new Date().toISOString(),
         deliveredBy: (session?.user as any)?.name || "Driver",
       };

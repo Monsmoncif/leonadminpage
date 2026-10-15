@@ -124,7 +124,7 @@ export async function sendClientContractNotification(
       try {
         const pdfPromise = generateContractPdfFromPrintUrl(contract._id.toString(), contractPdfData);
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Browser PDF generation timed out after 35s")), 35000)
+          setTimeout(() => reject(new Error("Browser PDF generation timed out after 12s")), 12000)
         );
         pdfBuffer = await Promise.race([pdfPromise, timeoutPromise]);
         console.log(`[ClientNotification] Generated exact admin print PDF (${pdfBuffer.length} bytes) for contract #${contractNum}`);

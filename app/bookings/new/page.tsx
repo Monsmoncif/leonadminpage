@@ -1118,7 +1118,7 @@ export function NewRentalAdminPageContent() {
       if (isEditMode) {
         toast.success("Contract updated successfully! (تم حفظ التعديلات بنجاح)");
       } else if (isDriver) {
-        toast.success("Contract created & activated! Car is with client. (تم إنشاء العقد وتفعيله مباشرة بدون تسليم مؤجل)");
+        toast.success("Contract created & sent to client directly! (تم إنشاء العقد وتفعيله وإرساله للعميل مباشرة)");
       } else if (contractType === "Personalized") {
         toast.success("Personalized Booking Created! The vehicle is now marked as booked in the fleet. (تم إنشاء الحجز الشخصي وحجز السيارة بنجاح)");
       } else if (contractType === "Delivery") {

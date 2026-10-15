@@ -302,7 +302,14 @@ export async function sendWhatsApp({
 
   if (ultraInstance && ultraToken) {
     try {
-      if (pdfUrl) {
+      let docParam = pdfUrl;
+      if (pdfBuffer && pdfBuffer.length > 0 && (!docParam || docParam.includes("localhost") || docParam.includes("127.0.0.1"))) {
+        docParam = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+      } else if (!docParam && pdfBuffer && pdfBuffer.length > 0) {
+        docParam = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+      }
+
+      if (docParam) {
         const response = await fetch(`https://api.ultramsg.com/${ultraInstance}/messages/document`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -310,7 +317,7 @@ export async function sendWhatsApp({
             token: ultraToken,
             to: recipient,
             filename: pdfFilename || "Rental-Contract.pdf",
-            document: pdfUrl,
+            document: docParam,
             caption: message,
           }),
         });

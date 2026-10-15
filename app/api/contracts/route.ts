@@ -408,10 +408,27 @@ export async function POST(req: Request) {
     // Synchronize vehicle status: if contract starts today or in past, it becomes Rented; if it starts in the future, it stays Available until the start date arrives
     await syncUnitStatuses(body.unitId);
 
-    // Automatically send booking confirmation notification to client (Order confirmed - without PDF)
-    sendClientContractNotification(contract._id.toString(), "created").catch((notifErr) => {
-      console.error("Failed to dispatch client booking confirmation notification:", notifErr);
+    // Automatically send contract notification to client:
+    // - When driver creates a contract (or car is already Delivered), send official agreement + PDF directly ("initial")
+    // - For admin advance reservations, send order confirmation ("created")
+    const clientNotificationType = (isDriverUser || initialDeliveryStatus === "Delivered") ? "initial" : "created";
+    sendClientContractNotification(contract._id.toString(), clientNotificationType).catch((notifErr) => {
+      console.error(`Failed to dispatch client ${clientNotificationType} notification:`, notifErr);
     });
+
+    // Notify admin when driver delivers/creates an active contract directly
+    if (isDriverUser || initialDeliveryStatus === "Delivered") {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+        fetch(`${baseUrl}/api/contracts/notify-admin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contractId: contract._id.toString(), type: "vehicle_delivered" }),
+        }).catch(err => console.error("Failed to notify admin on driver contract delivery:", err));
+      } catch (e) {
+        console.error("Admin notify trigger failed:", e);
+      }
+    }
 
     return NextResponse.json(contract, { status: 201 });
   } catch (error: any) {
