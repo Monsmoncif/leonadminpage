@@ -1057,6 +1057,7 @@ export function NewRentalAdminPageContent() {
           contractPayload.deliveredBy = (session?.user as any)?.name || "Driver";
           contractPayload.handoverCompletedAt = new Date().toISOString();
           contractPayload.deliveredAt = new Date().toISOString();
+          contractPayload.notifyClient = true;
         }
       } else if (contractType === "Personalized") {
         const clientObj = clients.find(c => c._id === selectedClient);

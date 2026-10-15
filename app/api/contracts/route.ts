@@ -411,7 +411,7 @@ export async function POST(req: Request) {
     // Automatically send contract notification to client:
     // - When driver creates a contract (or car is already Delivered), send official agreement + PDF directly ("initial")
     // - For admin advance reservations, send order confirmation ("created")
-    const clientNotificationType = (isDriverUser || initialDeliveryStatus === "Delivered") ? "initial" : "created";
+    const clientNotificationType = (isDriverUser || Boolean(body.isDriver) || Boolean(body.notifyClient) || initialDeliveryStatus === "Delivered") ? "initial" : "created";
     sendClientContractNotification(contract._id.toString(), clientNotificationType).catch((notifErr) => {
       console.error(`Failed to dispatch client ${clientNotificationType} notification:`, notifErr);
     });

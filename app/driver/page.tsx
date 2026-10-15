@@ -6,14 +6,12 @@ import {
   Clock, 
   MapPin, 
   CheckCircle2, 
-  Loader2, 
   ArrowLeftRight, 
   Phone, 
   Navigation, 
   Search, 
   AlertCircle,
-  Plus,
-  Send
+  Plus
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
@@ -130,28 +128,6 @@ export default function DriverDashboard() {
   });
   const [historyContracts, setHistoryContracts] = useState<any[]>([]);
   const [todayDeliveries, setTodayDeliveries] = useState<any[]>([]);
-  const [sendingContractId, setSendingContractId] = useState<string | null>(null);
-
-  const handleSendToClient = async (contractId: string) => {
-    setSendingContractId(contractId);
-    try {
-      const res = await fetch("/api/contracts/send-client", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractId, type: "initial" }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(data.message || "Contract sent to client directly! (تم إرسال العقد للعميل)");
-      } else {
-        toast.error(data.error || "Failed to send contract to client");
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to send contract");
-    } finally {
-      setSendingContractId(null);
-    }
-  };
 
   const fetchDashboardData = async () => {
     if (!session?.user?.id) return;
@@ -954,29 +930,10 @@ export default function DriverDashboard() {
                                   <span>Process Return</span>
                                 </button>
                               ) : isDelivered && !isReturned ? (
-                                <div className="inline-flex items-center gap-1.5">
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/80">
-                                    <CheckCircle2 size={12} className="text-emerald-600" />
-                                    <span>Delivered</span>
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSendToClient(contract._id || contract.id);
-                                    }}
-                                    disabled={sendingContractId === (contract._id || contract.id)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold border border-blue-200 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-                                    title="Send / Resend official contract directly to client (WhatsApp & Email)"
-                                  >
-                                    {sendingContractId === (contract._id || contract.id) ? (
-                                      <Loader2 size={11} className="animate-spin" />
-                                    ) : (
-                                      <Send size={11} />
-                                    )}
-                                    <span>Send Contract</span>
-                                  </button>
-                                </div>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/80">
+                                  <CheckCircle2 size={12} className="text-emerald-600" />
+                                  <span>Delivered</span>
+                                </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60">
                                   <CheckCircle2 size={12} />

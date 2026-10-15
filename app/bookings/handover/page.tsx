@@ -710,6 +710,7 @@ function ConfirmHandoverPageContent() {
         inspectionPhotos: inspectionArray,
         handoverCompletedAt: new Date().toISOString(),
         deliveredBy: (session?.user as any)?.name || "Admin",
+        notifyClient: true,
       };
 
       const res = await fetch(`/api/contracts/${contractId}`, {
