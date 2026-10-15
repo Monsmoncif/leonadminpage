@@ -144,7 +144,11 @@ export function NewRentalAdminPageContent() {
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState("");
   const [fleetFilter, setFleetFilter] = useState<"available" | "all">("all");
-  const [showAllCars, setShowAllCars] = useState(false);
+  const [visibleCarsCount, setVisibleCarsCount] = useState(3);
+
+  useEffect(() => {
+    setVisibleCarsCount(3);
+  }, [vehicleSearchQuery, fleetFilter]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -1260,17 +1264,15 @@ export function NewRentalAdminPageContent() {
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(showAllCars || filteredUnits.length <= 3 
-              ? filteredUnits 
-              : (() => {
-                  const top3 = filteredUnits.slice(0, 3);
-                  if (selectedVehicle && !top3.some(u => u._id === selectedVehicle)) {
-                    const sel = filteredUnits.find(u => u._id === selectedVehicle);
-                    if (sel) return [...top3, sel];
-                  }
-                  return top3;
-                })()
-            ).map((unit) => {
+            {(() => {
+              const currentLimit = Math.min(visibleCarsCount, filteredUnits.length);
+              const topCars = filteredUnits.slice(0, currentLimit);
+              if (selectedVehicle && !topCars.some(u => u._id === selectedVehicle)) {
+                const sel = filteredUnits.find(u => u._id === selectedVehicle);
+                if (sel) return [...topCars, sel];
+              }
+              return topCars;
+            })().map((unit) => {
               const isSelected = selectedVehicle === unit._id;
               const conflict = getUnitConflict(unit, rentalData.startDate, rentalData.endDate);
               const isAvailable = !conflict;
@@ -1353,24 +1355,15 @@ export function NewRentalAdminPageContent() {
             })}
           </div>
 
-          {filteredUnits.length > 3 && (
+          {filteredUnits.length > visibleCarsCount && (
             <div className="flex justify-center pt-2">
               <button
                 type="button"
-                onClick={() => setShowAllCars(prev => !prev)}
-                className="px-6 py-2.5 bg-white hover:bg-gray-50 text-text-primary text-xs font-bold rounded-xl border border-border shadow-xs hover:shadow transition-all flex items-center gap-2 cursor-pointer group"
+                onClick={() => setVisibleCarsCount((prev) => prev + 3)}
+                className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow cursor-pointer w-full sm:w-auto"
               >
-                {showAllCars ? (
-                  <>
-                    <span>Show Less (عرض 3 فقط)</span>
-                    <ChevronUp size={16} className="text-text-muted group-hover:text-text-primary transition-transform" />
-                  </>
-                ) : (
-                  <>
-                    <span>Show More Cars (عرض المزيد من السيارات) — +{filteredUnits.length - 3}</span>
-                    <ChevronDown size={16} className="text-text-muted group-hover:text-text-primary transition-transform" />
-                  </>
-                )}
+                <span>More</span>
+                <ChevronDown size={16} />
               </button>
             </div>
           )}
