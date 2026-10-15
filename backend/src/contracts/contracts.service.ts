@@ -339,8 +339,8 @@ export class ContractsService {
 
     try {
       await this.notificationModel.create({
-        title: 'New Contract Created',
-        message: `Contract #${contract._id.toString().substring(0, 8).toUpperCase()} was created (Draft / Pending Confirmation).`,
+        title: 'New Booking Created',
+        message: 'New booking created (Draft / Pending Confirmation).',
         type: 'contract',
       });
     } catch (e) {
@@ -823,7 +823,7 @@ export class ContractsService {
           <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e; line-height: 1.7;">
             <div style="background: ${isDelivery ? '#10b981' : '#2563eb'}; padding: 24px 30px; border-radius: 12px 12px 0 0;">
               <h1 style="color: white; margin: 0; font-size: 20px;">${taskArabicTitle}</h1>
-              <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">Contract #${contractNum} — ${taskType}</p>
+              <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">${vehicleName} (${vehiclePlate}) — ${taskType}</p>
             </div>
             <div style="padding: 28px 30px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: 0; border-radius: 0 0 12px 12px;">
               <p style="font-size: 16px; margin: 0 0 15px;">Hello <strong>${driver.name}</strong>,</p>
@@ -870,7 +870,6 @@ export class ContractsService {
         const whatsappMsg =
           `*${taskArabicTitle}*\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
-          `📄 رقم العقد / Contract: #${contractNum}\n` +
           `🚙 السيارة / Vehicle: ${vehicleName} (${vehiclePlate})\n` +
           `👤 العميل / Client: ${clientName}${clientPhone ? ` — ${clientPhone}` : ''}\n` +
           `📍 ${isDelivery ? 'موقع التسليم / Delivery' : 'موقع الاستلام / Pickup'}: ${location}\n` +
@@ -944,13 +943,12 @@ export class ContractsService {
           <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
             <div style="background: ${isDelivered ? '#10b981' : '#3b82f6'}; padding: 24px 30px; border-radius: 12px 12px 0 0;">
               <h1 style="color: white; margin: 0; font-size: 20px;">${eventTitle}</h1>
-              <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">Contract #${contractNum}</p>
+              <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">${vehicleName} (${vehiclePlate})</p>
             </div>
             <div style="padding: 28px 30px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: 0; border-radius: 0 0 12px 12px;">
               <p style="font-size: 16px;">Hello <strong>Admin</strong>,</p>
               <p>${actionText}</p>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
-                <tr><td style="padding: 8px 0; color: #64748b;">Contract</td><td style="padding: 8px 0; font-weight: 600;">#${contractNum}</td></tr>
                 <tr><td style="padding: 8px 0; color: #64748b;">Vehicle</td><td style="padding: 8px 0; font-weight: 600;">${vehicleName} (${vehiclePlate})</td></tr>
                 <tr><td style="padding: 8px 0; color: #64748b;">Client</td><td style="padding: 8px 0; font-weight: 600;">${clientName}</td></tr>
                 ${actorRow}

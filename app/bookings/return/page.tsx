@@ -742,7 +742,7 @@ function ReturnPageContent() {
                     onClick={() => {
                       setSelectedContractId(c._id);
                       setIsChangingContract(false);
-                      toast.success(`Selected contract #${c.id || c._id.substring(0,8).toUpperCase()}`);
+                      toast.success("Booking selected for return");
                     }}
                     className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
                       isSelected

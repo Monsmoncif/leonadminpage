@@ -274,9 +274,12 @@ export async function PUT(
           ip: "127.0.0.1"
         });
 
+        const clientNameForDelivery = (existingContract.clientId as any)?.name || (existingContract as any).additionalDriverName || "Client";
+        const vehicleForDelivery = (existingContract.unitId as any)?.make ? `${(existingContract.unitId as any).make} ${(existingContract.unitId as any).model || ""}`.trim() : "Vehicle";
+
         await Notification.create({
           title: "Vehicle Delivered",
-          message: `Vehicle for contract ${existingContract._id.toString().substring(0,8).toUpperCase()} delivered to client at ${existingContract.pickupLocation || "location"}.`,
+          message: `Vehicle (${vehicleForDelivery}) delivered to ${clientNameForDelivery} at ${existingContract.pickupLocation || "designated location"}.`,
           type: "contract"
         });
       } catch (logErr) {
@@ -417,9 +420,13 @@ export async function PUT(
       });
 
       if (body.status === "Completed" && body.status !== existingContract.status) {
+        const clientNameForReturn = (updatedContract.clientId as any)?.name || (updatedContract as any).additionalDriverName || "Client";
+        const vehicleForReturn = (updatedContract.unitId as any)?.make ? `${(updatedContract.unitId as any).make} ${(updatedContract.unitId as any).model || ""}`.trim() : "Vehicle";
+        const returnAmountStr = body.returnAmountCollected !== undefined ? `${body.returnAmountCollected} AED` : "remaining balance";
+
         await Notification.create({
           title: "Vehicle Returned & Settled",
-          message: `Contract ${updatedContract._id.toString().substring(0,8).toUpperCase()} was returned. Driver confirmed collecting ${body.returnAmountCollected !== undefined ? `$${body.returnAmountCollected}` : "remaining balance"} to admin.`,
+          message: `Vehicle (${vehicleForReturn}) returned by ${clientNameForReturn}. Driver confirmed collecting ${returnAmountStr} to admin.`,
           type: "alert"
         });
 
@@ -505,9 +512,10 @@ export async function PUT(
                   reportedDate: new Date(),
                 });
 
+                const vehicleForDamage = (existingContract.unitId as any)?.make ? `${(existingContract.unitId as any).make} ${(existingContract.unitId as any).model || ""}`.trim() : "Vehicle";
                 await Notification.create({
                   title: "New Damage Reported",
-                  message: `Driver recorded new damages for contract ${existingContract._id.toString().substring(0,8).toUpperCase()}: "${body.newDamages}". Admin evaluation needed.`,
+                  message: `Driver recorded new damages for ${vehicleForDamage}: "${body.newDamages}". Admin evaluation needed.`,
                   type: "alert"
                 });
               }
@@ -630,9 +638,10 @@ export async function PATCH(
         type: "edit",
         ip: "127.0.0.1"
       });
+      const vehicleForClientLink = (contract.unitId as any)?.make ? `${(contract.unitId as any).make} ${(contract.unitId as any).model || ""}`.trim() : "Vehicle";
       await Notification.create({
         title: "Client Registered by Driver",
-        message: `Driver registered a new client and linked them to contract ${contract._id.toString().substring(0,8).toUpperCase()}.`,
+        message: `Driver registered a new client and linked them to the booking for ${vehicleForClientLink}.`,
         type: "contract"
       });
     } catch (e) { console.error("Failed to log client link:", e); }

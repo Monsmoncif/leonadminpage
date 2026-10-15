@@ -107,7 +107,6 @@ export async function POST(req: Request) {
         : `💰 *Rest of Money Collected:* ${(Number(contract.returnAmountCollected) || 0).toLocaleString()} AED (${contract.returnPaymentMethod || "Cash"})`;
 
       const whatsappMsg = `${isDelivered ? '✅' : '🔄'} *${eventTitle}*\n\n` +
-        `📄 *Contract / رقم العقد:* #${contractNum}\n` +
         `🚙 *Vehicle / السيارة:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
         `👤 *Client / العميل:* ${clientName}\n` +
         (isShop

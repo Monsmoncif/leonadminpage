@@ -29,11 +29,12 @@ export default function DriverNotificationsPage() {
           const endDate = new Date(contract.endDate);
           endDate.setHours(0,0,0,0);
           
+          const carName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
           if (endDate.getTime() === today.getTime()) {
             dynamicNotifs.push({
               _id: `due-${contract._id}`,
               title: "Vehicle Return Due Today",
-              message: `Contract ${contract.id || contract._id.substring(0,8).toUpperCase()} for vehicle ${contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Unknown"} is scheduled to be returned today.`,
+              message: `${carName} is scheduled to be returned today.`,
               type: "warning",
               createdAt: new Date().toISOString(),
               read: false
@@ -42,7 +43,7 @@ export default function DriverNotificationsPage() {
             dynamicNotifs.push({
               _id: `overdue-${contract._id}`,
               title: "Vehicle Return Overdue!",
-              message: `Contract ${contract.id || contract._id.substring(0,8).toUpperCase()} is overdue for return! Please process the vehicle return immediately.`,
+              message: `${carName} is overdue for return! Please process the vehicle return immediately.`,
               type: "alert",
               createdAt: contract.endDate, // shows it's been overdue since end date
               read: false

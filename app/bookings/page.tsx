@@ -151,9 +151,8 @@ export default function ContractsPage() {
       if (!res.ok) {
         throw new Error(data.error || "Failed to dispatch contract");
       }
-      const contractNum = data.contract?.contractNumber || contract.contractNumber || "Dispatched";
       const driverName = contract.deliveryDriver || contract.driver || "driver";
-      toast.success(`Contract #${contractNum} dispatched to ${driverName}! Task sent to driver.`);
+      toast.success(`Booking dispatched to ${driverName}! Task sent to driver.`);
       fetchContracts();
     } catch (err: any) {
       toast.error(err.message || "Failed to dispatch contract");
@@ -203,7 +202,7 @@ export default function ContractsPage() {
         );
         setData({ ...data, contracts: newContracts });
       }
-      toast.success(`Contract #${contractToDelete.id || contractToDelete._id?.substring(0, 8)} deleted successfully.`);
+      toast.success("Contract deleted successfully.");
       setIsDeleteDialogOpen(false);
       setContractToDelete(null);
     } catch (err: any) {
@@ -722,7 +721,7 @@ export default function ContractsPage() {
                                           handleDispatchContract(contract);
                                         }}
                                         disabled={dispatchingContractId === contract._id}
-                                        title="Confirm & Dispatch to Driver (إرسال الطلب للسائق وتعيين رقم العقد)"
+                                        title="Confirm & Dispatch to Driver (إرسال الطلب للسائق)"
                                         className="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer bg-brand hover:bg-brand-dark text-white active:scale-95"
                                       >
                                         {dispatchingContractId === contract._id ? (

@@ -83,9 +83,12 @@ export async function POST(
         ip: "127.0.0.1",
       });
 
+      const clientName = (contract.clientId as any)?.name || (contract as any).additionalDriverName || "Client";
+      const vehicleDesc = (contract.unitId as any) ? `${(contract.unitId as any).make} ${(contract.unitId as any).model}` : "Vehicle";
+
       await Notification.create({
-        title: "Contract Dispatched",
-        message: `Contract #${contractNum} was dispatched to ${driverName}.`,
+        title: "Booking Dispatched",
+        message: `Booking for ${clientName} (${vehicleDesc}) was dispatched to ${driverName}.`,
         type: "contract",
       });
     } catch (e) {
@@ -101,7 +104,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: `Contract #${contractNum} dispatched successfully to ${driverName}`,
+      message: `Booking dispatched successfully to ${driverName}`,
       contract,
     });
   } catch (error: any) {

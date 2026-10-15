@@ -220,9 +220,9 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
   // MODE A: FINAL RETURN & COMPLETION (VIP THANK YOU - NO PDF)
   // ========================================================
   if (isFinal) {
-    const subject = `🌟 Thank You for Choosing Leon Rent Car! | Return Completed #${params.contractNumber}`;
+    const subject = `🌟 Thank You for Choosing Leon Rent Car! | Return Completed — ${params.vehicleName}`;
     const title = "Thank You for Driving with Leon Rent Car!";
-    const subtitle = `Vehicle return successfully completed for Contract #${params.contractNumber}.`;
+    const subtitle = `Vehicle return successfully completed for ${params.vehicleName}.`;
 
     const contentHtml = `
       <p style="margin: 0 0 16px; font-size: 15px; color: #1e293b;">
@@ -245,7 +245,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
               &#10003; Return Status: Completed & Inspected (تم الإرجاع وتسوية العقد بنجاح)
             </td>
             <td align="right" style="font-size: 12px; font-weight: 600; color: #166534;">
-              Contract #${params.contractNumber}
+              Leon Rent Car
             </td>
           </tr>
         </table>
@@ -382,9 +382,9 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
   // MODE C: HANDOVER CONFIRMATION (CAR DELIVERED - WITH OFFICIAL PDF)
   // ========================================================
   const title = "Official Rental Agreement & Handover Confirmation";
-  const subtitle = `Vehicle has been officially handed over for Contract #${params.contractNumber}.`;
+  const subtitle = `Vehicle has been officially handed over (${params.vehicleName}).`;
   const statusBadge = "Vehicle Delivered (تم التسليم وبدء العقد)";
-  const subject = `Official Handover Agreement #${params.contractNumber} — ${params.vehicleName} | Leon Rent Car`;
+  const subject = `Official Handover Agreement — ${params.vehicleName} | Leon Rent Car`;
 
   const contentHtml = `
     <p style="margin: 0 0 14px; font-size: 15px; color: #1e293b;">
@@ -403,7 +403,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
             &#10003; Status: ${statusBadge}
           </td>
           <td align="right" style="font-size: 12px; font-weight: 600; color: #166534;">
-            Agreement #${params.contractNumber}
+            Leon Rent Car
           </td>
         </tr>
       </table>
@@ -513,11 +513,10 @@ export function buildDriverTaskEmail(params: {
     ? "Vehicle handover task assigned for dispatch"
     : "Vehicle collection and return inspection assigned";
 
-  const subject = `[Dispatch] ${taskTitle} — Contract #${params.contractNumber} (${params.vehicleName})`;
+  const subject = `[Dispatch] ${taskTitle} — ${params.clientName} (${params.vehicleName})`;
 
   const rows = [
     buildDetailRow("Task", params.isDelivery ? "Client Delivery / Handover" : "Vehicle Return Collection"),
-    buildDetailRow("Contract Number", `#${params.contractNumber}`),
     buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
     buildDetailRow("Client", `${params.clientName}${params.clientPhone ? ` — ${params.clientPhone}` : ''}`),
     buildDetailRow(params.isDelivery ? "Delivery Location" : "Collection Location", params.location),
@@ -531,7 +530,7 @@ export function buildDriverTaskEmail(params: {
     </p>
 
     <p style="margin: 0 0 20px; font-size: 13px; color: #475569; line-height: 1.6;">
-      You have been assigned an operational task for Contract <strong>#${params.contractNumber}</strong>. Please review the schedule and complete the inspection workflow upon arrival.
+      You have been assigned an operational task for client <strong>${params.clientName}</strong> (${params.vehicleName}). Please review the schedule and complete the inspection workflow upon arrival.
     </p>
 
     <!-- Schedule Table -->
@@ -677,13 +676,12 @@ export function buildAdminEventNoticeEmail(params: {
     : (isShop ? "Vehicle Return Processed (Shop)" : "Vehicle Return Processed");
 
   const subtitle = params.isDelivered
-    ? `Vehicle handed over to client for Contract #${params.contractNumber}`
-    : `Vehicle collected and returned for Contract #${params.contractNumber}`;
+    ? `Vehicle handed over to client ${params.clientName}`
+    : `Vehicle collected and returned for client ${params.clientName}`;
 
-  const subject = `[Status Update] ${title} — Contract #${params.contractNumber} (${params.vehicleName})`;
+  const subject = `[Status Update] ${title} — ${params.clientName} (${params.vehicleName})`;
 
   const rows = [
-    buildDetailRow("Contract Number", `#${params.contractNumber}`),
     buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
     buildDetailRow("Client", params.clientName),
     isShop

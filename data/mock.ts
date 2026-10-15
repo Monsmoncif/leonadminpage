@@ -587,10 +587,10 @@ export const reportsList = [
 
 // 9. Notifications
 export const notificationsData = [
-  { id: 1, title: "Contract Signed", message: "Bob Smith has signed CTR-1002.", time: "10 mins ago", read: false },
+  { id: 1, title: "Contract Signed", message: "Bob Smith has signed the agreement.", time: "10 mins ago", read: false },
   { id: 2, title: "Rental Due Tomorrow", message: "Honda Civic (HX5678) is due for return tomorrow.", time: "1 hour ago", read: false },
   { id: 3, title: "Overdue Rental", message: "Toyota Corolla (TX1234) is overdue by 2 hours.", time: "3 hours ago", read: true },
-  { id: 4, title: "Deposit Reminder", message: "Deposit for CTR-1003 is pending.", time: "1 day ago", read: true },
+  { id: 4, title: "Deposit Reminder", message: "Deposit payment is pending.", time: "1 day ago", read: true },
 ];
 
 // 10. Documents

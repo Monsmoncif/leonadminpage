@@ -75,8 +75,26 @@ export async function GET() {
   try {
     await connectDB();
     await checkUpcomingHandoverReminders();
-    const notifications = await Notification.find({}).sort({ createdAt: -1 });
-    return NextResponse.json(notifications);
+    const rawNotifications = await Notification.find({}).sort({ createdAt: -1 }).lean();
+    const sanitized = rawNotifications.map((n: any) => {
+      let msg = n.message || "";
+      msg = msg
+        .replace(/Contract\s*#?[A-Z0-9_-]+\s*was created\./gi, "New booking was created.")
+        .replace(/Contract\s*#?[A-Z0-9_-]+\s*was dispatched to/gi, "Vehicle was dispatched to")
+        .replace(/Vehicle for contract\s*#?[A-Z0-9_-]+\s*delivered to/gi, "Vehicle delivered to")
+        .replace(/Contract\s*#?[A-Z0-9_-]+\s*was returned/gi, "Vehicle was returned")
+        .replace(/for contract\s*#?[A-Z0-9_-]+/gi, "")
+        .replace(/linked them to contract\s*#?[A-Z0-9_-]+/gi, "linked them to the booking")
+        .replace(/Contract\s*#?[A-Z0-9_-]+/gi, "Contract")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+
+      return {
+        ...n,
+        message: msg,
+      };
+    });
+    return NextResponse.json(sanitized);
   } catch (error: any) {
     console.warn("Notifications API: MongoDB not available, returning empty data.", error.message);
     return NextResponse.json([]);

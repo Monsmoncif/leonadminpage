@@ -346,9 +346,11 @@ export async function POST(req: Request) {
 
     // Automatically create a Notification for the new contract
     try {
+      const clientNameForNotif = body.clientName || "Client";
+      const vehicleDesc = unitDoc ? `${unitDoc.make} ${unitDoc.model}` : "Vehicle";
       await Notification.create({
-        title: "New Contract Created",
-        message: `Contract #${contract.contractNumber || contract._id.toString().substring(0,8).toUpperCase()} was created.`,
+        title: "New Booking Created",
+        message: `New booking created for ${clientNameForNotif} (${vehicleDesc}).`,
         type: "contract"
       });
 

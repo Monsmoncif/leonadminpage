@@ -211,7 +211,6 @@ export async function sendClientContractNotification(
             `*Thank You for Choosing Leon Rent Car!*\n\n` +
             `Hello *${clientName}*,\n` +
             `Thank you for renting with Leon Rent Car! It was a pleasure serving you, and we hope you had a wonderful driving journey.\n\n` +
-            `📄 *Contract / رقم العقد:* #${contractNum}\n` +
             `🚗 *Vehicle / السيارة:* ${vehicleName}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n\n` +
             `We look forward to welcoming you behind the wheel again very soon!\n` +
@@ -234,7 +233,6 @@ export async function sendClientContractNotification(
             `*Vehicle Rental Agreement & Handover*\n\n` +
             `Hello *${clientName}*,\n` +
             `Thank you for choosing Leon Rent Car! Your vehicle handover inspection is complete.\n\n` +
-            `📄 *Contract / رقم العقد:* #${contractNum}\n` +
             `🚗 *Vehicle / السيارة:* ${vehicleName}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
             (contract.pickupLocation ? `📍 *Pickup Location / موقع الاستلام:* ${contract.pickupLocation}\n` : '') +
@@ -372,7 +370,6 @@ export async function sendDriverTaskNotification(
         const clientChatLink = cleanClientPhone ? `https://wa.me/${cleanClientPhone}` : null;
 
         const whatsappMsg = `*${taskArabicTitle}*\n\n` +
-          `📄 *رقم العقد / Contract:* #${contractNum}\n` +
           `🚙 *السيارة / Vehicle:* ${vehicleName} (${vehiclePlate})\n` +
           `👤 *العميل / Client:* ${clientName}\n` +
           `📞 *هاتف العميل / Phone:* ${clientPhone || "N/A"}\n` +
@@ -533,7 +530,6 @@ export async function sendHandoverReminderNotification(
       const whatsappMsg = `⏰ *تذكير بموعد تسليم سيارة ${timingArabic} / Handover Reminder (${timingLabel})*\n\n` +
         `👤 *العميل / Client:* ${clientName}\n` +
         `🚙 *السيارة / Vehicle:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
-        (contractNum ? `📄 *رقم العقد / Contract:* #${contractNum}\n` : '') +
         `📞 *هاتف العميل / Phone:* ${clientPhone || "N/A"}\n` +
         (clientChatLink ? `💬 *مراسلة العميل:* ${clientChatLink}\n` : '') +
         `📅 *تاريخ التسليم / Start:* ${startDateFormatted} — ${checkoutTime}\n` +

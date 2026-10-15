@@ -44,15 +44,15 @@ export async function GET() {
       const isOverdue = endDate.getTime() < today.getTime();
 
       if (isDueToday || isOverdue) {
-        const contractNum = contract._id.toString().substring(0, 8).toUpperCase();
+        const vehicleDesc = (contract.unitId as any)?.make ? `${(contract.unitId as any).make} ${(contract.unitId as any).model || ""}`.trim() : "Vehicle";
         const subject = isOverdue
-          ? `[Action Required] Vehicle Return Overdue — Contract #${contractNum} | Leon Rent Car`
-          : `[Schedule Notice] Vehicle Return Scheduled Today — Contract #${contractNum} | Leon Rent Car`;
+          ? `[Action Required] Vehicle Return Overdue — ${vehicleDesc} | Leon Rent Car`
+          : `[Schedule Notice] Vehicle Return Scheduled Today — ${vehicleDesc} | Leon Rent Car`;
 
         const title = isOverdue ? "Vehicle Return Overdue" : "Vehicle Return Scheduled Today";
         const subtitle = isOverdue
-          ? `The scheduled rental return period for Contract #${contractNum} has passed.`
-          : `Operational reminder for Contract #${contractNum} scheduled for return today.`;
+          ? `The scheduled rental return period for ${vehicleDesc} has passed.`
+          : `Operational reminder for ${vehicleDesc} scheduled for return today.`;
 
         const contentHtml = `
           <p style="margin: 0 0 16px; font-size: 14px; color: #334155;">
@@ -61,12 +61,12 @@ export async function GET() {
 
           <p style="margin: 0 0 20px; font-size: 13px; color: #475569; line-height: 1.6;">
             ${isOverdue
-              ? `Contract <strong>#${contractNum}</strong> has exceeded its scheduled return date. Please contact the client immediately and initiate the vehicle recovery procedure.`
-              : `Contract <strong>#${contractNum}</strong> is scheduled for return inspection today. Please review the return inspection checklist.`}
+              ? `The vehicle <strong>${vehicleDesc}</strong> has exceeded its scheduled return date. Please contact the client immediately and initiate the vehicle recovery procedure.`
+              : `The vehicle <strong>${vehicleDesc}</strong> is scheduled for return inspection today. Please review the return inspection checklist.`}
           </p>
 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px; background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
-            ${buildDetailRow("Contract Number", `#${contractNum}`)}
+            ${buildDetailRow("Vehicle", vehicleDesc)}
             ${buildDetailRow("Scheduled Return", endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }))}
             ${buildDetailRow("Status", isOverdue ? "Overdue" : "Due Today", true)}
           </table>

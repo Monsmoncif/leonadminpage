@@ -31,6 +31,20 @@ const formatTime = (dateString: string) => {
   return d.toLocaleDateString();
 };
 
+const formatNotificationMessage = (msg: string) => {
+  if (!msg) return "";
+  return msg
+    .replace(/Contract\s*#?[A-Z0-9_-]+\s*was created\./gi, "New booking was created.")
+    .replace(/Contract\s*#?[A-Z0-9_-]+\s*was dispatched to/gi, "Vehicle was dispatched to")
+    .replace(/Vehicle for contract\s*#?[A-Z0-9_-]+\s*delivered to/gi, "Vehicle delivered to")
+    .replace(/Contract\s*#?[A-Z0-9_-]+\s*was returned/gi, "Vehicle was returned")
+    .replace(/for contract\s*#?[A-Z0-9_-]+/gi, "")
+    .replace(/linked them to contract\s*#?[A-Z0-9_-]+/gi, "linked them to the booking")
+    .replace(/Contract\s*#?[A-Z0-9_-]+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
 export default function NotificationsPage() {
   const toast = useToast();
   const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
@@ -186,7 +200,7 @@ export default function NotificationsPage() {
                           {notification.title}
                         </h3>
                         <p className={`text-sm mt-1 ${notification.read ? "text-text-secondary" : "text-gray-700"}`}>
-                          {notification.message}
+                          {formatNotificationMessage(notification.message)}
                         </p>
                       </div>
                       <span className="text-xs text-text-muted flex items-center gap-1 font-medium whitespace-nowrap shrink-0 sm:pt-0.5">

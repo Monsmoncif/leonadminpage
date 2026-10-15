@@ -242,7 +242,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
         const errData = await res.json().catch(() => null);
         throw new Error(errData?.error || "Failed to confirm delivery");
       }
-      toast.success(`Car confirmed as Delivered & Active (Contract #${contract.contractNumber || contract._id.slice(-6)})`);
+      toast.success("Car confirmed as Delivered & Active");
       await fetchUnit();
     } catch (err: any) {
       console.error("Delivery confirmation error:", err);
