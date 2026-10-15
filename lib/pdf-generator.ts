@@ -208,13 +208,17 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
         doc.font("Helvetica-Bold").text(licStr, leftColX + 85, itemY);
 
         itemY += 15;
+        doc.font("Helvetica").text(`License Expiry:`, leftColX + 12, itemY);
+        doc.font("Helvetica-Bold").text(data.licenseExpiry || "N/A", leftColX + 85, itemY);
+
+        itemY += 15;
         doc.font("Helvetica").text(`Passport No:`, leftColX + 12, itemY);
-        const passStr = `${data.passportNumber || data.clientIdNumber || "N/A"}${data.passportIssuedBy ? ` (${data.passportIssuedBy})` : (data.nationality ? ` (${data.nationality})` : "")}`;
+        const passStr = `${data.passportNumber || data.clientIdNumber || "N/A"}`;
         doc.font("Helvetica-Bold").text(passStr, leftColX + 85, itemY);
 
         itemY += 15;
-        doc.font("Helvetica").text(`Nationality / Exp:`, leftColX + 12, itemY);
-        doc.font("Helvetica-Bold").text(`${data.nationality || "Foreigner"} • Exp: ${data.passportExpiry || data.licenseExpiry || "Verified"}`, leftColX + 85, itemY);
+        doc.font("Helvetica").text(`Passport Expiry:`, leftColX + 12, itemY);
+        doc.font("Helvetica-Bold").text(`${data.passportExpiry || "N/A"}${data.nationality ? ` (${data.nationality})` : ""}`, leftColX + 85, itemY);
       } else {
         itemY += 16;
         doc.font("Helvetica").text(`Emirates ID:`, leftColX + 12, itemY);
