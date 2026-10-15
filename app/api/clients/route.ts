@@ -7,7 +7,12 @@ import { Contract } from "@/models/Contract";
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    const clients = await Client.find().sort({ createdAt: -1 }).lean();
+    const isFull = req.nextUrl.searchParams.get("full") === "true";
+    let query = Client.find().sort({ createdAt: -1 });
+    if (!isFull) {
+      query = query.select("-documents");
+    }
+    const clients = await query.lean();
     
     // Count active contracts for all clients
     const activeRentalsCount = await Contract.countDocuments({ status: "Active" });

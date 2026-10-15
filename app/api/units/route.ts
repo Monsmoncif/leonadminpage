@@ -23,7 +23,12 @@ export async function GET(req: NextRequest) {
     await syncUnitStatuses();
 
     // 2. Fetch all units
-    const units = await Unit.find().sort({ createdAt: -1 }).lean();
+    const isFull = req.nextUrl.searchParams.get("full") === "true";
+    let unitsQuery = Unit.find().sort({ createdAt: -1 });
+    if (!isFull) {
+      unitsQuery = unitsQuery.select("-documents");
+    }
+    const units = await unitsQuery.lean();
 
     // 3. Fetch active/draft contracts to attach upcoming bookings
     const activeContracts = await Contract.find({

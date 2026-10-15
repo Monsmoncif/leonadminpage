@@ -399,29 +399,33 @@ export default function RegisterClientModal({
 
   const processFile = (file: File): Promise<string> => {
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (file.type === "application/pdf") {
-          resolve(event.target?.result as string);
-          return;
-        }
+      if (file.type === "application/pdf") {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve((event.target?.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+        return;
+      }
 
+      try {
+        const objectUrl = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
           const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 1024;
-          const MAX_HEIGHT = 1024;
-          let width = img.width;
-          let height = img.height;
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width || 800;
+          let height = img.height || 600;
 
           if (width > height) {
             if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
+              height = Math.round((height * MAX_WIDTH) / width);
               width = MAX_WIDTH;
             }
           } else {
             if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
+              width = Math.round((width * MAX_HEIGHT) / height);
               height = MAX_HEIGHT;
             }
           }
@@ -429,11 +433,22 @@ export default function RegisterClientModal({
           canvas.height = height;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", 0.75));
+          resolve(canvas.toDataURL("image/jpeg", 0.70));
         };
-        img.src = event.target?.result as string;
-      };
-      reader.readAsDataURL(file);
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          const reader = new FileReader();
+          reader.onload = (event) => resolve((event.target?.result as string) || "");
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(file);
+        };
+        img.src = objectUrl;
+      } catch {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve((event.target?.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      }
     });
   };
 
@@ -814,7 +829,7 @@ export default function RegisterClientModal({
       let uploadedUrls: string[] = [];
 
       if (newFiles.length > 0) {
-        for (const base64 of newFiles) {
+        const uploadPromises = newFiles.map(async (base64) => {
           try {
             const res = await fetch("/api/upload", {
               method: "POST",
@@ -823,12 +838,15 @@ export default function RegisterClientModal({
             });
             if (res.ok) {
               const uploadData = await res.json();
-              uploadedUrls.push(uploadData.url || uploadData.secure_url);
+              return (uploadData.url || uploadData.secure_url) as string;
             }
           } catch (uploadErr) {
             console.error("Photo upload failed:", uploadErr);
           }
-        }
+          return null;
+        });
+        const results = await Promise.all(uploadPromises);
+        uploadedUrls.push(...(results.filter(Boolean) as string[]));
       }
 
       const allDocuments = [...existingUrls, ...uploadedUrls];

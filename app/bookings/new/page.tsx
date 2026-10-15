@@ -766,10 +766,10 @@ export function NewRentalAdminPageContent() {
     if (!files || files.length === 0) return;
     setIsUploadingMoneyPhoto(true);
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      const fileArray = Array.from(files);
+      const uploadPromises = fileArray.map(async (file) => {
         const base64 = await compressImage(file);
-        if (!base64) continue;
+        if (!base64) return null;
         const res = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -777,12 +777,16 @@ export function NewRentalAdminPageContent() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.url) {
-            setMoneyPhotos((prev) => [...prev, data.url]);
-          }
+          return (data.url || null) as string | null;
         }
+        return null;
+      });
+
+      const uploadedUrls = (await Promise.all(uploadPromises)).filter(Boolean) as string[];
+      if (uploadedUrls.length > 0) {
+        setMoneyPhotos((prev) => [...prev, ...uploadedUrls]);
+        toast.success("Money proof photo(s) attached successfully.");
       }
-      toast.success("Money proof photo attached successfully.");
     } catch (err) {
       console.error(err);
       toast.error("Failed to upload money photo.");

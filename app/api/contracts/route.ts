@@ -49,14 +49,23 @@ export async function GET(req: Request) {
       ];
     }
 
-    const contracts = await Contract.find(filter)
+    const isFull = searchParams.get("full") === "true";
+
+    let contractsQuery = Contract.find(filter)
       .sort({ createdAt: -1 })
       .populate({ path: "clientId", select: "name phone", strictPopulate: false })
       .populate({ path: "unitId", select: "make model plate mileage images color year fuelType", strictPopulate: false })
       .populate({ path: "driverId", select: "name", strictPopulate: false })
       .populate({ path: "deliveryDriverId", select: "name", strictPopulate: false })
-      .populate({ path: "returnDriverId", select: "name", strictPopulate: false })
-      .lean();
+      .populate({ path: "returnDriverId", select: "name", strictPopulate: false });
+
+    if (!isFull) {
+      contractsQuery = contractsQuery.select(
+        "-adminSignature -customerSignature -returnCustomerSignature -inspectionPhotos -returnPhotos -damagePhotos -moneyPhotos -returnMoneyPhotos"
+      );
+    }
+
+    const contracts = await contractsQuery.lean();
 
     // Calculate stats
     const now = new Date();

@@ -121,24 +121,25 @@ export default function CreateInspectionModal({
 
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
+      try {
+        const objectUrl = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
           const canvas = document.createElement("canvas");
           const MAX_WIDTH = 800;
           const MAX_HEIGHT = 800;
-          let width = img.width;
-          let height = img.height;
+          let width = img.width || 800;
+          let height = img.height || 600;
 
           if (width > height) {
             if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
+              height = Math.round((height * MAX_WIDTH) / width);
               width = MAX_WIDTH;
             }
           } else {
             if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
+              width = Math.round((width * MAX_HEIGHT) / height);
               height = MAX_HEIGHT;
             }
           }
@@ -146,11 +147,22 @@ export default function CreateInspectionModal({
           canvas.height = height;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", 0.6));
+          resolve(canvas.toDataURL("image/jpeg", 0.70));
         };
-        img.src = event.target?.result as string;
-      };
-      reader.readAsDataURL(file);
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          const reader = new FileReader();
+          reader.onload = (event) => resolve((event.target?.result as string) || "");
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(file);
+        };
+        img.src = objectUrl;
+      } catch {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve((event.target?.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      }
     });
   };
 
@@ -198,22 +210,13 @@ export default function CreateInspectionModal({
     setError("");
 
     try {
-      // 1. Upload any base64 photos to Cloudinary
-      const uploadedUrls: string[] = [];
+      let uploadedUrls: string[] = [];
       const photosToUpload = photos.filter(p => p && !p.startsWith("http"));
       
       if (photosToUpload.length > 0) {
-        let uploadCount = 0;
-        for (let i = 0; i < photos.length; i++) {
-          const photo = photos[i];
-          if (!photo) {
-            uploadedUrls.push("");
-            continue;
-          }
-          if (photo.startsWith("http")) {
-            uploadedUrls.push(photo);
-            continue;
-          }
+        const uploadPromises = photos.map(async (photo, i) => {
+          if (!photo) return "";
+          if (photo.startsWith("http")) return photo;
 
           const res = await fetch("/api/upload", {
             method: "POST",
@@ -222,13 +225,11 @@ export default function CreateInspectionModal({
           });
           if (!res.ok) throw new Error(`Failed to upload ${ANGLES[i]} photo`);
           const data = await res.json();
-          uploadedUrls.push(data.url);
-          uploadCount++;
-        }
+          return (data.url || "") as string;
+        });
+        uploadedUrls = await Promise.all(uploadPromises);
       } else {
-        for (const photo of photos) {
-          uploadedUrls.push(photo || "");
-        }
+        uploadedUrls = photos.map((p) => p || "");
       }
 
       // Get raw IDs from selected contract

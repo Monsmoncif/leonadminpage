@@ -90,6 +90,7 @@ export async function GET(request: Request) {
       Contract.find()
         .sort({ createdAt: -1 })
         .limit(5)
+        .select("contractNumber status totalAmount createdAt startDate endDate customer personalizedPersonName clientId unitId driverId deliveryDriverId returnDriverId")
         .populate("clientId", "name")
         .populate("unitId", "make model plate")
         .populate("driverId", "name")
@@ -97,6 +98,7 @@ export async function GET(request: Request) {
       Contract.find()
         .sort({ createdAt: -1 })
         .limit(4)
+        .select("contractNumber status totalAmount createdAt customer personalizedPersonName clientId unitId")
         .populate("clientId", "name")
         .populate("unitId", "make model plate")
         .lean(),
@@ -297,6 +299,7 @@ export async function GET(request: Request) {
     const upcomingReturnsRaw = await Contract.find({ status: "Active" })
       .sort({ endDate: 1 })
       .limit(4)
+      .select("contractNumber endDate clientId unitId")
       .populate("clientId", "name")
       .populate("unitId", "make model plate")
       .lean();

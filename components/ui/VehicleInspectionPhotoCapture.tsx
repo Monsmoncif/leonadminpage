@@ -47,57 +47,58 @@ interface VehicleInspectionPhotoCaptureProps {
 // Fast client-side image compression to prevent 5-10MB photo timeouts
 export const compressImage = (file: File): Promise<string> => {
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = (event.target?.result as string) || "";
-      if (!result) {
-        resolve("");
-        return;
-      }
-      try {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const canvas = document.createElement("canvas");
-            const MAX_WIDTH = 1200;
-            const MAX_HEIGHT = 1200;
-            let width = img.width || 800;
-            let height = img.height || 600;
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        try {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width || 800;
+          let height = img.height || 600;
 
-            if (width > height) {
-              if (width > MAX_WIDTH) {
-                height = Math.round((height * MAX_WIDTH) / width);
-                width = MAX_WIDTH;
-              }
-            } else {
-              if (height > MAX_HEIGHT) {
-                width = Math.round((width * MAX_HEIGHT) / height);
-                height = MAX_HEIGHT;
-              }
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
             }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext("2d");
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, width, height);
-              const compressedBase64 = canvas.toDataURL("image/jpeg", 0.75);
-              resolve(compressedBase64);
-              return;
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
             }
-            resolve(result);
-          } catch {
-            resolve(result);
           }
-        };
-        img.onerror = () => resolve(result);
-        img.src = result;
-      } catch {
-        resolve(result);
-      }
-    };
-    reader.onerror = () => resolve("");
-    reader.readAsDataURL(file);
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.70);
+            resolve(compressedBase64);
+            return;
+          }
+          resolve("");
+        } catch {
+          resolve("");
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        const reader = new FileReader();
+        reader.onload = (e) => resolve((e.target?.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      };
+      img.src = objectUrl;
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve((e.target?.result as string) || "");
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    }
   });
 };
 

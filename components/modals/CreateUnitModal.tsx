@@ -233,24 +233,25 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
 
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
+      try {
+        const objectUrl = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
           const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
-          let width = img.width;
-          let height = img.height;
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width || 800;
+          let height = img.height || 600;
 
           if (width > height) {
             if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
+              height = Math.round((height * MAX_WIDTH) / width);
               width = MAX_WIDTH;
             }
           } else {
             if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
+              width = Math.round((width * MAX_HEIGHT) / height);
               height = MAX_HEIGHT;
             }
           }
@@ -258,11 +259,22 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
           canvas.height = height;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", 0.7));
+          resolve(canvas.toDataURL("image/jpeg", 0.70));
         };
-        img.src = event.target?.result as string;
-      };
-      reader.readAsDataURL(file);
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          const reader = new FileReader();
+          reader.onload = (event) => resolve((event.target?.result as string) || "");
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(file);
+        };
+        img.src = objectUrl;
+      } catch {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve((event.target?.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      }
     });
   };
 
@@ -413,10 +425,8 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
 
     try {
       // 1. Upload photos if they are in base64 format
-      const finalImageUrls: string[] = [];
-      for (const p of photos) {
+      const photoPromises = photos.map(async (p) => {
         if (p.startsWith("data:image")) {
-          toast.success("Uploading vehicle photo...");
           const res = await fetch("/api/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -424,15 +434,16 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
           });
           if (!res.ok) throw new Error("Image upload failed");
           const data = await res.json();
-          if (data.url) finalImageUrls.push(data.url);
+          return data.url || p;
         } else if (p.startsWith("http") || p.startsWith("/")) {
-          finalImageUrls.push(p);
+          return p;
         }
-      }
+        return null;
+      });
+      const finalImageUrls = (await Promise.all(photoPromises)).filter(Boolean) as string[];
 
       // 2. Upload vehicle license documents if in base64
-      const finalDocUrls: string[] = [];
-      for (const doc of documents) {
+      const docPromises = documents.map(async (doc) => {
         if (doc.startsWith("data:image") || doc.startsWith("data:application/pdf")) {
           const res = await fetch("/api/upload", {
             method: "POST",
@@ -441,11 +452,13 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
           });
           if (!res.ok) throw new Error("Vehicle document upload failed");
           const data = await res.json();
-          if (data.url) finalDocUrls.push(data.url);
+          return data.url || doc;
         } else if (doc.startsWith("http") || doc.startsWith("/")) {
-          finalDocUrls.push(doc);
+          return doc;
         }
-      }
+        return null;
+      });
+      const finalDocUrls = (await Promise.all(docPromises)).filter(Boolean) as string[];
 
       // 3. Submit vehicle data
       const method = unitToEdit ? "PUT" : "POST";
