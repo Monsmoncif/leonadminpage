@@ -315,7 +315,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                 <tr className="border-b border-border bg-gray-50/50">
                   <th className="text-left py-3 px-4 text-text-muted font-semibold">Vehicle</th>
                   <th className="text-left py-3 px-4 text-text-muted font-semibold">Period</th>
-                  <th className="text-left py-3 px-4 text-text-muted font-semibold">Amount</th>
+                  <th className="text-left py-3 px-4 text-text-muted font-semibold">Amount (AED)</th>
                   <th className="text-left py-3 px-4 text-text-muted font-semibold">Status</th>
                 </tr>
               </thead>
@@ -338,7 +338,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                       {new Date(contract.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} → {new Date(contract.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </td>
                     <td className="py-3 px-4 font-semibold text-text-primary">
-                      ${contract.totalAmount}
+                      AED {Number(contract.totalAmount || 0).toLocaleString()}
                     </td>
                     <td className="py-3 px-4">
                       <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border ${getContractStatusColor(contract.status)}`}>
