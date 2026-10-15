@@ -118,7 +118,20 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   const client = contract.clientId || {};
   const unit = contract.unitId || {};
   const driver = contract.driverId || {};
-  const isResident = client.clientType ? client.clientType === "Resident" : Boolean(client.idNumber || !client.passportNumber);
+  // Check if client is a UAE Resident (has 784- Emirates ID or UAE nationality) vs Foreigner / Tourist
+  const hasEmiratesId = Boolean(
+    client.idNumber && (
+      client.idNumber.startsWith("784-") ||
+      /^\d{3}-\d{4}-\d{7}-\d{1}$/.test(client.idNumber)
+    )
+  );
+  const isForeigner = Boolean(
+    client.clientType === "Tourist" ||
+    client.passportNumber ||
+    (client.licenseIssuedBy && !["uae", "dubai", "abu dhabi", "sharjah", "ajman", "fujairah", "rak", "uaq", "united arab emirates"].includes(client.licenseIssuedBy.toLowerCase().trim())) ||
+    (client.nationality && !["uae", "united arab emirates", "emirati", "إماراتي"].includes(client.nationality.toLowerCase().trim()) && !hasEmiratesId)
+  );
+  const isResident = !isForeigner;
   const isPersonalized = Boolean(
     contract.contractType === "Personalized" ||
     contract.personalizedPersonName ||
@@ -433,60 +446,142 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                   {contract.personalizedPersonName || client.name || contract.customer || "N/A"}
                 </span>
               </div>
-              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Driving License No / رقم الرخصة</span>
-                <span className="font-bold truncate">{client.licenseNumber || "N/A"}</span>
-              </div>
-              <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Customer Type / العميل</span>
-                <span className="font-bold truncate">
-                  {isPersonalized ? "Personal / شخصي" : (contract.customerType || (client.companyName ? "B2B" : "B2C"))}
-                </span>
-              </div>
-              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Issued At / صادرة من</span>
-                <span className="font-bold truncate">{client.licenseIssuedBy || client.licenseIssuedAt || (isResident ? "Dubai" : "N/A")}</span>
-              </div>
-              <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Valid Up To / صالحة لغاية</span>
-                <span className="font-bold truncate">{client.licenseExpiry ? formatDate(client.licenseExpiry) : "N/A"}</span>
-              </div>
-              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">
-                  {isResident ? "ID No / رقم الهوية" : "Passport No / رقم جواز السفر"}
-                </span>
-                <span className="font-bold truncate">
-                  {isResident
-                    ? (client.idNumber || client.passportNumber || "N/A")
-                    : (client.passportNumber || client.idNumber || "N/A")}
-                </span>
-              </div>
-              <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">
-                  {isResident ? "ID Expiry / تاريخ انتهاء الهوية" : "Passport Expiry / تاريخ انتهاء الجواز"}
-                </span>
-                <span className="font-bold truncate">
-                  {isResident
-                    ? (client.idExpiry ? formatDate(client.idExpiry) : (client.passportExpiry ? formatDate(client.passportExpiry) : "N/A"))
-                    : (client.passportExpiry ? formatDate(client.passportExpiry) : (client.idExpiry ? formatDate(client.idExpiry) : "N/A"))}
-                </span>
-              </div>
-              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Nationality / الجنسية</span>
-                <span className="font-bold truncate">{client.nationality || "N/A"}</span>
-              </div>
-              <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Date of Birth / تاريخ الميلاد</span>
-                <span className="font-bold truncate">{client.dateOfBirth || client.dob ? formatDate(client.dateOfBirth || client.dob) : "N/A"}</span>
-              </div>
-              <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Tel/Mobile / الهاتف</span>
-                <span className="font-bold truncate">{client.phone || "N/A"}</span>
-              </div>
-              <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
-                <span className="text-gray-500 font-bold uppercase text-[6px]">Email / البريد الإلكتروني</span>
-                <span className="font-semibold text-[7.5px] truncate">{client.email || "N/A"}</span>
-              </div>
+              {isForeigner ? (
+                <>
+                  {/* Row 1: Driving License No & License Issued At */}
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Driving License No / رقم الرخصة</span>
+                    <span className="font-bold truncate">{client.licenseNumber || "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">License Issued At / صادرة من</span>
+                    <span className="font-bold truncate">{client.licenseIssuedBy || client.licenseIssuedAt || client.nationality || "N/A"}</span>
+                  </div>
+
+                  {/* Row 2: License Valid Up To & Int'l License / Customer Type */}
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">License Valid Up To / صالحة لغاية</span>
+                    <span className="font-bold truncate">{client.licenseExpiry ? formatDate(client.licenseExpiry) : "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">
+                      {client.internationalLicenseNumber ? "Int'l License / رخصة دولية" : "Customer Type / العميل"}
+                    </span>
+                    <span className="font-bold truncate">
+                      {client.internationalLicenseNumber || (isPersonalized ? "Personal / شخصي" : (contract.customerType || (client.companyName ? "B2B" : "B2C")))}
+                    </span>
+                  </div>
+
+                  {/* Row 3: Passport No & Passport Country */}
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col bg-amber-50/25">
+                    <span className="text-gray-700 font-bold uppercase text-[6px]">Passport No / رقم جواز السفر</span>
+                    <span className="font-bold text-gray-950 truncate">
+                      {client.passportNumber || client.idNumber || "N/A"}
+                    </span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col bg-amber-50/25">
+                    <span className="text-gray-700 font-bold uppercase text-[6px]">Passport Country / بلد الجواز</span>
+                    <span className="font-bold text-gray-950 truncate">
+                      {client.passportIssuedBy || client.nationality || "N/A"}
+                    </span>
+                  </div>
+
+                  {/* Row 4: Passport Expiry & Nationality */}
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Passport Expiry / تاريخ انتهاء الجواز</span>
+                    <span className="font-bold truncate">
+                      {client.passportExpiry ? formatDate(client.passportExpiry) : (client.idExpiry ? formatDate(client.idExpiry) : "N/A")}
+                    </span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Nationality / الجنسية</span>
+                    <span className="font-bold truncate">{client.nationality || "N/A"}</span>
+                  </div>
+
+                  {/* Row 5: Date of Birth & Customer Type (or Phone) */}
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Date of Birth / تاريخ الميلاد</span>
+                    <span className="font-bold truncate">{client.dateOfBirth || client.dob ? formatDate(client.dateOfBirth || client.dob) : "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">
+                      {client.internationalLicenseNumber ? "Customer Type / العميل" : "Tel/Mobile / الهاتف"}
+                    </span>
+                    <span className="font-bold truncate">
+                      {client.internationalLicenseNumber
+                        ? (isPersonalized ? "Personal / شخصي" : (contract.customerType || (client.companyName ? "B2B" : "B2C")))
+                        : (client.phone || "N/A")}
+                    </span>
+                  </div>
+
+                  {/* Row 6: Tel / Email / ID */}
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">
+                      {client.internationalLicenseNumber ? "Tel/Mobile / الهاتف" : "Email / البريد الإلكتروني"}
+                    </span>
+                    <span className={`truncate ${client.internationalLicenseNumber ? "font-bold" : "font-semibold text-[7.5px]"}`}>
+                      {client.internationalLicenseNumber ? (client.phone || "N/A") : (client.email || "N/A")}
+                    </span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">
+                      {client.internationalLicenseNumber ? "Email / البريد الإلكتروني" : "National ID / رقم الهوية"}
+                    </span>
+                    <span className={`truncate ${client.internationalLicenseNumber ? "font-semibold text-[7.5px]" : "font-bold text-gray-700"}`}>
+                      {client.internationalLicenseNumber
+                        ? (client.email || "N/A")
+                        : (client.idNumber && client.idNumber !== client.passportNumber ? client.idNumber : (client.visaNumber ? `Visa: ${client.visaNumber}` : "N/A"))}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Driving License No / رقم الرخصة</span>
+                    <span className="font-bold truncate">{client.licenseNumber || "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Customer Type / العميل</span>
+                    <span className="font-bold truncate">
+                      {isPersonalized ? "Personal / شخصي" : (contract.customerType || (client.companyName ? "B2B" : "B2C"))}
+                    </span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Issued At / صادرة من</span>
+                    <span className="font-bold truncate">{client.licenseIssuedBy || client.licenseIssuedAt || "Dubai"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Valid Up To / صالحة لغاية</span>
+                    <span className="font-bold truncate">{client.licenseExpiry ? formatDate(client.licenseExpiry) : "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Emirates ID No / رقم الهوية</span>
+                    <span className="font-bold truncate">{client.idNumber || client.passportNumber || "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">ID Expiry / تاريخ انتهاء الهوية</span>
+                    <span className="font-bold truncate">
+                      {client.idExpiry ? formatDate(client.idExpiry) : (client.passportExpiry ? formatDate(client.passportExpiry) : "N/A")}
+                    </span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Nationality / الجنسية</span>
+                    <span className="font-bold truncate">{client.nationality || "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Date of Birth / تاريخ الميلاد</span>
+                    <span className="font-bold truncate">{client.dateOfBirth || client.dob ? formatDate(client.dateOfBirth || client.dob) : "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Tel/Mobile / الهاتف</span>
+                    <span className="font-bold truncate">{client.phone || "N/A"}</span>
+                  </div>
+                  <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">Email / البريد الإلكتروني</span>
+                    <span className="font-semibold text-[7.5px] truncate">{client.email || "N/A"}</span>
+                  </div>
+                </>
+              )}
               <div className="col-span-2 px-1 py-[1.5px] border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Address in UAE / العنوان في الإمارات</span>
                 <span className="font-medium truncate text-gray-800">{client.address || "N/A"}</span>
@@ -1078,6 +1173,129 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
         </div>
 
       </div>
+
+      {/* ===== Page 3: Attached Identification Documents (Passport & Driving License) ===== */}
+      {client.documents && client.documents.length > 0 && (
+        <>
+          <div 
+            className="html2pdf__page-break page-break" 
+            style={{ pageBreakBefore: 'always', breakBefore: 'page', height: '0', margin: '0' }} 
+          />
+          <div 
+            id="contract-page-3" 
+            className="border-[1.5px] border-black px-4 pt-3 pb-3 mt-6 print:mt-0 relative bg-white print:min-h-0 print:h-auto flex flex-col box-border print:overflow-visible" 
+            style={{ pageBreakBefore: 'always', breakBefore: 'page' }}
+          >
+            {/* Border Ribbon Top */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#EEA21B]" />
+
+            {/* Header Block */}
+            <div className="flex justify-between items-center pb-2 mb-2 border-b border-black">
+              <div className="flex items-center gap-2">
+                <img src="/logo-original.png" alt="Company Logo" className="h-10 object-contain object-left" crossOrigin="anonymous" />
+                <div className="flex flex-col">
+                  <span className="font-extrabold text-[12px] uppercase text-black tracking-wide">
+                    LEON CAR RENTAL L.L.C
+                  </span>
+                  <span className="text-[9px] text-gray-600 font-semibold" dir="rtl">
+                    شركة ليون لتأجير السيارات ش.ذ.م.م
+                  </span>
+                </div>
+              </div>
+              <div className="text-right flex flex-col items-end">
+                <span className="text-[11px] font-black text-brand uppercase tracking-wider">
+                  AGREEMENT NO: #{serialNo}
+                </span>
+                <span className="text-[8.5px] font-semibold text-gray-600">
+                  {contract.startDate ? formatDate(contract.startDate) : ""}
+                </span>
+              </div>
+            </div>
+
+            {/* Document Verification Banner */}
+            <div className="bg-gray-100 border border-black py-1.5 px-3 mb-3 rounded-xs flex justify-between items-center">
+              <div>
+                <span className="font-extrabold text-[10px] uppercase tracking-wide text-black block">
+                  HIRER IDENTIFICATION DOCUMENTS / وثائق إثبات هوية المستأجر
+                </span>
+                <span className="text-[7.5px] text-gray-600 block">
+                  Official verified copies of Passport &amp; Driving License attached to this rental agreement
+                </span>
+              </div>
+              <div className="text-right flex items-center gap-2">
+                <span className="text-[7.5px] font-bold text-gray-700">
+                  {contract.personalizedPersonName || client.name || contract.customer || ""}
+                </span>
+                <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[8px] rounded">
+                  VERIFIED / معتمد
+                </span>
+              </div>
+            </div>
+
+            {/* Documents Display Grid */}
+            <div className="flex-1 flex flex-col gap-3">
+              {client.documents.length === 1 ? (
+                <div className="border border-black p-3 rounded bg-gray-50/20 flex flex-col items-center">
+                  <div className="w-full flex justify-between items-center pb-1.5 mb-2 border-b border-black/15 text-[9px] font-bold">
+                    <span className="text-black uppercase">
+                      {isForeigner ? "PASSPORT / DRIVING LICENSE DOCUMENT" : "IDENTIFICATION DOCUMENT"}
+                    </span>
+                    <span className="text-gray-700" dir="rtl">
+                      {isForeigner ? "وثيقة جواز السفر / رخصة القيادة المعتمدة" : "وثيقة إثبات الهوية"}
+                    </span>
+                  </div>
+                  <div className="w-full max-h-[700px] flex items-center justify-center overflow-hidden bg-white p-2 border border-gray-200 rounded">
+                    <img 
+                      src={client.documents[0]} 
+                      alt="Client Identification Document" 
+                      className="max-h-[660px] max-w-full object-contain rounded shadow-xs" 
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 w-full">
+                  {client.documents.map((docUrl: string, idx: number) => {
+                    const isFirst = idx === 0;
+                    const isSecond = idx === 1;
+                    const titleEn = isFirst 
+                      ? (isForeigner ? "1. PASSPORT / جواز السفر" : "1. EMIRATES ID / الهوية الإماراتية")
+                      : isSecond
+                      ? "2. DRIVING LICENSE / رخصة القيادة"
+                      : `3. ATTACHED DOCUMENT #${idx + 1}`;
+                    const titleAr = isFirst
+                      ? (isForeigner ? "جواز السفر" : "الهوية الإماراتية")
+                      : isSecond
+                      ? "رخصة القيادة"
+                      : "وثيقة إضافية";
+
+                    return (
+                      <div key={idx} className="border border-black p-2.5 rounded bg-gray-50/20 flex flex-col">
+                        <div className="flex justify-between items-center pb-1 mb-2 border-b border-black/15 text-[8.5px] font-bold">
+                          <span className="text-black uppercase">{titleEn}</span>
+                          <span className="text-gray-700" dir="rtl">{titleAr}</span>
+                        </div>
+                        <div className="flex-1 min-h-[320px] max-h-[460px] flex items-center justify-center overflow-hidden bg-white p-2 border border-gray-200 rounded">
+                          <img 
+                            src={docUrl} 
+                            alt={`Document ${idx + 1}`} 
+                            className="max-h-[440px] max-w-full object-contain rounded shadow-xs" 
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Footer Verification Seal */}
+            <div className="mt-4 pt-2 border-t border-black/20 flex justify-between items-center text-[7.5px] text-gray-500">
+              <span>Leon Car Rental LLC • Automated System Document Attachment • Confidential Agreement</span>
+              <span dir="rtl">شركة ليون لتأجير السيارات ش.ذ.م.م • مرفق وثائق العقد الرسمي</span>
+            </div>
+          </div>
+        </>
+      )}
 
     </div>
   );

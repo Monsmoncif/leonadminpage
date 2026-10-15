@@ -10,6 +10,14 @@ export interface ContractPdfData {
   clientIdNumber?: string;
   clientType?: string;
   clientLicense?: string;
+  licenseIssuedBy?: string;
+  licenseExpiry?: string;
+  internationalLicenseNumber?: string;
+  passportNumber?: string;
+  passportIssuedBy?: string;
+  passportExpiry?: string;
+  nationality?: string;
+  documents?: string[];
   vehicleName: string;
   vehiclePlate: string;
   vehicleColor?: string;
@@ -174,31 +182,52 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
       const rightColX = leftColX + colWidth + colGap;
 
       // Box 1: Customer Details
+      const isForeigner = Boolean(
+        data.clientType === "Tourist" ||
+        data.passportNumber ||
+        (data.nationality && !["uae", "united arab emirates", "emirati"].includes(data.nationality.toLowerCase().trim()))
+      );
+
       doc.rect(leftColX, y, colWidth, 130).fillAndStroke(lightBg, borderColor);
       doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text("1. HIRER (CUSTOMER) DETAILS", leftColX + 12, y + 10);
       doc.strokeColor(brandColor).lineWidth(1.5).moveTo(leftColX + 12, y + 24).lineTo(leftColX + 180, y + 24).stroke();
 
       doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
-      let itemY = y + 32;
+      let itemY = y + 30;
       doc.text(`Full Name:`, leftColX + 12, itemY);
       doc.font("Helvetica-Bold").text(data.clientName || "N/A", leftColX + 85, itemY);
       
-      itemY += 16;
-      doc.font("Helvetica").text(`Phone:`, leftColX + 12, itemY);
+      itemY += 15;
+      doc.font("Helvetica").text(`Phone / Tel:`, leftColX + 12, itemY);
       doc.font("Helvetica-Bold").text(data.clientPhone || "N/A", leftColX + 85, itemY);
 
-      itemY += 16;
-      doc.font("Helvetica").text(`Email:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.clientEmail || "N/A", leftColX + 85, itemY);
+      if (isForeigner) {
+        itemY += 15;
+        doc.font("Helvetica").text(`Driving License:`, leftColX + 12, itemY);
+        const licStr = `${data.clientLicense || "Verified"}${data.licenseIssuedBy ? ` (${data.licenseIssuedBy})` : ""}`;
+        doc.font("Helvetica-Bold").text(licStr, leftColX + 85, itemY);
 
-      itemY += 16;
-      const idLabel = data.clientType === "Resident" ? "ID Number:" : (data.clientType === "Tourist" ? "Passport No:" : "ID / Passport:");
-      doc.font("Helvetica").text(idLabel, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.clientIdNumber || "Verified", leftColX + 85, itemY);
+        itemY += 15;
+        doc.font("Helvetica").text(`Passport No:`, leftColX + 12, itemY);
+        const passStr = `${data.passportNumber || data.clientIdNumber || "N/A"}${data.passportIssuedBy ? ` (${data.passportIssuedBy})` : (data.nationality ? ` (${data.nationality})` : "")}`;
+        doc.font("Helvetica-Bold").text(passStr, leftColX + 85, itemY);
 
-      itemY += 16;
-      doc.font("Helvetica").text(`Driving License:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.clientLicense || "Verified", leftColX + 85, itemY);
+        itemY += 15;
+        doc.font("Helvetica").text(`Nationality / Exp:`, leftColX + 12, itemY);
+        doc.font("Helvetica-Bold").text(`${data.nationality || "Foreigner"} • Exp: ${data.passportExpiry || data.licenseExpiry || "Verified"}`, leftColX + 85, itemY);
+      } else {
+        itemY += 16;
+        doc.font("Helvetica").text(`Emirates ID:`, leftColX + 12, itemY);
+        doc.font("Helvetica-Bold").text(data.clientIdNumber || "Verified", leftColX + 85, itemY);
+
+        itemY += 16;
+        doc.font("Helvetica").text(`Driving License:`, leftColX + 12, itemY);
+        doc.font("Helvetica-Bold").text(data.clientLicense || "Verified", leftColX + 85, itemY);
+
+        itemY += 16;
+        doc.font("Helvetica").text(`Email:`, leftColX + 12, itemY);
+        doc.font("Helvetica-Bold").text(data.clientEmail || "N/A", leftColX + 85, itemY);
+      }
 
       // Box 2: Vehicle Details
       doc.rect(rightColX, y, colWidth, 130).fillAndStroke(lightBg, borderColor);

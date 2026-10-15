@@ -88,14 +88,35 @@ export async function sendClientContractNotification(
     // For "created" (booking confirmation) and "final" (VIP return thank you), no PDF is generated or attached as requested.
     let pdfBuffer: Buffer | undefined;
     if (type === "initial") {
+      const hasEmiratesId = Boolean(
+        clientDoc.idNumber && (
+          clientDoc.idNumber.startsWith("784-") ||
+          /^\d{3}-\d{4}-\d{7}-\d{1}$/.test(clientDoc.idNumber)
+        )
+      );
+      const isForeigner = Boolean(
+        clientDoc.clientType === "Tourist" ||
+        clientDoc.passportNumber ||
+        (clientDoc.licenseIssuedBy && !["uae", "dubai", "abu dhabi", "sharjah", "ajman", "fujairah", "rak", "uaq", "united arab emirates"].includes(clientDoc.licenseIssuedBy.toLowerCase().trim())) ||
+        (clientDoc.nationality && !["uae", "united arab emirates", "emirati", "إماراتي"].includes(clientDoc.nationality.toLowerCase().trim()) && !hasEmiratesId)
+      );
+
       const contractPdfData = {
         contractNumber: contractNum,
         clientName,
         clientPhone: clientPhone || "",
         clientEmail: clientEmail || "",
         clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
-        clientType: clientDoc.clientType || (clientDoc.idNumber ? "Resident" : "Tourist"),
+        clientType: isForeigner ? "Tourist" : (clientDoc.clientType || "Resident"),
         clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
+        licenseIssuedBy: clientDoc.licenseIssuedBy || clientDoc.licenseIssuedAt || "",
+        licenseExpiry: clientDoc.licenseExpiry ? new Date(clientDoc.licenseExpiry).toLocaleDateString("en-GB") : "",
+        internationalLicenseNumber: clientDoc.internationalLicenseNumber || "",
+        passportNumber: clientDoc.passportNumber || (isForeigner ? clientDoc.idNumber : ""),
+        passportIssuedBy: clientDoc.passportIssuedBy || (isForeigner ? clientDoc.nationality : ""),
+        passportExpiry: clientDoc.passportExpiry ? new Date(clientDoc.passportExpiry).toLocaleDateString("en-GB") : (isForeigner && clientDoc.idExpiry ? new Date(clientDoc.idExpiry).toLocaleDateString("en-GB") : ""),
+        nationality: clientDoc.nationality || "",
+        documents: Array.isArray(clientDoc.documents) ? clientDoc.documents : [],
         vehicleName,
         vehiclePlate,
         vehicleColor,
