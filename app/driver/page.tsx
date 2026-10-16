@@ -922,8 +922,7 @@ export default function DriverDashboard() {
                   return (
                     <div
                       key={contract._id || contract.id}
-                      onClick={() => router.push(`/driver/contracts/${contract._id || contract.id}`)}
-                      className="bg-card rounded-2xl border border-border/80 shadow-xs hover:shadow-md hover:border-brand/40 transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between gap-3.5 animate-fade-in-up relative overflow-hidden group cursor-pointer"
+                      className="bg-card rounded-2xl border border-border/80 shadow-xs hover:shadow-md transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between gap-3.5 animate-fade-in-up relative overflow-hidden group"
                       style={{ animationDelay: `${idx * 0.04 + 0.05}s` }}
                     >
                       {/* Top Status Accent Line */}
@@ -971,7 +970,7 @@ export default function DriverDashboard() {
                           {getInitials(contract.customer)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-text-primary text-xs sm:text-sm truncate group-hover:text-brand transition-colors" title={contract.customer}>
+                          <p className="font-bold text-text-primary text-xs sm:text-sm truncate" title={contract.customer}>
                             {contract.customer || "Unknown Client"}
                           </p>
                           <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-0.5 truncate">
@@ -1245,8 +1244,7 @@ export default function DriverDashboard() {
                       return (
                         <tr
                           key={contract._id || contract.id}
-                          onClick={() => router.push(`/driver/contracts/${contract._id || contract.id}`)}
-                          className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up cursor-pointer"
+                          className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up"
                           style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
                         >
                           {/* Contract Column */}
