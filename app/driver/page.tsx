@@ -15,7 +15,8 @@ import {
   LayoutGrid,
   List,
   MessageSquare,
-  Eye
+  Eye,
+  Car
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
@@ -824,17 +825,18 @@ export default function DriverDashboard() {
             viewMode === "cards" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="bg-card rounded-2xl border border-border p-4 animate-pulse space-y-3">
+                  <div key={i} className="bg-card rounded-2xl border border-border p-4 sm:p-5 animate-pulse space-y-3.5">
                     <div className="flex justify-between items-center">
-                      <div className="h-5 w-20 bg-gray-100 rounded-md" />
                       <div className="h-5 w-24 bg-gray-100 rounded-md" />
+                      <div className="h-5 w-20 bg-gray-100 rounded-md" />
                     </div>
                     <div className="h-14 bg-gray-50 rounded-xl" />
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="h-12 bg-gray-50 rounded-xl" />
-                      <div className="h-12 bg-gray-50 rounded-xl" />
+                      <div className="h-16 bg-gray-50 rounded-xl" />
+                      <div className="h-16 bg-gray-50 rounded-xl" />
                     </div>
-                    <div className="h-10 bg-gray-100 rounded-xl" />
+                    <div className="h-10 bg-gray-50 rounded-xl" />
+                    <div className="h-11 bg-gray-100 rounded-xl" />
                   </div>
                 ))}
               </div>
@@ -905,120 +907,149 @@ export default function DriverDashboard() {
                     ? (contract.dropoffLocation || contract.pickupLocation || "Main Office")
                     : (contract.pickupLocation || "Main Office");
 
-                  const locationLabel = isReturnTask ? "Return Location" : "Handover Location";
+                  const locationLabel = isReturnTask ? "Return" : "Handover";
+
+                  const statusBadge = isPendingDelivery
+                    ? { text: "Handover", cls: "bg-amber-50 text-amber-700 border-amber-300" }
+                    : isReturnForMe && !isReturned && activeTab === "tasks"
+                    ? { text: "Assigned Return", cls: "bg-purple-50 text-purple-700 border-purple-300" }
+                    : isReturned
+                    ? { text: "Completed", cls: "bg-emerald-50 text-emerald-700 border-emerald-300" }
+                    : isDelivered
+                    ? { text: "With Client", cls: "bg-blue-50 text-blue-700 border-blue-300" }
+                    : { text: "Active", cls: "bg-gray-50 text-gray-700 border-gray-300" };
 
                   return (
                     <div
                       key={contract._id || contract.id}
-                      className="bg-card rounded-2xl border border-border/80 hover:border-brand/40 shadow-xs hover:shadow-md transition-all p-4 flex flex-col justify-between gap-3 animate-fade-in-up relative overflow-hidden group"
+                      onClick={() => router.push(`/driver/contracts/${contract._id || contract.id}`)}
+                      className="bg-card rounded-2xl border border-border/80 shadow-xs hover:shadow-md hover:border-brand/40 transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between gap-3.5 animate-fade-in-up relative overflow-hidden group cursor-pointer"
                       style={{ animationDelay: `${idx * 0.04 + 0.05}s` }}
                     >
                       {/* Top Status Accent Line */}
-                      <div className={`absolute top-0 left-0 right-0 h-1 ${
-                        isPendingDelivery ? "bg-amber-500" :
-                        isReturnTask ? "bg-purple-500" :
-                        isDelivered && !isReturned ? "bg-blue-500" :
-                        isReturned ? "bg-emerald-600" : "bg-gray-300"
+                      <div className={`absolute top-0 left-0 right-0 h-1.5 transition-colors ${
+                        isPendingDelivery ? "bg-gradient-to-r from-amber-400 to-amber-500" :
+                        isReturnTask ? "bg-gradient-to-r from-purple-400 to-purple-600" :
+                        isDelivered && !isReturned ? "bg-gradient-to-r from-blue-400 to-blue-600" :
+                        isReturned ? "bg-gradient-to-r from-emerald-400 to-emerald-600" : "bg-gray-200"
                       }`} />
 
                       {/* Header: Contract # & Status Badge */}
-                      <div className="flex items-center justify-between gap-2 pt-0.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-sans font-black text-xs text-gray-950 tracking-tight tabular-nums bg-gray-100/90 px-2.5 py-0.5 rounded-lg border border-gray-200 shadow-2xs">
-                            #{contract.id || contract._id?.substring(0,8).toUpperCase()}
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-text-primary tabular-nums tracking-tight">
+                            #{contract.contractNumber || contract.id || contract._id?.substring(0,8).toUpperCase()}
                           </span>
                           {isPendingDelivery && isDeliveryForMe && (
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/90 px-2 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                               For You
+                            </span>
+                          )}
+                          {isReturnForMe && !isReturned && activeTab === "tasks" && (
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200/90 px-2 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                              Assigned Return
                             </span>
                           )}
                         </div>
 
                         <div>
-                          {isPendingDelivery ? (
-                            <span className="inline-flex items-center text-[11px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md">
-                              Delivery Handover
-                            </span>
-                          ) : isReturnForMe && !isReturned && activeTab === "tasks" ? (
-                            <span className="inline-flex items-center text-[11px] font-bold text-purple-800 bg-purple-100/90 px-2 py-0.5 rounded-md">
-                              Assigned Return
-                            </span>
-                          ) : isReturned ? (
-                            <span className="inline-flex items-center text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md">
-                              Completed
-                            </span>
-                          ) : isDelivered ? (
-                            <span className="inline-flex items-center text-[11px] font-bold text-blue-800 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md">
-                              On Rent • With Client
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center text-[11px] font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
-                              Rental Active
-                            </span>
-                          )}
+                          <span className={`inline-flex items-center text-[10.5px] font-semibold px-2.5 py-1 rounded-md border ${statusBadge.cls} shadow-2xs`}>
+                            {statusBadge.text}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Customer Row (phone number intentionally hidden from drivers) */}
-                      <div className="flex items-center gap-2.5 bg-gray-50/70 p-2.5 rounded-xl border border-gray-100/90">
+                      {/* Customer Row (no phone number shown to drivers) */}
+                      <div className="flex items-center gap-3 bg-gray-50/75 p-3 rounded-xl border border-gray-100 group-hover:border-gray-200/80 transition-colors">
                         <div
-                          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${getAvatarColor(
+                          className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ring-2 ring-white ${getAvatarColor(
                             contract.customer
                           )}`}
                         >
                           {getInitials(contract.customer)}
                         </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-text-primary text-xs truncate" title={contract.customer}>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-text-primary text-xs sm:text-sm truncate group-hover:text-brand transition-colors" title={contract.customer}>
                             {contract.customer || "Unknown Client"}
-                          </span>
-                          <span className="text-[10.5px] text-text-muted truncate">
-                            {isPendingDelivery && isDeliveryForMe
-                              ? "Assigned to you"
-                              : assignedDriverName
-                              ? `Driver: ${assignedDriverName}`
-                              : "Customer"}
-                          </span>
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-0.5 truncate">
+                            {isPendingDelivery && isDeliveryForMe ? (
+                              <span className="text-emerald-700 font-medium inline-flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Handover assigned to you
+                              </span>
+                            ) : isReturnForMe && !isReturned && activeTab === "tasks" ? (
+                              <span className="text-purple-700 font-medium inline-flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                Return assigned to you
+                              </span>
+                            ) : assignedDriverName ? (
+                              <span className="truncate">Driver: {assignedDriverName}</span>
+                            ) : (
+                              <span>Customer</span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* Vehicle & Schedule Grid */}
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {/* Vehicle Box */}
-                        <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100/80 flex flex-col justify-between min-h-[58px]">
-                          <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Vehicle</span>
-                          <span className="font-bold text-text-primary truncate text-[11.5px] mt-0.5" title={vehicleInfo.name}>
+                        <div className="bg-gray-50/70 p-2.5 sm:p-3 rounded-xl border border-gray-100 flex flex-col justify-between min-h-[64px]">
+                          <div className="flex items-center gap-1 text-[9.5px] text-text-muted font-bold uppercase tracking-wider">
+                            <Car size={11} className="text-text-muted shrink-0" />
+                            <span>Vehicle</span>
+                          </div>
+                          <p className="font-bold text-text-primary text-xs truncate mt-1" title={vehicleInfo.name}>
                             {vehicleInfo.name}
-                          </span>
-                          {vehicleInfo.plate && (
-                            <span className="font-sans font-black text-[11px] text-brand tracking-wider uppercase tabular-nums mt-0.5">
-                              • {vehicleInfo.plate}
-                            </span>
+                            {vehicleInfo.year && <span className="text-text-muted font-normal ml-1">({vehicleInfo.year})</span>}
+                          </p>
+                          {vehicleInfo.plate ? (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-white border border-gray-200 text-[10px] font-mono font-bold text-text-primary tracking-wider tabular-nums shadow-2xs">
+                                {vehicleInfo.plate}
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-text-muted mt-1">No plate</p>
                           )}
                         </div>
 
                         {/* Schedule Box */}
-                        <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100/80 flex flex-col justify-between min-h-[58px] overflow-hidden">
-                          <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">{timeInfo.label || "Schedule"}</span>
-                          <div className="flex items-center gap-1.5 flex-nowrap mt-1 overflow-hidden">
-                            <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold border ${timeInfo.badgeColor} shrink-0 whitespace-nowrap`}>
-                              <Clock size={10} className="shrink-0" />
-                              <span>{timeInfo.dayLabel}</span>
-                            </div>
-                            <span className="text-[11px] text-gray-800 font-sans font-bold tabular-nums whitespace-nowrap shrink-0">
-                              {timeInfo.timeStr}
+                        <div className="bg-gray-50/70 p-2.5 sm:p-3 rounded-xl border border-gray-100 flex flex-col justify-between min-h-[64px] overflow-hidden">
+                          <div className="flex items-center gap-1 text-[9.5px] text-text-muted font-bold uppercase tracking-wider">
+                            <Clock size={11} className="text-text-muted shrink-0" />
+                            <span>{timeInfo.label || "Schedule"}</span>
+                          </div>
+                          <p className="font-semibold text-text-primary text-xs tabular-nums truncate mt-1">
+                            {timeInfo.dayLabel} · {timeInfo.timeStr}
+                          </p>
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded border w-fit leading-none ${timeInfo.badgeColor}`}>
+                              {timeInfo.badgeText || timeInfo.dayLabel}
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {/* Location with Google Maps button */}
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100 text-xs">
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <MapPin size={13} className={isReturnTask ? "text-purple-600 shrink-0" : "text-emerald-600 shrink-0"} />
-                          <span className="truncate text-[11px] font-semibold text-text-secondary" title={`${locationLabel}: ${locationText}`}>
-                            {locationText}
-                          </span>
+                      <div className="flex items-center justify-between gap-2 py-2 px-3 bg-gray-50/50 rounded-xl border border-gray-100 text-xs">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                            isReturnTask ? "bg-purple-50 text-purple-600 border border-purple-200/60" : "bg-emerald-50 text-emerald-600 border border-emerald-200/60"
+                          }`}>
+                            <MapPin size={12} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[9.5px] font-bold text-text-muted uppercase tracking-wider block leading-tight">
+                              {locationLabel} Location
+                            </span>
+                            <span className="text-xs font-medium text-text-primary truncate block" title={`${locationLabel}: ${locationText}`}>
+                              {locationText}
+                            </span>
+                          </div>
                         </div>
                         <button
                           type="button"
@@ -1026,48 +1057,119 @@ export default function DriverDashboard() {
                             e.stopPropagation();
                             openGoogleMaps(locationText);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold border border-emerald-200 transition-colors shadow-2xs shrink-0 cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-emerald-50 text-text-secondary hover:text-emerald-700 text-xs font-semibold border border-border hover:border-emerald-200 transition-all shadow-2xs hover:shadow-xs active:scale-95 shrink-0 cursor-pointer"
                           title={`Open in Google Maps: ${locationText}`}
                         >
-                          <Navigation size={10} className="rotate-45" />
+                          <Navigation size={11} className="rotate-45" />
                           <span>Maps</span>
                         </button>
                       </div>
 
-                      {/* Main Action Button (Mobile Touch-Optimized) */}
-                      <div className="pt-1.5">
+                      {/* Main Action Button & View Details */}
+                      <div className="pt-0.5">
                         {isPendingDelivery && isDeliveryForMe ? (
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/driver/delivery?contractId=${contract._id || contract.id}`)}
-                            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer"
-                          >
-                            <CheckCircle2 size={15} />
-                            <span>Confirm Handover (تأكيد التسليم)</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/driver/delivery?contractId=${contract._id || contract.id}`);
+                              }}
+                              className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-sm cursor-pointer"
+                            >
+                              <CheckCircle2 size={15} />
+                              <span>Confirm Handover (تأكيد التسليم)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/driver/contracts/${contract._id || contract.id}`);
+                              }}
+                              className="p-2.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-xl border border-border/80 hover:border-brand/30 transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 shadow-2xs"
+                              title="View Contract Details"
+                            >
+                              <Eye size={16} />
+                            </button>
+                          </div>
                         ) : isPendingDelivery ? (
-                          <div className="w-full py-2 px-3 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 text-center text-xs font-semibold flex items-center justify-center gap-1.5 truncate" title={assignedDriverName ? `Assigned to: ${assignedDriverName}` : "Pending Handover"}>
-                            <Clock size={12} className="text-amber-600 shrink-0" />
-                            <span className="truncate">{assignedDriverName ? `Assigned: ${assignedDriverName}` : "Pending Handover"}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 py-2.5 px-3 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-800 text-center text-xs font-semibold flex items-center justify-center gap-1.5 truncate" title={assignedDriverName ? `Assigned to: ${assignedDriverName}` : "Pending Handover"}>
+                              <Clock size={13} className="text-amber-600 shrink-0" />
+                              <span className="truncate">{assignedDriverName ? `Assigned: ${assignedDriverName}` : "Pending Handover"}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/driver/contracts/${contract._id || contract.id}`);
+                              }}
+                              className="p-2.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-xl border border-border/80 hover:border-brand/30 transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 shadow-2xs"
+                              title="View Contract Details"
+                            >
+                              <Eye size={16} />
+                            </button>
                           </div>
                         ) : isDelivered && !isReturned && isReturnForMe && activeTab === "tasks" ? (
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/driver/return?contractId=${contract._id || contract.id}`)}
-                            className="w-full py-2.5 px-4 bg-brand hover:bg-brand-dark active:scale-[0.98] text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer"
-                          >
-                            <ArrowLeftRight size={15} />
-                            <span>Process Return (استلام السيارة)</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/driver/return?contractId=${contract._id || contract.id}`);
+                              }}
+                              className="flex-1 py-2.5 px-3 bg-brand hover:bg-brand-dark active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-sm cursor-pointer"
+                            >
+                              <ArrowLeftRight size={15} />
+                              <span>Process Return (استلام السيارة)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/driver/contracts/${contract._id || contract.id}`);
+                              }}
+                              className="p-2.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-xl border border-border/80 hover:border-brand/30 transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 shadow-2xs"
+                              title="View Contract Details"
+                            >
+                              <Eye size={16} />
+                            </button>
+                          </div>
                         ) : isDelivered && !isReturned ? (
-                          <div className="w-full py-2 px-3 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-800 text-center text-xs font-bold flex items-center justify-center gap-1.5">
-                            <CheckCircle2 size={13} className="text-blue-600" />
-                            <span>On Rent • With Client (مع العميل)</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 py-2.5 px-3 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-800 text-center text-xs font-semibold flex items-center justify-center gap-1.5">
+                              <CheckCircle2 size={13} className="text-blue-600 shrink-0" />
+                              <span>On Rent • With Client (مع العميل)</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/driver/contracts/${contract._id || contract.id}`);
+                              }}
+                              className="p-2.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-xl border border-border/80 hover:border-brand/30 transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 shadow-2xs"
+                              title="View Contract Details"
+                            >
+                              <Eye size={16} />
+                            </button>
                           </div>
                         ) : (
-                          <div className="w-full py-2 px-3 rounded-xl bg-emerald-50/50 border border-emerald-100 text-emerald-700 text-center text-xs font-semibold flex items-center justify-center gap-1.5">
-                            <CheckCircle2 size={13} className="text-emerald-600" />
-                            <span>Completed</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-800 text-center text-xs font-semibold flex items-center justify-center gap-1.5">
+                              <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                              <span>Completed</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/driver/contracts/${contract._id || contract.id}`);
+                              }}
+                              className="p-2.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-xl border border-border/80 hover:border-brand/30 transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 shadow-2xs"
+                              title="View Contract Details"
+                            >
+                              <Eye size={16} />
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1087,6 +1189,7 @@ export default function DriverDashboard() {
                     setCurrentPage(page);
                     window.scrollTo({ top: 350, behavior: "smooth" });
                   }}
+                  onItemsPerPageChange={setItemsPerPage}
                   itemLabel="tasks"
                 />
               )}
