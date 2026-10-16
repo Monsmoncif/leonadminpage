@@ -260,24 +260,7 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
             <Mail size={15} className="text-gray-400" />
             <span>Resend Email</span>
           </button>
-          {contractDetails.clientId?.phone ? (
-            <a
-              href={`tel:${contractDetails.clientId.phone.replace(/[^0-9+]/g, '')}`}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-text-primary text-xs sm:text-sm font-bold px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs"
-            >
-              <Phone size={15} className="text-text-primary" />
-              <span>Call Client</span>
-            </a>
-          ) : (
-            <button 
-              type="button"
-              onClick={() => toast.error("No phone number available for this customer.")}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-100 border border-gray-200 text-gray-400 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs cursor-not-allowed"
-            >
-              <Phone size={15} />
-              <span>Call Client</span>
-            </button>
-          )}
+          {/* Customer phone intentionally hidden from drivers */}
           <button className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs sm:text-sm font-bold px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs cursor-pointer">
             <Send size={15} className="text-gray-400" />
             <span>Send PDF</span>

@@ -574,13 +574,12 @@ export default function DriverDashboard() {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const customer = (c.customer || "").toLowerCase();
-    const phone = (c.customerPhone || "").toLowerCase();
     const vehicle = (c.vehicle || "").toLowerCase();
     const plate = (c.vehiclePlate || "").toLowerCase();
     const id = (c.id || "").toLowerCase();
     const location = ((c.pickupLocation || "") + " " + (c.dropoffLocation || "")).toLowerCase();
     const assigned = (getAssignedDriverName(c) || "").toLowerCase();
-    return customer.includes(q) || phone.includes(q) || vehicle.includes(q) || plate.includes(q) || id.includes(q) || location.includes(q) || assigned.includes(q);
+    return customer.includes(q) || vehicle.includes(q) || plate.includes(q) || id.includes(q) || location.includes(q) || assigned.includes(q);
   });
 
   const totalPages = Math.ceil(filteredContracts.length / itemsPerPage);
@@ -906,8 +905,6 @@ export default function DriverDashboard() {
                     : (contract.pickupLocation || "Main Office");
 
                   const locationLabel = isReturnTask ? "Return Location" : "Handover Location";
-                  const cleanPhone = contract.customerPhone ? contract.customerPhone.replace(/[^\d+]/g, "") : "";
-                  const waNumber = cleanPhone.startsWith("00") ? cleanPhone.substring(2) : cleanPhone.startsWith("05") ? "971" + cleanPhone.substring(1) : cleanPhone.replace("+", "");
 
                   return (
                     <div
@@ -961,48 +958,27 @@ export default function DriverDashboard() {
                         </div>
                       </div>
 
-                      {/* Customer Row with Call & WhatsApp quick buttons */}
-                      <div className="flex items-center justify-between gap-2 bg-gray-50/70 p-2.5 rounded-xl border border-gray-100/90">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div
-                            className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${getAvatarColor(
-                              contract.customer
-                            )}`}
-                          >
-                            {getInitials(contract.customer)}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-text-primary text-xs truncate max-w-[170px]" title={contract.customer}>
-                              {contract.customer || "Unknown Client"}
-                            </span>
-                            {contract.customerPhone && (
-                              <span className="text-[11.5px] text-gray-700 font-sans font-semibold tracking-tight tabular-nums truncate">
-                                {contract.customerPhone}
-                              </span>
-                            )}
-                          </div>
+                      {/* Customer Row (phone number intentionally hidden from drivers) */}
+                      <div className="flex items-center gap-2.5 bg-gray-50/70 p-2.5 rounded-xl border border-gray-100/90">
+                        <div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${getAvatarColor(
+                            contract.customer
+                          )}`}
+                        >
+                          {getInitials(contract.customer)}
                         </div>
-
-                        {contract.customerPhone && (
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <a
-                              href={`tel:${contract.customerPhone}`}
-                              className="w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/70 flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
-                              title={`Call: ${contract.customerPhone}`}
-                            >
-                              <Phone size={13} />
-                            </a>
-                            <a
-                              href={`https://wa.me/${waNumber}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/70 flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
-                              title={`WhatsApp: ${contract.customerPhone}`}
-                            >
-                              <MessageSquare size={13} />
-                            </a>
-                          </div>
-                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-text-primary text-xs truncate" title={contract.customer}>
+                            {contract.customer || "Unknown Client"}
+                          </span>
+                          <span className="text-[10.5px] text-text-muted truncate">
+                            {isPendingDelivery && isDeliveryForMe
+                              ? "Assigned to you"
+                              : assignedDriverName
+                              ? `Driver: ${assignedDriverName}`
+                              : "Customer"}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Vehicle & Schedule Grid */}
@@ -1115,248 +1091,174 @@ export default function DriverDashboard() {
               )}
             </div>
           ) : (
-            /* ================= TABLE VIEW (Scrollable on phone, classic on desktop) ================= */
-            <div className="space-y-4">
-              <div className="bg-card rounded-2xl border border-border shadow-xs overflow-hidden card-hover">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[720px]">
-                    <thead>
-                      <tr className="border-b border-border bg-gray-50/50">
-                        <th className="text-left py-3.5 px-4 text-text-muted font-semibold whitespace-nowrap">Task &amp; Schedule</th>
-                        <th className="text-left py-3.5 px-4 text-text-muted font-semibold whitespace-nowrap">Customer</th>
-                        <th className="text-left py-3.5 px-4 text-text-muted font-semibold whitespace-nowrap">Vehicle &amp; Plate</th>
-                        <th className="text-left py-3.5 px-4 text-text-muted font-semibold whitespace-nowrap">Location</th>
-                        <th className="text-right py-3.5 px-4 text-text-muted font-semibold whitespace-nowrap">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedContracts.map((contract, idx) => {
-                        const driverId = (session?.user as any)?.id;
-                        const isDeliveryForMe = matchDriverId(contract.deliveryDriverId, driverId) || (!contract.deliveryDriverId && matchDriverId(contract.driverId, driverId));
-                        const isReturnForMe = matchDriverId(contract.returnDriverId, driverId);
+            /* ================= TABLE VIEW (Matches Admin Customers Table Style) ================= */
+            <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] sm:text-xs md:text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-gray-50/75 text-[9.5px] sm:text-[11px] md:text-xs text-text-muted font-semibold uppercase tracking-wider">
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Contract</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[200px]">Customer</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Vehicle</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Schedule</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4">Location</th>
+                      <th className="text-right py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {paginatedContracts.map((contract, idx) => {
+                      const driverId = (session?.user as any)?.id;
+                      const isDeliveryForMe = matchDriverId(contract.deliveryDriverId, driverId) || (!contract.deliveryDriverId && matchDriverId(contract.driverId, driverId));
+                      const isReturnForMe = matchDriverId(contract.returnDriverId, driverId);
 
-                        const isDelivered = contract.deliveryStatus === "Delivered";
-                        const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned";
-                        const isPendingDelivery = !isDelivered && !isReturned;
+                      const isDelivered = contract.deliveryStatus === "Delivered";
+                      const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned";
+                      const isPendingDelivery = !isDelivered && !isReturned;
 
-                        const timeInfo = getTaskTimeAndUrgency(contract, isPendingDelivery, isReturnForMe, activeTab === "all", activeTab === "withClient");
-                        const vehicleInfo = getVehicleDisplay(contract);
-                        const assignedDriverName = getAssignedDriverName(contract);
-                        const isReturnTask = activeTab === "tasks" 
-                          ? (!isPendingDelivery && isReturnForMe) 
-                          : (isReturned && isReturnForMe);
+                      const timeInfo = getTaskTimeAndUrgency(contract, isPendingDelivery, isReturnForMe, activeTab === "all", activeTab === "withClient");
+                      const vehicleInfo = getVehicleDisplay(contract);
+                      const assignedDriverName = getAssignedDriverName(contract);
+                      const isReturnTask = activeTab === "tasks"
+                        ? (!isPendingDelivery && isReturnForMe)
+                        : (isReturned && isReturnForMe);
 
-                        const locationText = isReturnTask 
-                          ? (contract.dropoffLocation || contract.pickupLocation || "Main Office")
-                          : (contract.pickupLocation || "Main Office");
+                      const locationText = isReturnTask
+                        ? (contract.dropoffLocation || contract.pickupLocation || "Main Office")
+                        : (contract.pickupLocation || "Main Office");
+                      const locationLabel = isReturnTask ? "Return" : "Handover";
 
-                        const locationLabel = isReturnTask ? "Return Location" : "Handover Location";
-                        const cleanPhone = contract.customerPhone ? contract.customerPhone.replace(/[^\d+]/g, "") : "";
-                        const waNumber = cleanPhone.startsWith("00") ? cleanPhone.substring(2) : cleanPhone.startsWith("05") ? "971" + cleanPhone.substring(1) : cleanPhone.replace("+", "");
+                      const statusBadge = isPendingDelivery
+                        ? { text: "Handover", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+                        : isReturnForMe && !isReturned && activeTab === "tasks"
+                        ? { text: "Return", cls: "bg-purple-50 text-purple-700 border-purple-200" }
+                        : isReturned
+                        ? { text: "Completed", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" }
+                        : isDelivered
+                        ? { text: "On Rent", cls: "bg-blue-50 text-blue-700 border-blue-200" }
+                        : { text: "Active", cls: "bg-gray-50 text-gray-700 border-gray-200" };
 
-                        return (
-                          <tr
-                            key={contract._id || contract.id}
-                            className="border-b border-border/50 bg-white hover:bg-gray-50/50 transition-colors animate-fade-in-up group"
-                            style={{ animationDelay: `${idx * 0.04 + 0.1}s` }}
-                          >
-                            {/* Task & Schedule */}
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-sans font-black text-gray-950 text-xs tabular-nums bg-gray-100/90 px-2 py-0.5 rounded-md border border-gray-200">
-                                  #{contract.id || contract._id?.substring(0,8).toUpperCase()}
-                                </span>
-                                {isPendingDelivery ? (
-                                  <span className="inline-flex items-center text-[11px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md">
-                                    Delivery Handover
-                                  </span>
-                                ) : isReturnForMe && !isReturned && activeTab === "tasks" ? (
-                                  <span className="inline-flex items-center text-[11px] font-bold text-purple-800 bg-purple-100/90 px-2 py-0.5 rounded-md">
-                                    Assigned Return
-                                  </span>
-                                ) : isReturned ? (
-                                  <span className="inline-flex items-center text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md">
-                                    Completed
-                                  </span>
-                                ) : isDelivered ? (
-                                  <span className="inline-flex items-center text-[11px] font-bold text-blue-800 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md">
-                                    On Rent • With Client
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center text-[11px] font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
-                                    Rental Active
-                                  </span>
-                                )}
+                      return (
+                        <tr
+                          key={contract._id || contract.id}
+                          className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up"
+                          style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
+                        >
+                          {/* Contract Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                            <p className="font-bold text-text-primary text-[11px] sm:text-xs md:text-sm tabular-nums">
+                              #{contract.id || contract._id?.substring(0, 8).toUpperCase()}
+                            </p>
+                            <span className={`inline-block mt-0.5 text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
+                              {statusBadge.text}
+                            </span>
+                          </td>
 
-                                {isPendingDelivery && isDeliveryForMe && (
-                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                                    Assigned to You
-                                  </span>
-                                )}
+                          {/* Customer Column (no phone number shown to drivers) */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[200px]">
+                            <div className="flex items-center gap-2 sm:gap-2.5">
+                              <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(contract.customer)}`}>
+                                {getInitials(contract.customer)}
                               </div>
-                              <div className="flex items-center gap-1.5 mt-1.5 flex-nowrap whitespace-nowrap">
-                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border whitespace-nowrap ${timeInfo.badgeColor}`} title={`${timeInfo.label}: ${timeInfo.dayLabel} at ${timeInfo.timeStr}`}>
-                                  <Clock size={11} className="shrink-0" />
-                                  <span>{timeInfo.dayLabel}</span>
-                                </div>
-                                <span className="text-[11px] font-bold text-gray-800 tabular-nums whitespace-nowrap">
-                                  {timeInfo.timeStr}
-                                </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm break-words leading-tight" title={contract.customer}>
+                                  {contract.customer || "Unknown Client"}
+                                </p>
+                                <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 leading-tight">
+                                  {isPendingDelivery && isDeliveryForMe
+                                    ? "Assigned to you"
+                                    : assignedDriverName
+                                    ? `Driver: ${assignedDriverName}`
+                                    : "Customer"}
+                                </p>
                               </div>
-                            </td>
+                            </div>
+                          </td>
 
-                            {/* Customer & Avatar */}
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${getAvatarColor(
-                                    contract.customer
-                                  )}`}
-                                >
-                                  {getInitials(contract.customer)}
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="font-semibold text-text-primary text-xs group-hover:text-brand transition-colors truncate max-w-[150px]" title={contract.customer}>
-                                    {contract.customer || "Unknown Client"}
-                                  </span>
-                                  {contract.customerPhone && (
-                                    <span className="text-[11.5px] text-gray-700 font-sans font-semibold tracking-tight tabular-nums truncate">
-                                      {contract.customerPhone}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
+                          {/* Vehicle Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                            <p className="font-medium text-text-secondary text-[11px] sm:text-xs md:text-sm max-w-[160px] truncate" title={vehicleInfo.name}>
+                              {vehicleInfo.name}
+                              {vehicleInfo.year && <span className="text-text-muted font-normal ml-1">({vehicleInfo.year})</span>}
+                            </p>
+                            <p className="text-text-muted text-[9.5px] sm:text-[11px] mt-0.5 font-semibold uppercase tracking-wide">
+                              {vehicleInfo.plate || "No plate"}
+                            </p>
+                          </td>
 
-                            {/* Vehicle & Plate */}
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold text-text-primary text-xs truncate max-w-[150px]" title={vehicleInfo.name}>
-                                  {vehicleInfo.name}
-                                  {vehicleInfo.year && <span className="text-text-muted font-normal ml-1">({vehicleInfo.year})</span>}
-                                </span>
-                                {vehicleInfo.plate && (
-                                  <span className="font-sans font-black text-xs text-brand tracking-wider uppercase tabular-nums" title="Vehicle License Plate">
-                                    • {vehicleInfo.plate}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
+                          {/* Schedule Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                            <p className="font-medium text-text-secondary text-[11px] sm:text-xs md:text-sm tabular-nums flex items-center gap-1.5">
+                              <Clock size={11} className="text-text-muted shrink-0" />
+                              {timeInfo.dayLabel} · {timeInfo.timeStr}
+                            </p>
+                            <span className={`inline-block mt-0.5 text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border ${timeInfo.badgeColor}`}>
+                              {timeInfo.label}{timeInfo.badgeText && timeInfo.badgeText !== timeInfo.dayLabel ? ` · ${timeInfo.badgeText}` : ""}
+                            </span>
+                          </td>
 
-                            {/* Location & Navigation */}
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-1.5 text-xs text-text-primary font-medium max-w-[240px]">
-                                <MapPin size={13} className={isReturnTask ? "text-purple-600 shrink-0" : "text-emerald-600 shrink-0"} />
-                                <span className="truncate font-semibold" title={`${locationLabel}: ${locationText}`}>{locationText}</span>
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] text-text-muted font-medium">{locationLabel}</span>
+                          {/* Location Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
+                            <p className="font-medium text-text-secondary text-[11px] sm:text-xs md:text-sm flex items-center gap-1.5 max-w-[200px]">
+                              <MapPin size={11} className={isReturnTask ? "text-purple-600 shrink-0" : "text-emerald-600 shrink-0"} />
+                              <span className="truncate" title={locationText}>{locationText}</span>
+                            </p>
+                            <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5">{locationLabel} location</p>
+                          </td>
+
+                          {/* Actions Column */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+                              {isPendingDelivery && isDeliveryForMe ? (
                                 <button
                                   type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openGoogleMaps(locationText);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
-                                  title={`Open ${locationLabel} in Google Maps: ${locationText}`}
+                                  onClick={() => router.push(`/driver/delivery?contractId=${contract._id || contract.id}`)}
+                                  className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10.5px] sm:text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                                  title="Confirm vehicle handover"
                                 >
-                                  <Navigation size={10} className="rotate-45" />
-                                  <span>Maps</span>
+                                  <CheckCircle2 size={13} />
+                                  <span>Handover</span>
                                 </button>
-                              </div>
-                            </td>
-
-                            {/* Action */}
-                            <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                {isPendingDelivery && isDeliveryForMe ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/driver/delivery?contractId=${contract._id || contract.id}`);
-                                    }}
-                                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs hover:shadow-md cursor-pointer"
-                                    title="Confirm vehicle delivery to customer"
-                                  >
-                                    <CheckCircle2 size={13} />
-                                    <span>Confirm Handover</span>
-                                  </button>
-                                ) : isPendingDelivery ? (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200/80 max-w-[170px] truncate" title={assignedDriverName ? `Assigned to ${assignedDriverName}` : "Pending Handover"}>
-                                    <Clock size={12} className="text-amber-600 shrink-0" />
-                                    <span className="truncate">{assignedDriverName ? `Assigned: ${assignedDriverName}` : "Pending Handover"}</span>
-                                  </span>
-                                ) : isDelivered && !isReturned && isReturnForMe && activeTab === "tasks" ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/driver/return?contractId=${contract._id || contract.id}`);
-                                    }}
-                                    className="px-3.5 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs hover:shadow-md cursor-pointer"
-                                    title="Admin assigned you to pick up this vehicle"
-                                  >
-                                    <ArrowLeftRight size={13} />
-                                    <span>Process Return</span>
-                                  </button>
-                                ) : isDelivered && !isReturned ? (
-                                  <div className="inline-flex items-center gap-1.5">
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
-                                      <CheckCircle2 size={12} className="text-blue-600" />
-                                      <span>With Client</span>
-                                    </span>
-                                    {contract.customerPhone && (
-                                      <div className="flex items-center gap-1">
-                                        <a
-                                          href={`tel:${contract.customerPhone}`}
-                                          className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center transition-colors cursor-pointer"
-                                          title={`Call: ${contract.customerPhone}`}
-                                        >
-                                          <Phone size={12} />
-                                        </a>
-                                        <a
-                                          href={`https://wa.me/${waNumber}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition-colors cursor-pointer"
-                                          title={`WhatsApp: ${contract.customerPhone}`}
-                                        >
-                                          <MessageSquare size={12} />
-                                        </a>
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60">
-                                    <CheckCircle2 size={12} />
-                                    <span>Completed</span>
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              ) : isDelivered && !isReturned && isReturnForMe && activeTab === "tasks" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => router.push(`/driver/return?contractId=${contract._id || contract.id}`)}
+                                  className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-[10.5px] sm:text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                                  title="Process vehicle return"
+                                >
+                                  <ArrowLeftRight size={13} />
+                                  <span>Return</span>
+                                </button>
+                              ) : null}
+                              <div className="w-px h-3.5 sm:h-4 bg-border mx-0.5" />
+                              <button
+                                type="button"
+                                onClick={() => openGoogleMaps(locationText)}
+                                className="p-1 sm:p-1.5 text-text-muted hover:text-emerald-600 hover:bg-emerald-50 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                title={`Open in Google Maps: ${locationText}`}
+                              >
+                                <Navigation size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
-              {/* Table Pagination Footer */}
-              {!loading && filteredContracts.length > 0 && (
-                <TablePagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={filteredContracts.length}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={(page) => {
-                    setCurrentPage(page);
-                    window.scrollTo({ top: 350, behavior: "smooth" });
-                  }}
-                  itemLabel="tasks"
-                />
-              )}
+              {/* Pagination */}
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredContracts.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={(page) => {
+                  setCurrentPage(page);
+                  window.scrollTo({ top: 350, behavior: "smooth" });
+                }}
+                itemLabel="tasks"
+              />
             </div>
           )}
         </div>

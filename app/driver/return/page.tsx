@@ -705,7 +705,6 @@ export default function VehicleReturnPage() {
             </div>
             <div className="flex items-center justify-between">
               <strong className="text-text-primary font-bold">{customerName}</strong>
-              <span className="text-text-muted">{customerPhone || "No phone recorded"}</span>
             </div>
           </div>
         </div>
@@ -1105,7 +1104,6 @@ export default function VehicleReturnPage() {
           <strong className="text-text-primary text-sm font-bold block truncate">
             {customerName}
           </strong>
-          <span className="text-xs text-text-muted block truncate">{customerPhone || "No phone"}</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
