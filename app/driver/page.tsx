@@ -14,7 +14,8 @@ import {
   Plus,
   LayoutGrid,
   List,
-  MessageSquare
+  MessageSquare,
+  Eye
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
@@ -120,7 +121,7 @@ export default function DriverDashboard() {
   const [assignmentFilter, setAssignmentFilter] = useState<"all" | "mine">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   useEffect(() => {
@@ -1091,17 +1092,18 @@ export default function DriverDashboard() {
               )}
             </div>
           ) : (
-            /* ================= TABLE VIEW (Matches Admin Customers Table Style) ================= */
+            /* ================= TABLE VIEW (Matches Admin Bookings & Clients Tables Style) ================= */
             <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover">
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px] sm:text-xs md:text-sm">
                   <thead>
                     <tr className="border-b border-border bg-gray-50/75 text-[9.5px] sm:text-[11px] md:text-xs text-text-muted font-semibold uppercase tracking-wider">
                       <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Contract</th>
-                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[200px]">Customer</th>
-                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Vehicle</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">Customer / Driver</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4">Vehicle</th>
                       <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Schedule</th>
                       <th className="text-left py-2 sm:py-2.5 px-2.5 sm:px-4">Location</th>
+                      <th className="text-left py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">Status</th>
                       <th className="text-right py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
@@ -1128,42 +1130,40 @@ export default function DriverDashboard() {
                       const locationLabel = isReturnTask ? "Return" : "Handover";
 
                       const statusBadge = isPendingDelivery
-                        ? { text: "Handover", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+                        ? { text: "Handover", cls: "bg-amber-50 text-amber-700 border-amber-300" }
                         : isReturnForMe && !isReturned && activeTab === "tasks"
-                        ? { text: "Return", cls: "bg-purple-50 text-purple-700 border-purple-200" }
+                        ? { text: "Assigned Return", cls: "bg-purple-50 text-purple-700 border-purple-300" }
                         : isReturned
-                        ? { text: "Completed", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" }
+                        ? { text: "Completed", cls: "bg-emerald-50 text-emerald-700 border-emerald-300" }
                         : isDelivered
-                        ? { text: "On Rent", cls: "bg-blue-50 text-blue-700 border-blue-200" }
-                        : { text: "Active", cls: "bg-gray-50 text-gray-700 border-gray-200" };
+                        ? { text: "With Client", cls: "bg-blue-50 text-blue-700 border-blue-300" }
+                        : { text: "Active", cls: "bg-gray-50 text-gray-700 border-gray-300" };
 
                       return (
                         <tr
                           key={contract._id || contract.id}
-                          className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up"
+                          onClick={() => router.push(`/driver/contracts/${contract._id || contract.id}`)}
+                          className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up cursor-pointer"
                           style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
                         >
                           {/* Contract Column */}
                           <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
-                            <p className="font-bold text-text-primary text-[11px] sm:text-xs md:text-sm tabular-nums">
-                              #{contract.id || contract._id?.substring(0, 8).toUpperCase()}
-                            </p>
-                            <span className={`inline-block mt-0.5 text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border ${statusBadge.cls}`}>
-                              {statusBadge.text}
+                            <span className="font-bold text-text-primary text-[11px] sm:text-xs md:text-sm tabular-nums">
+                              #{contract.contractNumber || contract.id || contract._id?.substring(0, 8).toUpperCase()}
                             </span>
                           </td>
 
-                          {/* Customer Column (no phone number shown to drivers) */}
-                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[200px]">
+                          {/* Customer / Driver Column (no phone number shown to drivers) */}
+                          <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">
                             <div className="flex items-center gap-2 sm:gap-2.5">
                               <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(contract.customer)}`}>
                                 {getInitials(contract.customer)}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm break-words leading-tight" title={contract.customer}>
+                                <span className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight" title={contract.customer}>
                                   {contract.customer || "Unknown Client"}
-                                </p>
-                                <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 leading-tight">
+                                </span>
+                                <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 break-words leading-tight">
                                   {isPendingDelivery && isDeliveryForMe
                                     ? "Assigned to you"
                                     : assignedDriverName
@@ -1176,33 +1176,48 @@ export default function DriverDashboard() {
 
                           {/* Vehicle Column */}
                           <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
-                            <p className="font-medium text-text-secondary text-[11px] sm:text-xs md:text-sm max-w-[160px] truncate" title={vehicleInfo.name}>
+                            <span className="font-medium text-text-primary text-[11px] sm:text-xs md:text-sm line-clamp-1" title={vehicleInfo.name}>
                               {vehicleInfo.name}
                               {vehicleInfo.year && <span className="text-text-muted font-normal ml-1">({vehicleInfo.year})</span>}
-                            </p>
-                            <p className="text-text-muted text-[9.5px] sm:text-[11px] mt-0.5 font-semibold uppercase tracking-wide">
-                              {vehicleInfo.plate || "No plate"}
-                            </p>
+                            </span>
+                            {vehicleInfo.plate && (
+                              <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 font-bold tracking-wider uppercase tabular-nums">
+                                • {vehicleInfo.plate}
+                              </p>
+                            )}
                           </td>
 
                           {/* Schedule Column */}
                           <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 whitespace-nowrap">
-                            <p className="font-medium text-text-secondary text-[11px] sm:text-xs md:text-sm tabular-nums flex items-center gap-1.5">
-                              <Clock size={11} className="text-text-muted shrink-0" />
-                              {timeInfo.dayLabel} · {timeInfo.timeStr}
-                            </p>
-                            <span className={`inline-block mt-0.5 text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full border ${timeInfo.badgeColor}`}>
-                              {timeInfo.label}{timeInfo.badgeText && timeInfo.badgeText !== timeInfo.dayLabel ? ` · ${timeInfo.badgeText}` : ""}
-                            </span>
+                            <div className="text-[10px] sm:text-xs leading-tight">
+                              <span className="font-medium text-text-secondary flex items-center gap-1.5 tabular-nums">
+                                <Clock size={11} className="text-text-muted shrink-0" />
+                                {timeInfo.dayLabel} · {timeInfo.timeStr}
+                              </span>
+                              <span className={`inline-block mt-0.5 text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded border leading-tight ${timeInfo.badgeColor}`}>
+                                {timeInfo.label}{timeInfo.badgeText && timeInfo.badgeText !== timeInfo.dayLabel ? ` · ${timeInfo.badgeText}` : ""}
+                              </span>
+                            </div>
                           </td>
 
                           {/* Location Column */}
                           <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
-                            <p className="font-medium text-text-secondary text-[11px] sm:text-xs md:text-sm flex items-center gap-1.5 max-w-[200px]">
-                              <MapPin size={11} className={isReturnTask ? "text-purple-600 shrink-0" : "text-emerald-600 shrink-0"} />
-                              <span className="truncate" title={locationText}>{locationText}</span>
-                            </p>
-                            <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5">{locationLabel} location</p>
+                            <div className="text-[10px] sm:text-xs leading-tight max-w-[190px]">
+                              <span className="font-medium text-text-secondary flex items-center gap-1.5 truncate" title={locationText}>
+                                <MapPin size={11} className={isReturnTask ? "text-purple-600 shrink-0" : "text-emerald-600 shrink-0"} />
+                                <span className="truncate">{locationText}</span>
+                              </span>
+                              <p className="text-[9.5px] sm:text-[10.5px] text-text-muted mt-0.5">
+                                {locationLabel} Location
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Status Column (Dedicated column matching Admin Bookings & Clients) */}
+                          <td className="py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">
+                            <span className={`inline-flex items-center text-[9.5px] sm:text-[11px] font-semibold px-2 py-0.5 rounded border ${statusBadge.cls}`}>
+                              {statusBadge.text}
+                            </span>
                           </td>
 
                           {/* Actions Column */}
@@ -1211,7 +1226,10 @@ export default function DriverDashboard() {
                               {isPendingDelivery && isDeliveryForMe ? (
                                 <button
                                   type="button"
-                                  onClick={() => router.push(`/driver/delivery?contractId=${contract._id || contract.id}`)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/driver/delivery?contractId=${contract._id || contract.id}`);
+                                  }}
                                   className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10.5px] sm:text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
                                   title="Confirm vehicle handover"
                                 >
@@ -1221,7 +1239,10 @@ export default function DriverDashboard() {
                               ) : isDelivered && !isReturned && isReturnForMe && activeTab === "tasks" ? (
                                 <button
                                   type="button"
-                                  onClick={() => router.push(`/driver/return?contractId=${contract._id || contract.id}`)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/driver/return?contractId=${contract._id || contract.id}`);
+                                  }}
                                   className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-[10.5px] sm:text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
                                   title="Process vehicle return"
                                 >
@@ -1232,7 +1253,21 @@ export default function DriverDashboard() {
                               <div className="w-px h-3.5 sm:h-4 bg-border mx-0.5" />
                               <button
                                 type="button"
-                                onClick={() => openGoogleMaps(locationText)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/driver/contracts/${contract._id || contract.id}`);
+                                }}
+                                className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                title="View Details"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openGoogleMaps(locationText);
+                                }}
                                 className="p-1 sm:p-1.5 text-text-muted hover:text-emerald-600 hover:bg-emerald-50 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
                                 title={`Open in Google Maps: ${locationText}`}
                               >
@@ -1257,6 +1292,7 @@ export default function DriverDashboard() {
                   setCurrentPage(page);
                   window.scrollTo({ top: 350, behavior: "smooth" });
                 }}
+                onItemsPerPageChange={setItemsPerPage}
                 itemLabel="tasks"
               />
             </div>
