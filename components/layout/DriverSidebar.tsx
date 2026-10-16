@@ -119,7 +119,7 @@ export default function DriverSidebar() {
           <span className="text-[15px] font-bold text-text-primary tracking-tight whitespace-nowrap">
             Leon Driver
           </span>
-          <span className="text-[11px] text-text-muted font-medium whitespace-nowrap">
+          <span className="text-[11px] text-text-muted font-semibold whitespace-nowrap">
             Agent Dashboard
           </span>
         </div>
@@ -131,7 +131,7 @@ export default function DriverSidebar() {
           className="lg:hidden p-1.5 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           aria-label="Close menu"
         >
-          <X size={18} />
+          <X size={18} strokeWidth={2.2} />
         </button>
 
         {/* Collapse toggle (Desktop only) */}
@@ -141,9 +141,9 @@ export default function DriverSidebar() {
           className={`hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border border-border shadow-sm items-center justify-center text-text-muted hover:text-brand hover:border-brand/30 hover:shadow-md transition-all duration-200 z-10 cursor-pointer`}
         >
           {collapsed ? (
-            <ChevronsRight size={13} strokeWidth={2.5} />
+            <ChevronsRight size={13} strokeWidth={2.6} />
           ) : (
-            <ChevronsLeft size={13} strokeWidth={2.5} />
+            <ChevronsLeft size={13} strokeWidth={2.6} />
           )}
         </button>
       </div>
@@ -161,7 +161,7 @@ export default function DriverSidebar() {
               {collapsed ? (
                 <div className="w-5 h-[1px] bg-border/80 rounded-full" />
               ) : (
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-muted/70 select-none">
+                <span className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-text-muted select-none">
                   {section.label}
                 </span>
               )}
@@ -185,7 +185,7 @@ export default function DriverSidebar() {
                       }}
                       className={`
                         relative flex items-center gap-3 rounded-xl
-                        text-[13.5px] font-medium
+                        text-[13.5px] ${active ? "font-bold" : "font-semibold"}
                         transition-all duration-200 ease-out
                         ${collapsed ? "justify-center px-0 py-2.5 mx-auto w-11 h-11" : "px-3 py-2.5"}
                         ${
@@ -209,7 +209,7 @@ export default function DriverSidebar() {
                             : "text-text-muted group-hover:text-text-secondary"
                         }`}
                       >
-                        <item.icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+                        <item.icon size={20} strokeWidth={active ? 2.6 : 2.2} />
                       </span>
 
                       {/* Label */}
@@ -233,7 +233,7 @@ export default function DriverSidebar() {
                     {/* Tooltip for collapsed mode */}
                     {collapsed && hoveredItem === item.name && (
                       <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[60] pointer-events-none">
-                        <div className="relative bg-[#1A1D1F] text-white text-xs font-medium py-1.5 px-3 rounded-lg shadow-xl whitespace-nowrap">
+                        <div className="relative bg-[#1A1D1F] text-white text-xs font-semibold py-1.5 px-3 rounded-lg shadow-xl whitespace-nowrap">
                           {item.name}
                           {isNotif && unreadCount > 0 && (
                             <span className="ml-2 bg-brand rounded-full px-1.5 py-0.5 text-[10px]">
@@ -257,7 +257,7 @@ export default function DriverSidebar() {
         <button
           onClick={handleLogout}
           className={`
-            flex items-center gap-3 rounded-xl text-[13px] font-medium
+            flex items-center gap-3 rounded-xl text-[13px] font-semibold
             text-text-secondary hover:bg-red-50/80 hover:text-red-600
             transition-all duration-200 w-full group
             ${collapsed ? "justify-center p-2.5 mx-auto w-11 h-11" : "px-3 py-2.5"}
@@ -265,7 +265,7 @@ export default function DriverSidebar() {
         >
           <LogOut
             size={19}
-            strokeWidth={1.8}
+            strokeWidth={2.2}
             className="shrink-0 text-text-muted group-hover:text-red-500 transition-colors"
           />
           {!collapsed && <span>Logout</span>}
