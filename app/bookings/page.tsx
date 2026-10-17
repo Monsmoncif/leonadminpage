@@ -672,21 +672,6 @@ export default function ContractsPage() {
                             {/* Actions Column (Matches Clients Page) */}
                             <td className="py-2 sm:py-2.5 px-2 sm:px-4">
                               <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
-                                {/* When already delivered, show Edit Handover button so admin can fix any handover mistakes */}
-                                {contract.deliveryStatus === "Delivered" && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenHandoverPage(contract);
-                                    }}
-                                    title="Edit Vehicle Handover, Odometer, Fuel & Inspection (تعديل بيانات وفحص تسليم السيارة)"
-                                    className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 active:scale-95"
-                                  >
-                                    <Camera size={11} className="text-amber-700" />
-                                    <span className="hidden sm:inline">Edit Handover</span>
-                                  </button>
-                                )}
-
                                 {(contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
                                   const isShop = isShopContract(contract);
                                   const nowStartOfDay = new Date();
@@ -726,54 +711,39 @@ export default function ContractsPage() {
                                     );
                                   }
 
-                                  // 2. Driver Delivery Contract: Dispatch to driver or direct admin handover
+                                  // 2. Driver Delivery Contract: Dispatch to driver
                                   const isAlreadyDispatched = Boolean(contract.isDispatched || contract.contractNumber);
 
-                                  return (
-                                    <div className="flex items-center gap-1">
-                                      {!isAlreadyDispatched ? (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDispatchContract(contract);
-                                          }}
-                                          disabled={dispatchingContractId === contract._id}
-                                          title="Confirm & Dispatch to Driver (إرسال الطلب للسائق)"
-                                          className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer bg-brand hover:bg-brand-dark text-white active:scale-95"
-                                        >
-                                          {dispatchingContractId === contract._id ? (
-                                            <Loader2 size={10} className="animate-spin" />
-                                          ) : (
-                                            <Send size={10} />
-                                          )}
-                                          <span className="hidden sm:inline">Dispatch</span>
-                                        </button>
-                                      ) : (
-                                        <span 
-                                          className="px-1.5 py-0.5 rounded-md text-[9.5px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
-                                          title="Dispatched to Driver — Waiting for driver delivery handover"
-                                        >
-                                          <CheckCircle2 size={10} className="text-emerald-600 shrink-0" />
-                                          <span className="hidden sm:inline">Dispatched</span>
-                                        </span>
-                                      )}
+                                  if (!isAlreadyDispatched) {
+                                    return (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleOpenHandoverPage(contract);
+                                          handleDispatchContract(contract);
                                         }}
-                                        title="Direct Handover by Admin (تسليم مباشر بواسطة الإدارة)"
-                                        className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
-                                          isFuture
-                                            ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300"
-                                            : "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
-                                        }`}
+                                        disabled={dispatchingContractId === contract._id}
+                                        title="Confirm & Dispatch to Driver (إرسال الطلب للسائق)"
+                                        className="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer bg-brand hover:bg-brand-dark text-white active:scale-95"
                                       >
-                                        <CheckCircle2 size={11} className={isFuture ? "text-amber-600" : "text-white"} />
-                                        <span className="hidden sm:inline">{isFuture ? `Starts ${formattedStart}` : "Hand Over"}</span>
+                                        {dispatchingContractId === contract._id ? (
+                                          <Loader2 size={10} className="animate-spin" />
+                                        ) : (
+                                          <Send size={10} />
+                                        )}
+                                        <span className="hidden sm:inline">Dispatch</span>
                                       </button>
-                                    </div>
-                                  );
+                                    );
+                                  } else {
+                                    return (
+                                      <span 
+                                        className="px-1.5 py-0.5 rounded-md text-[9.5px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
+                                        title="Dispatched to Driver — Waiting for driver delivery handover"
+                                      >
+                                        <CheckCircle2 size={10} className="text-emerald-600 shrink-0" />
+                                        <span className="hidden sm:inline">Dispatched</span>
+                                      </span>
+                                    );
+                                  }
                                 })()}
 
                                 <button 
