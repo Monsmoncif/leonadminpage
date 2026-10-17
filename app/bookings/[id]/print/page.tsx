@@ -474,7 +474,10 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                   {/* Row 1: Driving License No & Customer Type */}
                   <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                     <span className="text-gray-500 font-bold uppercase text-[6px]">Driving License No / رقم الرخصة</span>
-                    <span className="font-bold truncate">{client.licenseNumber || "N/A"}</span>
+                    <span className="font-bold truncate">
+                      {client.licenseNumber || "N/A"}
+                      {(client.licenseIssuedBy || client.licenseIssuedAt) ? ` (${client.licenseIssuedBy || client.licenseIssuedAt})` : ""}
+                    </span>
                   </div>
                   <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
                     <span className="text-gray-500 font-bold uppercase text-[6px]">Customer Type / العميل</span>
@@ -483,13 +486,17 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                     </span>
                   </div>
 
-                  {/* Row 2: License Issued At & License Expiry */}
+                  {/* Row 2: License Issue Date (Created) & License Expiry */}
                   <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
-                    <span className="text-gray-500 font-bold uppercase text-[6px]">Issued At / صادرة من</span>
-                    <span className="font-bold truncate">{client.licenseIssuedBy || client.licenseIssuedAt || client.nationality || "N/A"}</span>
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">License Issue Date / تاريخ إصدار الرخصة</span>
+                    <span className="font-bold truncate">
+                      {client.licenseIssuedDate 
+                        ? formatDate(client.licenseIssuedDate) 
+                        : (client.licenseCreatedDate ? formatDate(client.licenseCreatedDate) : (client.licenseIssuedBy || client.licenseIssuedAt || "N/A"))}
+                    </span>
                   </div>
                   <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
-                    <span className="text-gray-500 font-bold uppercase text-[6px]">License Expiry / تاريخ انتهاء</span>
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">License Expiry / تاريخ انتهاء الرخصة</span>
                     <span className="font-bold truncate">{client.licenseExpiry ? formatDate(client.licenseExpiry) : "N/A"}</span>
                   </div>
 
@@ -529,9 +536,13 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                 </>
               ) : (
                 <>
+                  {/* Row 1: Driving License No & Customer Type */}
                   <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                     <span className="text-gray-500 font-bold uppercase text-[6px]">Driving License No / رقم الرخصة</span>
-                    <span className="font-bold truncate">{client.licenseNumber || "N/A"}</span>
+                    <span className="font-bold truncate">
+                      {client.licenseNumber || "N/A"}
+                      {(client.licenseIssuedBy || client.licenseIssuedAt) ? ` (${client.licenseIssuedBy || client.licenseIssuedAt})` : ""}
+                    </span>
                   </div>
                   <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
                     <span className="text-gray-500 font-bold uppercase text-[6px]">Customer Type / العميل</span>
@@ -539,12 +550,17 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                       {isPersonalized ? "Personal / شخصي" : (contract.customerType || (client.companyName ? "B2B" : "B2C"))}
                     </span>
                   </div>
+                  {/* Row 2: License Issue Date (Created) & License Expiry */}
                   <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
-                    <span className="text-gray-500 font-bold uppercase text-[6px]">Issued At / صادرة من</span>
-                    <span className="font-bold truncate">{client.licenseIssuedBy || client.licenseIssuedAt || "Dubai"}</span>
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">License Issue Date / تاريخ إصدار الرخصة</span>
+                    <span className="font-bold truncate">
+                      {client.licenseIssuedDate 
+                        ? formatDate(client.licenseIssuedDate) 
+                        : (client.licenseCreatedDate ? formatDate(client.licenseCreatedDate) : (client.licenseIssuedBy || client.licenseIssuedAt || "Dubai"))}
+                    </span>
                   </div>
                   <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
-                    <span className="text-gray-500 font-bold uppercase text-[6px]">License Expiry / تاريخ انتهاء</span>
+                    <span className="text-gray-500 font-bold uppercase text-[6px]">License Expiry / تاريخ انتهاء الرخصة</span>
                     <span className="font-bold truncate">{client.licenseExpiry ? formatDate(client.licenseExpiry) : "N/A"}</span>
                   </div>
                   <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">

@@ -150,7 +150,8 @@ export default function ContractDetailsModal({
               customer: fresh.personalizedPersonName || fresh.clientId?.name || prev.customer,
               customerPhone: fresh.clientId?.phone || prev.customerPhone,
               customerEmail: fresh.clientId?.email || prev.customerEmail,
-              customerLicense: fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev.customerLicense,
+              customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev.customerLicense,
+              customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || prev.customerLicenseIssuedDate,
               deliveryDriver: fresh.deliveryDriverId?.name || (fresh.driverId && !fresh.returnDriverId ? fresh.driverId.name : prev.deliveryDriver),
               returnDriver: fresh.returnDriverId?.name || prev.returnDriver,
               vehicle: fresh.unitId ? `${fresh.unitId.make} ${fresh.unitId.model} (${fresh.unitId.plate})` : prev.vehicle,
@@ -181,7 +182,8 @@ export default function ContractDetailsModal({
                 customer: fresh.personalizedPersonName || fresh.clientId?.name || prev.customer,
                 customerPhone: fresh.clientId?.phone || prev.customerPhone,
                 customerEmail: fresh.clientId?.email || prev.customerEmail,
-                customerLicense: fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev.customerLicense,
+                customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev.customerLicense,
+                customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || prev.customerLicenseIssuedDate,
                 deliveryDriver: fresh.deliveryDriverId?.name || (fresh.driverId && !fresh.returnDriverId ? fresh.driverId.name : prev.deliveryDriver),
                 returnDriver: fresh.returnDriverId?.name || prev.returnDriver,
                 vehicle: fresh.unitId ? `${fresh.unitId.make} ${fresh.unitId.model} (${fresh.unitId.plate})` : prev.vehicle,
@@ -797,6 +799,14 @@ export default function ContractDetailsModal({
                               {contractData.customerLicense || "—"}
                             </strong>
                           </div>
+                          {(contractData.clientId?.licenseIssuedDate || contractData.customerLicenseIssuedDate) && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-text-muted text-[11px]">License Issue Date:</span>
+                              <strong className="font-semibold text-text-secondary truncate text-right">
+                                {formatDisplayDate(contractData.clientId?.licenseIssuedDate || contractData.customerLicenseIssuedDate)}
+                              </strong>
+                            </div>
+                          )}
                         </>
                       )}
 

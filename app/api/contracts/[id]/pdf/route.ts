@@ -108,6 +108,7 @@ export async function GET(
       clientType: isForeigner ? "Tourist" : (clientDoc.clientType || "Resident"),
       clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
       licenseIssuedBy: clientDoc.licenseIssuedBy || clientDoc.licenseIssuedAt || "",
+      licenseIssuedDate: clientDoc.licenseIssuedDate ? new Date(clientDoc.licenseIssuedDate).toLocaleDateString("en-GB") : "",
       licenseExpiry: clientDoc.licenseExpiry ? new Date(clientDoc.licenseExpiry).toLocaleDateString("en-GB") : "",
       internationalLicenseNumber: clientDoc.internationalLicenseNumber || "",
       passportNumber: clientDoc.passportNumber || (isForeigner ? clientDoc.idNumber : ""),

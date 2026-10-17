@@ -11,6 +11,7 @@ export interface ContractPdfData {
   clientType?: string;
   clientLicense?: string;
   licenseIssuedBy?: string;
+  licenseIssuedDate?: string;
   licenseExpiry?: string;
   internationalLicenseNumber?: string;
   passportNumber?: string;
@@ -206,6 +207,10 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
         doc.font("Helvetica").text(`Driving License:`, leftColX + 12, itemY);
         const licStr = `${data.clientLicense || "Verified"}${data.licenseIssuedBy ? ` (${data.licenseIssuedBy})` : ""}`;
         doc.font("Helvetica-Bold").text(licStr, leftColX + 85, itemY);
+
+        itemY += 15;
+        doc.font("Helvetica").text(`License Issue Date:`, leftColX + 12, itemY);
+        doc.font("Helvetica-Bold").text(data.licenseIssuedDate || "N/A", leftColX + 85, itemY);
 
         itemY += 15;
         doc.font("Helvetica").text(`License Expiry:`, leftColX + 12, itemY);
