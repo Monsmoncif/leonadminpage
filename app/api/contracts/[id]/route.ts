@@ -401,6 +401,24 @@ export async function PUT(
       } else if (body.status === "Active") {
         await syncUnitStatuses(existingContract.unitId);
       }
+    } else if (existingContract.status === "Completed" || body.status === "Completed") {
+      // Editing an existing completed contract return: sync mileage and return photos if provided
+      const unitEditUpdates: any = {};
+      if (body.returnOdometer !== undefined && body.returnOdometer !== "") {
+        const retOdo = Number(body.returnOdometer);
+        if (!isNaN(retOdo) && retOdo > 0) {
+          unitEditUpdates.mileage = retOdo;
+        }
+      }
+      if (Array.isArray(body.returnPhotos) && body.returnPhotos.length > 0) {
+        const validPhotos = body.returnPhotos.filter((url: string) => typeof url === "string" && url.trim() !== "");
+        if (validPhotos.length > 0) {
+          unitEditUpdates.images = validPhotos;
+        }
+      }
+      if (Object.keys(unitEditUpdates).length > 0) {
+        await Unit.findByIdAndUpdate(existingContract.unitId, unitEditUpdates);
+      }
     }
 
     try {

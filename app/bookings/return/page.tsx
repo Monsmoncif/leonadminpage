@@ -202,19 +202,26 @@ function ReturnPageContent() {
       .then(([contractsData, driversData]) => {
         const list = contractsData.contracts || [];
         const activeList = list.filter((c: any) => c.status === "Active" || c.deliveryStatus === "Delivered");
-        setContracts(activeList.length > 0 ? activeList : list);
+
+        // Keep all contracts in list so user can search or edit completed ones too
+        setContracts(list);
 
         const driversList = Array.isArray(driversData) ? driversData : (driversData.drivers || []);
         setDrivers(driversList);
 
         const qId = searchParams.get("contractId");
         if (qId) {
-          const match = list.find((c: any) => c._id === qId || c.id === qId);
-          if (match) setSelectedContractId(match._id);
-        } else if (activeList.length > 0) {
-          setSelectedContractId(activeList[0]._id);
+          const match = list.find((c: any) => c._id === qId || c.id === qId || String(c.contractNumber) === String(qId));
+          if (match) {
+            setSelectedContractId(match._id || match.id);
+            return;
+          }
+        }
+        
+        if (activeList.length > 0) {
+          setSelectedContractId(activeList[0]._id || activeList[0].id);
         } else if (list.length > 0) {
-          setSelectedContractId(list[0]._id);
+          setSelectedContractId(list[0]._id || list[0].id);
         }
       })
       .catch(err => {
@@ -233,13 +240,21 @@ function ReturnPageContent() {
   // When selected contract changes, populate fields
   useEffect(() => {
     if (selectedContract) {
+      const isCompletedContract = Boolean(
+        selectedContract.status === "Completed" ||
+        selectedContract.deliveryStatus === "Returned" ||
+        selectedContract.returnedAt
+      );
+
       const isPersonalized = Boolean(
         selectedContract.contractType === "Personalized" ||
         selectedContract.personalizedPersonName ||
         selectedContract.deliveryDriver === "Personal Use"
       );
       const isShop = selectedContract.contractType === "Shop" || selectedContract.contractType === "In-Store / Counter" || isPersonalized;
-      setReturnMode(isShop ? "shop" : "dispatch");
+      
+      // In edit mode for completed returns, default directly to shop return inspection & settlement mode
+      setReturnMode(isCompletedContract ? "shop" : (isShop ? "shop" : "dispatch"));
 
       const initialLoc = (selectedContract.dropoffLocation && selectedContract.dropoffLocation !== "Main Office") 
         ? selectedContract.dropoffLocation 
@@ -260,24 +275,50 @@ function ReturnPageContent() {
       if (selectedContract.returnNotes) {
         setInstructions(selectedContract.returnNotes);
       } else {
-        const legacyMatch = selectedContract.notes?.match(/\[Return Pickup Notes:\s*([\s\S]*?)\]$/);
-        setInstructions(legacyMatch && legacyMatch[1] ? legacyMatch[1].trim() : "");
+        const legacyMatch = selectedContract.notes?.match(/\[Return Remarks:\s*([\s\S]*?)\]/);
+        const legacyPickupMatch = selectedContract.notes?.match(/\[Return Pickup Notes:\s*([\s\S]*?)\]$/);
+        setInstructions(legacyMatch && legacyMatch[1] ? legacyMatch[1].trim() : (legacyPickupMatch && legacyPickupMatch[1] ? legacyPickupMatch[1].trim() : ""));
       }
 
-      const initialOdo = selectedContract.checkoutMileage || selectedContract.unitMileage || 0;
+      // Return Odometer: preserve existing returnOdometer if already completed/recorded
+      const initialOdo = selectedContract.returnOdometer ?? selectedContract.checkoutMileage ?? selectedContract.unitMileage ?? 0;
       setReturnOdometer(String(initialOdo));
-      setReturnFuelLevel(selectedContract.checkoutFuelLevel !== undefined ? Number(selectedContract.checkoutFuelLevel) : 100);
-      setHasDamages(false);
-      setDamageDescription("");
-      setDamageCost("0");
-      setDamagePhotos([]);
-      setMoneyPhotos(Array.isArray(selectedContract.returnMoneyPhotos) ? selectedContract.returnMoneyPhotos : []);
+
+      // Return Fuel Level: preserve recorded returnFuelLevel
+      const existingFuel = selectedContract.returnFuelLevel !== undefined
+        ? Number(selectedContract.returnFuelLevel)
+        : (selectedContract.checkoutFuelLevel !== undefined ? Number(selectedContract.checkoutFuelLevel) : 100);
+      setReturnFuelLevel(existingFuel);
+
+      // Damages: check for recorded damages or charges
+      const hasRecordedDamages = Boolean(
+        (selectedContract.newDamages && selectedContract.newDamages !== "None" && selectedContract.newDamages !== "") ||
+        Number(selectedContract.damageCharge) > 0 ||
+        (Array.isArray(selectedContract.damages) && selectedContract.damages.length > 0) ||
+        (Array.isArray(selectedContract.damagePhotos) && selectedContract.damagePhotos.length > 0)
+      );
+      setHasDamages(hasRecordedDamages);
+
+      const existingDamageDesc = (selectedContract.newDamages && selectedContract.newDamages !== "None")
+        ? selectedContract.newDamages
+        : (selectedContract.damages?.[0]?.description || "");
+      setDamageDescription(existingDamageDesc);
+
+      setDamageCost(String(selectedContract.damageCharge || 0));
+      setDamagePhotos(Array.isArray(selectedContract.damagePhotos) ? selectedContract.damagePhotos : []);
+
+      // Return Money Photos: preserve existing returnMoneyPhotos or moneyPhotos
+      const existingMoneyPhotos = Array.isArray(selectedContract.returnMoneyPhotos) && selectedContract.returnMoneyPhotos.length > 0
+        ? selectedContract.returnMoneyPhotos
+        : (Array.isArray(selectedContract.moneyPhotos) ? selectedContract.moneyPhotos : []);
+      setMoneyPhotos(existingMoneyPhotos);
+
       setSalikCharge(String(selectedContract.salikFees || selectedContract.salikCharge || 0));
       setParkingCharge(String(selectedContract.parkingFees || selectedContract.parkingCharge || 0));
       setFinesCharge(String(selectedContract.finesFees || selectedContract.finesCharge || 0));
       setFuelCharge(String(selectedContract.fuelFees || selectedContract.fuelCharge || 0));
 
-      setReturnPaymentMethod(selectedContract.paymentMethod || "Cash");
+      setReturnPaymentMethod(selectedContract.returnPaymentMethod || selectedContract.paymentMethod || "Cash");
 
       const initialPhotos: Record<string, string> = {};
       if (Array.isArray(selectedContract.returnPhotos)) {
@@ -292,8 +333,10 @@ function ReturnPageContent() {
         });
       }
       setReturnPhotos(initialPhotos);
-      setIsConfirmed(false);
-      setIsAllMoneyConfirmed(false);
+
+      // If completed contract, checkboxes are already confirmed
+      setIsConfirmed(isCompletedContract);
+      setIsAllMoneyConfirmed(isCompletedContract);
     }
   }, [selectedContract]);
 
@@ -318,6 +361,14 @@ function ReturnPageContent() {
     selectedContract?.contractType === "Personalized" ||
     selectedContract?.personalizedPersonName ||
     selectedContract?.deliveryDriver === "Personal Use"
+  );
+
+  const isCompleted = Boolean(
+    selectedContract && (
+      selectedContract.status === "Completed" ||
+      selectedContract.deliveryStatus === "Returned" ||
+      selectedContract.returnedAt
+    )
   );
 
   const customerName = selectedContract?.personalizedPersonName || selectedContract?.customer || selectedContract?.clientId?.name || (isPersonalized ? "Personal Use" : "Customer");
@@ -463,7 +514,7 @@ function ReturnPageContent() {
     // Step 1: Contract & Mileage validation
     if (currentStep === 1) {
       if (!selectedContract) {
-        toast.error("Please select an active contract to return.");
+        toast.error("Please select a contract to return.");
         return;
       }
       if (returnMode === "shop") {
@@ -544,6 +595,13 @@ function ReturnPageContent() {
         ...getExtraPhotoKeys(returnPhotos).map(k => returnPhotos[k]),
       ];
 
+      // Avoid duplicate [Return Remarks: ...] when repeatedly editing
+      let cleanedNotes = selectedContract.notes || "";
+      if (instructions.trim()) {
+        cleanedNotes = cleanedNotes.replace(/\s*\[Return Remarks:\s*[\s\S]*?\]/g, "").trim();
+        cleanedNotes = cleanedNotes ? `${cleanedNotes}\n[Return Remarks: ${instructions.trim()}]` : `[Return Remarks: ${instructions.trim()}]`;
+      }
+
       const payload = {
         status: "Completed",
         deliveryStatus: "Returned",
@@ -574,12 +632,13 @@ function ReturnPageContent() {
         returnAmountCollected: totalReturnCharges,
         returnPaymentMethod: returnPaymentMethod,
         returnPhotos: orderedReturnPhotos,
-        notes: instructions.trim() ? `${selectedContract.notes || ""}\n[Return Remarks: ${instructions.trim()}]`.trim() : selectedContract.notes,
-        returnedAt: new Date().toISOString(),
-        returnedBy: (session?.user as any)?.name || "Admin",
+        returnNotes: instructions.trim(),
+        notes: cleanedNotes,
+        returnedAt: selectedContract.returnedAt || new Date().toISOString(),
+        returnedBy: selectedContract.returnedBy || (session?.user as any)?.name || "Admin",
       };
 
-      const res = await fetch(`/api/contracts/${selectedContract._id}`, {
+      const res = await fetch(`/api/contracts/${selectedContract._id || selectedContract.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -590,13 +649,17 @@ function ReturnPageContent() {
         throw new Error(errorData.error || "Failed to complete return process");
       }
 
-      toast.success("Vehicle returned and contract completed successfully! ✓");
+      if (isCompleted) {
+        toast.success("Return details updated successfully! ✓ (تم حفظ وتحديث بيانات الإرجاع بنجاح)");
+      } else {
+        toast.success("Vehicle returned and contract completed successfully! ✓");
+      }
       setTimeout(() => {
         router.push("/bookings");
       }, 800);
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "An error occurred while completing return");
+      toast.error(err.message || "An error occurred while saving return details");
       setIsSubmitting(false);
     }
   };
@@ -650,7 +713,13 @@ function ReturnPageContent() {
 
   // Filter contracts by query
   const filteredContracts = useMemo(() => {
-    if (!contractSearchQuery.trim()) return contracts;
+    if (!contractSearchQuery.trim()) {
+      const active = contracts.filter(c => c.status === "Active" || c.deliveryStatus === "Delivered");
+      if (selectedContract && !active.some(c => (c._id || c.id) === (selectedContract._id || selectedContract.id))) {
+        return [selectedContract, ...active];
+      }
+      return active.length > 0 ? active : contracts;
+    }
     const q = contractSearchQuery.toLowerCase();
     return contracts.filter(c => 
       c.vehicle?.toLowerCase().includes(q) ||
@@ -658,9 +727,10 @@ function ReturnPageContent() {
       c.customer?.toLowerCase().includes(q) ||
       c.personalizedPersonName?.toLowerCase().includes(q) ||
       c.id?.toLowerCase().includes(q) ||
-      c._id?.toLowerCase().includes(q)
+      c._id?.toLowerCase().includes(q) ||
+      String(c.contractNumber || "").includes(q)
     );
-  }, [contracts, contractSearchQuery]);
+  }, [contracts, contractSearchQuery, selectedContract]);
 
   if (loading) {
     return (
@@ -701,7 +771,7 @@ function ReturnPageContent() {
         {(!selectedContract || isChangingContract) ? (
           <div className="space-y-4 p-5 rounded-2xl bg-surface border border-border/80">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-bold text-text-primary">Active Fleet Bookings</span>
+              <span className="text-sm font-bold text-text-primary">Fleet Bookings (Active &amp; Completed)</span>
               {selectedContract && (
                 <button
                   type="button"
@@ -771,9 +841,16 @@ function ReturnPageContent() {
                           <Check size={14} />
                         </span>
                       ) : (
-                        <span className="text-[10px] font-semibold text-text-muted px-2 py-0.5 bg-gray-50 rounded border border-gray-200 shrink-0">
-                          #{c.id || c._id.substring(0,8).toUpperCase()}
-                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {(c.status === "Completed" || c.deliveryStatus === "Returned") && (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              Completed
+                            </span>
+                          )}
+                          <span className="text-[10px] font-semibold text-text-muted px-2 py-0.5 bg-gray-50 rounded border border-gray-200">
+                            #{c.contractNumber || c.id || c._id.substring(0,8).toUpperCase()}
+                          </span>
+                        </div>
                       )}
                     </div>
 
@@ -794,7 +871,7 @@ function ReturnPageContent() {
               })}
               {filteredContracts.length === 0 && (
                 <div className="col-span-2 py-8 text-center text-text-muted text-xs">
-                  No active contracts matching "{contractSearchQuery}".
+                  No contracts matching "{contractSearchQuery}".
                 </div>
               )}
             </div>
@@ -1925,11 +2002,22 @@ function ReturnPageContent() {
           >
             <ArrowLeft size={14} /> Back to Bookings
           </button>
-          <h1 className="text-2xl font-bold text-text-primary">Vehicle Return &amp; Check-in</h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-bold text-text-primary">
+              {isCompleted ? "Edit Vehicle Return & Settlement" : "Vehicle Return & Check-in"}
+            </h1>
+            {isCompleted && (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                Editing Completed Return #{contractNum}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-text-secondary mt-1">
-            {returnMode === "shop"
-              ? "In-Store Return — verify mileage & fuel, inspect vehicle condition, and settle contract."
-              : "Driver Dispatch — assign a driver to pick up and retrieve the vehicle from the client."}
+            {isCompleted
+              ? "Modify return inspection photos, return odometer, fuel level, damages, or settlement charges for this contract."
+              : (returnMode === "shop"
+                ? "In-Store Return — verify mileage & fuel, inspect vehicle condition, and settle contract."
+                : "Driver Dispatch — assign a driver to pick up and retrieve the vehicle from the client.")}
           </p>
         </div>
 
@@ -2071,17 +2159,29 @@ function ReturnPageContent() {
               type="button"
               onClick={returnMode === "shop" ? () => handleShopReturn() : () => handleDispatch()}
               disabled={isSubmitting || (returnMode === "shop" ? (!returnOdometer.trim() || isNaN(Number(returnOdometer))) : (!returnDriverId || !pickupLocation.trim()))}
-              className="px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer"
+              className={`px-7 py-3 rounded-xl text-white text-sm font-bold flex items-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer ${
+                isCompleted 
+                  ? "bg-amber-600 hover:bg-amber-700" 
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>{returnMode === "shop" ? "Closing Contract..." : "Dispatching Driver..."}</span>
+                  <span>
+                    {isCompleted 
+                      ? "Saving Return Changes..." 
+                      : (returnMode === "shop" ? "Closing Contract..." : "Dispatching Driver...")}
+                  </span>
                 </>
               ) : (
                 <>
                   {returnMode === "shop" ? <CheckCircle2 size={18} /> : <Send size={18} />}
-                  <span>{returnMode === "shop" ? "Complete Return & Check-in" : "Dispatch Return Driver"}</span>
+                  <span>
+                    {isCompleted
+                      ? "Save Return Changes (حفظ تعديلات الإرجاع)"
+                      : (returnMode === "shop" ? "Complete Return & Check-in" : "Dispatch Return Driver")}
+                  </span>
                 </>
               )}
             </button>

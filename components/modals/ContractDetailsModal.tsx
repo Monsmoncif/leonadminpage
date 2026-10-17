@@ -1295,9 +1295,25 @@ export default function ContractDetailsModal({
                     Return location, driver, odometer reading, fuel level, and damages inspection.
                   </p>
                 </div>
-                <span className={`text-[10px] sm:text-xs font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full border shrink-0 ${isReturned ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-50/70 text-red-600 border-red-200'}`}>
-                  {isReturned ? "Returned" : "Pending Return"}
-                </span>
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                  {isReturned && !isDriver && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        window.location.href = `/bookings/return?contractId=${contractData._id || contractData.id}`;
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 hover:bg-red-100 text-red-800 border border-red-300 rounded-full text-[11px] sm:text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                      title="Edit Return Data, Photos, Charges & Odometer (تعديل بيانات وفحص الإرجاع)"
+                    >
+                      <Edit size={12} className="text-red-700" />
+                      <span>Edit Return (تعديل الإرجاع)</span>
+                    </button>
+                  )}
+                  <span className={`text-[10px] sm:text-xs font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full border shrink-0 ${isReturned ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-50/70 text-red-600 border-red-200'}`}>
+                    {isReturned ? "Returned" : "Pending Return"}
+                  </span>
+                </div>
               </div>
 
               {/* Return Logistics Snapshot Card */}
@@ -1702,6 +1718,22 @@ export default function ContractDetailsModal({
                   >
                     <ArrowLeftRight size={15} className="shrink-0" />
                     <span className="truncate">Process Return</span>
+                  </button>
+                )}
+
+                {/* Edit Return: Admin can edit return details & settlement for completed/returned contracts */}
+                {!isDriver && isCompletedOrReturned && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      window.location.href = `/bookings/return?contractId=${contractData._id || contractData.id}`;
+                    }}
+                    className="flex-1 sm:flex-none px-3.5 py-2.5 min-h-[40px] sm:min-h-[38px] bg-red-50 hover:bg-red-100 active:scale-[0.98] text-red-800 border border-red-300 text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Edit vehicle return details, odometer, fuel, damages, or charges (تعديل بيانات وفحص الإرجاع)"
+                  >
+                    <Edit size={14} className="shrink-0 text-red-700" />
+                    <span className="truncate">Edit Return</span>
                   </button>
                 )}
 
