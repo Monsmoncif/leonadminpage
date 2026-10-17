@@ -470,37 +470,53 @@ export default function ContractDetailsModal({
                       : "Confirmed rental agreement details, schedule, pricing terms, and pending handover."}
                   </p>
                 </div>
-                <span className={`text-[11px] sm:text-xs font-bold px-2.5 py-1 rounded-full border self-start sm:self-auto shrink-0 flex items-center gap-1.5 shadow-2xs ${
-                  isCancelled
-                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                    : isCompletedOrReturned
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : isHandedOver 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                    : 'bg-amber-50 text-amber-700 border-amber-200'
-                }`}>
-                  {isCancelled ? (
-                    <>
-                      <XCircle size={13} className="text-rose-600 shrink-0" />
-                      <span>Cancelled</span>
-                    </>
-                  ) : isCompletedOrReturned ? (
-                    <>
-                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                      <span>{isDriverDelivery ? "Delivered • Returned" : "Handed Over • Returned"}</span>
-                    </>
-                  ) : isHandedOver ? (
-                    <>
-                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                      <span>{isDriverDelivery ? "Delivered" : "Handed Over"}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock size={13} className="text-amber-600 animate-pulse shrink-0" />
-                      <span>Pending Handover (معلق)</span>
-                    </>
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                  {isHandedOver && !isDriver && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        window.location.href = `/bookings/handover?contractId=${contractData._id || contractData.id}`;
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-full text-[11px] sm:text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                      title="Edit Handover Data, Photos & Odometer (تعديل بيانات وفحص التسليم)"
+                    >
+                      <Edit size={12} className="text-amber-700" />
+                      <span>Edit Handover (تعديل التسليم)</span>
+                    </button>
                   )}
-                </span>
+                  <span className={`text-[11px] sm:text-xs font-bold px-2.5 py-1 rounded-full border flex items-center gap-1.5 shadow-2xs ${
+                    isCancelled
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : isCompletedOrReturned
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : isHandedOver 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}>
+                    {isCancelled ? (
+                      <>
+                        <XCircle size={13} className="text-rose-600 shrink-0" />
+                        <span>Cancelled</span>
+                      </>
+                    ) : isCompletedOrReturned ? (
+                      <>
+                        <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        <span>{isDriverDelivery ? "Delivered • Returned" : "Handed Over • Returned"}</span>
+                      </>
+                    ) : isHandedOver ? (
+                      <>
+                        <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        <span>{isDriverDelivery ? "Delivered" : "Handed Over"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={13} className="text-amber-600 animate-pulse shrink-0" />
+                        <span>Pending Handover (معلق)</span>
+                      </>
+                    )}
+                  </span>
+                </div>
               </div>
 
               {/* ================= AWAITING HANDOVER BANNER (SHOWN WHEN NOT HANDED OVER) ================= */}
@@ -1644,8 +1660,24 @@ export default function ContractDetailsModal({
                 </button>
               </div>
 
-              {/* Primary Operational Action Buttons (Extend, Process Return, Confirm Handover) */}
+              {/* Primary Operational Action Buttons (Extend, Process Return, Edit Handover, Confirm Handover) */}
               <div className="flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+                {/* Edit Handover: Admin can edit handover for any delivered contract */}
+                {!isDriver && isDelivered && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      window.location.href = `/bookings/handover?contractId=${contractData._id || contractData.id}`;
+                    }}
+                    className="flex-1 sm:flex-none px-3.5 py-2.5 min-h-[40px] sm:min-h-[38px] bg-amber-50 hover:bg-amber-100 active:scale-[0.98] text-amber-800 border border-amber-300 text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Edit handover data, odometer, fuel, photos, or signature (تعديل بيانات التسليم)"
+                  >
+                    <Edit size={14} className="shrink-0 text-amber-700" />
+                    <span className="truncate">Edit Handover</span>
+                  </button>
+                )}
+
                 {/* Extend Rental: Admin only when delivered and not yet completed */}
                 {!isDriver && isDelivered && !isCompletedOrReturned && (
                   <button

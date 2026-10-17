@@ -362,6 +362,16 @@ function ConfirmHandoverPageContent() {
         if (Array.isArray(contractData.moneyPhotos) && contractData.moneyPhotos.length > 0) {
           setMoneyPhotos(contractData.moneyPhotos);
         }
+
+        // Initialize customer signature if already present (e.g. editing handover)
+        if (contractData.customerSignature) {
+          setSignatureData(contractData.customerSignature);
+        }
+
+        // Initialize payment confirmation if contract was already delivered or paid
+        if (contractData.deliveryStatus === "Delivered" || contractData.paymentStatus === "Paid") {
+          setIsDepositConfirmed(true);
+        }
       } catch (err: any) {
         console.error("Contract loading error:", err);
         setError(err.message || "Failed to load contract details.");
@@ -403,8 +413,9 @@ function ConfirmHandoverPageContent() {
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.setTransform(1, 0, 0, 1, 0, 0);
-          if (toDraw && typeof toDraw === "string" && toDraw.startsWith("data:image")) {
+          if (toDraw && typeof toDraw === "string") {
             const img = new Image();
+            img.crossOrigin = "anonymous";
             img.onload = () => {
               ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
             };
@@ -636,37 +647,43 @@ function ConfirmHandoverPageContent() {
 
   // Final Submission to API
   const handleConfirmHandover = async () => {
+    const isEditingDelivered = contract?.deliveryStatus === "Delivered";
+
     if (!isDepositConfirmed) {
-      setError("Please check 'Confirm Get All Money' in Step 3 before activating the contract.");
+      setError("Please check 'Confirm Get All Money' in Step 3 before saving the contract.");
       toast.error("Please confirm payment in Step 3.");
       setCurrentStep(3);
       return;
     }
 
-    if (!signatureData) {
+    const finalSignature = signatureData || contract.customerSignature;
+    if (!finalSignature) {
       setError("Customer signature is required. Please capture customer signature in Step 4.");
       toast.error("Customer signature is required. (توقيع العميل مطلوب)");
       return;
     }
 
-    const nowStartOfDay = new Date();
-    nowStartOfDay.setHours(0, 0, 0, 0);
-    const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
-    contractStartDate.setHours(0, 0, 0, 0);
+    // Only enforce day-of-start check for fresh initial handover, never for editing already handed over contracts
+    if (!isEditingDelivered) {
+      const nowStartOfDay = new Date();
+      nowStartOfDay.setHours(0, 0, 0, 0);
+      const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
+      contractStartDate.setHours(0, 0, 0, 0);
 
-    if (contractStartDate > nowStartOfDay) {
-      const formattedDate = contractStartDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-      });
-      setError(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
-      toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
-      return;
+      if (contractStartDate > nowStartOfDay) {
+        const formattedDate = contractStartDate.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric"
+        });
+        setError(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
+        toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
+        return;
+      }
     }
 
     setIsSubmitting(true);
-    toast.success("Activating contract and completing vehicle handover...");
+    toast.success(isEditingDelivered ? "Saving handover modifications..." : "Activating contract and completing vehicle handover...");
 
     try {
       const contractId = contract._id || contract.id;
@@ -677,9 +694,8 @@ function ConfirmHandoverPageContent() {
         ...getExtraPhotoKeys(inspectionPhotos).map((k) => inspectionPhotos[k]),
       ];
 
-      const payload = {
+      const payload: any = {
         deliveryStatus: "Delivered",
-        status: "Active",
         startDate: rentalData.startDate,
         endDate: rentalData.endDate,
         rentalType: rentalData.rentalType,
@@ -705,13 +721,18 @@ function ConfirmHandoverPageContent() {
         collectionAmount: Number(rentalData.collectionAmount),
         moneyPhotos,
         notes: rentalData.notes,
-        customerSignature: signatureData,
-        adminSignature: contract.adminSignature || null,
+        customerSignature: finalSignature,
+        adminSignature: contract.adminSignature || "/images/admin-signature.png",
         inspectionPhotos: inspectionArray,
-        handoverCompletedAt: new Date().toISOString(),
-        deliveredBy: (session?.user as any)?.name || "Admin",
-        notifyClient: true,
+        handoverCompletedAt: contract.handoverCompletedAt || new Date().toISOString(),
+        deliveredAt: contract.deliveredAt || new Date().toISOString(),
+        deliveredBy: contract.deliveredBy || (session?.user as any)?.name || "Admin",
+        notifyClient: !isEditingDelivered,
       };
+
+      if (contract.status !== "Completed" && contract.status !== "Cancelled") {
+        payload.status = "Active";
+      }
 
       const res = await fetch(`/api/contracts/${contractId}`, {
         method: "PUT",
@@ -721,10 +742,14 @@ function ConfirmHandoverPageContent() {
 
       if (!res.ok) {
         const resData = await res.json();
-        throw new Error(resData.error || "Failed to confirm delivery handover.");
+        throw new Error(resData.error || "Failed to save vehicle handover.");
       }
 
-      toast.success("Vehicle handover completed and contract activated successfully! ✓");
+      toast.success(
+        isEditingDelivered 
+          ? "Handover details updated successfully! ✓ (تم حفظ وتحديث بيانات التسليم بنجاح)"
+          : "Vehicle handover completed and contract activated successfully! ✓"
+      );
       router.push("/bookings");
     } catch (err: any) {
       console.error("Handover submit error:", err);
@@ -1609,6 +1634,15 @@ function ConfirmHandoverPageContent() {
             onTouchEnd={stopDrawing}
             className="w-full h-44 cursor-crosshair block"
           />
+          {signatureData && !hasDrawnRef.current && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4">
+              <img
+                src={signatureData}
+                alt="Captured Customer Signature"
+                className="max-h-32 max-w-[80%] object-contain select-none"
+              />
+            </div>
+          )}
           {!signatureData && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1">
               <PenTool size={26} className="opacity-30" />
@@ -1677,7 +1711,21 @@ function ConfirmHandoverPageContent() {
           >
             <ArrowLeft size={14} /> Back to Bookings
           </button>
-          <h1 className="text-2xl font-bold text-text-primary">Confirm Vehicle Handover</h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-bold text-text-primary">
+              {contract?.deliveryStatus === "Delivered" ? "Edit Vehicle Handover (تعديل بيانات التسليم)" : "Confirm Vehicle Handover"}
+            </h1>
+            {contract?.deliveryStatus === "Delivered" && (
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                Editing Handover #{contractNum}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-text-muted mt-1">
+            {contract?.deliveryStatus === "Delivered"
+              ? `You are editing existing handover data for Contract #${contractNum} (Handed over by: ${contract.deliveredBy || "Staff"}). Any changes will update the contract and the official PDF.`
+              : "Verify assigned car, set handover time and fuel level, capture inspection photos, and complete client handover."}
+          </p>
         </div>
       </div>
 
@@ -1792,12 +1840,12 @@ function ConfirmHandoverPageContent() {
                 {isSubmitting ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Activating Contract...</span>
+                    <span>{contract?.deliveryStatus === "Delivered" ? "Saving Changes..." : "Activating Contract..."}</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 size={16} />
-                    <span>Confirm Handover &amp; Activate Contract</span>
+                    <span>{contract?.deliveryStatus === "Delivered" ? "Save Handover Changes (حفظ التعديلات)" : "Confirm Handover & Activate Contract"}</span>
                   </>
                 )}
               </button>
