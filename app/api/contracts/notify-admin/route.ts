@@ -7,6 +7,7 @@ import { Unit } from "@/models/Unit";
 import nodemailer from "nodemailer";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { buildAdminEventNoticeEmail, getEmailLogoAttachment } from "@/lib/email-templates";
+import { generateContractPdfFromPrintUrl } from "@/lib/pdf-generator";
 
 export async function POST(req: Request) {
   try {
@@ -53,6 +54,17 @@ export async function POST(req: Request) {
       }
     }
 
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const contractDownloadUrl = `${baseUrl}/api/contracts/${contract._id}/pdf`;
+
+    // Generate real official contract PDF for admin
+    let pdfBuffer: Buffer | undefined;
+    try {
+      pdfBuffer = await generateContractPdfFromPrintUrl(contract._id.toString());
+    } catch (e) {
+      console.warn("Could not generate real print PDF for admin notification:", e);
+    }
+
     const adminEmail = process.env.SMTP_USER;
     const results = { email: false, whatsapp: false };
 
@@ -84,12 +96,22 @@ export async function POST(req: Request) {
         });
 
         const logoAtt = getEmailLogoAttachment();
+        const attachments: any[] = [];
+        if (logoAtt) attachments.push(logoAtt);
+        if (pdfBuffer) {
+          attachments.push({
+            filename: `Contract-${contractNum}.pdf`,
+            content: pdfBuffer,
+            contentType: "application/pdf",
+          });
+        }
+
         await transporter.sendMail({
           from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
           to: adminEmail,
           subject,
           html: emailHtml,
-          attachments: logoAtt ? [logoAtt] : [],
+          attachments,
         });
         results.email = true;
       } catch (emailErr) {
@@ -112,7 +134,8 @@ export async function POST(req: Request) {
         (isShop
           ? `🏢 *Handover / الاستلام:* Agency / Shop (المكتب / الوكالة)\n`
           : `👨‍✈️ *Driver / السائق:* ${driverName}\n`) +
-        `${moneyLine}\n\n` +
+        `${moneyLine}\n` +
+        `📄 *Contract / العقد:* ${contractDownloadUrl}\n\n` +
         `— *Leon Rent Car*`;
 
       for (const admin of admins) {
@@ -120,6 +143,9 @@ export async function POST(req: Request) {
           const waResult = await sendWhatsApp({
             to: admin.phone,
             message: whatsappMsg,
+            pdfBuffer,
+            pdfFilename: `Contract-${contractNum}.pdf`,
+            pdfUrl: contractDownloadUrl,
           });
           if (waResult.success) {
             results.whatsapp = true;

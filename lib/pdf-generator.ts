@@ -46,14 +46,20 @@ export interface ContractPdfData {
 
 function getBrowserExecutablePath(): string | null {
   const possiblePaths = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    process.env.CHROME_BIN,
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/snap/bin/chromium",
+    "/usr/local/bin/chrome",
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-  ];
+  ].filter(Boolean) as string[];
+
   for (const p of possiblePaths) {
     try {
       if (fs.existsSync(p)) return p;
@@ -63,7 +69,6 @@ function getBrowserExecutablePath(): string | null {
   }
   return null;
 }
-
 
 /**
  * Generates the EXACT official contract PDF matching the Admin Print page (/bookings/[id]/print)
@@ -94,26 +99,42 @@ export async function generateContractPdfFromPrintUrl(
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-extensions",
+        "--ignore-certificate-errors",
+        "--allow-insecure-localhost",
+        "--disable-web-security",
       ],
     });
 
     page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://127.0.0.1:3000";
-    const printUrl = `${baseUrl}/bookings/${contractId}/print?noprint=1&fresh=1`;
+    const localPort = process.env.PORT || "3000";
+    const localBaseUrl = `http://127.0.0.1:${localPort}`;
+    const nextAuthBase = process.env.NEXTAUTH_URL;
+
+    // Try local loopback first (direct fast connection, avoids DNS/SSL/proxy issues on server)
+    let printUrl = `${localBaseUrl}/bookings/${contractId}/print?noprint=1&fresh=1`;
 
     try {
-      await page.goto(printUrl, { waitUntil: "networkidle0", timeout: 20000 });
-    } catch {
-      await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+      await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
+    } catch (localErr) {
+      if (nextAuthBase && !nextAuthBase.includes("127.0.0.1") && !nextAuthBase.includes(`:${localPort}`)) {
+        printUrl = `${nextAuthBase}/bookings/${contractId}/print?noprint=1&fresh=1`;
+        console.warn(`[PdfGenerator] Local URL failed, retrying via NEXTAUTH_URL: ${printUrl}`);
+        await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
+      } else {
+        throw localErr;
+      }
     }
 
     // Wait for the contract page content to be fully rendered
-    await page.waitForSelector("#contract-page-1, #contract-print-content", { timeout: 15000 });
+    await page.waitForSelector("#contract-page-1, #contract-print-content", { timeout: 20000 });
     
-    // Brief settle time for fonts, diagrams, stamps, and signatures
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // Wait for fonts & brand assets to settle
+    try {
+      await page.evaluate(() => (document as any).fonts?.ready);
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const pdfUint8Array = await page.pdf({
       format: "A4",
@@ -160,19 +181,21 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
       doc.on("end", () => resolve(Buffer.concat(buffers)));
       doc.on("error", (err) => reject(err));
 
-      const primaryColor = "#0f172a";
-      const brandColor = "#2563eb";
+      const primaryColor = "#181818";
+      const brandColor = "#EEA21B";
       const lightBg = "#f8fafc";
       const borderColor = "#cbd5e1";
 
-      // --- HEADER ---
-      doc.rect(36, 36, 523, 60).fill("#1e293b");
+      // --- HEADER BANNER (Black & Gold Official Leon Design) ---
+      doc.rect(36, 36, 523, 62).fill("#181818");
+      doc.rect(36, 96, 523, 2).fill("#EEA21B");
 
-      doc.fillColor("#ffffff").fontSize(20).font("Helvetica-Bold").text("LEON RENT CAR", 50, 48);
-      doc.fontSize(9).font("Helvetica").fillColor("#94a3b8").text("Luxury & Commercial Vehicle Rentals — Car Rental Agreement", 50, 72);
+      doc.fillColor("#EEA21B").fontSize(19).font("Helvetica-Bold").text("LEON ", 50, 48, { continued: true });
+      doc.fillColor("#ffffff").text("CAR RENTAL");
+      doc.fontSize(8.5).font("Helvetica").fillColor("#cbd5e1").text("Tel: +971 589 206 713 • Al Quoz Industrial Area 3, Dubai", 50, 72);
 
-      doc.fillColor("#ffffff").fontSize(12).font("Helvetica-Bold").text(`CONTRACT #${data.contractNumber}`, 380, 50, { align: "right", width: 165 });
-      doc.fontSize(8).font("Helvetica").fillColor("#cbd5e1").text(`Date: ${data.createdAt || new Date().toLocaleDateString("en-GB")}`, 380, 70, { align: "right", width: 165 });
+      doc.fillColor("#EEA21B").fontSize(11).font("Helvetica-Bold").text(`AGREEMENT #${data.contractNumber}`, 370, 48, { align: "right", width: 175 });
+      doc.fontSize(8).font("Helvetica").fillColor("#e2e8f0").text(`Date: ${data.createdAt || new Date().toLocaleDateString("en-GB")}`, 370, 72, { align: "right", width: 175 });
 
       let y = 110;
 

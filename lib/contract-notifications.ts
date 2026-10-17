@@ -84,10 +84,10 @@ export async function sendClientContractNotification(
     const contractPdfUrl = `${baseUrl}/bookings/${contract._id}/print`;
     const contractDownloadUrl = `${baseUrl}/api/contracts/${contract._id}/pdf`;
 
-    // 0. GENERATE REAL PDF BUFFER ONLY FOR OFFICIAL HANDOVER (type === "initial")
-    // For "created" (booking confirmation) and "final" (VIP return thank you), no PDF is generated or attached as requested.
+    // 0. GENERATE REAL PDF BUFFER FOR CONTRACT CREATION & HANDOVER
+    const shouldSendContractPdf = type === "initial" || type === "created";
     let pdfBuffer: Buffer | undefined;
-    if (type === "initial") {
+    if (shouldSendContractPdf) {
       const hasEmiratesId = Boolean(
         clientDoc.idNumber && (
           clientDoc.idNumber.startsWith("784-") ||
@@ -110,6 +110,7 @@ export async function sendClientContractNotification(
         clientType: isForeigner ? "Tourist" : (clientDoc.clientType || "Resident"),
         clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
         licenseIssuedBy: clientDoc.licenseIssuedBy || clientDoc.licenseIssuedAt || "",
+        licenseIssuedDate: clientDoc.licenseIssuedDate ? new Date(clientDoc.licenseIssuedDate).toLocaleDateString("en-GB") : "",
         licenseExpiry: clientDoc.licenseExpiry ? new Date(clientDoc.licenseExpiry).toLocaleDateString("en-GB") : "",
         internationalLicenseNumber: clientDoc.internationalLicenseNumber || "",
         passportNumber: clientDoc.passportNumber || (isForeigner ? clientDoc.idNumber : ""),
@@ -143,14 +144,11 @@ export async function sendClientContractNotification(
       };
 
       try {
-        const pdfPromise = generateContractPdfFromPrintUrl(contract._id.toString(), contractPdfData);
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Browser PDF generation timed out after 12s")), 12000)
-        );
-        pdfBuffer = await Promise.race([pdfPromise, timeoutPromise]);
-        console.log(`[ClientNotification] Generated exact admin print PDF (${pdfBuffer.length} bytes) for contract #${contractNum}`);
+        console.log(`[ClientNotification] Generating real contract PDF from print page for contract #${contractNum}...`);
+        pdfBuffer = await generateContractPdfFromPrintUrl(contract._id.toString(), contractPdfData);
+        console.log(`[ClientNotification] Successfully generated exact real contract PDF (${pdfBuffer.length} bytes) for #${contractNum}`);
       } catch (browserErr) {
-        console.warn(`[ClientNotification] Browser PDF render failed/timed out for contract #${contractNum}, generating via fallback:`, browserErr);
+        console.warn(`[ClientNotification] Real print PDF generation failed for contract #${contractNum}, using styled fallback:`, browserErr);
         try {
           pdfBuffer = await generateContractPdf(contractPdfData);
         } catch (fallbackErr) {
@@ -198,7 +196,7 @@ export async function sendClientContractNotification(
           const attachments: any[] = [];
           const logoAtt = getEmailLogoAttachment();
           if (logoAtt) attachments.push(logoAtt);
-          if (pdfBuffer && type === "initial") {
+          if (pdfBuffer && shouldSendContractPdf) {
             attachments.push({
               filename: `Contract-${contractNum}.pdf`,
               content: pdfBuffer,
@@ -214,7 +212,7 @@ export async function sendClientContractNotification(
             attachments,
           });
           results.email = true;
-          console.log(`[ClientNotification] Email (${type}) sent to ${clientEmail}`);
+          console.log(`[ClientNotification] Email (${type}) sent to ${clientEmail} with real contract PDF attachment: ${Boolean(pdfBuffer)}`);
         } catch (mailErr) {
           console.error(`[ClientNotification] Failed to send email to ${clientEmail}:`, mailErr);
         }
@@ -238,26 +236,28 @@ export async function sendClientContractNotification(
             `Safe travels,\n` +
             `— *Leon Rent Car Team*`;
         } else if (type === "created") {
-          whatsappMsg = `🎉 *LEON RENT CAR* | تأكيد حجز سيارة\n` +
-            `*Vehicle Reservation Confirmed*\n\n` +
+          whatsappMsg = `🎉 *LEON RENT CAR* | تأكيد حجز وعقد سيارة رسمي\n` +
+            `*Vehicle Reservation & Agreement*\n\n` +
             `Hello *${clientName}*,\n` +
-            `Your vehicle reservation has been successfully confirmed and registered! ✨\n\n` +
+            `Your vehicle reservation and rental agreement have been successfully registered! ✨\n\n` +
             `🚙 *Vehicle / السيارة:* ${vehicleName}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
             (contract.pickupLocation ? `📍 *Pickup Location / موقع الاستلام:* ${contract.pickupLocation}\n` : '') +
             (contract.checkoutTime ? `⏰ *Pickup Time / موعد الاستلام:* ${contract.checkoutTime}\n` : '') +
-            `\n🛡️ *Your vehicle is confirmed and is being prepared for you.* Our team will have it ready on time.\n\n` +
+            `\n📎 *Your official rental contract is attached below (PDF).*\n` +
+            `📄 *مرفق لكم العقد الرسمي بصيغة PDF.*\n\n` +
             `Need any assistance? Reply directly to this chat.\n` +
             `— *Leon Rent Car*`;
         } else {
-          whatsappMsg = `🌟 *LEON RENT CAR* | عقد إيجار سيارة رسمي\n` +
+          whatsappMsg = `🌟 *LEON RENT CAR* | عقد إيجار سيارة رسمي والتسليم\n` +
             `*Vehicle Rental Agreement & Handover*\n\n` +
             `Hello *${clientName}*,\n` +
             `Thank you for choosing Leon Rent Car! Your vehicle handover inspection is complete.\n\n` +
             `🚗 *Vehicle / السيارة:* ${vehicleName}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
             (contract.pickupLocation ? `📍 *Pickup Location / موقع الاستلام:* ${contract.pickupLocation}\n` : '') +
-            `\n📎 *Your official rental contract is attached below (PDF).*\n\n` +
+            `\n📎 *Your official rental contract is attached below (PDF).*\n` +
+            `📄 *مرفق لكم العقد الرسمي بصيغة PDF.*\n\n` +
             `🛣️ Have a safe journey and enjoy the drive!\n` +
             `— *Leon Rent Car*`;
         }
@@ -265,9 +265,9 @@ export async function sendClientContractNotification(
         const waRes = await sendWhatsApp({
           to: clientPhone,
           message: whatsappMsg,
-          pdfBuffer: type === "initial" ? pdfBuffer : undefined,
-          pdfFilename: type === "initial" ? `Contract-${contractNum}.pdf` : undefined,
-          pdfUrl: type === "initial" ? (contract.contractPdfUrl || contractDownloadUrl || contractPdfUrl) : undefined,
+          pdfBuffer: shouldSendContractPdf ? pdfBuffer : undefined,
+          pdfFilename: shouldSendContractPdf ? `Contract-${contractNum}.pdf` : undefined,
+          pdfUrl: shouldSendContractPdf ? (contract.contractPdfUrl || contractDownloadUrl || contractPdfUrl) : undefined,
         });
 
         if (waRes.success) {
@@ -346,6 +346,16 @@ export async function sendDriverTaskNotification(
     const actionUrl = isDelivery 
       ? `${baseUrl}/driver/delivery?contractId=${contract._id}`
       : `${baseUrl}/driver/return?contractId=${contract._id}`;
+    const contractPrintUrl = `${baseUrl}/bookings/${contract._id}/print`;
+    const contractDownloadUrl = `${baseUrl}/api/contracts/${contract._id}/pdf`;
+
+    // Generate real official contract PDF for driver
+    let driverPdfBuffer: Buffer | undefined;
+    try {
+      driverPdfBuffer = await generateContractPdfFromPrintUrl(contract._id.toString());
+    } catch (e) {
+      console.warn(`[DriverNotification] Could not pre-generate print PDF for driver task:`, e);
+    }
 
     // 1. SEND GMAIL TO DRIVER
     if (driver.email) {
@@ -369,12 +379,22 @@ export async function sendDriverTaskNotification(
           });
 
           const logoAtt = getEmailLogoAttachment();
+          const attachments: any[] = [];
+          if (logoAtt) attachments.push(logoAtt);
+          if (driverPdfBuffer) {
+            attachments.push({
+              filename: `Contract-${contractNum}.pdf`,
+              content: driverPdfBuffer,
+              contentType: "application/pdf",
+            });
+          }
+
           await transporter.sendMail({
             from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
             to: driver.email,
             subject,
             html: emailHtml,
-            attachments: logoAtt ? [logoAtt] : [],
+            attachments,
           });
           results.email = true;
           console.log(`[DriverNotification] Email sent to ${driver.email}`);
@@ -399,12 +419,16 @@ export async function sendDriverTaskNotification(
           `⏰ *التوقيت المحدد / Time:* ${time}\n` +
           `📅 *فترة الإيجار / Period:* ${startDate} → ${endDate}\n` +
           (contract.notes ? `\n📋 *ملاحظات / Notes:* ${contract.notes}\n` : '') +
-          `\n📲 *رابط المهمة للسائق / Open Task:*\n${actionUrl}\n\n` +
+          `\n📲 *رابط المهمة للسائق / Open Task:*\n${actionUrl}\n` +
+          `📄 *رابط العقد الرسمي / View Contract:*\n${contractPrintUrl}\n\n` +
           `— *Leon Rent Car Dispatch*`;
 
         const waRes = await sendWhatsApp({
           to: driver.phone,
           message: whatsappMsg,
+          pdfBuffer: driverPdfBuffer,
+          pdfFilename: `Contract-${contractNum}.pdf`,
+          pdfUrl: contractDownloadUrl,
         });
 
         if (waRes.success) {
