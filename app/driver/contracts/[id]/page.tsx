@@ -88,6 +88,13 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
     );
   }
 
+  const isHandedOver = Boolean(
+    contractDetails.contractNumber ||
+    contractDetails.deliveryStatus === "Delivered" ||
+    contractDetails.status === "Active" ||
+    contractDetails.status === "Completed"
+  );
+
   return (
     <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 pb-12 animate-fade-in-up">
       {/* Header */}
@@ -100,8 +107,14 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
             <ChevronLeft size={18} className="text-text-secondary" />
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text-primary">Contract Details</h1>
-            <p className="text-xs sm:text-sm font-medium text-text-secondary mt-0.5">#{contractDetails.contractNumber || contractDetails._id?.toString().substring(0,8).toUpperCase()}</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary">
+              {isHandedOver ? "Contract Details" : "Delivery Order Details"}
+            </h1>
+            <p className="text-xs sm:text-sm font-medium text-text-secondary mt-0.5">
+              {contractDetails.contractNumber
+                ? `#${contractDetails.contractNumber}`
+                : `Order #${contractDetails._id?.toString().substring(0,8).toUpperCase()}`}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3 self-start sm:self-auto">
@@ -233,46 +246,76 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
             </div>
           )}
 
-          {/* Document Details */}
-          <div className="bg-gray-50 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-gray-200 flex items-center justify-between">
-            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl flex items-center justify-center text-red-500 shadow-2xs border border-gray-100 shrink-0">
-                <FileText size={20} className="sm:w-6 sm:h-6" />
+          {/* Document Details or Pending Handover Notice */}
+          {isHandedOver ? (
+            <div className="bg-gray-50 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl flex items-center justify-center text-red-500 shadow-2xs border border-gray-100 shrink-0">
+                  <FileText size={20} className="sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-base font-bold text-gray-900 truncate">
+                    {contractDetails.contractNumber ? `${contractDetails.contractNumber}.pdf` : 'Contract.pdf'}
+                  </p>
+                  <p className="text-[11px] sm:text-xs font-medium text-gray-500 mt-0.5">Signed Official Contract</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-xs sm:text-base font-bold text-gray-900 truncate">{contractDetails.contractNumber ? `${contractDetails.contractNumber}.pdf` : 'Contract.pdf'}</p>
-                <p className="text-[11px] sm:text-xs font-medium text-gray-500 mt-0.5">2.4 MB • Signed</p>
-              </div>
+              <button
+                onClick={() => window.open(`/bookings/${contractDetails._id}/print`, "_blank")}
+                className="p-2.5 sm:p-3 bg-white border border-gray-200 rounded-xl hover:text-brand hover:border-brand hover:shadow-md transition-all cursor-pointer text-gray-600 shrink-0"
+                title="Download or Print PDF"
+              >
+                <Download size={16} />
+              </button>
             </div>
-            <button
-              onClick={() => window.open(`/bookings/${contractDetails._id}/print`, "_blank")}
-              className="p-2.5 sm:p-3 bg-white border border-gray-200 rounded-xl hover:text-brand hover:border-brand hover:shadow-md transition-all cursor-pointer text-gray-600 shrink-0"
-              title="Download or Print PDF"
-            >
-              <Download size={16} />
-            </button>
-          </div>
+          ) : (
+            <div className="bg-amber-50/70 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700 shadow-2xs border border-amber-200 shrink-0">
+                  <Clock size={20} className="sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-base font-bold text-amber-950">
+                    Pending Vehicle Handover (بانتظار تسليم السيارة وتوثيق الفحص)
+                  </p>
+                  <p className="text-[11px] sm:text-xs font-medium text-amber-700 mt-0.5">
+                    Official signed contract PDF will be generated and automatically sent to the client once vehicle inspection and client handover are confirmed.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push(`/driver/delivery?contractId=${contractDetails._id}`)}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors shrink-0 cursor-pointer"
+              >
+                <CheckCircle size={15} />
+                <span>Confirm Handover (تأكيد التسليم)</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Action Footer */}
-        <div className="px-3.5 sm:px-6 py-3.5 sm:py-5 border-t border-gray-100 bg-gray-50 grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-3 sm:justify-end">
-          <button className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-gray-200 hover:bg-gray-100 hover:border-gray-300 text-gray-700 text-xs sm:text-sm font-bold px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs cursor-pointer">
-            <Mail size={15} className="text-gray-400" />
-            <span>Resend Email</span>
-          </button>
-          {/* Customer phone intentionally hidden from drivers */}
-          <button className="flex items-center justify-center gap-1.5 sm:gap-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs sm:text-sm font-bold px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl transition-all shadow-2xs cursor-pointer">
-            <Send size={15} className="text-gray-400" />
-            <span>Send PDF</span>
-          </button>
-          <button
-            onClick={() => window.open(`/bookings/${contractDetails._id}/print`, "_blank")}
-            className="flex items-center justify-center gap-1.5 sm:gap-2 bg-brand text-white text-xs sm:text-sm font-bold px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:bg-brand-dark cursor-pointer"
-          >
-            <Printer size={15} />
-            <span>Print PDF</span>
-          </button>
-        </div>
+        {isHandedOver ? (
+          <div className="px-3.5 sm:px-6 py-3.5 sm:py-5 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2 sm:gap-3">
+            <button
+              onClick={() => window.open(`/bookings/${contractDetails._id}/print`, "_blank")}
+              className="flex items-center justify-center gap-1.5 sm:gap-2 bg-brand text-white text-xs sm:text-sm font-bold px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:bg-brand-dark cursor-pointer"
+            >
+              <Printer size={15} />
+              <span>Print Official Contract</span>
+            </button>
+          </div>
+        ) : (
+          <div className="px-3.5 sm:px-6 py-3.5 sm:py-5 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2 sm:gap-3">
+            <button
+              onClick={() => router.push(`/driver/delivery?contractId=${contractDetails._id}`)}
+              className="flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl transition-all shadow-md cursor-pointer"
+            >
+              <CheckCircle size={16} />
+              <span>Proceed to Handover &amp; Inspection (بدء تسليم السيارة)</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

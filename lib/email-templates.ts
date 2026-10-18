@@ -561,7 +561,11 @@ export function buildDriverTaskEmail(params: {
     html: buildBaseEmailLayout({
       title: taskTitle,
       subtitle: taskSubtitle,
-      referenceBadge: `#${params.contractNumber}`,
+      referenceBadge: params.contractNumber
+        ? (params.contractNumber.startsWith("#") || params.contractNumber.startsWith("Order")
+            ? params.contractNumber
+            : `#${params.contractNumber}`)
+        : "Task Order",
       contentHtml,
     }),
   };

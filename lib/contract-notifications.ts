@@ -331,7 +331,9 @@ export async function sendDriverTaskNotification(
       return results;
     }
 
-    const contractNum = contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase();
+    const orderRef = contract.contractNumber 
+      ? `#${contract.contractNumber}` 
+      : `Order #${contract._id.toString().substring(0, 8).toUpperCase()}`;
     const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
     const vehiclePlate = contract.unitId?.plate || "";
     const clientName = contract.clientId?.name || "Client";
@@ -341,8 +343,8 @@ export async function sendDriverTaskNotification(
 
     const isDelivery = type === "delivery_assigned";
     const taskArabicTitle = isDelivery 
-      ? "🚗 مهمة تسليم سيارة للعميل (Give a Car)" 
-      : "🔄 مهمة استلام وإرجاع سيارة (Pick a Car & Return)";
+      ? "🚗 طلب تسليم سيارة جديد (New Delivery Assignment)" 
+      : "🔄 طلب استلام وإرجاع سيارة (New Return Assignment)";
     const taskType = isDelivery ? "Vehicle Delivery" : "Vehicle Return Pickup";
     const location = isDelivery 
       ? (contract.pickupLocation || "Main Office") 
@@ -353,16 +355,10 @@ export async function sendDriverTaskNotification(
     const actionUrl = isDelivery 
       ? `${baseUrl}/driver/delivery?contractId=${contract._id}`
       : `${baseUrl}/driver/return?contractId=${contract._id}`;
-    const contractPrintUrl = `${baseUrl}/bookings/${contract._id}/print`;
-    const contractDownloadUrl = `${baseUrl}/api/contracts/${contract._id}/pdf`;
 
-    // Generate real official contract PDF for driver
-    let driverPdfBuffer: Buffer | undefined;
-    try {
-      driverPdfBuffer = await generateContractPdfFromPrintUrl(contract._id.toString());
-    } catch (e) {
-      console.warn(`[DriverNotification] Could not pre-generate print PDF for driver task:`, e);
-    }
+    // Note: PDF is NOT attached for driver dispatch.
+    // The driver only sees the new assignment and operational task details.
+    // The official contract PDF is generated and sent to the client when the vehicle handover is completed.
 
     // 1. SEND GMAIL TO DRIVER
     if (driver.email) {
@@ -371,7 +367,7 @@ export async function sendDriverTaskNotification(
         try {
           const { subject, html: emailHtml } = buildDriverTaskEmail({
             driverName: driver.name,
-            contractNumber: contractNum,
+            contractNumber: orderRef,
             vehicleName,
             vehiclePlate,
             clientName,
@@ -388,13 +384,6 @@ export async function sendDriverTaskNotification(
           const logoAtt = getEmailLogoAttachment();
           const attachments: any[] = [];
           if (logoAtt) attachments.push(logoAtt);
-          if (driverPdfBuffer) {
-            attachments.push({
-              filename: `Contract-${contractNum}.pdf`,
-              content: driverPdfBuffer,
-              contentType: "application/pdf",
-            });
-          }
 
           await transporter.sendMail({
             from: `"Leon Rent Car Dispatch" <${process.env.SMTP_USER}>`,
@@ -418,7 +407,8 @@ export async function sendDriverTaskNotification(
         const clientChatLink = cleanClientPhone ? `https://wa.me/${cleanClientPhone}` : null;
 
         const whatsappMsg = `*${taskArabicTitle}*\n\n` +
-          `🚙 *السيارة / Vehicle:* ${vehicleName} (${vehiclePlate})\n` +
+          `📋 *المرجع / Reference:* ${orderRef}\n` +
+          `🚙 *السيارة / Vehicle:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
           `👤 *العميل / Client:* ${clientName}\n` +
           `📞 *هاتف العميل / Phone:* ${clientPhone || "N/A"}\n` +
           (clientChatLink ? `💬 *واتساب العميل / Chat:* ${clientChatLink}\n` : '') +
@@ -426,16 +416,12 @@ export async function sendDriverTaskNotification(
           `⏰ *التوقيت المحدد / Time:* ${time}\n` +
           `📅 *فترة الإيجار / Period:* ${startDate} → ${endDate}\n` +
           (contract.notes ? `\n📋 *ملاحظات / Notes:* ${contract.notes}\n` : '') +
-          `\n📲 *رابط المهمة للسائق / Open Task:*\n${actionUrl}\n` +
-          `📄 *رابط العقد الرسمي / View Contract:*\n${contractPrintUrl}\n\n` +
+          `\n📲 *رابط استلام ومتابعة المهمة / Open Task:*\n${actionUrl}\n\n` +
           `— *Leon Rent Car Dispatch*`;
 
         const waRes = await sendWhatsApp({
           to: driver.phone,
           message: whatsappMsg,
-          pdfBuffer: driverPdfBuffer,
-          pdfFilename: `Contract-${contractNum}.pdf`,
-          pdfUrl: contractDownloadUrl,
         });
 
         if (waRes.success) {
