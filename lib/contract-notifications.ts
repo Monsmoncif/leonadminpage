@@ -84,8 +84,15 @@ export async function sendClientContractNotification(
     const contractPdfUrl = `${baseUrl}/bookings/${contract._id}/print`;
     const contractDownloadUrl = `${baseUrl}/api/contracts/${contract._id}/pdf`;
 
-    // 0. GENERATE REAL PDF BUFFER FOR CONTRACT CREATION & HANDOVER
-    const shouldSendContractPdf = type === "initial" || type === "created";
+    // 0. GENERATE REAL PDF BUFFER FOR CONTRACT HANDOVER / DELIVERY
+    // Real official signed contract PDF is ONLY attached upon actual vehicle Handover / Delivery ("initial")
+    // When an admin creates a contract without handover ("created"), send clean booking confirmation WITHOUT any PDF contract.
+    const isHandedOverOrDelivered = Boolean(
+      contract.deliveryStatus === "Delivered" ||
+      contract.status === "Active" ||
+      contract.deliveredAt
+    );
+    const shouldSendContractPdf = type === "initial" && isHandedOverOrDelivered;
     let pdfBuffer: Buffer | undefined;
     if (shouldSendContractPdf) {
       const hasEmiratesId = Boolean(
@@ -236,16 +243,16 @@ export async function sendClientContractNotification(
             `Safe travels,\n` +
             `— *Leon Rent Car Team*`;
         } else if (type === "created") {
-          whatsappMsg = `🎉 *LEON RENT CAR* | تأكيد حجز وعقد سيارة رسمي\n` +
-            `*Vehicle Reservation & Agreement*\n\n` +
+          whatsappMsg = `🎉 *LEON RENT CAR* | تأكيد حجز سيارة\n` +
+            `*Vehicle Reservation Confirmed*\n\n` +
             `Hello *${clientName}*,\n` +
-            `Your vehicle reservation and rental agreement have been successfully registered! ✨\n\n` +
+            `Your vehicle reservation has been successfully confirmed and registered! ✨\n\n` +
             `🚙 *Vehicle / السيارة:* ${vehicleName}\n` +
             `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n` +
             (contract.pickupLocation ? `📍 *Pickup Location / موقع الاستلام:* ${contract.pickupLocation}\n` : '') +
-            (contract.checkoutTime ? `⏰ *Pickup Time / موعد الاستلام:* ${contract.checkoutTime}\n` : '') +
-            `\n📎 *Your official rental contract is attached below (PDF).*\n` +
-            `📄 *مرفق لكم العقد الرسمي بصيغة PDF.*\n\n` +
+            (contract.checkoutTime && contract.checkoutTime !== "Pending Handover" ? `⏰ *Pickup Time / موعد الاستلام:* ${contract.checkoutTime}\n` : '') +
+            `\n📋 *Inspection & official signed contract will be completed upon vehicle handover.*\n` +
+            `📄 *سيتم إتمام الفحص وتوقيع العقد الرسمي وتسليم المفاتيح عند استلام السيارة.*\n\n` +
             `Need any assistance? Reply directly to this chat.\n` +
             `— *Leon Rent Car*`;
         } else {
