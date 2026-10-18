@@ -1730,8 +1730,8 @@ function ConfirmHandoverPageContent() {
       </div>
 
       {/* Stepper Header (100% IDENTICAL to Driver Handover) */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-6 animate-fade-in-up stagger-1">
-        <div className="relative w-full max-w-4xl mx-auto px-2 sm:px-4">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3 sm:p-6 animate-fade-in-up stagger-1">
+        <div className="relative w-full max-w-4xl mx-auto px-1 sm:px-4">
           {/* Background Track Line */}
           <div
             className="absolute top-[18px] -translate-y-1/2 h-[2px] bg-gray-200 z-0 hidden sm:block pointer-events-none"
@@ -1761,12 +1761,12 @@ function ConfirmHandoverPageContent() {
                     if (step.id < currentStep) setCurrentStep(step.id);
                     else if (step.id === currentStep + 1) handleNext();
                   }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
                     currentStep === step.id
-                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-4 ring-white"
+                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-2 sm:ring-4 ring-white"
                       : currentStep > step.id
-                      ? "border-brand bg-white text-brand ring-4 ring-white"
-                      : "border-gray-200 bg-white text-gray-400 ring-4 ring-white"
+                      ? "border-brand bg-white text-brand ring-2 sm:ring-4 ring-white"
+                      : "border-gray-200 bg-white text-gray-400 ring-2 sm:ring-4 ring-white"
                   }`}
                 >
                   {currentStep > step.id ? (
@@ -1790,11 +1790,17 @@ function ConfirmHandoverPageContent() {
               </div>
             ))}
           </div>
+
+          {/* Mobile Current Step Indicator */}
+          <div className="sm:hidden text-center mt-2.5 pt-2 border-t border-border/50">
+            <span className="text-[11px] font-bold text-brand uppercase tracking-wider">Step {currentStep} of {totalSteps}:</span>{" "}
+            <span className="text-xs font-semibold text-text-primary">{STEPS[currentStep - 1]?.title}</span>
+          </div>
         </div>
       </div>
 
       {/* Wizard Step Content (Matching Driver Handover Container & Navigation) */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-6 sm:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 md:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-xs text-red-700 animate-shake">
             <AlertCircle size={18} className="shrink-0 text-red-600" />
@@ -1805,29 +1811,29 @@ function ConfirmHandoverPageContent() {
         {renderStepContent()}
 
         {/* Step Navigation Buttons (Matching Driver Handover Footer) */}
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handleBack}
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer w-full sm:w-auto"
+              className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <ArrowLeft size={16} />
-              Previous Step
+              <span>Previous Step</span>
             </button>
           ) : (
             <div className="hidden sm:block" />
           )}
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
             {currentStep < totalSteps ? (
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
               >
-                Next Step
+                <span>Next Step</span>
                 <ArrowRight size={16} />
               </button>
             ) : (
@@ -1835,7 +1841,7 @@ function ConfirmHandoverPageContent() {
                 type="button"
                 onClick={handleConfirmHandover}
                 disabled={isSubmitting}
-                className="px-8 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md cursor-pointer disabled:opacity-50 w-full sm:w-auto"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>

@@ -2957,14 +2957,14 @@ export function NewRentalAdminPageContent() {
 
         {/* Contract Type Pill Switcher (Admins Only) */}
         {!isDriver && (
-          <div className="bg-gray-100 p-1 rounded-2xl flex flex-wrap items-center border border-gray-200/80 shadow-2xs self-start md:self-auto shrink-0 gap-1">
+          <div className="bg-gray-100 p-1 rounded-xl sm:rounded-2xl grid grid-cols-1 sm:flex sm:flex-wrap items-center border border-gray-200/80 shadow-2xs w-full md:w-auto shrink-0 gap-1">
             <button
               type="button"
               onClick={() => {
                 setContractType("Shop");
                 if (currentStep > 4) setCurrentStep(4);
               }}
-              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 sm:px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center justify-center ${
                 contractType === "Shop"
                   ? "bg-white text-brand shadow-xs"
                   : "text-text-muted hover:text-text-primary"
@@ -2979,7 +2979,7 @@ export function NewRentalAdminPageContent() {
                 if (currentStep === 3) setCurrentStep(2);
                 else if (currentStep > 3) setCurrentStep(3);
               }}
-              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 sm:px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center justify-center ${
                 contractType === "Delivery"
                   ? "bg-white text-brand shadow-xs"
                   : "text-text-muted hover:text-text-primary"
@@ -2993,7 +2993,7 @@ export function NewRentalAdminPageContent() {
                 setContractType("Personalized");
                 if (currentStep > 2) setCurrentStep(2);
               }}
-              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 sm:px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center justify-center ${
                 contractType === "Personalized"
                   ? "bg-white text-brand shadow-xs"
                   : "text-text-muted hover:text-text-primary"
@@ -3006,8 +3006,8 @@ export function NewRentalAdminPageContent() {
       </div>
 
       {/* Stepper Header */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-6 animate-fade-in-up stagger-1">
-        <div className="relative w-full max-w-4xl mx-auto px-2 sm:px-4">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3 sm:p-6 animate-fade-in-up stagger-1">
+        <div className="relative w-full max-w-4xl mx-auto px-1 sm:px-4">
           {/* Background Track Line (connected precisely through centers of first and last circles) */}
           <div 
             className="absolute top-[18px] -translate-y-1/2 h-[2px] bg-gray-200 z-0 hidden sm:block pointer-events-none" 
@@ -3044,12 +3044,12 @@ export function NewRentalAdminPageContent() {
                     else if (step.id < currentStep) setCurrentStep(step.id);
                     else if (step.id === currentStep + 1) handleNext();
                   }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
                     currentStep === step.id 
-                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-4 ring-white" 
+                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-2 sm:ring-4 ring-white" 
                       : currentStep > step.id 
-                      ? "border-brand bg-white text-brand ring-4 ring-white" 
-                      : "border-gray-200 bg-white text-gray-400 ring-4 ring-white"
+                      ? "border-brand bg-white text-brand ring-2 sm:ring-4 ring-white" 
+                      : "border-gray-200 bg-white text-gray-400 ring-2 sm:ring-4 ring-white"
                   }`}
                 >
                   {currentStep > step.id ? (
@@ -3073,23 +3073,30 @@ export function NewRentalAdminPageContent() {
               </div>
             ))}
           </div>
+
+          {/* Mobile Current Step Indicator */}
+          <div className="sm:hidden text-center mt-2.5 pt-2 border-t border-border/50">
+            <span className="text-[11px] font-bold text-brand uppercase tracking-wider">Step {currentStep} of {totalSteps}:</span>{" "}
+            <span className="text-xs font-semibold text-text-primary">{STEPS.find(s => s.id === currentStep)?.title}</span>
+          </div>
         </div>
       </div>
 
       {/* Wizard Step Content */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-6 sm:p-8 animate-fade-in-up stagger-2">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 md:p-8 animate-fade-in-up stagger-2">
         {renderStepContent()}
 
         {/* Step Navigation Buttons */}
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
           {currentStep > 1 ? (
             <button
+              type="button"
               onClick={handleBack}
               disabled={isLoading}
-              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer w-full sm:w-auto"
+              className="px-5 py-3 sm:py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer w-full sm:w-auto"
             >
               <ArrowLeft size={16} />
-              Previous Step
+              <span>Previous Step</span>
             </button>
           ) : (
             <div className="hidden sm:block" />
@@ -3102,7 +3109,7 @@ export function NewRentalAdminPageContent() {
                   type="button"
                   onClick={handleGenerate}
                   disabled={isLoading}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-3 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-xs disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                   title="Save all changes immediately"
                 >
                   {isLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
@@ -3112,7 +3119,7 @@ export function NewRentalAdminPageContent() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
+                className="px-6 py-3 sm:py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
               >
                 <span>Next Step</span>
                 <ArrowRight size={16} />
@@ -3123,7 +3130,7 @@ export function NewRentalAdminPageContent() {
               type="button"
               onClick={handleGenerate}
               disabled={isLoading}
-              className="px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+              className="px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer w-full sm:w-auto"
             >
               {isLoading ? (
                 <>

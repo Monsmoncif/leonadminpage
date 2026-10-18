@@ -2022,7 +2022,7 @@ function ReturnPageContent() {
         </div>
 
         {/* Return Mode Pill Switcher (Matches /bookings/new) */}
-        <div className="bg-gray-100 p-1 rounded-2xl flex items-center border border-gray-200/80 shadow-2xs self-start md:self-auto shrink-0">
+        <div className="bg-gray-100 p-1 rounded-xl sm:rounded-2xl grid grid-cols-1 sm:flex sm:flex-wrap items-center border border-gray-200/80 shadow-2xs w-full md:w-auto shrink-0 gap-1">
           <button
             type="button"
             onClick={() => {
@@ -2030,7 +2030,7 @@ function ReturnPageContent() {
               const maxSteps = isPersonalized ? 3 : 4;
               if (currentStep > maxSteps) setCurrentStep(maxSteps);
             }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               returnMode === "shop"
                 ? "bg-white text-brand shadow-xs"
                 : "text-text-muted hover:text-text-primary"
@@ -2045,7 +2045,7 @@ function ReturnPageContent() {
               setReturnMode("dispatch");
               if (currentStep > 3) setCurrentStep(3);
             }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               returnMode === "dispatch"
                 ? "bg-white text-brand shadow-xs"
                 : "text-text-muted hover:text-text-primary"
@@ -2058,8 +2058,8 @@ function ReturnPageContent() {
       </div>
 
       {/* ===== STEPPER HEADER (100% Identical to /bookings/new) ===== */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-6 animate-fade-in-up stagger-1">
-        <div className="relative w-full max-w-4xl mx-auto px-2 sm:px-4">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3 sm:p-6 animate-fade-in-up stagger-1">
+        <div className="relative w-full max-w-4xl mx-auto px-1 sm:px-4">
           {/* Background Track Line */}
           <div 
             className="absolute top-[18px] -translate-y-1/2 h-[2px] bg-gray-200 z-0 hidden sm:block pointer-events-none" 
@@ -2088,12 +2088,12 @@ function ReturnPageContent() {
                     if (step.id < currentStep) setCurrentStep(step.id);
                     else if (step.id === currentStep + 1) handleNext();
                   }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
                     currentStep === step.id 
-                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-4 ring-white" 
+                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-2 sm:ring-4 ring-white" 
                       : currentStep > step.id 
-                      ? "border-brand bg-white text-brand ring-4 ring-white" 
-                      : "border-gray-200 bg-white text-gray-400 ring-4 ring-white"
+                      ? "border-brand bg-white text-brand ring-2 sm:ring-4 ring-white" 
+                      : "border-gray-200 bg-white text-gray-400 ring-2 sm:ring-4 ring-white"
                   }`}
                 >
                   {currentStep > step.id ? (
@@ -2117,31 +2117,37 @@ function ReturnPageContent() {
               </div>
             ))}
           </div>
+
+          {/* Mobile Current Step Indicator */}
+          <div className="sm:hidden text-center mt-2.5 pt-2 border-t border-border/50">
+            <span className="text-[11px] font-bold text-brand uppercase tracking-wider">Step {currentStep} of {totalSteps}:</span>{" "}
+            <span className="text-xs font-semibold text-text-primary">{STEPS[currentStep - 1]?.title}</span>
+          </div>
         </div>
       </div>
 
       {/* ===== WIZARD STEP CONTENT ===== */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-6 sm:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
+      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 md:p-8 animate-fade-in-up stagger-2 min-h-[480px]">
         {renderStepContent()}
 
         {/* Step Navigation Buttons (Matching /bookings/new) */}
-        <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handleBack}
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <ArrowLeft size={16} />
-              Previous Step
+              <span>Previous Step</span>
             </button>
           ) : (
             <Link
               href="/bookings"
-              className="px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1.5"
+              className="w-full sm:w-auto px-4 py-3 sm:py-2 text-xs sm:text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors flex items-center justify-center gap-1.5 border border-transparent sm:border-0 rounded-xl"
             >
-              <ArrowLeft size={14} /> Back to Bookings
+              <ArrowLeft size={14} /> <span>Back to Bookings</span>
             </Link>
           )}
 
@@ -2149,7 +2155,7 @@ function ReturnPageContent() {
             <button
               type="button"
               onClick={handleNext}
-              className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+              className="w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
             >
               <span>Next Step</span>
               <ArrowRight size={16} />
@@ -2159,7 +2165,7 @@ function ReturnPageContent() {
               type="button"
               onClick={returnMode === "shop" ? () => handleShopReturn() : () => handleDispatch()}
               disabled={isSubmitting || (returnMode === "shop" ? (!returnOdometer.trim() || isNaN(Number(returnOdometer))) : (!returnDriverId || !pickupLocation.trim()))}
-              className={`px-7 py-3 rounded-xl text-white text-sm font-bold flex items-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer ${
+              className={`w-full sm:w-auto px-7 py-3 rounded-xl text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer ${
                 isCompleted 
                   ? "bg-amber-600 hover:bg-amber-700" 
                   : "bg-emerald-600 hover:bg-emerald-700"

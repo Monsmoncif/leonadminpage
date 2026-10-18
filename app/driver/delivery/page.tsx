@@ -2039,12 +2039,12 @@ export default function ConfirmDeliveryPage() {
                     if (step.id < currentStep) setCurrentStep(step.id);
                     else if (step.id === currentStep + 1) handleNext();
                   }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
+                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
                     currentStep === step.id
-                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-4 ring-white"
+                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-2 sm:ring-4 ring-white"
                       : currentStep > step.id
-                      ? "border-brand bg-white text-brand ring-4 ring-white"
-                      : "border-gray-200 bg-white text-gray-400 ring-4 ring-white"
+                      ? "border-brand bg-white text-brand ring-2 sm:ring-4 ring-white"
+                      : "border-gray-200 bg-white text-gray-400 ring-2 sm:ring-4 ring-white"
                   }`}
                 >
                   {currentStep > step.id ? (
@@ -2095,10 +2095,10 @@ export default function ConfirmDeliveryPage() {
               type="button"
               onClick={handleBack}
               disabled={isSubmitting}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <ArrowLeft size={16} />
-              Previous Step
+              <span>Previous Step</span>
             </button>
           ) : (
             <div className="hidden sm:block" />
@@ -2109,7 +2109,7 @@ export default function ConfirmDeliveryPage() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="w-full sm:w-auto px-6 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
               >
                 <span>Next Step</span>
                 <ArrowRight size={16} />
@@ -2119,7 +2119,7 @@ export default function ConfirmDeliveryPage() {
                 type="button"
                 onClick={handleConfirmHandover}
                 disabled={isSubmitting}
-                className="w-full sm:w-auto px-6 sm:px-8 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>

@@ -289,10 +289,19 @@ export default function VehicleInspectionPhotoCapture({
                   <button 
                     type="button"
                     onClick={() => handleRemovePhoto(angle)}
-                    className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer z-10"
+                    className="absolute inset-0 bg-black/60 hidden sm:flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer z-10"
                   >
                     <X size={24} className="mb-1 text-red-400" />
                     <span className="text-xs font-medium">Remove</span>
+                  </button>
+                  {/* Mobile Direct Delete Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePhoto(angle)}
+                    className="sm:hidden absolute top-1.5 right-1.5 w-7 h-7 bg-red-600/90 active:bg-red-700 text-white rounded-full flex items-center justify-center shadow-md z-15 cursor-pointer"
+                    title="Remove Photo"
+                  >
+                    <X size={15} />
                   </button>
                 </div>
               ) : isUploading ? (
@@ -348,10 +357,19 @@ export default function VehicleInspectionPhotoCapture({
                     <button
                       type="button"
                       onClick={() => handleRemovePhoto(key)}
-                      className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer z-10"
+                      className="absolute inset-0 bg-black/60 hidden sm:flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer z-10"
                     >
                       <X size={24} className="mb-1 text-red-400" />
                       <span className="text-xs font-medium">Remove</span>
+                    </button>
+                    {/* Mobile Direct Delete Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(key)}
+                      className="sm:hidden absolute top-1.5 right-1.5 w-7 h-7 bg-red-600/90 active:bg-red-700 text-white rounded-full flex items-center justify-center shadow-md z-15 cursor-pointer"
+                      title="Remove Photo"
+                    >
+                      <X size={15} />
                     </button>
                   </div>
                 </div>
