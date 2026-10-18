@@ -1826,22 +1826,22 @@ export default function CreateContractModal({
                     </p>
                   </div>
 
-                  <div className="bg-gray-50/70 rounded-2xl p-6 border border-border space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-                        <span className="text-text-muted text-xs block mb-1">Customer</span>
+                  <div className="bg-gray-50/70 rounded-xl sm:rounded-2xl p-3 sm:p-5 md:p-6 border border-border space-y-3.5 sm:space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                      <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
+                        <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Customer</span>
                         <strong className="text-text-primary text-sm font-bold block truncate">{selectedClientObj?.name || "N/A"}</strong>
-                        <span className="text-xs text-text-muted">{selectedClientObj?.phone || ""}</span>
+                        <span className="text-xs text-text-muted block truncate">{selectedClientObj?.phone || ""}</span>
                       </div>
-                      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-                        <span className="text-text-muted text-xs block mb-1">Vehicle</span>
+                      <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
+                        <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Vehicle</span>
                         <strong className="text-text-primary text-sm font-bold block truncate">
                           {selectedVehicleObj ? `${selectedVehicleObj.make} ${selectedVehicleObj.model}` : "N/A"}
                         </strong>
-                        <span className="text-xs text-text-muted font-mono">{selectedVehicleObj?.plate || ""}</span>
+                        <span className="text-xs text-text-muted font-mono block">{selectedVehicleObj?.plate || ""}</span>
                       </div>
-                      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-                        <span className="text-text-muted text-xs block mb-1">Assigned Driver</span>
+                      <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
+                        <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Assigned Driver</span>
                         <strong className="text-text-primary text-sm font-bold block truncate">
                           {selectedDeliveryDriverObj ? selectedDeliveryDriverObj.name : "Self-Drive (Client Picks Up)"}
                         </strong>
@@ -1849,8 +1849,8 @@ export default function CreateContractModal({
                           {selectedDeliveryDriverObj ? (selectedDeliveryDriverObj.email || selectedDeliveryDriverObj.phone || "Assigned Driver") : "No driver assigned"}
                         </span>
                       </div>
-                      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-                        <span className="text-text-muted text-xs block mb-1">Handover Location</span>
+                      <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
+                        <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Handover Location</span>
                         <strong className="text-text-primary text-xs font-bold block truncate" title={formData.pickupLocation}>
                           {formData.pickupLocation || "Main Office"}
                         </strong>
@@ -1859,9 +1859,9 @@ export default function CreateContractModal({
 
                     {/* Second Driver — if added */}
                     {formData.additionalDriverName && (
-                      <div className="bg-emerald-50/70 p-4 rounded-xl border border-emerald-200 shadow-2xs flex items-center justify-between">
+                      <div className="bg-emerald-50/70 p-3.5 sm:p-4 rounded-xl border border-emerald-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shrink-0">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs sm:text-sm shrink-0">
                             2
                           </div>
                           <div>
@@ -1871,7 +1871,7 @@ export default function CreateContractModal({
                             <strong className="text-sm font-bold text-text-primary block">
                               {formData.additionalDriverName}
                             </strong>
-                            <div className="flex items-center gap-2 text-xs text-text-muted mt-0.5">
+                            <div className="flex items-center gap-2 text-xs text-text-muted mt-0.5 flex-wrap">
                               <span>{formData.additionalDriverPhone || "No phone"}</span>
                               {formData.additionalDriverLicense && (
                                 <span className="font-mono text-[10px] text-emerald-700 bg-white px-1.5 py-0.2 rounded border border-emerald-200">
@@ -1881,84 +1881,90 @@ export default function CreateContractModal({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[11px] bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-1 rounded-full">
+                        <span className="text-[11px] bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-1 rounded-full self-start sm:self-auto">
                           Coverage Included
                         </span>
                       </div>
                     )}
 
-                    <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between py-1 border-b border-gray-100">
-                          <span className="text-text-muted">Rental Period:</span>
-                          <span className="font-semibold text-text-primary">{formData.startDate} to {formData.endDate} (Expected, {durationDays} days)</span>
+                    <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-gray-100 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-center">
+                      <div className="space-y-1 sm:space-y-2 text-xs">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
+                          <span className="text-text-muted font-medium">Rental Period:</span>
+                          <span className="font-semibold text-text-primary text-xs sm:text-right break-words">{formData.startDate} to {formData.endDate} (Expected, {durationDays} days)</span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-gray-100">
-                          <span className="text-text-muted">Scheduled Delivery Time:</span>
-                          <span className="font-semibold text-brand">{formData.checkoutTime}</span>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
+                          <span className="text-text-muted font-medium">Scheduled Delivery Time:</span>
+                          <span className="font-bold text-brand">{formData.checkoutTime}</span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-gray-100">
-                          <span className="text-text-muted">Rental Collection Amount:</span>
-                          <span className="font-bold text-text-primary">AED {formData.collectionAmount} (~AED {formData.dailyRate}/day)</span>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
+                          <span className="text-text-muted font-medium">Rental Collection Amount:</span>
+                          <span className="font-bold text-text-primary flex flex-wrap items-center gap-1">
+                            <span>AED {formData.collectionAmount}</span>
+                            <span className="text-text-muted font-normal text-[11px]">(~AED {formData.dailyRate}/day)</span>
+                          </span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-gray-100">
-                          <span className="text-text-muted">Initial Fuel &amp; Odometer:</span>
-                          <span className="font-bold text-text-primary flex items-center gap-1.5">
-                            <span className="text-emerald-600">{formData.checkoutFuelLevel || 100}% Fuel</span>
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
+                          <span className="text-text-muted font-medium">Initial Fuel &amp; Odometer:</span>
+                          <span className="font-bold text-text-primary flex flex-wrap items-center gap-1.5">
+                            <span className="text-emerald-600 font-bold">{formData.checkoutFuelLevel || 100}% Fuel</span>
                             {formData.checkoutMileage > 0 && (
-                              <span className="text-gray-500">({formData.checkoutMileage.toLocaleString()} km)</span>
+                              <span className="text-gray-500 font-normal">({formData.checkoutMileage.toLocaleString()} km)</span>
                             )}
                           </span>
                         </div>
                         {formData.deliveryCharges > 0 && (
-                          <div className="flex justify-between py-1 border-b border-gray-100">
-                            <span className="text-text-muted">Delivery Fee:</span>
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
+                            <span className="text-text-muted font-medium">Delivery Fee:</span>
                             <span className="font-semibold text-text-primary">AED {formData.deliveryCharges}</span>
                           </div>
                         )}
                         {formData.babySeatFees > 0 && (
-                          <div className="flex justify-between py-1 border-b border-gray-100">
-                            <span className="text-text-muted">Baby Seat Fee:</span>
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
+                            <span className="text-text-muted font-medium">Baby Seat Fee:</span>
                             <span className="font-semibold text-text-primary">AED {formData.babySeatFees}</span>
                           </div>
                         )}
-                        <div className="flex justify-between py-1 border-b border-gray-100">
-                          <span className="text-text-muted">Expected Deposit:</span>
-                          <span className="font-bold text-emerald-600">
-                            AED {formData.depositAmount} {formData.deliveryDriverId || formData.deliveryCharges > 0 ? "(Collected upon delivery)" : "(Collected at shop)"}
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
+                          <span className="text-text-muted font-medium">Expected Deposit:</span>
+                          <span className="font-bold text-emerald-600 flex flex-wrap items-center gap-1">
+                            <span>AED {formData.depositAmount}</span>
+                            <span className="text-xs text-text-muted font-normal">
+                              {formData.deliveryDriverId || formData.deliveryCharges > 0 ? "(Collected upon delivery)" : "(Collected at shop)"}
+                            </span>
                           </span>
                         </div>
                         {Number(formData.advancePayment || 0) > 0 && (
-                          <div className="flex justify-between py-1 border-b border-gray-100 bg-emerald-50/50 px-2 rounded-lg items-center">
+                          <div className="flex justify-between py-2 border-b border-gray-100 bg-emerald-50/50 px-2.5 rounded-lg items-center">
                             <span className="text-emerald-800 font-bold text-xs">Prepaid Advance:</span>
                             <span className="font-black text-emerald-700 text-xs">- AED {formData.advancePayment}</span>
                           </div>
                         )}
-                        <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
-                          <div>
-                            <span className="font-bold text-brand block">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2.5 border-b border-gray-100 bg-brand/5 px-3 rounded-xl gap-2 sm:gap-4">
+                          <div className="min-w-0">
+                            <span className="font-bold text-brand block text-xs sm:text-sm">
                               {Number(formData.advancePayment || 0) > 0 
                                 ? "Remaining Handover Collection:" 
                                 : "Total Handover Collection:"}
                             </span>
-                            <span className="text-[10px] text-text-muted">
+                            <span className="text-[11px] text-text-muted block">
                               {Number(formData.advancePayment || 0) > 0 
                                 ? `Total AED ${Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)} - Advance AED ${formData.advancePayment}`
                                 : `Collection Price ${formData.deliveryCharges > 0 ? "+ Delivery" : ""}`}
                             </span>
                           </div>
-                          <span className="text-base font-black text-brand">
+                          <span className="text-base sm:text-lg font-black text-brand shrink-0">
                             AED {Math.max(0, (Number(formData.collectionAmount || 0) + Number(formData.deliveryCharges || 0)) - Number(formData.advancePayment || 0))}
                           </span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-gray-100 items-center">
-                          <span className="text-text-muted">Payment Method &amp; Status:</span>
-                          <span className="font-semibold text-text-primary flex items-center gap-1.5 flex-wrap justify-end text-right">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start sm:items-center py-2 border-b border-gray-100 gap-1.5 sm:gap-2">
+                          <span className="text-text-muted font-medium">Payment Method &amp; Status:</span>
+                          <span className="font-semibold text-text-primary flex flex-wrap items-center gap-1.5">
                             {formData.paymentMethod?.includes("Crypto") && <Coins size={14} className="text-amber-600 shrink-0" />}
                             {formData.paymentMethod?.includes("Card") && <CreditCard size={14} className="text-blue-600 shrink-0" />}
                             {formData.paymentMethod?.includes("Cash") && <Banknote size={14} className="text-emerald-600 shrink-0" />}
                             <span>{formData.paymentMethod}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ml-1 ${
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                               formData.paymentStatus === "Paid" 
                                 ? "bg-emerald-100 text-emerald-800" 
                                 : formData.paymentStatus === "Partial" || Number(formData.advancePayment || 0) > 0
@@ -1969,9 +1975,9 @@ export default function CreateContractModal({
                             </span>
                           </span>
                         </div>
-                        <div className="flex justify-between py-1">
-                          <span className="text-text-muted">Mileage Limit:</span>
-                          <span className="font-semibold text-text-primary">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 py-2">
+                          <span className="text-text-muted font-medium">Mileage Limit:</span>
+                          <span className="font-semibold text-text-primary text-xs sm:text-right">
                             {formData.dailyKmLimit ? `${formData.dailyKmLimit} km/day (+AED ${formData.pricePerExtraKm}/km)` : "Unlimited mileage"}
                           </span>
                         </div>

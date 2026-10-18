@@ -2239,9 +2239,9 @@ export function NewRentalAdminPageContent() {
       : null;
 
     return (
-      <div className="space-y-6 animate-fade-in-up">
+      <div className="space-y-4 sm:space-y-6 animate-fade-in-up">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">
+          <h2 className="text-base sm:text-lg font-bold text-text-primary">
             {isEditMode 
               ? "Review & Save Contract Changes" 
               : contractType === "Personalized"
@@ -2259,21 +2259,21 @@ export function NewRentalAdminPageContent() {
           </p>
         </div>
 
-        <div className="bg-gray-50/70 rounded-2xl p-6 border border-border space-y-6">
-          <div className={`grid grid-cols-1 md:grid-cols-2 ${contractType === "Delivery" || contractType === "Personalized" ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-4`}>
+        <div className="bg-gray-50/70 rounded-xl sm:rounded-2xl p-3 sm:p-5 md:p-6 border border-border space-y-3.5 sm:space-y-5">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${contractType === "Delivery" || contractType === "Personalized" ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-2.5 sm:gap-4`}>
             {/* Customer — for Shop or whenever a client is selected */}
             {(contractType === "Shop" || (selectedClient && contractType !== "Personalized")) && (
-              <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-                <span className="text-text-muted text-xs block mb-1">Customer</span>
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
+                <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Customer</span>
                 <strong className="text-text-primary text-sm font-bold block truncate">{clientObj?.name || (editingContract?.clientId?.name) || "N/A"}</strong>
-                <span className="text-xs text-text-muted">{clientObj?.phone || (editingContract?.clientId?.phone) || ""}</span>
+                <span className="text-xs text-text-muted block truncate">{clientObj?.phone || (editingContract?.clientId?.phone) || ""}</span>
               </div>
             )}
 
             {/* Personalized — show Receiver Name & Client info */}
             {contractType === "Personalized" && (
-              <div className="bg-white p-4 rounded-xl border border-purple-200/80 shadow-2xs bg-purple-50/30">
-                <span className="text-purple-700 text-xs font-bold block mb-1 flex items-center justify-between">
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-purple-200/80 shadow-2xs bg-purple-50/30">
+                <span className="text-purple-700 text-xs font-bold block mb-1 flex items-center justify-between flex-wrap gap-1">
                   <span>Car Receiver (مستلم السيارة)</span>
                   {selectedClient && (
                     <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-semibold">
@@ -2284,7 +2284,7 @@ export function NewRentalAdminPageContent() {
                 <strong className="text-text-primary text-sm font-bold block truncate">
                   {personName || (editingContract?.personalizedPersonName) || "Personal Use"}
                 </strong>
-                <span className="text-xs text-text-muted">
+                <span className="text-xs text-text-muted block truncate">
                   {selectedClient && clients.find(c => c._id === selectedClient)?.phone
                     ? clients.find(c => c._id === selectedClient)?.phone
                     : "Personalized Booking (حجز مخصص)"}
@@ -2294,7 +2294,7 @@ export function NewRentalAdminPageContent() {
 
             {/* Second Driver — if added */}
             {contractType === "Shop" && additionalDriver.name && (
-              <div className="bg-white p-4 rounded-xl border border-brand/20 shadow-2xs bg-brand/5">
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-brand/20 shadow-2xs bg-brand/5">
                 <span className="text-brand text-xs font-semibold block mb-1 flex items-center gap-1.5">
                   <span className="w-4 h-4 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center">2</span>
                   <span>Second Driver</span>
@@ -2308,25 +2308,25 @@ export function NewRentalAdminPageContent() {
 
             {/* For Delivery — show "Client TBD" */}
             {contractType === "Delivery" && (
-              <div className="bg-white p-4 rounded-xl border border-amber-200/50 shadow-2xs bg-amber-50/30">
-                <span className="text-text-muted text-xs block mb-1">Customer</span>
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-amber-200/50 shadow-2xs bg-amber-50/30">
+                <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Customer</span>
                 <strong className="text-amber-800 text-sm font-bold block">To be registered by driver</strong>
-                <span className="text-xs text-amber-600">Driver will collect client info on-site</span>
+                <span className="text-xs text-amber-600 block">Driver will collect client info on-site</span>
               </div>
             )}
 
-            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-              <span className="text-text-muted text-xs block mb-1">Vehicle</span>
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
+              <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Vehicle</span>
               <strong className="text-text-primary text-sm font-bold block truncate">
                 {vehicleObj ? `${vehicleObj.make} ${vehicleObj.model}` : "N/A"}
               </strong>
-              <span className="text-xs text-text-muted font-mono">{vehicleObj?.plate || ""}</span>
+              <span className="text-xs text-text-muted font-mono block">{vehicleObj?.plate || ""}</span>
             </div>
 
             {/* Driver — only for Delivery */}
             {contractType === "Delivery" && (
-              <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-                <span className="text-text-muted text-xs block mb-1">Assigned Driver</span>
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
+                <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Assigned Driver</span>
                 <strong className="text-text-primary text-sm font-bold block truncate">
                   {deliveryDriverObj ? deliveryDriverObj.name : "No driver"}
                 </strong>
@@ -2336,8 +2336,8 @@ export function NewRentalAdminPageContent() {
               </div>
             )}
 
-            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs">
-              <span className="text-text-muted text-xs block mb-1">
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
+              <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">
                 {contractType === "Delivery" ? "Delivery Location" : "Pickup Location"}
               </span>
               <strong className="text-text-primary text-xs font-bold block truncate" title={rentalData.pickupLocation}>
@@ -2346,15 +2346,17 @@ export function NewRentalAdminPageContent() {
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs">
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-text-muted">Rental Period:</span>
-                <span className="font-semibold text-text-primary">{rentalData.startDate} to {rentalData.endDate} (Expected, {totalDays} days)</span>
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-gray-100 shadow-2xs">
+            <div className="space-y-1 sm:space-y-2 text-xs">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
+                <span className="text-text-muted font-medium">Rental Period:</span>
+                <span className="font-semibold text-text-primary text-xs sm:text-right break-words">
+                  {rentalData.startDate} to {rentalData.endDate} <span className="text-text-muted font-normal">(Expected, {totalDays} days)</span>
+                </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 items-center">
-                <span className="text-text-muted">Rental &amp; Customer Type:</span>
-                <span className="font-semibold text-text-primary flex items-center gap-1.5">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
+                <span className="text-text-muted font-medium">Rental &amp; Customer Type:</span>
+                <span className="font-semibold text-text-primary flex flex-wrap items-center gap-1.5">
                   <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                     rentalData.rentalType === "Monthly" ? "bg-purple-100 text-purple-700" : "bg-amber-100 text-amber-800"
                   }`}>
@@ -2367,68 +2369,74 @@ export function NewRentalAdminPageContent() {
                   </span>
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-text-muted">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
+                <span className="text-text-muted font-medium">
                   {contractType === "Delivery" ? "Scheduled Delivery Time:" : "Checkout Time:"}
                 </span>
-                <span className="font-semibold text-brand">{rentalData.checkoutTime}</span>
+                <span className="font-bold text-brand">{rentalData.checkoutTime}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-text-muted">Rental Collection Amount:</span>
-                <span className="font-bold text-text-primary">AED {rentalData.collectionAmount} (~AED {rentalData.dailyRate}/day)</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
+                <span className="text-text-muted font-medium">Rental Collection Amount:</span>
+                <span className="font-bold text-text-primary flex flex-wrap items-center gap-1">
+                  <span>AED {rentalData.collectionAmount}</span>
+                  <span className="text-text-muted font-normal text-[11px]">(~AED {rentalData.dailyRate}/day)</span>
+                </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-text-muted">Initial Fuel &amp; Odometer:</span>
-                <span className="font-bold text-text-primary flex items-center gap-1.5">
-                  <span className="text-emerald-600">{rentalData.checkoutFuelLevel || 100}% Fuel</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
+                <span className="text-text-muted font-medium">Initial Fuel &amp; Odometer:</span>
+                <span className="font-bold text-text-primary flex flex-wrap items-center gap-1.5">
+                  <span className="text-emerald-600 font-bold">{rentalData.checkoutFuelLevel || 100}% Fuel</span>
                   {rentalData.checkoutMileage > 0 && (
-                    <span className="text-gray-500">({rentalData.checkoutMileage.toLocaleString()} km)</span>
+                    <span className="text-gray-500 font-normal">({rentalData.checkoutMileage.toLocaleString()} km)</span>
                   )}
                 </span>
               </div>
               {rentalData.deliveryFee > 0 && (
-                <div className="flex justify-between py-1 border-b border-gray-100">
-                  <span className="text-text-muted">Delivery Fee:</span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
+                  <span className="text-text-muted font-medium">Delivery Fee:</span>
                   <span className="font-semibold text-text-primary">AED {rentalData.deliveryFee}</span>
                 </div>
               )}
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-text-muted">Expected Deposit:</span>
-                <span className="font-bold text-emerald-600">
-                  AED {rentalData.depositAmount} {contractType === "Delivery" ? "(Collected by driver)" : "(Collected at shop)"}
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
+                <span className="text-text-muted font-medium">Expected Deposit:</span>
+                <span className="font-bold text-emerald-600 flex flex-wrap items-center gap-1">
+                  <span>AED {rentalData.depositAmount}</span>
+                  <span className="text-xs text-text-muted font-normal">
+                    {contractType === "Delivery" ? "(Collected by driver)" : "(Collected at shop)"}
+                  </span>
                 </span>
               </div>
               {Number(rentalData.advancePayment || 0) > 0 && (
-                <div className="flex justify-between py-1 border-b border-gray-100 bg-emerald-50/50 px-2 rounded-lg items-center">
+                <div className="flex justify-between py-2 border-b border-gray-100 bg-emerald-50/50 px-2.5 rounded-lg items-center">
                   <span className="text-emerald-800 font-bold text-xs">Prepaid Advance:</span>
                   <span className="font-black text-emerald-700 text-xs">- AED {rentalData.advancePayment}</span>
                 </div>
               )}
-              <div className="flex justify-between py-2 border-b border-gray-100 bg-brand/5 px-2.5 rounded-lg items-center">
-                <div>
-                  <span className="font-bold text-brand block">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2.5 border-b border-gray-100 bg-brand/5 px-3 rounded-xl gap-2 sm:gap-4">
+                <div className="min-w-0">
+                  <span className="font-bold text-brand block text-xs sm:text-sm">
                     {Number(rentalData.advancePayment || 0) > 0 
                       ? "Remaining Handover Collection:" 
                       : "Total Handover Collection:"}
                   </span>
-                  <span className="text-[10px] text-text-muted">
+                  <span className="text-[11px] text-text-muted block">
                     {Number(rentalData.advancePayment || 0) > 0 
                       ? `Total AED ${Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)} - Advance AED ${rentalData.advancePayment}`
                       : `Collection Price ${rentalData.deliveryFee > 0 ? "+ Delivery" : ""}`}
                   </span>
                 </div>
-                <span className="text-base font-black text-brand">
+                <span className="text-base sm:text-lg font-black text-brand shrink-0">
                   AED {Math.max(0, (Number(rentalData.collectionAmount || 0) + Number(rentalData.deliveryFee || 0)) - Number(rentalData.advancePayment || 0))}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 items-center">
-                <span className="text-text-muted">Payment Method &amp; Status:</span>
-                <span className="font-semibold text-text-primary flex items-center gap-1.5">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start sm:items-center py-2 border-b border-gray-100 gap-1.5 sm:gap-2">
+                <span className="text-text-muted font-medium">Payment Method &amp; Status:</span>
+                <span className="font-semibold text-text-primary flex flex-wrap items-center gap-1.5">
                   {rentalData.paymentMethod.includes("Crypto") && <Coins size={14} className="text-amber-600" />}
                   {rentalData.paymentMethod.includes("Card") && <CreditCard size={14} className="text-blue-600" />}
                   {rentalData.paymentMethod.includes("Cash") && <Banknote size={14} className="text-emerald-600" />}
                   <span>{rentalData.paymentMethod}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ml-1 ${
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                     rentalData.paymentStatus === "Paid" 
                       ? "bg-emerald-100 text-emerald-800" 
                       : rentalData.paymentStatus === "Partial" || Number(rentalData.advancePayment || 0) > 0
@@ -2444,7 +2452,7 @@ export function NewRentalAdminPageContent() {
 
           {/* Existing Inspection Photos in Edit Mode */}
           {isEditMode && Array.isArray(editingContract?.inspectionPhotos) && editingContract.inspectionPhotos.some(Boolean) && (
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
+            <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
               <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                 <Camera size={14} className="text-brand" />
                 Handover Vehicle Inspection ({editingContract.inspectionPhotos.filter(Boolean).length}/8 photos)
@@ -2465,7 +2473,7 @@ export function NewRentalAdminPageContent() {
 
           {/* Money / Payment Proof in Review Step */}
           {moneyPhotos.length > 0 && (
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
+            <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-gray-100 shadow-2xs space-y-3">
               <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                 <Banknote size={14} className="text-amber-800" />
                 Payment &amp; Money Proof ({moneyPhotos.length} {moneyPhotos.length === 1 ? "photo" : "photos"})
@@ -2482,9 +2490,9 @@ export function NewRentalAdminPageContent() {
 
           {/* Customer Digital Signature Canvas (Drivers Only on direct handover) */}
           {isDriver && (
-            <div id="customer-signature-box" className="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+            <div id="customer-signature-box" className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-gray-100 shadow-2xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-xs sm:text-sm font-bold text-text-primary flex items-center gap-1.5">
                   <PenTool size={16} className="text-brand shrink-0" />
                   <span>Customer Signature (توقيع العميل)</span>
                   <span className="text-red-500 font-bold">*</span>
@@ -2493,7 +2501,7 @@ export function NewRentalAdminPageContent() {
                   <button
                     type="button"
                     onClick={clearSignature}
-                    className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                    className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-semibold cursor-pointer transition-colors"
                   >
                     <RotateCcw size={12} />
                     <span>Clear (مسح التوقيع)</span>
@@ -2504,7 +2512,7 @@ export function NewRentalAdminPageContent() {
                 يرجى تسليم الهاتف أو الجهاز للعميل للتوقيع باليد أو القلم قبل إتمام العقد (Client signature on handover)
               </p>
 
-              <div className="relative border-2 border-dashed border-gray-300 rounded-2xl bg-white overflow-hidden shadow-inner touch-none">
+              <div className="relative border-2 border-dashed border-gray-300 rounded-xl sm:rounded-2xl bg-white overflow-hidden shadow-inner touch-none">
                 <canvas
                   ref={canvasRef}
                   onMouseDown={startDrawing}
@@ -2514,29 +2522,29 @@ export function NewRentalAdminPageContent() {
                   onTouchStart={startDrawing}
                   onTouchMove={draw}
                   onTouchEnd={stopDrawing}
-                  className="w-full h-48 sm:h-56 cursor-crosshair bg-white block select-none"
+                  className="w-full h-44 sm:h-56 cursor-crosshair bg-white block select-none"
                 />
                 {!signatureData && !isDrawing && (!isEditMode || !editingContract?.customerSignature) && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 space-y-1.5 select-none">
-                    <PenTool size={28} className="opacity-40 text-brand" />
-                    <span className="text-xs sm:text-sm font-semibold text-gray-500">Please draw customer signature here (finger or stylus)</span>
-                    <span className="text-xs text-gray-400 font-medium" dir="rtl">يرجى توقيع العميل هنا باليد أو القلم</span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-gray-400 p-2 text-center space-y-1 select-none">
+                    <PenTool size={24} className="opacity-40 text-brand" />
+                    <span className="text-xs sm:text-sm font-semibold text-gray-500">Please draw customer signature here</span>
+                    <span className="text-[11px] sm:text-xs text-gray-400 font-medium" dir="rtl">يرجى توقيع العميل هنا باليد أو القلم</span>
                   </div>
                 )}
-                <div className="absolute bottom-2 left-4 right-4 pointer-events-none flex items-center justify-between border-t border-dashed border-gray-200 pt-1 text-[10px] text-gray-400 uppercase tracking-widest font-semibold select-none">
+                <div className="absolute bottom-2 left-3 right-3 pointer-events-none flex items-center justify-between border-t border-dashed border-gray-200 pt-1 text-[9px] sm:text-[10px] text-gray-400 uppercase tracking-widest font-semibold select-none">
                   <span>Customer Signature</span>
                   <span>توقيع العميل</span>
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
-                <span className="text-text-muted">Touch screen or drag mouse/stylus to sign.</span>
+                <span className="text-text-muted text-[11px] sm:text-xs">Touch screen or drag finger/stylus to sign.</span>
                 {(signatureData || (isEditMode && editingContract?.customerSignature)) ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg w-full sm:w-auto justify-center">
                     <CheckCircle2 size={13} className="text-emerald-600" /> Signature Captured (تم التوقيع بنجاح)
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1.5 rounded-lg w-full sm:w-auto justify-center">
                     <AlertCircle size={13} className="text-red-600" /> Required (إلزامي)
                   </span>
                 )}
