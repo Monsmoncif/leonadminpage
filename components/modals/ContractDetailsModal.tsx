@@ -474,9 +474,10 @@ export default function ContractDetailsModal({
   const inspectionPhotos: string[] = validInspectionPhotos;
 
   const rawReturnPhotos: string[] = Array.isArray(contractData.returnPhotos) ? contractData.returnPhotos : [];
-  const returnPhotos: string[] = rawReturnPhotos.filter(
+  const validReturnPhotos = rawReturnPhotos.filter(
     (p) => typeof p === "string" && p.trim().length > 0 && p.trim() !== "null" && p.trim() !== "undefined"
   );
+  const returnPhotos: string[] = validReturnPhotos;
 
   const rawMoneyPhotos: string[] = Array.isArray(contractData.moneyPhotos) ? contractData.moneyPhotos : [];
   const moneyPhotos: string[] = rawMoneyPhotos.filter(
@@ -1562,30 +1563,67 @@ export default function ContractDetailsModal({
                   <span className="text-xs font-bold text-red-950 flex items-center gap-1.5 min-w-0">
                     <Camera size={14} className="text-red-600 shrink-0" />
                     <span className="truncate">Return Inspection Photos</span>
-                    <span className="text-[10px] text-red-700 shrink-0">({returnPhotos.length})</span>
+                    <span className="text-[10px] text-red-700 shrink-0">
+                      ({Math.min(validReturnPhotos.length, 8)}/8{validReturnPhotos.length > 8 ? ` + ${validReturnPhotos.length - 8}` : ""})
+                    </span>
                   </span>
                   <span className="text-[10px] sm:text-[11px] text-text-muted font-medium shrink-0 hidden xs:inline">Return Inspection</span>
                 </div>
 
-                {returnPhotos.length > 0 ? (
+                {isLoadingDetails && !contractData.returnPhotos ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
-                    {returnPhotos.map((photoUrl, index) => (
-                      <PhotoThumbnailCard
-                        key={index}
-                        url={photoUrl}
-                        title={`Return Photo #${index + 1}`}
-                        badgeText={`Return #${index + 1}`}
-                        badgeNumber={index + 1}
-                        onPreview={setPreviewImage}
-                        borderClass="border-red-100"
-                        badgeBgClass="bg-red-950/80 text-white"
-                      />
+                    {[...Array(8)].map((_, i) => (
+                      <div key={i} className="h-[110px] sm:h-[135px] md:h-[155px] rounded-xl bg-red-50/50 animate-pulse border border-red-100/60" />
                     ))}
                   </div>
+                ) : validReturnPhotos.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+                    {VEHICLE_ANGLES.map((angleLabel, index) => {
+                      const photoUrl = rawReturnPhotos[index] || "";
+                      return (
+                        <PhotoThumbnailCard
+                          key={index}
+                          url={photoUrl}
+                          title={angleLabel}
+                          badgeText={angleLabel}
+                          badgeNumber={index + 1}
+                          onPreview={setPreviewImage}
+                          borderClass="border-red-100"
+                          badgeBgClass="bg-red-950/80 text-white"
+                          emptyPlaceholderText="No image"
+                        />
+                      );
+                    })}
+                    {/* Any extra return photos beyond the 8 standard angles */}
+                    {rawReturnPhotos.slice(8).map((photoUrl, extraIdx) => {
+                      const index = 8 + extraIdx;
+                      const angleLabel = `Extra Return Photo ${extraIdx + 1}`;
+                      if (!photoUrl || !photoUrl.trim()) return null;
+                      return (
+                        <PhotoThumbnailCard
+                          key={index}
+                          url={photoUrl}
+                          title={angleLabel}
+                          badgeText={angleLabel}
+                          badgeNumber={index + 1}
+                          onPreview={setPreviewImage}
+                          borderClass="border-red-100"
+                          badgeBgClass="bg-red-950/80 text-white"
+                        />
+                      );
+                    })}
+                  </div>
                 ) : (
-                  <div className="bg-red-50/40 p-3 sm:p-4 rounded-xl border border-dashed border-red-100 flex items-center gap-2 text-xs text-red-900/70">
-                    <Camera size={14} className="text-red-500 shrink-0" />
-                    <span>No return inspection photos recorded yet.</span>
+                  <div className="bg-red-50/40 p-4 sm:p-5 rounded-xl border border-dashed border-red-200/80 flex flex-col items-center justify-center text-center gap-1.5 text-xs text-red-900/80">
+                    <div className="w-8 h-8 rounded-full bg-red-100/70 flex items-center justify-center text-red-600 mb-0.5">
+                      <Camera size={16} />
+                    </div>
+                    <p className="font-semibold text-red-950 text-xs">No Return Inspection Photos Uploaded (0/8)</p>
+                    <p className="text-[11px] text-red-900/70 max-w-sm">
+                      {isReturned 
+                        ? "No return vehicle photos were recorded for this contract." 
+                        : "Return inspection photos will be recorded upon vehicle dropoff/collection."}
+                    </p>
                   </div>
                 )}
               </div>
