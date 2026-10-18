@@ -102,6 +102,102 @@ const formatTimeDisplay = (rawTime?: string): string => {
   return trimmed;
 };
 
+function PhotoThumbnailCard({
+  url,
+  title,
+  badgeText,
+  badgeNumber,
+  onPreview,
+  borderClass = "border-border",
+  badgeBgClass = "bg-black/75 text-white",
+  aspectHeight = "h-[110px] sm:h-[135px] md:h-[155px]",
+  emptyPlaceholderText = "No image",
+}: {
+  url?: string;
+  title: string;
+  badgeText?: string;
+  badgeNumber?: number;
+  onPreview?: (url: string) => void;
+  borderClass?: string;
+  badgeBgClass?: string;
+  aspectHeight?: string;
+  emptyPlaceholderText?: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const hasValidUrl = Boolean(
+    url &&
+    typeof url === "string" &&
+    url.trim().length > 0 &&
+    url.trim() !== "null" &&
+    url.trim() !== "undefined" &&
+    !imageFailed
+  );
+
+  if (!hasValidUrl) {
+    return (
+      <div 
+        className={`relative ${aspectHeight} w-full rounded-xl border border-dashed border-gray-200 bg-gray-50/80 flex flex-col items-center justify-center p-2 text-center select-none shadow-2xs`}
+        title={`${title} - ${emptyPlaceholderText}`}
+      >
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 mb-1">
+          <Camera size={14} />
+        </div>
+        <span className="text-[10px] sm:text-[11px] font-medium text-text-muted line-clamp-1 px-1">
+          {title}
+        </span>
+        <span className="text-[9px] text-gray-400 font-semibold mt-0.5">{emptyPlaceholderText}</span>
+        {badgeNumber !== undefined && (
+          <div className="absolute bottom-1 right-1">
+            <span className="text-[8px] sm:text-[9px] font-semibold text-gray-400 bg-white border border-gray-200/90 px-1 py-0.2 rounded">
+              #{badgeNumber}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      onClick={() => onPreview?.(url!)}
+      className={`relative ${aspectHeight} w-full rounded-xl border ${borderClass} overflow-hidden group shadow-2xs bg-gray-100 cursor-pointer active:scale-95 transition-transform`}
+      title={`${title} - Click to enlarge`}
+    >
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center">
+          <Camera size={16} className="text-gray-300" />
+        </div>
+      )}
+      <img 
+        src={url} 
+        alt={title} 
+        loading="lazy"
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setIsLoading(false);
+          setImageFailed(true);
+        }}
+        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" 
+      />
+      <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+        <Maximize2 size={16} />
+      </div>
+      <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between pointer-events-none">
+        <span className={`${badgeBgClass} backdrop-blur-xs text-[9px] sm:text-[10px] font-medium px-1.5 py-0.5 rounded truncate max-w-[78%]`}>
+          {badgeText || title}
+        </span>
+        {badgeNumber !== undefined && (
+          <span className="text-[8px] sm:text-[9px] font-bold text-white/90 bg-black/60 px-1 py-0.5 rounded shrink-0">
+            #{badgeNumber}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface ContractDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -124,6 +220,8 @@ export default function ContractDetailsModal({
   const [damages, setDamages] = useState<any[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isExtendOpen, setIsExtendOpen] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const lastFetchedIdRef = useRef<string | null>(null);
   const contentContainerRef = useRef<HTMLDivElement>(null);
   const overlayContainerRef = useRef<HTMLDivElement>(null);
 
@@ -138,80 +236,83 @@ export default function ContractDetailsModal({
   }, [activeTab, isOpen]);
 
   const refreshContractData = () => {
-    const contractId = contractData._id || contractData.id || contract?._id || contract?.id;
+    const contractId = contractData?._id || contractData?.id || contract?._id || contract?.id;
     if (contractId) {
-      fetch(`/api/contracts/${contractId}`, { cache: "no-store" })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((fresh) => {
+      setIsLoadingDetails(true);
+      Promise.all([
+        fetch(`/api/contracts/${contractId}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)),
+        fetch(`/api/damages?contractId=${contractId}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : []))
+      ])
+        .then(([fresh, damagesData]) => {
           if (fresh) {
             setContractData((prev: any) => ({
               ...prev,
               ...fresh,
-              customer: fresh.personalizedPersonName || fresh.clientId?.name || prev.customer,
-              customerPhone: fresh.clientId?.phone || prev.customerPhone,
-              customerEmail: fresh.clientId?.email || prev.customerEmail,
-              customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev.customerLicense,
-              customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || prev.customerLicenseIssuedDate,
-              deliveryDriver: fresh.deliveryDriverId?.name || (fresh.driverId && !fresh.returnDriverId ? fresh.driverId.name : prev.deliveryDriver),
-              returnDriver: fresh.returnDriverId?.name || prev.returnDriver,
-              vehicle: fresh.unitId ? `${fresh.unitId.make} ${fresh.unitId.model} (${fresh.unitId.plate})` : prev.vehicle,
-              vehiclePlate: fresh.unitId?.plate || prev.vehiclePlate,
-              vehicleColor: fresh.unitId?.color || prev.vehicleColor,
-              vehicleYear: fresh.unitId?.year || prev.vehicleYear,
-              vehicleFuel: fresh.unitId?.fuelType || prev.vehicleFuel,
+              customer: fresh.personalizedPersonName || fresh.clientId?.name || prev?.customer,
+              customerPhone: fresh.clientId?.phone || prev?.customerPhone,
+              customerEmail: fresh.clientId?.email || prev?.customerEmail,
+              customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev?.customerLicense,
+              customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || prev?.customerLicenseIssuedDate,
+              deliveryDriver: fresh.deliveryDriverId?.name || (fresh.driverId && !fresh.returnDriverId ? fresh.driverId.name : prev?.deliveryDriver),
+              returnDriver: fresh.returnDriverId?.name || prev?.returnDriver,
+              vehicle: fresh.unitId ? `${fresh.unitId.make} ${fresh.unitId.model} (${fresh.unitId.plate})` : prev?.vehicle,
+              vehiclePlate: fresh.unitId?.plate || prev?.vehiclePlate,
+              vehicleColor: fresh.unitId?.color || prev?.vehicleColor,
+              vehicleYear: fresh.unitId?.year || prev?.vehicleYear,
+              vehicleFuel: fresh.unitId?.fuelType || prev?.vehicleFuel,
             }));
             onEdit?.(fresh);
           }
+          if (Array.isArray(damagesData)) {
+            setDamages(damagesData);
+          }
         })
-        .catch((err) => console.error("Error refreshing contract details:", err));
+        .catch((err) => console.error("Error refreshing contract details:", err))
+        .finally(() => setIsLoadingDetails(false));
     }
   };
 
   useEffect(() => {
-    if (contract) {
+    if (contract && isOpen) {
       setContractData(contract);
       const contractId = contract._id || contract.id;
-      if (contractId) {
-        fetch(`/api/contracts/${contractId}`, { cache: "no-store" })
-          .then((res) => (res.ok ? res.json() : null))
-          .then((fresh) => {
+      if (contractId && contractId !== lastFetchedIdRef.current) {
+        lastFetchedIdRef.current = String(contractId);
+        setIsLoadingDetails(true);
+        Promise.all([
+          fetch(`/api/contracts/${contractId}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)),
+          fetch(`/api/damages?contractId=${contractId}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : []))
+        ])
+          .then(([fresh, damagesData]) => {
             if (fresh) {
               setContractData((prev: any) => ({
                 ...prev,
                 ...fresh,
-                customer: fresh.personalizedPersonName || fresh.clientId?.name || prev.customer,
-                customerPhone: fresh.clientId?.phone || prev.customerPhone,
-                customerEmail: fresh.clientId?.email || prev.customerEmail,
-                customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev.customerLicense,
-                customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || prev.customerLicenseIssuedDate,
-                deliveryDriver: fresh.deliveryDriverId?.name || (fresh.driverId && !fresh.returnDriverId ? fresh.driverId.name : prev.deliveryDriver),
-                returnDriver: fresh.returnDriverId?.name || prev.returnDriver,
-                vehicle: fresh.unitId ? `${fresh.unitId.make} ${fresh.unitId.model} (${fresh.unitId.plate})` : prev.vehicle,
-                vehiclePlate: fresh.unitId?.plate || prev.vehiclePlate,
-                vehicleColor: fresh.unitId?.color || prev.vehicleColor,
-                vehicleYear: fresh.unitId?.year || prev.vehicleYear,
-                vehicleFuel: fresh.unitId?.fuelType || prev.vehicleFuel,
+                customer: fresh.personalizedPersonName || fresh.clientId?.name || prev?.customer,
+                customerPhone: fresh.clientId?.phone || prev?.customerPhone,
+                customerEmail: fresh.clientId?.email || prev?.customerEmail,
+                customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev?.customerLicense,
+                customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || prev?.customerLicenseIssuedDate,
+                deliveryDriver: fresh.deliveryDriverId?.name || (fresh.driverId && !fresh.returnDriverId ? fresh.driverId.name : prev?.deliveryDriver),
+                returnDriver: fresh.returnDriverId?.name || prev?.returnDriver,
+                vehicle: fresh.unitId ? `${fresh.unitId.make} ${fresh.unitId.model} (${fresh.unitId.plate})` : prev?.vehicle,
+                vehiclePlate: fresh.unitId?.plate || prev?.vehiclePlate,
+                vehicleColor: fresh.unitId?.color || prev?.vehicleColor,
+                vehicleYear: fresh.unitId?.year || prev?.vehicleYear,
+                vehicleFuel: fresh.unitId?.fuelType || prev?.vehicleFuel,
               }));
             }
-          })
-          .catch((err) => console.error("Error fetching full contract details:", err));
-
-        fetch("/api/damages", { cache: "no-store" })
-          .then((res) => res.json())
-          .then((data) => {
-            if (Array.isArray(data)) {
-              setDamages(
-                data.filter((d) => {
-                  const cId = d.contractId && typeof d.contractId === "object" ? d.contractId._id : d.contractId;
-                  return cId && String(cId) === String(contractId);
-                })
-              );
+            if (Array.isArray(damagesData)) {
+              setDamages(damagesData);
             }
           })
-          .catch((err) => console.error("Error fetching damages:", err));
+          .catch((err) => console.error("Error fetching full contract details:", err))
+          .finally(() => setIsLoadingDetails(false));
       }
+    } else if (!isOpen) {
+      lastFetchedIdRef.current = null;
     }
-  }, [contract, isOpen]);
+  }, [contract?._id, contract?.id, isOpen]);
 
   const isReturned = contractData ? (contractData.status === "Completed" || contractData.deliveryStatus === "Returned") : false;
   const hasReturnData = Boolean(
@@ -366,14 +467,31 @@ export default function ContractDetailsModal({
 
   const { adminNotes, driverNotes } = parseHandoverNotes(contractData.notes);
   const returnNotes = getReturnNotes(contractData.notes, contractData.returnNotes);
-  const inspectionPhotos: string[] = Array.isArray(contractData.inspectionPhotos) ? contractData.inspectionPhotos : [];
-  const returnPhotos: string[] = Array.isArray(contractData.returnPhotos) ? contractData.returnPhotos : [];
-  const moneyPhotos: string[] = Array.isArray(contractData.moneyPhotos) ? contractData.moneyPhotos : [];
-  const returnMoneyPhotos: string[] = Array.isArray(contractData.returnMoneyPhotos) ? contractData.returnMoneyPhotos : [];
+  const rawInspectionPhotos: string[] = Array.isArray(contractData.inspectionPhotos) ? contractData.inspectionPhotos : [];
+  const validInspectionPhotos = rawInspectionPhotos.filter(
+    (p) => typeof p === "string" && p.trim().length > 0 && p.trim() !== "null" && p.trim() !== "undefined"
+  );
+  const inspectionPhotos: string[] = validInspectionPhotos;
+
+  const rawReturnPhotos: string[] = Array.isArray(contractData.returnPhotos) ? contractData.returnPhotos : [];
+  const returnPhotos: string[] = rawReturnPhotos.filter(
+    (p) => typeof p === "string" && p.trim().length > 0 && p.trim() !== "null" && p.trim() !== "undefined"
+  );
+
+  const rawMoneyPhotos: string[] = Array.isArray(contractData.moneyPhotos) ? contractData.moneyPhotos : [];
+  const moneyPhotos: string[] = rawMoneyPhotos.filter(
+    (p) => typeof p === "string" && p.trim().length > 0 && p.trim() !== "null" && p.trim() !== "undefined"
+  );
+
+  const rawReturnMoneyPhotos: string[] = Array.isArray(contractData.returnMoneyPhotos) ? contractData.returnMoneyPhotos : [];
+  const returnMoneyPhotos: string[] = rawReturnMoneyPhotos.filter(
+    (p) => typeof p === "string" && p.trim().length > 0 && p.trim() !== "null" && p.trim() !== "undefined"
+  );
+
   const damagePhotos: string[] = Array.from(new Set([
     ...(Array.isArray(contractData.damagePhotos) ? contractData.damagePhotos : []),
     ...damages.flatMap((d: any) => Array.isArray(d.photos) ? d.photos : [])
-  ])).filter(Boolean);
+  ])).filter((p) => typeof p === "string" && p.trim().length > 0 && p.trim() !== "null" && p.trim() !== "undefined");
 
   return (
     <div 
@@ -1155,48 +1273,67 @@ export default function ContractDetailsModal({
                     <span className="text-xs font-bold text-text-primary flex items-center gap-1.5 min-w-0">
                       <Camera size={14} className="text-brand shrink-0" />
                       <span className="truncate">Pre-Delivery Inspection Photos</span>
-                      <span className="text-[10px] text-text-muted shrink-0">({Math.min(inspectionPhotos.length, 8)}/8{inspectionPhotos.length > 8 ? ` + ${inspectionPhotos.length - 8}` : ""})</span>
+                      <span className="text-[10px] text-text-muted shrink-0">
+                        ({Math.min(validInspectionPhotos.length, 8)}/8{validInspectionPhotos.length > 8 ? ` + ${validInspectionPhotos.length - 8}` : ""})
+                      </span>
                     </span>
                     <span className="text-[10px] sm:text-[11px] text-text-muted font-medium shrink-0 hidden xs:inline">
                       Inspection Photos
                     </span>
                   </div>
 
-                  {inspectionPhotos.length > 0 ? (
+                  {isLoadingDetails && !contractData.inspectionPhotos ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
-                      {inspectionPhotos.map((photoUrl, index) => {
-                        const angleLabel = VEHICLE_ANGLES[index] || `Extra Photo ${index - VEHICLE_ANGLES.length + 1}`;
+                      {[...Array(8)].map((_, i) => (
+                        <div key={i} className="h-[110px] sm:h-[135px] md:h-[155px] rounded-xl bg-gray-100 animate-pulse border border-border/60" />
+                      ))}
+                    </div>
+                  ) : validInspectionPhotos.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+                      {VEHICLE_ANGLES.map((angleLabel, index) => {
+                        const photoUrl = rawInspectionPhotos[index] || "";
                         return (
-                          <div 
+                          <PhotoThumbnailCard
                             key={index}
-                            onClick={() => setPreviewImage(photoUrl)}
-                            className="relative h-[110px] sm:h-[135px] md:h-[155px] w-full rounded-xl border border-border overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer active:scale-95 transition-transform"
-                            title={`${angleLabel} - Click to enlarge`}
-                          >
-                            <img 
-                              src={photoUrl} 
-                              alt={angleLabel} 
-                              className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" 
-                            />
-                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                              <Maximize2 size={16} />
-                            </div>
-                            <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between pointer-events-none">
-                              <span className="bg-black/75 backdrop-blur-xs text-white text-[9px] sm:text-[10px] font-medium px-1.5 py-0.5 rounded truncate max-w-[78%]">
-                                {angleLabel}
-                              </span>
-                              <span className="text-[8px] sm:text-[9px] font-bold text-white/80 bg-black/60 px-1 py-0.5 rounded shrink-0">
-                                #{index + 1}
-                              </span>
-                            </div>
-                          </div>
+                            url={photoUrl}
+                            title={angleLabel}
+                            badgeText={angleLabel}
+                            badgeNumber={index + 1}
+                            onPreview={setPreviewImage}
+                            borderClass="border-border"
+                            emptyPlaceholderText="No image"
+                          />
+                        );
+                      })}
+                      {/* Any extra photos beyond the 8 standard angles */}
+                      {rawInspectionPhotos.slice(8).map((photoUrl, extraIdx) => {
+                        const index = 8 + extraIdx;
+                        const angleLabel = `Extra Photo ${extraIdx + 1}`;
+                        if (!photoUrl || !photoUrl.trim()) return null;
+                        return (
+                          <PhotoThumbnailCard
+                            key={index}
+                            url={photoUrl}
+                            title={angleLabel}
+                            badgeText={angleLabel}
+                            badgeNumber={index + 1}
+                            onPreview={setPreviewImage}
+                            borderClass="border-border"
+                          />
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="bg-gray-50/80 p-3 sm:p-4 rounded-xl border border-border/70 flex items-center gap-2 text-xs text-text-muted">
-                      <Camera size={14} className="text-text-muted shrink-0" />
-                      <span>{isHandedOver ? "No inspection photos attached for this contract." : (isDriverDelivery ? "Awaiting driver inspection photos upon vehicle delivery." : "Awaiting showroom inspection photos upon vehicle handover.")}</span>
+                    <div className="bg-gray-50/80 p-4 sm:p-5 rounded-xl border border-dashed border-border/80 flex flex-col items-center justify-center text-center gap-1.5 text-xs text-text-muted">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 mb-0.5">
+                        <Camera size={16} />
+                      </div>
+                      <p className="font-semibold text-text-primary text-xs">No Inspection Photos Uploaded (0/8)</p>
+                      <p className="text-[11px] text-text-muted max-w-sm">
+                        {isHandedOver 
+                          ? "No pre-delivery vehicle photos were recorded for this contract." 
+                          : (isDriverDelivery ? "Awaiting driver inspection photos upon vehicle delivery." : "Awaiting showroom inspection photos upon vehicle handover.")}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1255,20 +1392,16 @@ export default function ContractDetailsModal({
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                       {moneyPhotos.map((photoUrl, index) => (
-                        <div 
+                        <PhotoThumbnailCard
                           key={index}
-                          onClick={() => setPreviewImage(photoUrl)}
-                          className="relative h-[110px] sm:h-[135px] md:h-[155px] w-full rounded-xl sm:rounded-2xl border border-emerald-100 overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer active:scale-95 transition-transform"
-                          title="Click to enlarge"
-                        >
-                          <img src={photoUrl} alt={`Handover Cash Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                            <Maximize2 size={16} />
-                          </div>
-                          <div className="absolute bottom-1.5 left-1.5 bg-emerald-950/80 text-white text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-900/50">
-                            Cash Proof #{index + 1}
-                          </div>
-                        </div>
+                          url={photoUrl}
+                          title={`Handover Cash Proof #${index + 1}`}
+                          badgeText={`Cash Proof #${index + 1}`}
+                          badgeNumber={index + 1}
+                          onPreview={setPreviewImage}
+                          borderClass="border-emerald-100"
+                          badgeBgClass="bg-emerald-950/80 text-white"
+                        />
                       ))}
                     </div>
                   </div>
@@ -1437,24 +1570,20 @@ export default function ContractDetailsModal({
                 {returnPhotos.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                     {returnPhotos.map((photoUrl, index) => (
-                      <div 
+                      <PhotoThumbnailCard
                         key={index}
-                        onClick={() => setPreviewImage(photoUrl)}
-                        className="relative h-[110px] sm:h-[135px] md:h-[155px] w-full rounded-xl sm:rounded-2xl border border-red-100 overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer active:scale-95 transition-transform"
-                        title="Click to enlarge"
-                      >
-                        <img src={photoUrl} alt={`Return Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                          <Maximize2 size={16} />
-                        </div>
-                        <div className="absolute bottom-1.5 left-1.5 bg-red-950/80 text-white text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded border border-red-900/50">
-                          Return #{index + 1}
-                        </div>
-                      </div>
+                        url={photoUrl}
+                        title={`Return Photo #${index + 1}`}
+                        badgeText={`Return #${index + 1}`}
+                        badgeNumber={index + 1}
+                        onPreview={setPreviewImage}
+                        borderClass="border-red-100"
+                        badgeBgClass="bg-red-950/80 text-white"
+                      />
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-red-50/40 p-3 sm:p-4 rounded-xl border border-red-100 flex items-center gap-2 text-xs text-red-900/70">
+                  <div className="bg-red-50/40 p-3 sm:p-4 rounded-xl border border-dashed border-red-100 flex items-center gap-2 text-xs text-red-900/70">
                     <Camera size={14} className="text-red-500 shrink-0" />
                     <span>No return inspection photos recorded yet.</span>
                   </div>
@@ -1475,20 +1604,16 @@ export default function ContractDetailsModal({
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                     {returnMoneyPhotos.map((photoUrl, index) => (
-                      <div 
+                      <PhotoThumbnailCard
                         key={index}
-                        onClick={() => setPreviewImage(photoUrl)}
-                        className="relative h-[110px] sm:h-[135px] md:h-[155px] w-full rounded-xl sm:rounded-2xl border border-emerald-100 overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer active:scale-95 transition-transform"
-                        title="Click to enlarge"
-                      >
-                        <img src={photoUrl} alt={`Return Proof Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                          <Maximize2 size={16} />
-                        </div>
-                        <div className="absolute bottom-1.5 left-1.5 bg-emerald-950/80 text-white text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-900/50">
-                          Return Proof #{index + 1}
-                        </div>
-                      </div>
+                        url={photoUrl}
+                        title={`Return Proof Photo #${index + 1}`}
+                        badgeText={`Return Proof #${index + 1}`}
+                        badgeNumber={index + 1}
+                        onPreview={setPreviewImage}
+                        borderClass="border-emerald-100"
+                        badgeBgClass="bg-emerald-950/80 text-white"
+                      />
                     ))}
                   </div>
                 </div>
@@ -1508,20 +1633,16 @@ export default function ContractDetailsModal({
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                     {damagePhotos.map((photoUrl, index) => (
-                      <div 
+                      <PhotoThumbnailCard
                         key={index}
-                        onClick={() => setPreviewImage(photoUrl)}
-                        className="relative h-[110px] sm:h-[135px] md:h-[155px] w-full rounded-xl sm:rounded-2xl border border-red-200 overflow-hidden group shadow-2xs bg-gray-900 cursor-pointer active:scale-95 transition-transform"
-                        title="Click to enlarge"
-                      >
-                        <img src={photoUrl} alt={`Damage Photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                          <Maximize2 size={16} />
-                        </div>
-                        <div className="absolute bottom-1.5 left-1.5 bg-red-950/80 text-white text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded border border-red-900/50">
-                          Damage Proof #{index + 1}
-                        </div>
-                      </div>
+                        url={photoUrl}
+                        title={`Damage Photo #${index + 1}`}
+                        badgeText={`Damage Proof #${index + 1}`}
+                        badgeNumber={index + 1}
+                        onPreview={setPreviewImage}
+                        borderClass="border-red-200"
+                        badgeBgClass="bg-red-950/80 text-white"
+                      />
                     ))}
                   </div>
                 </div>

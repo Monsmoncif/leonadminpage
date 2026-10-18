@@ -24,9 +24,12 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const driverId = searchParams.get("driverId");
+    const contractId = searchParams.get("contractId");
 
     let filter: any = {};
-    if (driverId) {
+    if (contractId) {
+      filter.contractId = contractId;
+    } else if (driverId) {
       const driverContracts = await Contract.find({ driverId }).select('_id');
       const contractIds = driverContracts.map(c => c._id);
       filter = {
