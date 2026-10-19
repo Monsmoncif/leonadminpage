@@ -326,6 +326,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
       const summaryParts = [
         data.make && data.model ? `${data.make} ${data.model} ${data.year || ""}`.trim() : "",
         data.plate ? `Plate: ${data.plate}` : "",
+        data.color ? `Color: ${data.color}${data.colorAr ? ` (${data.colorAr})` : ""}` : "",
         data.vin ? `VIN: ${data.vin}` : "",
         data.capacity ? `Seats: ${data.capacity}` : "",
         data.owner ? `Owner: ${data.owner}` : "",
@@ -937,16 +938,58 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Color <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-text-secondary">
+                      Color (اللون) <span className="text-red-500">*</span>
+                    </label>
+                    {formData.color && (
+                      <span className="text-[11px] text-brand font-bold">
+                        {formData.color}
+                      </span>
+                    )}
+                  </div>
                   <input 
                     required
-                    placeholder="e.g. White" 
+                    placeholder="e.g. White, Grey, Black, Silver..." 
                     className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
                     value={formData.color}
                     onChange={(e) => setFormData({...formData, color: e.target.value})}
                   />
+                  {/* Quick color selector chips */}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[
+                      { name: "White", ar: "أبيض", bg: "#ffffff", border: "#cbd5e1" },
+                      { name: "Black", ar: "أسود", bg: "#0f172a", border: "#0f172a" },
+                      { name: "Grey", ar: "رمادي", bg: "#64748b", border: "#64748b" },
+                      { name: "Silver", ar: "فضي", bg: "#e2e8f0", border: "#94a3b8" },
+                      { name: "Dark Blue", ar: "كحلي", bg: "#1e3a8a", border: "#1e3a8a" },
+                      { name: "Blue", ar: "أزرق", bg: "#2563eb", border: "#2563eb" },
+                      { name: "Red", ar: "أحمر", bg: "#dc2626", border: "#dc2626" },
+                      { name: "Burgundy", ar: "عنابي", bg: "#831843", border: "#831843" },
+                      { name: "Beige", ar: "بيج", bg: "#fef3c7", border: "#d97706" },
+                      { name: "Gold", ar: "ذهبي", bg: "#f59e0b", border: "#b45309" },
+                      { name: "White/Black", ar: "أبيض/أسود", bg: "linear-gradient(135deg, #ffffff 50%, #000000 50%)", border: "#94a3b8" },
+                    ].map((c) => (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, color: c.name })}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-medium flex items-center gap-1 border transition-all cursor-pointer ${
+                          formData.color?.toLowerCase() === c.name.toLowerCase()
+                            ? "border-brand bg-brand/10 text-brand font-bold shadow-xs"
+                            : "border-gray-200 bg-gray-50/70 text-gray-700 hover:bg-gray-100"
+                        }`}
+                        title={`${c.name} - ${c.ar}`}
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block shrink-0 shadow-2xs"
+                          style={{ background: c.bg, border: `1px solid ${c.border}` }}
+                        />
+                        <span>{c.name}</span>
+                        <span className="text-gray-400 text-[9px]">({c.ar})</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
