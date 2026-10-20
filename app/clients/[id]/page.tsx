@@ -23,6 +23,8 @@ import {
   ChevronRight,
   Download,
   Eye,
+  Maximize2,
+  Camera,
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 
@@ -285,19 +287,18 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
             </h3>
           </div>
           <div className="p-5">
-            <div className="flex flex-wrap gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
               {client.documents.map((doc: string, idx: number) => {
                 const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
                 return (
-                  <button
+                  <div
                     key={idx}
-                    type="button"
                     onClick={() => setPreviewDocIndex(idx)}
-                    className="w-28 h-28 rounded-xl border border-border overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all block group bg-gray-50 relative cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand"
-                    title={`Click to preview Document ${idx + 1} (عرض المستند)`}
+                    className="relative h-28 sm:h-32 md:h-36 w-full rounded-xl border border-border overflow-hidden group shadow-2xs bg-gray-100 cursor-pointer active:scale-95 transition-transform"
+                    title={`Document #${idx + 1} - Click to enlarge`}
                   >
                     {isPdf ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-brand gap-1.5 p-2 text-center">
+                      <div className="w-full h-full flex flex-col items-center justify-center text-brand gap-1.5 p-2 text-center bg-gray-50">
                         <FileText size={28} />
                         <span className="text-[10px] font-semibold">PDF Document</span>
                       </div>
@@ -305,17 +306,22 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                       <img
                         src={doc}
                         alt={`Document ${idx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                       />
                     )}
-                    <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white">
-                      <Eye size={18} />
-                      <span className="text-[10px] font-bold">Preview</span>
+                    <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                      <Maximize2 size={18} />
                     </div>
-                    <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded pointer-events-none">
-                      #{idx + 1}
-                    </span>
-                  </button>
+                    <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none">
+                      <span className="bg-black/60 backdrop-blur-xs text-[9px] sm:text-[10px] font-medium text-white px-1.5 py-0.5 rounded truncate max-w-[75%]">
+                        {isPdf ? "PDF" : "Document"}
+                      </span>
+                      <span className="text-[8px] sm:text-[9px] font-bold text-white/90 bg-black/60 px-1 py-0.5 rounded shrink-0">
+                        #{idx + 1}
+                      </span>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -386,7 +392,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {/* In-Page Document Preview Modal */}
+      {/* Full-size Image Preview Modal (Inspired by Booking & Handover Details) */}
       {previewDocIndex !== null && client?.documents?.[previewDocIndex] && (() => {
         const currentDoc = client.documents[previewDocIndex];
         const isPdfDoc = currentDoc.includes("application/pdf") || currentDoc.endsWith(".pdf");
@@ -397,127 +403,87 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
 
         return (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md animate-fade-in"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in"
             onClick={() => setPreviewDocIndex(null)}
           >
             <div
-              className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-white/20"
+              className="relative max-w-4xl max-h-[92vh] flex flex-col items-center"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-border flex items-center justify-between bg-gray-50/90 gap-2 shrink-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                    <FileText size={16} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-text-primary flex items-center gap-2 truncate">
-                      <span>Document Preview</span>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
-                        {previewDocIndex + 1} of {totalDocs}
-                      </span>
-                    </h3>
-                    <p className="text-[11px] text-text-muted truncate">
-                      {client.name} &bull; {isPdfDoc ? "PDF Document" : "Image File"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <a
-                    href={downloadUrl}
-                    download={`client-doc-${previewDocIndex + 1}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 text-text-muted hover:text-brand hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
-                    title="Download or open original"
-                  >
-                    <Download size={18} />
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewDocIndex(null)}
-                    className="flex items-center gap-1 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-text-primary px-3 py-1.5 rounded-xl font-semibold text-xs transition-colors cursor-pointer active:scale-95"
-                    aria-label="Close document preview"
-                  >
-                    <X size={16} />
-                    <span>Close</span>
-                  </button>
-                </div>
+              {/* Top controls: Download and Close */}
+              <div className="absolute -top-11 right-0 sm:-top-10 sm:right-0 flex items-center gap-2">
+                <a
+                  href={downloadUrl}
+                  download={`client-doc-${previewDocIndex + 1}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-black/60 hover:bg-black/90 text-white p-2 rounded-full cursor-pointer transition-all active:scale-95 shadow-md flex items-center justify-center"
+                  title="Download or open original"
+                >
+                  <Download size={18} />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDocIndex(null)}
+                  className="bg-black/60 hover:bg-black/90 text-white p-2 rounded-full cursor-pointer transition-all active:scale-95 shadow-md flex items-center justify-center"
+                  aria-label="Close image preview"
+                >
+                  <X size={20} />
+                </button>
               </div>
 
-              {/* Body */}
-              <div className="relative flex-1 p-3 sm:p-5 flex items-center justify-center bg-gray-900/95 overflow-hidden min-h-[350px] sm:min-h-[460px]">
-                {/* Previous Button */}
-                {totalDocs > 1 && (
-                  <button
-                    type="button"
-                    disabled={previewDocIndex === 0}
-                    onClick={() => setPreviewDocIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
-                    className="absolute left-2 sm:left-4 z-10 p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/90 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg active:scale-95"
-                    title="Previous document (Left Arrow)"
-                  >
-                    <ChevronLeft size={22} />
-                  </button>
-                )}
-
-                {/* Main Content Area */}
-                <div className="max-h-[75vh] w-full flex items-center justify-center overflow-auto">
-                  {isPdfDoc ? (
-                    <iframe
-                      src={currentDoc}
-                      className="w-full h-[70vh] rounded-lg bg-white border border-gray-700"
-                      title={`Document ${previewDocIndex + 1}`}
-                    />
-                  ) : (
-                    <img
-                      src={currentDoc}
-                      alt={`Document ${previewDocIndex + 1}`}
-                      className="max-h-[72vh] max-w-full rounded-lg object-contain shadow-2xl"
-                    />
-                  )}
-                </div>
-
-                {/* Next Button */}
-                {totalDocs > 1 && (
-                  <button
-                    type="button"
-                    disabled={previewDocIndex === totalDocs - 1}
-                    onClick={() => setPreviewDocIndex((prev) => (prev !== null && prev < totalDocs - 1 ? prev + 1 : prev))}
-                    className="absolute right-2 sm:right-4 z-10 p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/90 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg active:scale-95"
-                    title="Next document (Right Arrow)"
-                  >
-                    <ChevronRight size={22} />
-                  </button>
-                )}
+              {/* Top info badge (Document title & count) */}
+              <div className="absolute -top-11 left-0 sm:-top-10 sm:left-0 flex items-center gap-2 text-white/90 text-xs font-semibold select-none">
+                <span className="bg-black/50 px-2.5 py-1 rounded-full border border-white/10 backdrop-blur-xs">
+                  Document #{previewDocIndex + 1} {totalDocs > 1 ? `(${previewDocIndex + 1} / ${totalDocs})` : ""}
+                </span>
               </div>
 
-              {/* Thumbnail Strip */}
+              {/* Previous Button (if multiple docs) */}
               {totalDocs > 1 && (
-                <div className="p-2 sm:p-3 bg-gray-50 border-t border-border flex items-center justify-center gap-2 overflow-x-auto shrink-0">
-                  {client.documents.map((d: string, i: number) => {
-                    const isThumbPdf = d.includes("application/pdf") || d.endsWith(".pdf");
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setPreviewDocIndex(i)}
-                        className={`w-12 h-12 rounded-lg border-2 overflow-hidden transition-all cursor-pointer shrink-0 ${
-                          previewDocIndex === i ? "border-brand ring-2 ring-brand/30 scale-105" : "border-border/70 opacity-60 hover:opacity-100"
-                        }`}
-                        title={`Document ${i + 1}`}
-                      >
-                        {isThumbPdf ? (
-                          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand text-[9px] font-bold">
-                            PDF
-                          </div>
-                        ) : (
-                          <img src={d} alt="" className="w-full h-full object-cover" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                <button
+                  type="button"
+                  disabled={previewDocIndex === 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewDocIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+                  }}
+                  className="absolute -left-12 sm:-left-16 top-1/2 -translate-y-1/2 p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg active:scale-95"
+                  title="Previous document (Left Arrow)"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+              )}
+
+              {/* Main Content */}
+              {isPdfDoc ? (
+                <iframe
+                  src={currentDoc}
+                  className="w-[85vw] max-w-4xl h-[80vh] rounded-xl sm:rounded-2xl bg-white shadow-2xl border border-white/20"
+                  title={`Document ${previewDocIndex + 1}`}
+                />
+              ) : (
+                <img
+                  src={currentDoc}
+                  alt={`Document ${previewDocIndex + 1}`}
+                  className="max-h-[85vh] max-w-full rounded-xl sm:rounded-2xl object-contain shadow-2xl border border-white/20 select-none"
+                />
+              )}
+
+              {/* Next Button (if multiple docs) */}
+              {totalDocs > 1 && (
+                <button
+                  type="button"
+                  disabled={previewDocIndex === totalDocs - 1}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewDocIndex((prev) => (prev !== null && prev < totalDocs - 1 ? prev + 1 : prev));
+                  }}
+                  className="absolute -right-12 sm:-right-16 top-1/2 -translate-y-1/2 p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg active:scale-95"
+                  title="Next document (Right Arrow)"
+                >
+                  <ChevronRight size={24} />
+                </button>
               )}
             </div>
           </div>
