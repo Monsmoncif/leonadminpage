@@ -112,10 +112,12 @@ export async function GET(request: Request) {
       Contract.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }),
     ]);
 
-    // Calculate this month's revenue properly (excluding damage charges which go directly to mechanic/repairs)
+    // Calculate this month's revenue properly (excluding personalized contracts and damage charges which go directly to mechanic/repairs)
     const revenueThisMonthResult = await Contract.aggregate([
       { 
         $match: { 
+          contractType: { $ne: "Personalized" },
+          personalizedPersonName: { $in: [null, ""] },
           $or: [
             // Contracts completed this month (full amount earned)
             { status: "Completed", updatedAt: { $gte: startOfThisMonth } },
@@ -145,10 +147,12 @@ export async function GET(request: Request) {
     ]);
     const revenueThisMonth = revenueThisMonthResult.length > 0 ? revenueThisMonthResult[0].total : 0;
 
-    // Calculate last month's revenue for comparison (excluding damage charges)
+    // Calculate last month's revenue for comparison (excluding personalized contracts and damage charges)
     const revenueLastMonthResult = await Contract.aggregate([
       { 
         $match: { 
+          contractType: { $ne: "Personalized" },
+          personalizedPersonName: { $in: [null, ""] },
           $or: [
             // Contracts completed last month (full amount earned)
             { status: "Completed", updatedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } },
@@ -178,9 +182,15 @@ export async function GET(request: Request) {
     ]);
     const revenueLastMonth = revenueLastMonthResult.length > 0 ? revenueLastMonthResult[0].total : 0;
 
-    // Calculate total lifetime revenue for context (excluding damage charges)
+    // Calculate total lifetime revenue for context (excluding personalized contracts and damage charges)
     const totalRevenueResult = await Contract.aggregate([
-      { $match: { status: { $in: ["Active", "Completed"] } } },
+      { 
+        $match: { 
+          contractType: { $ne: "Personalized" },
+          personalizedPersonName: { $in: [null, ""] },
+          status: { $in: ["Active", "Completed"] } 
+        } 
+      },
       { 
         $group: { 
           _id: null, 
@@ -240,9 +250,15 @@ export async function GET(request: Request) {
       return { month, rentals: found ? found.count : 0 };
     });
 
-    // Revenue per month (for line chart) - excluding damage charges
+    // Revenue per month (for line chart) - excluding personalized contracts and damage charges
     const revenuePerMonth = await Contract.aggregate([
-      { $match: { status: { $in: ["Active", "Completed"] } } },
+      { 
+        $match: { 
+          contractType: { $ne: "Personalized" },
+          personalizedPersonName: { $in: [null, ""] },
+          status: { $in: ["Active", "Completed"] } 
+        } 
+      },
       {
         $group: {
           _id: { $month: "$createdAt" },
@@ -374,7 +390,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       stats: {
-        totalRevenue: `AED ${revenueThisMonth.toLocaleString()}`, // Changed to show this month's revenue
+        totalRevenue: `AED ${revenueThisMonth.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, // Show this month's revenue cleanly formatted
         activeRentals: String(activeContracts),
         totalCustomers: String(totalClients),
         totalDrivers: String(totalDrivers),
