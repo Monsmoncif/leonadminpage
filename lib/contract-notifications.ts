@@ -322,7 +322,7 @@ export async function sendDriverTaskNotification(
     const _c = Client;
     const _u = Unit;
     const contract = await Contract.findById(contractId)
-      .populate({ path: "clientId", select: "name phone", strictPopulate: false })
+      .populate({ path: "clientId", select: "name", strictPopulate: false })
       .populate({ path: "unitId", select: "make model plate", strictPopulate: false })
       .lean() as any;
 
@@ -340,7 +340,6 @@ export async function sendDriverTaskNotification(
     const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
     const vehiclePlate = contract.unitId?.plate || "";
     const clientName = contract.clientId?.name || "Client";
-    const clientPhone = contract.clientId?.phone || "";
     const startDate = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     const endDate = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -373,7 +372,6 @@ export async function sendDriverTaskNotification(
             vehicleName,
             vehiclePlate,
             clientName,
-            clientPhone,
             location,
             time,
             startDate,
@@ -402,18 +400,13 @@ export async function sendDriverTaskNotification(
       }
     }
 
-    // 2. SEND WHATSAPP TO DRIVER
+    // 2. SEND WHATSAPP TO DRIVER (Without client phone number)
     if (driver.phone) {
       try {
-        const cleanClientPhone = clientPhone ? formatPhoneNumberForWhatsApp(clientPhone) : "";
-        const clientChatLink = cleanClientPhone ? `https://wa.me/${cleanClientPhone}` : null;
-
         const whatsappMsg = `*${taskArabicTitle}*\n\n` +
           `📋 *المرجع / Reference:* ${orderRef}\n` +
           `🚙 *السيارة / Vehicle:* ${vehicleName}${vehiclePlate ? ` (${vehiclePlate})` : ''}\n` +
           `👤 *العميل / Client:* ${clientName}\n` +
-          `📞 *هاتف العميل / Phone:* ${clientPhone || "N/A"}\n` +
-          (clientChatLink ? `💬 *واتساب العميل / Chat:* ${clientChatLink}\n` : '') +
           `📍 *${isDelivery ? 'موقع التسليم / Delivery' : 'موقع الاستلام / Pickup'}:* ${location}\n` +
           `⏰ *التوقيت المحدد / Time:* ${time}\n` +
           `📅 *فترة الإيجار / Period:* ${startDate} → ${endDate}\n` +

@@ -513,6 +513,13 @@ export default function ContractsPage() {
                         const cPaymentStatus = contract.status === "Active" || contract.status === "Completed" ? "Paid" : "Pending";
                         const cCarStatus = contract.deliveryStatus || (contract.status === "Completed" ? "Returned" : contract.status === "Draft" ? "Pending" : "Delivered");
 
+                        const clientId = typeof contract.clientId === "object" && contract.clientId !== null
+                          ? (contract.clientId._id || contract.clientId.id)
+                          : contract.clientId;
+                        const unitId = typeof contract.unitId === "object" && contract.unitId !== null
+                          ? (contract.unitId._id || contract.unitId.id)
+                          : contract.unitId;
+
                         return (
                           <tr 
                             key={contract._id} 
@@ -540,16 +547,38 @@ export default function ContractsPage() {
                             {/* Customer / Driver Column (Shows full customer name & driver name) */}
                             <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">
                               <div className="flex items-center gap-2 sm:gap-2.5">
-                                <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(contract.customer)}`}>
-                                  {getInitials(contract.customer)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <span 
-                                    className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight"
-                                    title={contract.customer}
+                                {clientId ? (
+                                  <Link
+                                    href={`/clients/${clientId}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    title={`View client details: ${contract.customer}`}
+                                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs hover:ring-2 hover:ring-brand/50 transition-all ${getAvatarColor(contract.customer)}`}
                                   >
-                                    {contract.customer}
-                                  </span>
+                                    {getInitials(contract.customer)}
+                                  </Link>
+                                ) : (
+                                  <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(contract.customer)}`}>
+                                    {getInitials(contract.customer)}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  {clientId ? (
+                                    <Link
+                                      href={`/clients/${clientId}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight hover:text-brand hover:underline transition-colors"
+                                      title={`View client details: ${contract.customer}`}
+                                    >
+                                      {contract.customer}
+                                    </Link>
+                                  ) : (
+                                    <span 
+                                      className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight"
+                                      title={contract.customer}
+                                    >
+                                      {contract.customer}
+                                    </span>
+                                  )}
                                   {(() => {
                                     const hasDelivery = contract.deliveryDriver && contract.deliveryDriver !== "None";
                                     const hasReturn = contract.returnDriver && contract.returnDriver !== "None";
@@ -581,13 +610,33 @@ export default function ContractsPage() {
 
                             {/* Vehicle Column */}
                             <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
-                              <span className="font-medium text-text-primary text-[11px] sm:text-xs md:text-sm line-clamp-1" title={contract.vehicle}>
-                                {contract.vehicle}
-                              </span>
-                              {contract.vehiclePlate && (
-                                <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5">
-                                  {contract.vehiclePlate}
-                                </p>
+                              {unitId ? (
+                                <Link
+                                  href={`/units/${unitId}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="group block"
+                                  title={`View vehicle details: ${contract.vehicle}`}
+                                >
+                                  <span className="font-medium text-text-primary group-hover:text-brand group-hover:underline text-[11px] sm:text-xs md:text-sm line-clamp-1 transition-colors">
+                                    {contract.vehicle}
+                                  </span>
+                                  {contract.vehiclePlate && (
+                                    <p className="text-[9.5px] sm:text-[11px] text-text-muted group-hover:text-brand/80 mt-0.5 transition-colors">
+                                      {contract.vehiclePlate}
+                                    </p>
+                                  )}
+                                </Link>
+                              ) : (
+                                <div>
+                                  <span className="font-medium text-text-primary text-[11px] sm:text-xs md:text-sm line-clamp-1" title={contract.vehicle}>
+                                    {contract.vehicle}
+                                  </span>
+                                  {contract.vehiclePlate && (
+                                    <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5">
+                                      {contract.vehiclePlate}
+                                    </p>
+                                  )}
+                                </div>
                               )}
                             </td>
 

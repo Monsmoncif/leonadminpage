@@ -499,7 +499,6 @@ export function buildDriverTaskEmail(params: {
   vehicleName: string;
   vehiclePlate?: string;
   clientName: string;
-  clientPhone?: string;
   location: string;
   time: string;
   startDate: string;
@@ -518,7 +517,7 @@ export function buildDriverTaskEmail(params: {
   const rows = [
     buildDetailRow("Task", params.isDelivery ? "Client Delivery / Handover" : "Vehicle Return Collection"),
     buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
-    buildDetailRow("Client", `${params.clientName}${params.clientPhone ? ` — ${params.clientPhone}` : ''}`),
+    buildDetailRow("Client", params.clientName),
     buildDetailRow(params.isDelivery ? "Delivery Location" : "Collection Location", params.location),
     buildDetailRow("Scheduled Time", params.time),
     buildDetailRow("Rental Period", `${params.startDate} to ${params.endDate}`, true),
