@@ -89,10 +89,9 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
   }
 
   const isHandedOver = Boolean(
-    contractDetails.contractNumber ||
     contractDetails.deliveryStatus === "Delivered" ||
-    contractDetails.status === "Active" ||
-    contractDetails.status === "Completed"
+    contractDetails.status === "Completed" ||
+    (contractDetails.status === "Active" && contractDetails.contractNumber)
   );
 
   return (

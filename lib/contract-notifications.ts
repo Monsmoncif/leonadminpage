@@ -331,9 +331,12 @@ export async function sendDriverTaskNotification(
       return results;
     }
 
-    const orderRef = contract.contractNumber 
-      ? `#${contract.contractNumber}` 
-      : `Order #${contract._id.toString().substring(0, 8).toUpperCase()}`;
+    const isDelivery = type === "delivery_assigned";
+    // For dispatch/delivery orders, driver only sees new order reference without contract number or PDF
+    const orderRef = isDelivery
+      ? `Order #${contract._id.toString().substring(0, 8).toUpperCase()}`
+      : (contract.contractNumber ? `#${contract.contractNumber}` : `Order #${contract._id.toString().substring(0, 8).toUpperCase()}`);
+
     const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
     const vehiclePlate = contract.unitId?.plate || "";
     const clientName = contract.clientId?.name || "Client";
@@ -341,7 +344,6 @@ export async function sendDriverTaskNotification(
     const startDate = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     const endDate = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-    const isDelivery = type === "delivery_assigned";
     const taskArabicTitle = isDelivery 
       ? "🚗 طلب تسليم سيارة جديد (New Delivery Assignment)" 
       : "🔄 طلب استلام وإرجاع سيارة (New Return Assignment)";

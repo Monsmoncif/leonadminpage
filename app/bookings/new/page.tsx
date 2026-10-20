@@ -62,8 +62,9 @@ const formatDateToInput = (dateStr: string) => {
 
 const DELIVERY_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
-  { id: 2, title: "Rental Data & Driver", icon: Truck },
-  { id: 3, title: "Review & Dispatch", icon: CheckCircle },
+  { id: 2, title: "Client (Optional)", icon: User },
+  { id: 3, title: "Rental Data & Driver", icon: Truck },
+  { id: 4, title: "Review & Dispatch", icon: CheckCircle },
 ];
 
 const SHOP_STEPS = [
@@ -450,7 +451,7 @@ export function NewRentalAdminPageContent() {
   useEffect(() => {
     const isReviewStep = 
       (contractType === "Shop" && currentStep === (isDriver ? 5 : 4)) || 
-      (contractType === "Delivery" && currentStep === 3) ||
+      (contractType === "Delivery" && currentStep === 4) ||
       (contractType === "Personalized" && currentStep === 3);
     if (!isReviewStep) return;
 
@@ -835,7 +836,8 @@ export function NewRentalAdminPageContent() {
         }
       }
     } else if (contractType === "Delivery") {
-      if (currentStep === 2) {
+      // Step 2 (Client selection) is optional: user can select existing client or skip
+      if (currentStep === 3) {
         if (!rentalData.deliveryDriverId) {
           toast.error("Please assign a delivery driver for this contract.");
           return;
@@ -1125,7 +1127,7 @@ export function NewRentalAdminPageContent() {
       } else if (contractType === "Personalized") {
         toast.success("Personalized Booking Created! The vehicle is now marked as booked in the fleet. (تم إنشاء الحجز الشخصي وحجز السيارة بنجاح)");
       } else if (contractType === "Delivery") {
-        toast.success("Delivery Booking Created! Click 'Dispatch' in the contracts table to assign number and send to driver.");
+        toast.success("Delivery Booking Created! Click 'Dispatch' in the contracts table to send the task to the driver. (تم إنشاء حجز التسليم! اضغط على إرسال لإرسال المهمة للسائق)");
       } else {
         toast.success("Shop Booking Created! Click 'Hand Over' in the contracts table when handing the car to the client. (تم إنشاء الحجز بنجاح! اضغط على 'تسليم' عند تسليم السيارة للعميل)");
       }
@@ -2306,8 +2308,8 @@ export function NewRentalAdminPageContent() {
               </div>
             )}
 
-            {/* For Delivery — show "Client TBD" */}
-            {contractType === "Delivery" && (
+            {/* For Delivery without selected client — show "Client TBD" */}
+            {contractType === "Delivery" && !selectedClient && (
               <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-amber-200/50 shadow-2xs bg-amber-50/30">
                 <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Customer</span>
                 <strong className="text-amber-800 text-sm font-bold block">To be registered by driver</strong>
@@ -2896,11 +2898,11 @@ export function NewRentalAdminPageContent() {
     }
 
     if (contractType === "Delivery") {
-      // 3 Steps for Driver Delivery: Car (1) → Rental Data & Driver (2) → Review & Dispatch (3)
-      // Client is skipped — driver registers the client upon delivery on-site
+      // 4 Steps for Driver Delivery: Car (1) → Client (Optional) (2) → Rental Data & Driver (3) → Review & Dispatch (4)
       if (currentStep === 1) return renderVehicleSelector();
-      if (currentStep === 2) return renderRentalData();
-      if (currentStep === 3) return renderReview();
+      if (currentStep === 2) return renderClientSelector();
+      if (currentStep === 3) return renderRentalData();
+      if (currentStep === 4) return renderReview();
       return null;
     }
 
@@ -2984,8 +2986,7 @@ export function NewRentalAdminPageContent() {
               type="button"
               onClick={() => {
                 setContractType("Delivery");
-                if (currentStep === 3) setCurrentStep(2);
-                else if (currentStep > 3) setCurrentStep(3);
+                if (currentStep > 4) setCurrentStep(4);
               }}
               className={`px-3.5 sm:px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center justify-center ${
                 contractType === "Delivery"
