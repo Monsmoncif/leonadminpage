@@ -505,7 +505,7 @@ export function buildDriverTaskEmail(params: {
   endDate: string;
   notes?: string;
   isDelivery: boolean;
-  actionUrl: string;
+  actionUrl?: string;
 }): { subject: string; html: string } {
   const taskTitle = params.isDelivery ? "Vehicle Delivery Assignment" : "Vehicle Return Collection";
   const taskSubtitle = params.isDelivery
@@ -529,7 +529,7 @@ export function buildDriverTaskEmail(params: {
     </p>
 
     <p style="margin: 0 0 20px; font-size: 13px; color: #475569; line-height: 1.6;">
-      You have been assigned an operational task for client <strong>${params.clientName}</strong> (${params.vehicleName}). Please review the schedule and complete the inspection workflow upon arrival.
+      You have been assigned an operational task for client <strong>${params.clientName}</strong> (${params.vehicleName}). Please find the task details below:
     </p>
 
     <!-- Schedule Table -->
@@ -543,16 +543,6 @@ export function buildDriverTaskEmail(params: {
       <span style="color: #475569;">${params.notes}</span>
     </div>
     ` : ''}
-
-    <div style="text-align: center; margin: 28px 0 16px;">
-      <a href="${params.actionUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 600; border-radius: 6px; letter-spacing: 0.2px;">
-        Open Driver Inspection Portal
-      </a>
-    </div>
-
-    <p style="margin: 20px 0 0; font-size: 12px; color: #64748b; line-height: 1.5;">
-      Ensure all 8-angle vehicle photos, fuel level, and odometer readings are documented before handover.
-    </p>
   `;
 
   return {

@@ -357,11 +357,7 @@ export async function sendDriverTaskNotification(
       ? `${baseUrl}/driver/delivery?contractId=${contract._id}`
       : `${baseUrl}/driver/return?contractId=${contract._id}`;
 
-    // Note: PDF is NOT attached for driver dispatch.
-    // The driver only sees the new assignment and operational task details.
-    // The official contract PDF is generated and sent to the client when the vehicle handover is completed.
-
-    // 1. SEND GMAIL TO DRIVER
+    // 1. SEND GMAIL TO DRIVER (Task details only, no contract PDF)
     if (driver.email) {
       const transporter = getTransporter();
       if (transporter) {
@@ -378,7 +374,6 @@ export async function sendDriverTaskNotification(
             endDate,
             notes: contract.notes,
             isDelivery,
-            actionUrl,
           });
 
           const logoAtt = getEmailLogoAttachment();

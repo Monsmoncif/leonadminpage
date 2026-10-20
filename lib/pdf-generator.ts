@@ -1,6 +1,12 @@
-import PDFDocument from "pdfkit";
 import puppeteer from "puppeteer-core";
 import fs from "fs";
+import path from "path";
+import connectDB from "@/lib/db";
+import { Contract } from "@/models/Contract";
+import { Client } from "@/models/Client";
+import { Unit } from "@/models/Unit";
+import { User } from "@/models/User";
+import { CONTRACT_TERMS } from "@/lib/contractTerms";
 
 export interface ContractPdfData {
   contractNumber: string | number;
@@ -40,7 +46,7 @@ export interface ContractPdfData {
   finesCharge?: number;
   fuelCharge?: number;
   notes?: string;
-  customerSignature?: string; // base64 or data uri
+  customerSignature?: string;
   createdAt?: string;
 }
 
@@ -54,10 +60,10 @@ function getBrowserExecutablePath(): string | null {
     "/usr/bin/chromium",
     "/snap/bin/chromium",
     "/usr/local/bin/chrome",
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
   ].filter(Boolean) as string[];
 
   for (const p of possiblePaths) {
@@ -70,9 +76,370 @@ function getBrowserExecutablePath(): string | null {
   return null;
 }
 
+function formatDateDisplay(dateVal: any): string {
+  if (!dateVal) return "";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+  } catch {
+    return String(dateVal);
+  }
+}
+
+/**
+ * Builds the complete, 100% authentic HTML of the official Leon Car Rental 2-page contract agreement
+ * (Identical to /bookings/[id]/print page)
+ */
+export function buildRealContractHtml(contract: any): string {
+  const client = contract.clientId || {};
+  const unit = contract.unitId || {};
+  const serialNo = contract.contractNumber || (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2240");
+  const isPersonalized = Boolean(contract.contractType === "Personalized" || contract.personalizedPersonName);
+  const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned" || Boolean(contract.returnedAt);
+
+  const hasEmiratesId = Boolean(
+    client.idNumber && (
+      client.idNumber.startsWith("784-") ||
+      /^\d{3}-\d{4}-\d{7}-\d{1}$/.test(client.idNumber)
+    )
+  );
+  const isForeigner = Boolean(
+    client.clientType === "Tourist" ||
+    client.passportNumber ||
+    (client.licenseIssuedBy && !["uae", "dubai", "abu dhabi", "sharjah", "ajman", "fujairah", "rak", "uaq", "united arab emirates"].includes(client.licenseIssuedBy.toLowerCase().trim())) ||
+    (client.nationality && !["uae", "united arab emirates", "emirati", "إماراتي"].includes(client.nationality.toLowerCase().trim()) && !hasEmiratesId)
+  );
+
+  let logoBase64 = "";
+  try {
+    const logoBuf = fs.readFileSync(path.join(process.cwd(), "public", "logo-original.png"));
+    logoBase64 = `data:image/png;base64,${logoBuf.toString("base64")}`;
+  } catch (e) {}
+
+  let adminSignBase64 = contract.adminSignature || "";
+  if (!adminSignBase64) {
+    try {
+      const signBuf = fs.readFileSync(path.join(process.cwd(), "public", "images", "admin-signature.png"));
+      adminSignBase64 = `data:image/png;base64,${signBuf.toString("base64")}`;
+    } catch (e) {}
+  }
+
+  const INSPECTION_ANGLES = [
+    { en: "Front View", ar: "الأمام" },
+    { en: "Rear View", ar: "الخلف" },
+    { en: "Left Side", ar: "اليسار" },
+    { en: "Right Side", ar: "اليمين" },
+    { en: "Dashboard / KM", ar: "العداد" },
+    { en: "Front Interior", ar: "الصالون" },
+    { en: "Rear Interior", ar: "المقاعد" },
+    { en: "Trunk / Boot", ar: "الصندوق" },
+  ];
+
+  const handoverDisplay = `${formatDateDisplay(contract.deliveredAt || contract.startDate)} - ${contract.checkoutTime || "08:00 AM"}`;
+  const returnDisplay = isReturned
+    ? `${formatDateDisplay(contract.returnedAt || contract.endDate)} - ${contract.checkinTime || "N/A"}`
+    : (contract.endDate ? formatDateDisplay(contract.endDate) : "N/A");
+  const returnMileageDisplay = isReturned
+    ? (contract.returnOdometer || contract.returnMileage || unit.mileage || "N/A")
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${serialNo}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 10px; color: #111827; background: #fff; }
+    @page { size: A4 portrait; margin: 6mm 5mm 6mm 5mm; }
+    .page-break { page-break-before: always; break-before: page; }
+    .border-b-black { border-bottom: 1px solid #000; }
+    .border-r-black { border-right: 1px solid #000; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .grid-12 { display: grid; grid-template-columns: repeat(12, 1fr); }
+    .col-5 { grid-column: span 5; }
+    .col-7 { grid-column: span 7; }
+    .col-span-2 { grid-column: span 2; }
+    .bg-gray-50 { background-color: #f9fafb; }
+    .bg-gray-100 { background-color: #f3f4f6; }
+    .term-row { page-break-inside: avoid; break-inside: avoid; border-bottom: 1px solid #f3f4f6; padding: 1px 0; }
+  </style>
+</head>
+<body>
+  <!-- PAGE 1: OFFICIAL CONTRACT FORM -->
+  <div style="border: 1.5px solid #000; padding: 10px; background: #fff; position: relative;">
+    <!-- HEADER -->
+    <div style="background-color: #181818; color: #fff; margin: -10px -10px 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #EEA21B;">
+      <div style="width: 28%;">
+        ${logoBase64 ? `<img src="${logoBase64}" style="height: 44px; object-fit: contain;" />` : `<strong style="color: #EEA21B; font-size: 16px;">LEON RENT CAR</strong>`}
+      </div>
+      <div style="text-align: center; flex: 1;">
+        <div style="font-size: 16px; font-weight: 900; direction: rtl;"><span style="color: #EEA21B;">ليــون </span><span>لتأجير السيارات</span></div>
+        <div style="font-size: 13px; font-weight: 900; letter-spacing: 1px;"><span style="color: #EEA21B;">LEON </span><span>CAR RENTAL</span></div>
+        <div style="width: 180px; height: 1.5px; background: #EEA21B; margin: 4px auto 0;"></div>
+      </div>
+      <div style="width: 36%; font-size: 7px; font-weight: bold; color: #f3f4f6; text-align: right; line-height: 1.3;">
+        <div>📞 +971 589 206 713</div>
+        <div>📍 19D Street - Al Quoz Industrial Area 3 - Dubai</div>
+        <div>📘 LEON CAR Rental Dubai</div>
+        <div>📸 Leon_car_rantel_dubai</div>
+      </div>
+    </div>
+
+    <!-- TITLE BAR -->
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 3px 6px; border-bottom: 2px solid #000; background: #f9fafb; margin-bottom: 4px;">
+      <div style="font-weight: 900; font-size: 9px; text-transform: uppercase;">
+        ${isPersonalized ? "PERSONAL AGREEMENT" : "RENTAL AGREEMENT"} | <span style="direction: rtl;">${isPersonalized ? "عقد استخدام شخصي ومخصص" : "عقد إيجار مركبة"}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px; background: #fff; padding: 2px 6px; border: 1px solid #d1d5db; border-radius: 4px;">
+        <span style="font-weight: bold; font-size: 8px; color: #4b5563;">Agreement No / رقم العقد:</span>
+        <span style="font-weight: 900; font-size: 11px; color: #dc2626;">${serialNo}</span>
+      </div>
+    </div>
+
+    <!-- LOCATION & DATES -->
+    <div class="grid-4 border-b-black" style="font-size: 7px;">
+      <div class="border-r-black" style="padding: 2px 4px;">
+        <div style="font-size: 6px; color: #6b7280; font-weight: bold;">LOCATION / منفذ البيع</div>
+        <div style="font-weight: bold; font-size: 8px;">${contract.pickupLocation || "Main Office"}</div>
+      </div>
+      <div class="border-r-black" style="padding: 2px 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <span style="font-weight: bold;">${contract.rentalType === "Monthly" ? "☑ Monthly / شهري" : "☑ Daily / يومي"}</span>
+      </div>
+      <div class="border-r-black" style="padding: 2px 4px;">
+        <div style="font-size: 6px; color: #6b7280; font-weight: bold;">HA DATE / تاريخ الاتفاقية</div>
+        <div style="font-weight: 900; font-size: 8px;">${formatDateDisplay(contract.startDate)}</div>
+      </div>
+      <div style="padding: 2px 4px;">
+        <div style="font-size: 6px; color: #6b7280; font-weight: bold;">HIRE MODE / نوع الاستئجار</div>
+        <div style="font-weight: bold; font-size: 8px;">${isPersonalized ? "Personal Use" : (contract.driverId ? "Chauffeur Driven" : "Self-Drive")}</div>
+      </div>
+    </div>
+
+    <!-- DUAL COLUMN -->
+    <div class="grid-12 border-b-black">
+      <!-- HIRER INFO -->
+      <div class="col-5 border-r-black">
+        <div class="bg-gray-100 border-b-black" style="padding: 2px 4px; display: flex; justify-content: space-between; font-weight: bold; font-size: 7.5px;">
+          <span>HIRER INFORMATION</span>
+          <span style="direction: rtl;">معلومات المستأجر</span>
+        </div>
+        <div class="border-b-black" style="padding: 2px 4px;">
+          <div style="font-size: 6px; color: #6b7280; font-weight: bold;">NAME / الاسم</div>
+          <div style="font-weight: 900; font-size: 8.5px;">${contract.personalizedPersonName || client.name || "N/A"}</div>
+        </div>
+        <div class="grid-2 border-b-black" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">LICENSE NO / رقم الرخصة</div>
+            <div style="font-weight: bold;">${client.licenseNumber || "N/A"}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">CUSTOMER / نوع العميل</div>
+            <div style="font-weight: bold;">${contract.customerType || "B2C"}</div>
+          </div>
+        </div>
+        <div class="grid-2 border-b-black" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">LICENSE EXPIRY / انتهاء الرخصة</div>
+            <div style="font-weight: bold;">${formatDateDisplay(client.licenseExpiry) || "N/A"}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">ID / PASSPORT / الهوية</div>
+            <div style="font-weight: bold;">${client.idNumber || client.passportNumber || "N/A"}</div>
+          </div>
+        </div>
+        <div class="grid-2 border-b-black" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">NATIONALITY / الجنسية</div>
+            <div style="font-weight: bold;">${client.nationality || "N/A"}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">PHONE / الهاتف</div>
+            <div style="font-weight: bold;">${client.phone || "N/A"}</div>
+          </div>
+        </div>
+        <div style="padding: 2px 4px; font-size: 6.5px;">
+          <div style="font-size: 6px; color: #6b7280;">EMAIL / البريد</div>
+          <div style="font-weight: 600;">${client.email || "N/A"}</div>
+        </div>
+      </div>
+
+      <!-- VEHICLE & HIRE INFO -->
+      <div class="col-7">
+        <div class="bg-gray-100 border-b-black" style="padding: 2px 4px; display: flex; justify-content: space-between; font-weight: bold; font-size: 7.5px;">
+          <span>VEHICLE &amp; HIRE INFORMATION</span>
+          <span style="direction: rtl;">معلومات المركبة والاستئجار</span>
+        </div>
+        <div class="grid-3 border-b-black" style="font-size: 6.5px;">
+          <div class="col-span-2 border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">VEHICLE / المركبة</div>
+            <div style="font-weight: 900; font-size: 8.5px;">${unit.make || ""} ${unit.model || ""} (${unit.year || ""}) - ${unit.color || ""}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">PLATE / رقم اللوحة</div>
+            <div style="font-weight: 900; font-size: 9px; color: #dc2626;">${unit.plate || "N/A"}</div>
+          </div>
+        </div>
+        <div class="grid-3 border-b-black" style="font-size: 6.5px;">
+          <div class="col-span-2 border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">HANDOVER / التسليم</div>
+            <div style="font-weight: bold;">${handoverDisplay}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">OUT KM / عداد الخروج</div>
+            <div style="font-weight: 900; color: #b45309;">${contract.checkoutMileage ? `${contract.checkoutMileage.toLocaleString()} km` : `${unit.mileage || 0} km`}</div>
+          </div>
+        </div>
+        <div class="grid-3 border-b-black" style="font-size: 6.5px;">
+          <div class="col-span-2 border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">RETURN DATE / تاريخ الإرجاع</div>
+            <div style="font-weight: bold;">${returnDisplay}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">IN KM / عداد العودة</div>
+            <div style="font-weight: 900;">${returnMileageDisplay}</div>
+          </div>
+        </div>
+        <div class="grid-3 border-b-black" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">DAILY RATE / اليومي</div>
+            <div style="font-weight: bold;">AED ${contract.dailyRate || 0}</div>
+          </div>
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">DEPOSIT / التأمين</div>
+            <div style="font-weight: bold; color: #047857;">AED ${contract.depositAmount || 0}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">TOTAL / الإجمالي</div>
+            <div style="font-weight: 900; font-size: 8.5px;">AED ${(Number(contract.totalAmount) || 0).toFixed(2)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTES TABLE -->
+    <div class="border-b-black" style="padding: 4px 6px; font-size: 6.5px; line-height: 1.25;">
+      <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 7.5px; background: #f3f4f6; padding: 2px 4px; margin-bottom: 2px;">
+        <span>IMPORTANT NOTES FOR CUSTOMER:</span>
+        <span style="direction: rtl;">معلومات هامة للمستأجر:</span>
+      </div>
+      <p style="text-align: center; direction: rtl; font-weight: bold; color: #111827;">
+        يكون لموظفي شركة ليون لتأجير السيارات ش.ذ.م.م كامل الصلاحية في تمديد فترة إيجار المركبة وزيادة رسومها المتفق عليها مع المستأجر.
+        التأمين لا يشمل أي ضرر لزجاج المركبة والإطارات والجنوط والأعطال الناتجة عن سوء الاستخدام.
+      </p>
+      <p style="text-align: center; font-size: 5.8px; color: #4b5563; margin-top: 1px;">
+        Hirer is obliged to obtain all extensions from authorized Leon Car Rental LLC staff. Insurance does not cover glass, tires, alloy wheels or negligence malfunctions.
+      </p>
+      <p style="text-align: center; font-weight: bold; color: #dc2626; margin-top: 2px;">
+        🚭 حظر التدخين داخل السيارة - غرامة 200 إلى 400 درهم | Smoking is strictly prohibited inside the vehicle (Fine AED 200-400) 🚭
+      </p>
+    </div>
+
+    <!-- INSPECTION PHOTOS (8 ANGLES) -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px 0; border-bottom: 1px solid #000;">
+      <!-- CHECK OUT -->
+      <div style="border: 1px solid #000; padding: 3px; border-radius: 4px; background: #fafafa;">
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; margin-bottom: 3px;">
+          <span>CHECK OUT (تسليم خروج)</span>
+          <span>KM: ${contract.checkoutMileage || unit.mileage || 0} | Fuel: ${contract.checkoutFuelLevel || 100}%</span>
+        </div>
+        <div class="grid-4" style="gap: 2px;">
+          ${INSPECTION_ANGLES.map((angle, idx) => {
+            const p = Array.isArray(contract.inspectionPhotos) ? contract.inspectionPhotos[idx] : null;
+            if (p && typeof p === "string" && p.trim()) {
+              return `<div style="border: 1px solid #d1d5db; height: 38px; overflow: hidden; border-radius: 2px; background: #fff;"><img src="${p}" style="width: 100%; height: 100%; object-fit: cover;" /></div>`;
+            }
+            return `<div style="border: 1px dashed #d1d5db; height: 38px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 5.5px; color: #9ca3af; text-align: center; border-radius: 2px;"><span>${angle.en}</span><span style="direction: rtl;">${angle.ar}</span></div>`;
+          }).join("")}
+        </div>
+      </div>
+
+      <!-- CHECK IN -->
+      <div style="border: 1px solid #000; padding: 3px; border-radius: 4px; background: #fafafa;">
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; margin-bottom: 3px;">
+          <span>CHECK IN (استلام عودة)</span>
+          <span>KM: ${returnMileageDisplay || "Pending"} | Fuel: ${contract.returnFuelLevel ? `${contract.returnFuelLevel}%` : "Pending"}</span>
+        </div>
+        <div class="grid-4" style="gap: 2px;">
+          ${INSPECTION_ANGLES.map((angle, idx) => {
+            const p = Array.isArray(contract.returnPhotos) ? contract.returnPhotos[idx] : null;
+            if (p && typeof p === "string" && p.trim()) {
+              return `<div style="border: 1px solid #d1d5db; height: 38px; overflow: hidden; border-radius: 2px; background: #fff;"><img src="${p}" style="width: 100%; height: 100%; object-fit: cover;" /></div>`;
+            }
+            return `<div style="border: 1px dashed #d1d5db; height: 38px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 5.5px; color: #9ca3af; text-align: center; border-radius: 2px;"><span>${angle.en}</span><span style="direction: rtl;">${angle.ar}</span></div>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>
+
+    <!-- SIGNATURES -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 6px 10px 2px; align-items: center;">
+      <!-- STAFF SIGN -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <strong style="font-size: 8.5px;">Staff Sign:</strong>
+        <div style="flex: 1; height: 36px; border-bottom: 1px dashed #9ca3af; position: relative; display: flex; align-items: center; justify-content: center;">
+          ${adminSignBase64 ? `<img src="${adminSignBase64}" style="max-height: 34px; max-width: 80%; object-fit: contain;" />` : ''}
+        </div>
+        <strong style="font-size: 8.5px; direction: rtl;">توقيع الموظف:</strong>
+      </div>
+
+      <!-- HIRER SIGN -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <strong style="font-size: 8.5px;">Hirer Sign:</strong>
+        <div style="flex: 1; height: 36px; border-bottom: 1px dashed #9ca3af; position: relative; display: flex; align-items: center; justify-content: center;">
+          ${contract.customerSignature ? `<img src="${contract.customerSignature}" style="max-height: 34px; max-width: 80%; object-fit: contain;" />` : `<span style="font-size: 7px; color: #9ca3af;">Customer Signature</span>`}
+        </div>
+        <strong style="font-size: 8.5px; direction: rtl;">توقيع المستأجر:</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE BREAK -->
+  <div class="page-break" style="height: 0; margin: 0;"></div>
+
+  <!-- PAGE 2: TERMS AND CONDITIONS -->
+  <div style="border: 1.5px solid #000; padding: 8px 10px; background: #fff; position: relative; margin-top: 10px;">
+    <div style="height: 4px; background: #EEA21B; margin: -8px -10px 6px;"></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 4px;">
+      <span style="font-size: 9.5px; font-weight: 900; text-decoration: underline;">Terms &amp; Conditions:-</span>
+      <span style="font-size: 10px; font-weight: 900; text-decoration: underline; direction: rtl;">الشروط والأحكام:-</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 1px; font-size: 5.6px; line-height: 1.12;">
+      ${CONTRACT_TERMS.map((t) => `
+        <div class="term-row">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start;">
+            <div style="text-align: left;">
+              <strong>${t.num}- </strong><span>${t.en}</span>
+            </div>
+            <div style="text-align: right; direction: rtl;">
+              <span dir="ltr"><strong>${t.num}- </strong></span><span>${t.ar}</span>
+            </div>
+          </div>
+          ${t.subItems && t.subItems.length > 0 ? `
+            <div style="margin-top: 1px;">
+              ${t.subItems.map(sub => `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 1px 0;">
+                  <div style="padding-left: 8px;"><strong>${sub.enKey} </strong>${sub.en}</div>
+                  <div style="padding-right: 8px; text-align: right; direction: rtl;"><strong>${sub.arKey} </strong>${sub.ar}</div>
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
+        </div>
+      `).join("")}
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 /**
  * Generates the EXACT official contract PDF matching the Admin Print page (/bookings/[id]/print)
- * 100% identical to the physical printed contract agreement.
+ * 100% authentic, reliable, and renders completely server-side via Puppeteer without localhost dependencies.
  */
 export async function generateContractPdfFromPrintUrl(
   contractId: string,
@@ -81,9 +448,62 @@ export async function generateContractPdfFromPrintUrl(
   const execPath = getBrowserExecutablePath();
   if (!execPath) {
     console.error("[PdfGenerator] No Chrome or Edge executable found on server host");
-    if (fallbackData) return generateContractPdf(fallbackData);
     throw new Error("No browser executable found to render print PDF");
   }
+
+  // 1. Fetch full contract data from database
+  let contractObj: any = null;
+  try {
+    await connectDB();
+    const mongoose = (await import("mongoose")).default;
+    if (mongoose.Types.ObjectId.isValid(contractId)) {
+      contractObj = await Contract.findById(contractId)
+        .populate({ path: "clientId" })
+        .populate({ path: "unitId" })
+        .lean();
+    }
+    if (!contractObj && !isNaN(Number(contractId))) {
+      contractObj = await Contract.findOne({ contractNumber: Number(contractId) })
+        .populate({ path: "clientId" })
+        .populate({ path: "unitId" })
+        .lean();
+    }
+  } catch (dbErr) {
+    console.warn(`[PdfGenerator] Failed loading contract from DB for ${contractId}:`, dbErr);
+  }
+
+  // If not found in DB, adapt fallbackData
+  if (!contractObj && fallbackData) {
+    contractObj = {
+      ...fallbackData,
+      clientId: {
+        name: fallbackData.clientName,
+        phone: fallbackData.clientPhone,
+        email: fallbackData.clientEmail,
+        idNumber: fallbackData.clientIdNumber,
+        licenseNumber: fallbackData.clientLicense,
+        licenseIssuedBy: fallbackData.licenseIssuedBy,
+        licenseIssuedDate: fallbackData.licenseIssuedDate,
+        licenseExpiry: fallbackData.licenseExpiry,
+        passportNumber: fallbackData.passportNumber,
+        passportExpiry: fallbackData.passportExpiry,
+        nationality: fallbackData.nationality,
+      },
+      unitId: {
+        make: fallbackData.vehicleName?.split(" ")[0] || "Vehicle",
+        model: fallbackData.vehicleName?.split(" ").slice(1).join(" ") || "",
+        plate: fallbackData.vehiclePlate,
+        color: fallbackData.vehicleColor,
+        year: fallbackData.vehicleYear,
+      },
+    };
+  }
+
+  if (!contractObj) {
+    throw new Error(`Contract ${contractId} could not be resolved to generate real contract PDF`);
+  }
+
+  const html = buildRealContractHtml(contractObj);
 
   let browser: any = null;
   let page: any = null;
@@ -100,41 +520,19 @@ export async function generateContractPdfFromPrintUrl(
         "--no-default-browser-check",
         "--disable-extensions",
         "--ignore-certificate-errors",
-        "--allow-insecure-localhost",
         "--disable-web-security",
       ],
     });
 
     page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-    const localPort = process.env.PORT || "3000";
-    const localBaseUrl = `http://127.0.0.1:${localPort}`;
-    const nextAuthBase = process.env.NEXTAUTH_URL;
-
-    // Try local loopback first (direct fast connection, avoids DNS/SSL/proxy issues on server)
-    let printUrl = `${localBaseUrl}/bookings/${contractId}/print?noprint=1&fresh=1`;
-
-    try {
-      await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
-    } catch (localErr) {
-      if (nextAuthBase && !nextAuthBase.includes("127.0.0.1") && !nextAuthBase.includes(`:${localPort}`)) {
-        printUrl = `${nextAuthBase}/bookings/${contractId}/print?noprint=1&fresh=1`;
-        console.warn(`[PdfGenerator] Local URL failed, retrying via NEXTAUTH_URL: ${printUrl}`);
-        await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
-      } else {
-        throw localErr;
-      }
-    }
-
-    // Wait for the contract page content to be fully rendered
-    await page.waitForSelector("#contract-page-1, #contract-print-content", { timeout: 20000 });
-    
-    // Wait for fonts & brand assets to settle
+    // Wait for fonts & rendering to settle
     try {
       await page.evaluate(() => (document as any).fonts?.ready);
     } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     const pdfUint8Array = await page.pdf({
       format: "A4",
@@ -143,13 +541,10 @@ export async function generateContractPdfFromPrintUrl(
     });
 
     const pdfBuffer = Buffer.from(pdfUint8Array);
-    console.log(`[PdfGenerator] Successfully generated official contract PDF (${pdfBuffer.length} bytes) for #${contractId}`);
+    console.log(`[PdfGenerator] Successfully generated official real contract PDF (${pdfBuffer.length} bytes) for #${contractId}`);
     return pdfBuffer;
   } catch (err) {
-    console.error(`[PdfGenerator] Failed generating print PDF for contract ${contractId}:`, err);
-    if (fallbackData) {
-      return generateContractPdf(fallbackData);
-    }
+    console.error(`[PdfGenerator] Failed generating official contract PDF for ${contractId}:`, err);
     throw err;
   } finally {
     if (page) {
@@ -162,260 +557,9 @@ export async function generateContractPdfFromPrintUrl(
 }
 
 /**
- * Generates an official, beautifully styled PDF Contract buffer
+ * Backward compatibility: generates the REAL official PDF contract buffer (NOT fake PDFKit!)
  */
 export async function generateContractPdf(data: ContractPdfData): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({
-        size: "A4",
-        margins: { top: 36, bottom: 36, left: 36, right: 36 },
-        info: {
-          Title: `Rental-Contract-${data.contractNumber}`,
-          Author: "Leon Rent Car",
-        },
-      });
-
-      const buffers: Buffer[] = [];
-      doc.on("data", (chunk) => buffers.push(chunk));
-      doc.on("end", () => resolve(Buffer.concat(buffers)));
-      doc.on("error", (err) => reject(err));
-
-      const primaryColor = "#181818";
-      const brandColor = "#EEA21B";
-      const lightBg = "#f8fafc";
-      const borderColor = "#cbd5e1";
-
-      // --- HEADER BANNER (Black & Gold Official Leon Design) ---
-      doc.rect(36, 36, 523, 62).fill("#181818");
-      doc.rect(36, 96, 523, 2).fill("#EEA21B");
-
-      doc.fillColor("#EEA21B").fontSize(19).font("Helvetica-Bold").text("LEON ", 50, 48, { continued: true });
-      doc.fillColor("#ffffff").text("CAR RENTAL");
-      doc.fontSize(8.5).font("Helvetica").fillColor("#cbd5e1").text("Tel: +971 589 206 713 • Al Quoz Industrial Area 3, Dubai", 50, 72);
-
-      doc.fillColor("#EEA21B").fontSize(11).font("Helvetica-Bold").text(`AGREEMENT #${data.contractNumber}`, 370, 48, { align: "right", width: 175 });
-      doc.fontSize(8).font("Helvetica").fillColor("#e2e8f0").text(`Date: ${data.createdAt || new Date().toLocaleDateString("en-GB")}`, 370, 72, { align: "right", width: 175 });
-
-      let y = 110;
-
-      // Section: HIRER & VEHICLE DETAILS (2 COLUMNS)
-      const colWidth = 255;
-      const colGap = 13;
-      const leftColX = 36;
-      const rightColX = leftColX + colWidth + colGap;
-
-      // Box 1: Customer Details
-      const isForeigner = Boolean(
-        data.clientType === "Tourist" ||
-        data.passportNumber ||
-        (data.nationality && !["uae", "united arab emirates", "emirati"].includes(data.nationality.toLowerCase().trim()))
-      );
-
-      doc.rect(leftColX, y, colWidth, 130).fillAndStroke(lightBg, borderColor);
-      doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text("1. HIRER (CUSTOMER) DETAILS", leftColX + 12, y + 10);
-      doc.strokeColor(brandColor).lineWidth(1.5).moveTo(leftColX + 12, y + 24).lineTo(leftColX + 180, y + 24).stroke();
-
-      doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
-      let itemY = y + 30;
-      doc.text(`Full Name:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.clientName || "N/A", leftColX + 85, itemY);
-      
-      itemY += 15;
-      doc.font("Helvetica").text(`Phone / Tel:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.clientPhone || "N/A", leftColX + 85, itemY);
-
-      if (isForeigner) {
-        itemY += 15;
-        doc.font("Helvetica").text(`Driving License:`, leftColX + 12, itemY);
-        const licStr = `${data.clientLicense || "Verified"}${data.licenseIssuedBy ? ` (${data.licenseIssuedBy})` : ""}`;
-        doc.font("Helvetica-Bold").text(licStr, leftColX + 85, itemY);
-
-        itemY += 15;
-        doc.font("Helvetica").text(`License Issue Date:`, leftColX + 12, itemY);
-        doc.font("Helvetica-Bold").text(data.licenseIssuedDate || "N/A", leftColX + 85, itemY);
-
-        itemY += 15;
-        doc.font("Helvetica").text(`License Expiry:`, leftColX + 12, itemY);
-        doc.font("Helvetica-Bold").text(data.licenseExpiry || "N/A", leftColX + 85, itemY);
-
-        itemY += 15;
-        doc.font("Helvetica").text(`Passport No:`, leftColX + 12, itemY);
-        const passStr = `${data.passportNumber || data.clientIdNumber || "N/A"}`;
-        doc.font("Helvetica-Bold").text(passStr, leftColX + 85, itemY);
-
-        itemY += 15;
-        doc.font("Helvetica").text(`Passport Expiry:`, leftColX + 12, itemY);
-        doc.font("Helvetica-Bold").text(`${data.passportExpiry || "N/A"}${data.nationality ? ` (${data.nationality})` : ""}`, leftColX + 85, itemY);
-      } else {
-        itemY += 16;
-        doc.font("Helvetica").text(`Emirates ID:`, leftColX + 12, itemY);
-        doc.font("Helvetica-Bold").text(data.clientIdNumber || "Verified", leftColX + 85, itemY);
-
-        itemY += 16;
-        doc.font("Helvetica").text(`Driving License:`, leftColX + 12, itemY);
-        doc.font("Helvetica-Bold").text(data.clientLicense || "Verified", leftColX + 85, itemY);
-
-        itemY += 16;
-        doc.font("Helvetica").text(`Email:`, leftColX + 12, itemY);
-        doc.font("Helvetica-Bold").text(data.clientEmail || "N/A", leftColX + 85, itemY);
-      }
-
-      // Box 2: Vehicle Details
-      doc.rect(rightColX, y, colWidth, 130).fillAndStroke(lightBg, borderColor);
-      doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text("2. VEHICLE DETAILS", rightColX + 12, y + 10);
-      doc.strokeColor(brandColor).lineWidth(1.5).moveTo(rightColX + 12, y + 24).lineTo(rightColX + 150, y + 24).stroke();
-
-      itemY = y + 32;
-      doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
-      doc.text(`Vehicle:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`${data.vehicleName} ${data.vehicleYear || ""}`, rightColX + 85, itemY);
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Plate Number:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.vehiclePlate || "N/A", rightColX + 85, itemY);
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Color:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.vehicleColor || "N/A", rightColX + 85, itemY);
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Initial Odometer:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`${data.checkoutMileage || 0} km`, rightColX + 85, itemY);
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Fuel Level:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`${data.checkoutFuelLevel || 100}%`, rightColX + 85, itemY);
-
-      y += 145;
-
-      // Section: RENTAL PERIOD & FINANCIAL SUMMARY
-      // Box 3: Logistics & Period
-      doc.rect(leftColX, y, colWidth, 120).fillAndStroke(lightBg, borderColor);
-      doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text("3. RENTAL PERIOD", leftColX + 12, y + 10);
-      doc.strokeColor(brandColor).lineWidth(1.5).moveTo(leftColX + 12, y + 24).lineTo(leftColX + 140, y + 24).stroke();
-
-      itemY = y + 32;
-      doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
-      doc.text(`Pickup Date:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.startDate, leftColX + 100, itemY);
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Expected End:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(data.endDate, leftColX + 100, itemY);
-
-      const isReturned = data.status === "Completed" || data.deliveryStatus === "Returned" || Boolean(data.returnedAt);
-      if (isReturned) {
-        itemY += 16;
-        const returnDateStr = data.returnedAt ? new Date(data.returnedAt).toLocaleDateString("en-GB") : data.endDate;
-        doc.font("Helvetica").text(`Date of Return:`, leftColX + 12, itemY);
-        doc.font("Helvetica-Bold").text(returnDateStr, leftColX + 100, itemY);
-      }
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Total Duration:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`${data.totalDays} Days`, leftColX + 100, itemY);
-
-      const isPersonalized = data.dailyRate === 0 && data.totalAmount === 0;
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Daily Rate:`, leftColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(isPersonalized ? `AED 0.00 (Personal)` : `AED ${data.dailyRate}/day`, leftColX + 100, itemY);
-
-      // Box 4: Financial Settlement
-      doc.rect(rightColX, y, colWidth, 120).fillAndStroke(lightBg, borderColor);
-      doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text(isPersonalized ? "4. PERSONAL USE SUMMARY" : "4. FINANCIAL SUMMARY", rightColX + 12, y + 10);
-      doc.strokeColor(brandColor).lineWidth(1.5).moveTo(rightColX + 12, y + 24).lineTo(rightColX + 160, y + 24).stroke();
-
-      itemY = y + 32;
-      doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
-      doc.text(`Rental Charges:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(isPersonalized ? `AED 0.00 (Free)` : `AED ${data.totalAmount}`, rightColX + 110, itemY);
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Security Deposit:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(`AED ${data.depositAmount || 0}`, rightColX + 110, itemY);
-
-      itemY += 16;
-      doc.font("Helvetica").text(`Payment Method:`, rightColX + 12, itemY);
-      doc.font("Helvetica-Bold").text(isPersonalized ? "Personal / Free" : (data.paymentMethod || "Cash"), rightColX + 110, itemY);
-
-      const extraCharges = (Number(data.salikCharge) || 0) + (Number(data.parkingCharge) || 0) + (Number(data.finesCharge) || 0) + (Number(data.fuelCharge) || 0);
-      const totalDue = Number(data.totalAmount || 0) + extraCharges;
-
-      itemY += 18;
-      doc.rect(rightColX + 10, itemY - 2, colWidth - 20, 22).fill("#e2e8f0");
-      doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(9.5).text(
-        isPersonalized ? `AMOUNT DUE: AED 0.00 (FREE)` : `AMOUNT DUE: AED ${totalDue.toFixed(2)}`,
-        rightColX + 18,
-        itemY + 3
-      );
-
-      y += 135;
-
-      // Section: SPECIAL INSTRUCTIONS & NOTES (IF ANY)
-      if (data.notes) {
-        doc.rect(leftColX, y, 523, 40).fillAndStroke("#fffbeb", "#fde68a");
-        doc.fillColor("#92400e").fontSize(8.5).font("Helvetica-Bold").text("Special Instructions / Notes:", leftColX + 10, y + 8);
-        doc.font("Helvetica").text(data.notes, leftColX + 10, y + 22, { width: 503 });
-        y += 50;
-      }
-
-      // Section: SIGNATURES & ACKNOWLEDGEMENT
-      const sigHeight = 110;
-      doc.rect(leftColX, y, 523, sigHeight).fillAndStroke(lightBg, borderColor);
-      doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text("5. SIGNATURES & ACKNOWLEDGEMENT", leftColX + 12, y + 10);
-      doc.fontSize(7.5).font("Helvetica").fillColor("#64748b").text(
-        "By signing below, the Hirer confirms inspection and receipt of the vehicle in good condition, and agrees to all rental terms.",
-        leftColX + 12, y + 24, { width: 500 }
-      );
-
-      // Customer Signature Box
-      const sigBoxW = 230;
-      const sigBoxH = 55;
-      const sigY = y + 42;
-
-      doc.rect(leftColX + 15, sigY, sigBoxW, sigBoxH).fillAndStroke("#ffffff", "#e2e8f0");
-      doc.fillColor("#64748b").fontSize(7.5).font("Helvetica").text("Customer / Hirer Signature (توقيع العميل)", leftColX + 22, sigY + 5);
-
-      // If base64 customer signature exists, embed image
-      if (data.customerSignature && data.customerSignature.startsWith("data:image")) {
-        try {
-          const base64Data = data.customerSignature.split(",")[1];
-          const imgBuffer = Buffer.from(base64Data, "base64");
-          doc.image(imgBuffer, leftColX + 25, sigY + 16, { fit: [180, 34] });
-        } catch (imgErr) {
-          console.error("Failed to render customer signature in PDF:", imgErr);
-        }
-      }
-
-      // Staff Signature Box
-      doc.rect(rightColX, sigY, sigBoxW, sigBoxH).fillAndStroke("#ffffff", "#e2e8f0");
-      doc.fillColor("#64748b").fontSize(7.5).font("Helvetica").text("Authorized Staff / Company Stamp (توقيع الموظف)", rightColX + 7, sigY + 5);
-      doc.fillColor("#0f172a").fontSize(9).font("Helvetica-Bold").text("Leon Rent Car", rightColX + 10, sigY + 22);
-      doc.fontSize(7.5).font("Helvetica").fillColor("#64748b").text("Approved & Handover Confirmed", rightColX + 10, sigY + 36);
-
-      y += sigHeight + 15;
-
-      // Section: KEY TERMS & CONDITIONS (COMPACT LEGAL FOOTER)
-      doc.rect(leftColX, y, 523, 110).fillAndStroke("#f1f5f9", "#e2e8f0");
-      doc.fillColor(primaryColor).fontSize(8.5).font("Helvetica-Bold").text("TERMS & CONDITIONS SUMMARY / ملخص الشروط والأحكام", leftColX + 12, y + 8);
-      
-      const termsText = 
-        "1. The Hirer agrees to return the vehicle on the specified return date and time in the same mechanical and physical condition.\n" +
-        "2. The vehicle is provided with insurance coverage subject to the terms of the policy. Negligent operation or unlicensed drivers void coverage.\n" +
-        "3. Any traffic violations, toll fees, fines, or fuel shortages during the rental period are the sole responsibility of the Hirer.\n" +
-        "4. Unauthorized subleasing, reckless driving, or off-road driving is strictly prohibited.\n" +
-        "5. The security deposit will be refunded upon vehicle inspection and clearance of all potential traffic fines within the agreed timeframe.";
-
-      doc.fontSize(7.2).font("Helvetica").fillColor("#475569").text(termsText, leftColX + 12, y + 24, { width: 500, lineGap: 2 });
-
-      // Footer brand note
-      doc.fontSize(7.5).font("Helvetica-Bold").fillColor("#94a3b8").text("Leon Rent Car — +213 541 77 08 49 — Official Vehicle Rental Agreement", 36, 785, { align: "center", width: 523 });
-
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
-  });
+  const dummyId = String(data.contractNumber || Date.now());
+  return generateContractPdfFromPrintUrl(dummyId, data);
 }
