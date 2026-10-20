@@ -249,7 +249,7 @@ export class DashboardService {
           ? 'Today'
           : isTomorrow
           ? 'Tomorrow'
-          : endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          : endDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
         dueTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
         status: isToday ? 'due-today' : 'upcoming',
       };

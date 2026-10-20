@@ -109,8 +109,8 @@ export async function GET(req: Request) {
       checkinTime: c.checkinTime || "",
       deliveredAt: c.deliveredAt || null,
       returnedAt: c.returnedAt || (c.status === "Completed" ? (c.updatedAt || new Date().toISOString()) : null),
-      startDate: new Date(c.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      endDate: new Date(c.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      startDate: new Date(c.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+      endDate: new Date(c.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
       deposit: `$${c.depositAmount || 0}`,
       advancePayment: c.advancePayment || 0,
       rentAmount: `$${c.totalAmount || 0}`,
@@ -210,8 +210,8 @@ export async function POST(req: Request) {
     });
 
     if (conflictingContract) {
-      const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
       return NextResponse.json(
         { error: `Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates or choose another car.` },
         { status: 400 }
@@ -364,9 +364,9 @@ export async function POST(req: Request) {
         const contractNum = contract.contractNumber 
           ? `#${contract.contractNumber}` 
           : `#${contract._id.toString().substring(0, 8).toUpperCase()}`;
-        const dateFormatted = contractStartDate.toLocaleDateString("en-US", {
-          month: "short",
+        const dateFormatted = contractStartDate.toLocaleDateString("en-GB", {
           day: "numeric",
+          month: "short",
           year: "numeric",
         });
         const vehicle = unitDoc ? `${unitDoc.make} ${unitDoc.model} (${unitDoc.plate || ""})`.trim() : "Vehicle";

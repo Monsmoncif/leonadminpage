@@ -443,7 +443,7 @@ export default function DriversPage() {
                               {driver.license}
                             </p>
                             <p className="text-text-muted text-[9.5px] sm:text-[11px] mt-0.5">
-                              Exp: {new Date(driver.licenseExpiry).toLocaleDateString()}
+                              Exp: {new Date(driver.licenseExpiry).toLocaleDateString("en-GB")}
                             </p>
                           </td>
 

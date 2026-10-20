@@ -671,11 +671,7 @@ function ConfirmHandoverPageContent() {
       contractStartDate.setHours(0, 0, 0, 0);
 
       if (contractStartDate > nowStartOfDay) {
-        const formattedDate = contractStartDate.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric"
-        });
+        const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
         setError(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
         toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
         return;

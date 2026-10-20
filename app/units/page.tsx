@@ -426,12 +426,12 @@ export default function UnitsPage() {
                               <div className="flex flex-wrap items-center gap-1 mt-0.5">
                                 {unit.registrationExpiry && (
                                   <span className="text-[9px] sm:text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded leading-tight">
-                                    Reg: {new Date(unit.registrationExpiry).toLocaleDateString()}
+                                    Reg: {new Date(unit.registrationExpiry).toLocaleDateString("en-GB")}
                                   </span>
                                 )}
                                 {unit.insuranceExpiry && (
                                   <span className="text-[9px] sm:text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded leading-tight">
-                                    Ins: {new Date(unit.insuranceExpiry).toLocaleDateString()}
+                                    Ins: {new Date(unit.insuranceExpiry).toLocaleDateString("en-GB")}
                                   </span>
                                 )}
                               </div>

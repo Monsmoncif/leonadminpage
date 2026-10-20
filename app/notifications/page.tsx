@@ -28,7 +28,7 @@ const formatTime = (dateString: string) => {
   if (diffInDays === 1) return "Yesterday";
   if (diffInDays < 7) return `${diffInDays} days ago`;
   
-  return d.toLocaleDateString();
+  return d.toLocaleDateString("en-GB");
 };
 
 const formatNotificationMessage = (msg: string) => {

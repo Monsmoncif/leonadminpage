@@ -47,7 +47,7 @@ async function checkUpcomingHandoverReminders() {
           ? `${(contract.unitId as any).make} ${(contract.unitId as any).model || ""} (${(contract.unitId as any).plate || ""})`.trim()
           : "Vehicle";
         const client = (contract.clientId as any)?.name || (contract as any).additionalDriverName || "Client";
-        const dateFormatted = contractStartDate.toLocaleDateString("en-US", {
+        const dateFormatted = contractStartDate.toLocaleDateString("en-GB", {
           month: "short",
           day: "numeric",
           year: "numeric",

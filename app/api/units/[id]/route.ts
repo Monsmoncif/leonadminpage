@@ -44,7 +44,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     for (const contract of contracts as any[]) {
       const startDate = new Date(contract.startDate);
-      const startLabel = startDate.toLocaleDateString("en-US", {
+      const startLabel = startDate.toLocaleDateString("en-GB", {
         month: "short",
         year: "2-digit",
       });
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // Add return odometer point if car was returned
       if (contract.returnOdometer != null && contract.returnOdometer > 0) {
         const endDate = new Date(contract.endDate);
-        const endLabel = endDate.toLocaleDateString("en-US", {
+        const endLabel = endDate.toLocaleDateString("en-GB", {
           month: "short",
           year: "2-digit",
         });

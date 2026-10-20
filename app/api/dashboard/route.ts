@@ -319,7 +319,7 @@ export async function GET(request: Request) {
         vehicle: contract.unitId
           ? `${contract.unitId.make} ${contract.unitId.model} (${contract.unitId.plate})`
           : "Unknown",
-        dueDate: isToday ? "Today" : isTomorrow ? "Tomorrow" : endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        dueDate: isToday ? "Today" : isTomorrow ? "Tomorrow" : endDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
         dueTime: endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
         status: isToday ? "due-today" : "upcoming",
       };

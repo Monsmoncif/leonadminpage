@@ -41,8 +41,8 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
       ]).then(([contractData, damagesData]) => {
         const enriched = {
           ...contractData,
-          startDate: new Date(contractData.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-          endDate: new Date(contractData.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          startDate: new Date(contractData.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+          endDate: new Date(contractData.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
           customer: contractData.clientId?.name || contractData.customer,
           driver: contractData.driverId?.name || "No Driver Assigned",
           vehicle: contractData.unitId ? `${contractData.unitId.make} ${contractData.unitId.model} (${contractData.unitId.plate})` : contractData.vehicle,

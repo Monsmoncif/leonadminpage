@@ -164,7 +164,7 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
                   <UserCircle size={14} /> ID: {driver.driverId}
                 </span>
                 <span className="text-sm text-text-muted flex items-center gap-1.5">
-                  <Clock size={14} /> Member since {driver.createdAt ? new Date(driver.createdAt).toLocaleDateString() : "Unknown"}
+                  <Clock size={14} /> Member since {driver.createdAt ? new Date(driver.createdAt).toLocaleDateString("en-GB") : "Unknown"}
                 </span>
               </div>
             </div>
@@ -187,7 +187,7 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
             </div>
             <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0">
               {driver.licenseExpiry
-                ? new Date(driver.licenseExpiry).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                ? new Date(driver.licenseExpiry).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
                 : "—"}
             </span>
           </div>
@@ -219,7 +219,7 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
             </div>
             <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0">
               {driver.createdAt
-                ? new Date(driver.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                ? new Date(driver.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
                 : "—"}
             </span>
           </div>

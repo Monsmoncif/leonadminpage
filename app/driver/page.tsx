@@ -271,11 +271,7 @@ export default function DriverDashboard() {
     contractStartDate.setHours(0, 0, 0, 0);
 
     if (contractStartDate > nowStartOfDay) {
-      const formattedDate = contractStartDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-      });
+      const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
       toast.error(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
       return;
     }
@@ -465,7 +461,7 @@ export default function DriverDashboard() {
       ? "Yesterday" 
       : isTomorrow 
       ? "Tomorrow" 
-      : taskDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      : taskDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
     // In WithClient tab: calm scheduled return due badge
     if (isWithClientTab) {

@@ -52,12 +52,7 @@ const getLogBg = (type: string) => {
 
 const formatDate = (dateString: string) => {
   const d = new Date(dateString);
-  return d.toLocaleString("en-US", { 
-    month: "short", 
-    day: "2-digit", 
-    hour: "2-digit", 
-    minute: "2-digit" 
-  });
+  return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 
 export default function ActivityLogsPage() {

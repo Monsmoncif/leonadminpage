@@ -474,7 +474,7 @@ export default function InspectionsPage() {
                             </span>
                             {selectedContract?.startDate && (
                               <span className="text-xs text-text-muted">
-                                {new Date(selectedContract.startDate).toLocaleDateString()}
+                                {new Date(selectedContract.startDate).toLocaleDateString("en-GB")}
                               </span>
                             )}
                           </div>
@@ -485,7 +485,7 @@ export default function InspectionsPage() {
                             </span>
                             {selectedContract?.endDate && (
                               <span className="text-xs text-text-muted">
-                                {new Date(selectedContract.endDate).toLocaleDateString()}
+                                {new Date(selectedContract.endDate).toLocaleDateString("en-GB")}
                               </span>
                             )}
                           </div>

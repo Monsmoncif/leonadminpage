@@ -172,8 +172,8 @@ export async function PUT(
       });
 
       if (conflictingContract) {
-        const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-        const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+        const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
         return NextResponse.json(
           { error: `Date Conflict: Vehicle (${targetUnitDoc.make} ${targetUnitDoc.model} - ${targetUnitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates.` },
           { status: 400 }
@@ -237,11 +237,7 @@ export async function PUT(
                          (body.status === "Active" && existingContract.status !== "Active");
 
     if (isActivating && isEarlyHandover) {
-      const formattedStart = contractStartDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-      });
+      const formattedStart = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
       return NextResponse.json(
         { 
           error: `Contract handover cannot be activated before its start date (${formattedStart}). Handover can be confirmed once the start date arrives.` 

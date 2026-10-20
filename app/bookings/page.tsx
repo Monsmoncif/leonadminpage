@@ -128,11 +128,7 @@ export default function ContractsPage() {
     contractStartDate.setHours(0, 0, 0, 0);
 
     if (contractStartDate > nowStartOfDay) {
-      const formattedDate = contractStartDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-      });
+      const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
       toast.error(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
       return;
     }
@@ -626,11 +622,7 @@ export default function ContractsPage() {
                                       contractStartDate.setHours(0, 0, 0, 0);
 
                                       if (contractStartDate > nowStartOfDay) {
-                                        const formattedDate = contractStartDate.toLocaleDateString("en-US", {
-                                          month: "short",
-                                          day: "numeric",
-                                          year: "numeric"
-                                        });
+                                        const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
                                         toast.error(`Cannot activate contract before start date (${formattedDate}).`);
                                         return;
                                       }
@@ -679,10 +671,7 @@ export default function ContractsPage() {
                                   const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
                                   contractStartDate.setHours(0, 0, 0, 0);
                                   const isFuture = contractStartDate > nowStartOfDay;
-                                  const formattedStart = contractStartDate.toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric"
-                                  });
+                                  const formattedStart = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
                                   // 1. Shop Contract: Handover in showroom
                                   if (isShop) {

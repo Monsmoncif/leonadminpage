@@ -307,7 +307,7 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Buffer
       const isReturned = data.status === "Completed" || data.deliveryStatus === "Returned" || Boolean(data.returnedAt);
       if (isReturned) {
         itemY += 16;
-        const returnDateStr = data.returnedAt ? new Date(data.returnedAt).toLocaleDateString() : data.endDate;
+        const returnDateStr = data.returnedAt ? new Date(data.returnedAt).toLocaleDateString("en-GB") : data.endDate;
         doc.font("Helvetica").text(`Date of Return:`, leftColX + 12, itemY);
         doc.font("Helvetica-Bold").text(returnDateStr, leftColX + 100, itemY);
       }

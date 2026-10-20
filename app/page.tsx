@@ -45,11 +45,11 @@ function getGreeting() {
 }
 
 function getFormattedDate() {
-  return new Date().toLocaleDateString("en-US", {
+  return new Date().toLocaleDateString("en-GB", {
     weekday: "long",
-    year: "numeric",
-    month: "long",
     day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }
 

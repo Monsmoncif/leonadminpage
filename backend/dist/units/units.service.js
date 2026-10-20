@@ -49,7 +49,7 @@ let UnitsService = class UnitsService {
         const mileageHistory = [];
         for (const contract of contracts) {
             const startDate = new Date(contract.startDate);
-            const startLabel = startDate.toLocaleDateString('en-US', {
+            const startLabel = startDate.toLocaleDateString('en-GB', {
                 month: 'short',
                 year: '2-digit',
             });
@@ -62,7 +62,7 @@ let UnitsService = class UnitsService {
             }
             if (contract.returnOdometer != null && contract.returnOdometer > 0) {
                 const endDate = new Date(contract.endDate);
-                const endLabel = endDate.toLocaleDateString('en-US', {
+                const endLabel = endDate.toLocaleDateString('en-GB', {
                     month: 'short',
                     year: '2-digit',
                 });

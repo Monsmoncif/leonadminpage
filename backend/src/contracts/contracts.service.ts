@@ -118,14 +118,14 @@ export class ContractsService {
       rawEndDate: c.endDate,
       checkoutTime: c.checkoutTime || '08:00 AM',
       checkinTime: c.checkinTime || '08:00 AM',
-      startDate: new Date(c.startDate).toLocaleDateString('en-US', {
-        month: 'short',
+      startDate: new Date(c.startDate).toLocaleDateString('en-GB', {
         day: 'numeric',
+        month: 'short',
         year: 'numeric',
       }),
-      endDate: new Date(c.endDate).toLocaleDateString('en-US', {
-        month: 'short',
+      endDate: new Date(c.endDate).toLocaleDateString('en-GB', {
         day: 'numeric',
+        month: 'short',
         year: 'numeric',
       }),
       deposit: `$${c.depositAmount || 0}`,
@@ -223,8 +223,8 @@ export class ContractsService {
 
     for (const existing of candidateContracts) {
       if (areDatesOverlapping(existing.startDate, existing.endDate, body.startDate, body.endDate)) {
-        const conflictStart = new Date(existing.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const conflictEnd = new Date(existing.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const conflictStart = new Date(existing.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const conflictEnd = new Date(existing.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
         throw new BadRequestException(
           `Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates or choose another car.`,
         );
@@ -796,8 +796,8 @@ export class ContractsService {
     const vehiclePlate = contract.unitId?.plate || '';
     const clientName = contract.clientId?.name || 'Client';
     const clientPhone = contract.clientId?.phone || '';
-    const startDate = new Date(contract.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const endDate = new Date(contract.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const startDate = new Date(contract.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const endDate = new Date(contract.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
     const isDelivery = type === 'delivery_assigned';
     const taskArabicTitle = isDelivery 
@@ -1026,7 +1026,7 @@ export class ContractsService {
               <p>Your vehicle rental agreement <strong>#${contractNum}</strong> has been confirmed and the vehicle has been handed over.</p>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #fafafa; border: 1px solid #e2e8f0;">
                 <tr><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Vehicle:</td><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">${vehicleName}</td></tr>
-                <tr><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Rental Period:</td><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">${new Date(contract.startDate).toLocaleDateString()} to ${new Date(contract.endDate).toLocaleDateString()}</td></tr>
+                <tr><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Rental Period:</td><td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">${new Date(contract.startDate).toLocaleDateString("en-GB")} to ${new Date(contract.endDate).toLocaleDateString("en-GB")}</td></tr>
                 <tr><td style="padding: 10px; color: #64748b;">Total Amount:</td><td style="padding: 10px; font-weight: bold;">AED ${(contract.totalAmount || 0).toLocaleString()}</td></tr>
               </table>
               <div style="text-align: center; margin: 25px 0;">

@@ -75,8 +75,8 @@ export async function sendClientContractNotification(
     const vehicleColor = contract.unitId?.color || "";
     const vehicleYear = contract.unitId?.year || "";
 
-    const startDate = new Date(contract.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-    const endDate = new Date(contract.endDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const startDate = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    const endDate = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
     const driverName = contract.deliveryDriverId?.name || "Our driver";
     const driverPhone = contract.deliveryDriverId?.phone || "";
 
@@ -338,8 +338,8 @@ export async function sendDriverTaskNotification(
     const vehiclePlate = contract.unitId?.plate || "";
     const clientName = contract.clientId?.name || "Client";
     const clientPhone = contract.clientId?.phone || "";
-    const startDate = new Date(contract.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const endDate = new Date(contract.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const startDate = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const endDate = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
     const isDelivery = type === "delivery_assigned";
     const taskArabicTitle = isDelivery 
@@ -484,16 +484,16 @@ export async function sendHandoverReminderNotification(
     const location = contract.pickupLocation || "Main Office";
     const checkoutTime = contract.checkoutTime || "08:00 AM";
 
-    const startDateFormatted = new Date(contract.startDate).toLocaleDateString("en-US", {
+    const startDateFormatted = new Date(contract.startDate).toLocaleDateString("en-GB", {
       weekday: "short",
-      month: "short",
       day: "numeric",
+      month: "short",
       year: "numeric",
     });
-    const endDateFormatted = new Date(contract.endDate).toLocaleDateString("en-US", {
+    const endDateFormatted = new Date(contract.endDate).toLocaleDateString("en-GB", {
       weekday: "short",
-      month: "short",
       day: "numeric",
+      month: "short",
       year: "numeric",
     });
 

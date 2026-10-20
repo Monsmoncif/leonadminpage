@@ -67,7 +67,7 @@ export async function GET() {
 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px; background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
             ${buildDetailRow("Vehicle", vehicleDesc)}
-            ${buildDetailRow("Scheduled Return", endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }))}
+            ${buildDetailRow("Scheduled Return", endDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}
             ${buildDetailRow("Status", isOverdue ? "Overdue" : "Due Today", true)}
           </table>
 

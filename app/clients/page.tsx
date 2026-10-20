@@ -429,7 +429,7 @@ export default function ClientsPage() {
                             </p>
                             <p className="text-text-muted text-[9.5px] sm:text-[11px] mt-0.5">
                               {client.licenseExpiry
-                                ? `Exp: ${new Date(client.licenseExpiry).toLocaleDateString()}`
+                                ? `Exp: ${new Date(client.licenseExpiry).toLocaleDateString("en-GB")}`
                                 : client.idNumber
                                 ? `ID: ${client.idNumber}`
                                 : "No expiry"}

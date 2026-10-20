@@ -222,11 +222,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
     contractStartDate.setHours(0, 0, 0, 0);
 
     if (contractStartDate > nowStartOfDay) {
-      const formattedDate = contractStartDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-      });
+      const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
       toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
       return;
     }
@@ -363,8 +359,8 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
     { icon: DollarSign, label: "Price / Extra KM (سعر كم إضافي)", value: unit.pricePerExtraKm > 0 ? `AED ${unit.pricePerExtraKm}/km` : "Free / Included" },
     { icon: DollarSign, label: "Daily Rate (السعر اليومي)", value: `AED ${unit.dailyRate ?? 0}/day` },
     ...(unit.owner ? [{ icon: Building2, label: "Owner", value: unit.owner }] : []),
-    ...(unit.registrationExpiry ? [{ icon: Calendar, label: "Registration Expiry", value: new Date(unit.registrationExpiry).toLocaleDateString() }] : []),
-    ...(unit.insuranceExpiry ? [{ icon: ShieldCheck, label: "Insurance Expiry", value: new Date(unit.insuranceExpiry).toLocaleDateString() }] : []),
+    ...(unit.registrationExpiry ? [{ icon: Calendar, label: "Registration Expiry", value: new Date(unit.registrationExpiry).toLocaleDateString("en-GB") }] : []),
+    ...(unit.insuranceExpiry ? [{ icon: ShieldCheck, label: "Insurance Expiry", value: new Date(unit.insuranceExpiry).toLocaleDateString("en-GB") }] : []),
   ];
 
   // ===== Vidange (Oil Change - 10,000 KM Interval) Calculations =====
@@ -764,7 +760,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     tickFormatter={(val) => {
                       if (!val) return "";
                       const d = new Date(val);
-                      return isNaN(d.getTime()) ? val : d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+                      return isNaN(d.getTime()) ? val : d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
                     }}
                   />
                   <YAxis 
@@ -782,7 +778,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     labelFormatter={(label) => {
                       if (!label) return "";
                       const d = new Date(label);
-                      return isNaN(d.getTime()) ? label : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                      return isNaN(d.getTime()) ? label : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
                     }}
                   />
                   <Area 
@@ -878,7 +874,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     Currently delivered to {activeRental.clientId?.name || "Client"}
                   </p>
                   <p className="text-[11px] text-emerald-700">
-                    Active until {new Date(activeRental.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    Active until {new Date(activeRental.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                 </div>
                 <button
@@ -898,7 +894,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     Delivery pending for {pendingRental.clientId?.name || "Client"}
                   </p>
                   <p className="text-[11px] text-amber-700">
-                    Starts {new Date(pendingRental.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    Starts {new Date(pendingRental.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -990,7 +986,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                   label: "Last Vidange (آخر تغيير زيت)", 
                   value: `${lastVidangeKm.toLocaleString()} km`,
                   sub: unit.lastOilChangeMileage && unit.lastOilChangeMileage > 0 && unit.lastOilChangeDate 
-                    ? new Date(unit.lastOilChangeDate).toLocaleDateString() 
+                    ? new Date(unit.lastOilChangeDate).toLocaleDateString("en-GB") 
                     : undefined
                 },
                 { 
@@ -1189,16 +1185,8 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                   const paymentBadge = getPaymentBadge(contract.paymentStatus);
                   const isCarDelivered = effectiveStatus === "Active";
 
-                  const startFormatted = new Date(contract.startDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric"
-                  });
-                  const endFormatted = new Date(contract.endDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric"
-                  });
+                  const startFormatted = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                  const endFormatted = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
                   const checkoutKm = contract.checkoutMileage != null ? contract.checkoutMileage : 0;
                   const returnKm = contract.returnOdometer;

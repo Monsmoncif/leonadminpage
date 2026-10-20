@@ -458,8 +458,8 @@ export default function CreateContractModal({
       const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate) : null;
       if (conflict && !isCurrentContractUnit(formData.unitId)) {
         if (conflict.reason === "Booked") {
-          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
           toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
         } else {
           toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
@@ -652,8 +652,8 @@ export default function CreateContractModal({
     const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate) : null;
     if (conflict && !isCurrentContractUnit(formData.unitId)) {
       if (conflict.reason === "Booked") {
-        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
         toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
       } else {
         toast.error(`The selected car is in ${conflict.reason} and cannot be booked.`);
@@ -1006,8 +1006,8 @@ export default function CreateContractModal({
                                 }));
 
                                 if (conflict && conflict.reason === "Booked") {
-                                  const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                                  const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                  const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                                  const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
                                   toast.info(`Selected ${unit.make} ${unit.model}. Note: It is booked from ${conflictStart} to ${conflictEnd}. Please choose non-overlapping dates.`);
                                 } else {
                                   toast.success(`Selected ${unit.make} ${unit.model} (${unit.plate})`);
@@ -1030,7 +1030,7 @@ export default function CreateContractModal({
                                   <span className="bg-brand text-white p-1 rounded-full"><CheckCircle2 size={16} /></span>
                                 ) : conflict?.reason === "Booked" ? (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                    Booked ({new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+                                    Booked ({new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - {new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})
                                   </span>
                                 ) : unit.status === "Maintenance" || unit.status === "Out of Service" ? (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
@@ -1427,8 +1427,8 @@ export default function CreateContractModal({
                       {(() => {
                         const conflict = selectedVehicleObj ? getUnitConflict(selectedVehicleObj, formData.startDate, formData.endDate) : null;
                         if (!conflict || conflict.reason !== "Booked") return null;
-                        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-                        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
                         return (
                           <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in shadow-2xs">
                             <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-600" />

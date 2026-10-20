@@ -103,8 +103,8 @@ export default function ReportsPage() {
 
     try {
       setGeneratingType(type);
-      const sDate = new Date(startDate).toLocaleDateString();
-      const eDate = new Date(endDate).toLocaleDateString();
+      const sDate = new Date(startDate).toLocaleDateString("en-GB");
+      const eDate = new Date(endDate).toLocaleDateString("en-GB");
       
       const reportName = `${type} (${sDate} - ${eDate})`;
       
@@ -392,8 +392,8 @@ export default function ReportsPage() {
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   {paginatedReports.map((r, idx) => {
-                    const startStr = r.startDate ? new Date(r.startDate).toLocaleDateString() : null;
-                    const endStr = r.endDate ? new Date(r.endDate).toLocaleDateString() : null;
+                    const startStr = r.startDate ? new Date(r.startDate).toLocaleDateString("en-GB") : null;
+                    const endStr = r.endDate ? new Date(r.endDate).toLocaleDateString("en-GB") : null;
 
                     return (
                       <tr 
@@ -441,7 +441,7 @@ export default function ReportsPage() {
                         <td className="py-3 px-4 whitespace-nowrap text-xs text-text-secondary tabular-nums">
                           <div className="flex items-center gap-1.5">
                             <Clock size={13} className="text-text-muted shrink-0" />
-                            <span>{new Date(r.dateGenerated).toLocaleDateString()} {new Date(r.dateGenerated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span>{new Date(r.dateGenerated).toLocaleDateString("en-GB")} {new Date(r.dateGenerated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         </td>
 
@@ -698,13 +698,13 @@ export default function ReportsPage() {
                 <div>
                   <span className="text-[10px] font-bold uppercase text-text-muted tracking-wider block">Timeline Start</span>
                   <span className="font-medium text-text-secondary mt-0.5 block tabular-nums">
-                    {viewingReport.startDate ? new Date(viewingReport.startDate).toLocaleDateString() : "N/A"}
+                    {viewingReport.startDate ? new Date(viewingReport.startDate).toLocaleDateString("en-GB") : "N/A"}
                   </span>
                 </div>
                 <div>
                   <span className="text-[10px] font-bold uppercase text-text-muted tracking-wider block">Timeline End</span>
                   <span className="font-medium text-text-secondary mt-0.5 block tabular-nums">
-                    {viewingReport.endDate ? new Date(viewingReport.endDate).toLocaleDateString() : "N/A"}
+                    {viewingReport.endDate ? new Date(viewingReport.endDate).toLocaleDateString("en-GB") : "N/A"}
                   </span>
                 </div>
               </div>

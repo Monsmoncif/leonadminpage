@@ -186,7 +186,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                   <Globe size={14} /> {client.nationality}
                 </span>
                 <span className="text-sm text-text-muted flex items-center gap-1.5">
-                  <Clock size={14} /> Member since {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : "Unknown"}
+                  <Clock size={14} /> Member since {client.createdAt ? new Date(client.createdAt).toLocaleDateString("en-GB") : "Unknown"}
                 </span>
               </div>
             </div>
@@ -216,7 +216,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
             </div>
             <span className="text-sm font-semibold text-text-primary">
               {client.licenseExpiry
-                ? new Date(client.licenseExpiry).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                ? new Date(client.licenseExpiry).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
                 : "—"}
             </span>
           </div>
@@ -335,7 +335,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                       </a>
                     </td>
                     <td className="py-3 px-4 text-text-secondary">
-                      {new Date(contract.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} → {new Date(contract.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      {new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} → {new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                     </td>
                     <td className="py-3 px-4 font-semibold text-text-primary">
                       AED {Number(contract.totalAmount || 0).toLocaleString()}

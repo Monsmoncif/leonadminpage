@@ -88,12 +88,7 @@ export default function ExtendRentalModal({
   const paymentStatus = contract.paymentStatus || "Pending";
 
   const formatDateDisplay = (date: Date) => {
-    return date.toLocaleDateString("en-US", { 
-      weekday: "short", 
-      month: "short", 
-      day: "numeric", 
-      year: "numeric" 
-    });
+    return date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   };
 
   const handleSubmit = async () => {

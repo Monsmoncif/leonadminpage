@@ -122,7 +122,7 @@ export default function CalendarPage() {
   const monthEnd = monthDates[41];
   monthEnd.setHours(23, 59, 59, 999);
 
-  const monthYearStr = currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthYearStr = currentDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
   useEffect(() => {
     const fetchContracts = async () => {
@@ -250,7 +250,7 @@ export default function CalendarPage() {
               chipClass,
               dotClass,
               color: getAvatarColor(c.customer),
-              dateStr: startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+              dateStr: startDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
               notes: pickupNotes,
               location: pickupLocation,
               rawContract: c,
@@ -346,7 +346,7 @@ export default function CalendarPage() {
               chipClass,
               dotClass,
               color: getAvatarColor(c.customer),
-              dateStr: endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+              dateStr: endDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
               notes: returnNotes,
               location: returnLocation,
               rawContract: c,
@@ -753,7 +753,7 @@ export default function CalendarPage() {
               <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                 <CalendarIcon size={13} className="text-brand" />
                 <span>
-                  {selectedDay.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  {selectedDay.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
                 </span>
               </span>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white border border-border text-text-secondary tabular-nums">
@@ -810,7 +810,7 @@ export default function CalendarPage() {
               ← Prev
             </button>
             <button onClick={goToday} className="px-2 sm:px-2.5 py-1 bg-brand text-white rounded-lg font-bold cursor-pointer text-xs shadow-xs">
-              {currentDate.toLocaleDateString("en-US", { month: "short" })}
+              {currentDate.toLocaleDateString("en-GB", { month: "short" })}
             </button>
             <button onClick={nextMonth} className="px-2 sm:px-2.5 py-1 border border-border rounded-lg bg-white hover:bg-gray-50 transition-colors cursor-pointer text-xs font-bold text-text-secondary">
               Next →

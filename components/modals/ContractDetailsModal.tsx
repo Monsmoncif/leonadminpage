@@ -413,7 +413,7 @@ export default function ContractDetailsModal({
     try {
       const dateObj = new Date(d);
       if (isNaN(dateObj.getTime())) return String(d);
-      return dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      return dateObj.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     } catch {
       return String(d);
     }
@@ -1367,7 +1367,7 @@ export default function ContractDetailsModal({
                       {contractData.signatureMetadata?.signedAt && (
                         <div className="text-[10px] sm:text-[11px] text-text-muted flex items-center gap-1.5 pt-0.5">
                           <Clock size={11} className="shrink-0" />
-                          <span>Signed: {new Date(contractData.signatureMetadata.signedAt).toLocaleDateString()} {new Date(contractData.signatureMetadata.signedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span>Signed: {new Date(contractData.signatureMetadata.signedAt).toLocaleDateString("en-GB")} {new Date(contractData.signatureMetadata.signedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       )}
                     </div>
