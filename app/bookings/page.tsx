@@ -523,8 +523,7 @@ export default function ContractsPage() {
                         return (
                           <tr 
                             key={contract._id} 
-                            onClick={() => setSelectedContractForDetails(contract)}
-                            className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up cursor-pointer"
+                            className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up"
                             style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
                           >
                             {/* Contract Column */}
@@ -550,9 +549,8 @@ export default function ContractsPage() {
                                 {clientId ? (
                                   <Link
                                     href={`/clients/${clientId}`}
-                                    onClick={(e) => e.stopPropagation()}
                                     title={`View client details: ${contract.customer}`}
-                                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs hover:ring-2 hover:ring-brand/50 transition-all ${getAvatarColor(contract.customer)}`}
+                                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs hover:ring-2 hover:ring-red-500/70 transition-all cursor-pointer ${getAvatarColor(contract.customer)}`}
                                   >
                                     {getInitials(contract.customer)}
                                   </Link>
@@ -565,8 +563,7 @@ export default function ContractsPage() {
                                   {clientId ? (
                                     <Link
                                       href={`/clients/${clientId}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight hover:text-brand hover:underline transition-colors"
+                                      className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight hover:text-red-600 hover:underline transition-colors cursor-pointer"
                                       title={`View client details: ${contract.customer}`}
                                     >
                                       {contract.customer}
@@ -613,15 +610,14 @@ export default function ContractsPage() {
                               {unitId ? (
                                 <Link
                                   href={`/units/${unitId}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="group block"
+                                  className="group block cursor-pointer"
                                   title={`View vehicle details: ${contract.vehicle}`}
                                 >
-                                  <span className="font-medium text-text-primary group-hover:text-brand group-hover:underline text-[11px] sm:text-xs md:text-sm line-clamp-1 transition-colors">
+                                  <span className="font-medium text-text-primary group-hover:text-red-600 group-hover:underline text-[11px] sm:text-xs md:text-sm line-clamp-1 transition-colors">
                                     {contract.vehicle}
                                   </span>
                                   {contract.vehiclePlate && (
-                                    <p className="text-[9.5px] sm:text-[11px] text-text-muted group-hover:text-brand/80 mt-0.5 transition-colors">
+                                    <p className="text-[9.5px] sm:text-[11px] text-text-muted group-hover:text-red-500 mt-0.5 transition-colors">
                                       {contract.vehiclePlate}
                                     </p>
                                   )}

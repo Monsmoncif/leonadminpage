@@ -18,6 +18,11 @@ import {
   ExternalLink,
   Loader2,
   Clock,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Eye,
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 
@@ -60,6 +65,22 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
   const [client, setClient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewDocIndex, setPreviewDocIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (previewDocIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPreviewDocIndex(null);
+      } else if (e.key === "ArrowLeft") {
+        setPreviewDocIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+      } else if (e.key === "ArrowRight") {
+        setPreviewDocIndex((prev) => (prev !== null && client?.documents && prev < client.documents.length - 1 ? prev + 1 : prev));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewDocIndex, client?.documents]);
 
   const fetchClient = async () => {
     try {
@@ -267,19 +288,18 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
             <div className="flex flex-wrap gap-4">
               {client.documents.map((doc: string, idx: number) => {
                 const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
-                const fileUrl = isPdf && doc.includes("cloudinary.com") ? doc.replace("/upload/", "/upload/fl_attachment/") : doc;
                 return (
-                  <a
+                  <button
                     key={idx}
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-28 h-28 rounded-xl border border-border overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all block group bg-gray-50"
+                    type="button"
+                    onClick={() => setPreviewDocIndex(idx)}
+                    className="w-28 h-28 rounded-xl border border-border overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all block group bg-gray-50 relative cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand"
+                    title={`Click to preview Document ${idx + 1} (عرض المستند)`}
                   >
                     {isPdf ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-brand gap-1.5">
+                      <div className="w-full h-full flex flex-col items-center justify-center text-brand gap-1.5 p-2 text-center">
                         <FileText size={28} />
-                        <span className="text-[10px] font-semibold">PDF</span>
+                        <span className="text-[10px] font-semibold">PDF Document</span>
                       </div>
                     ) : (
                       <img
@@ -288,7 +308,14 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
                     )}
-                  </a>
+                    <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white">
+                      <Eye size={18} />
+                      <span className="text-[10px] font-bold">Preview</span>
+                    </div>
+                    <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded pointer-events-none">
+                      #{idx + 1}
+                    </span>
+                  </button>
                 );
               })}
             </div>
@@ -358,6 +385,144 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </div>
+
+      {/* In-Page Document Preview Modal */}
+      {previewDocIndex !== null && client?.documents?.[previewDocIndex] && (() => {
+        const currentDoc = client.documents[previewDocIndex];
+        const isPdfDoc = currentDoc.includes("application/pdf") || currentDoc.endsWith(".pdf");
+        const downloadUrl = isPdfDoc && currentDoc.includes("cloudinary.com")
+          ? currentDoc.replace("/upload/", "/upload/fl_attachment/")
+          : currentDoc;
+        const totalDocs = client.documents.length;
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md animate-fade-in"
+            onClick={() => setPreviewDocIndex(null)}
+          >
+            <div
+              className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-white/20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-border flex items-center justify-between bg-gray-50/90 gap-2 shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                    <FileText size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-text-primary flex items-center gap-2 truncate">
+                      <span>Document Preview</span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                        {previewDocIndex + 1} of {totalDocs}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-text-muted truncate">
+                      {client.name} &bull; {isPdfDoc ? "PDF Document" : "Image File"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <a
+                    href={downloadUrl}
+                    download={`client-doc-${previewDocIndex + 1}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-text-muted hover:text-brand hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                    title="Download or open original"
+                  >
+                    <Download size={18} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDocIndex(null)}
+                    className="flex items-center gap-1 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-text-primary px-3 py-1.5 rounded-xl font-semibold text-xs transition-colors cursor-pointer active:scale-95"
+                    aria-label="Close document preview"
+                  >
+                    <X size={16} />
+                    <span>Close</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="relative flex-1 p-3 sm:p-5 flex items-center justify-center bg-gray-900/95 overflow-hidden min-h-[350px] sm:min-h-[460px]">
+                {/* Previous Button */}
+                {totalDocs > 1 && (
+                  <button
+                    type="button"
+                    disabled={previewDocIndex === 0}
+                    onClick={() => setPreviewDocIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
+                    className="absolute left-2 sm:left-4 z-10 p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/90 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg active:scale-95"
+                    title="Previous document (Left Arrow)"
+                  >
+                    <ChevronLeft size={22} />
+                  </button>
+                )}
+
+                {/* Main Content Area */}
+                <div className="max-h-[75vh] w-full flex items-center justify-center overflow-auto">
+                  {isPdfDoc ? (
+                    <iframe
+                      src={currentDoc}
+                      className="w-full h-[70vh] rounded-lg bg-white border border-gray-700"
+                      title={`Document ${previewDocIndex + 1}`}
+                    />
+                  ) : (
+                    <img
+                      src={currentDoc}
+                      alt={`Document ${previewDocIndex + 1}`}
+                      className="max-h-[72vh] max-w-full rounded-lg object-contain shadow-2xl"
+                    />
+                  )}
+                </div>
+
+                {/* Next Button */}
+                {totalDocs > 1 && (
+                  <button
+                    type="button"
+                    disabled={previewDocIndex === totalDocs - 1}
+                    onClick={() => setPreviewDocIndex((prev) => (prev !== null && prev < totalDocs - 1 ? prev + 1 : prev))}
+                    className="absolute right-2 sm:right-4 z-10 p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/90 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg active:scale-95"
+                    title="Next document (Right Arrow)"
+                  >
+                    <ChevronRight size={22} />
+                  </button>
+                )}
+              </div>
+
+              {/* Thumbnail Strip */}
+              {totalDocs > 1 && (
+                <div className="p-2 sm:p-3 bg-gray-50 border-t border-border flex items-center justify-center gap-2 overflow-x-auto shrink-0">
+                  {client.documents.map((d: string, i: number) => {
+                    const isThumbPdf = d.includes("application/pdf") || d.endsWith(".pdf");
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setPreviewDocIndex(i)}
+                        className={`w-12 h-12 rounded-lg border-2 overflow-hidden transition-all cursor-pointer shrink-0 ${
+                          previewDocIndex === i ? "border-brand ring-2 ring-brand/30 scale-105" : "border-border/70 opacity-60 hover:opacity-100"
+                        }`}
+                        title={`Document ${i + 1}`}
+                      >
+                        {isThumbPdf ? (
+                          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-brand text-[9px] font-bold">
+                            PDF
+                          </div>
+                        ) : (
+                          <img src={d} alt="" className="w-full h-full object-cover" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
