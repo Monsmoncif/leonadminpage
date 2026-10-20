@@ -237,9 +237,9 @@ let ContractsService = class ContractsService {
                 .sort({ contractNumber: -1 })
                 .select('contractNumber')
                 .lean();
-            const nextContractNumber = lastContract && typeof lastContract.contractNumber === 'number' && lastContract.contractNumber >= 2200
+            const nextContractNumber = lastContract && typeof lastContract.contractNumber === 'number' && lastContract.contractNumber >= 2240
                 ? lastContract.contractNumber + 1
-                : 2200;
+                : 2240;
             assignedContractNumber = nextContractNumber;
         }
         const contract = await this.contractModel.create({
@@ -460,9 +460,9 @@ let ContractsService = class ContractsService {
                 .sort({ contractNumber: -1 })
                 .select('contractNumber')
                 .lean();
-            const nextContractNumber = lastContract && typeof lastContract.contractNumber === 'number' && lastContract.contractNumber >= 2200
+            const nextContractNumber = lastContract && typeof lastContract.contractNumber === 'number' && lastContract.contractNumber >= 2240
                 ? lastContract.contractNumber + 1
-                : 2200;
+                : 2240;
             updatedData.contractNumber = nextContractNumber;
         }
         if (body.isDispatched !== undefined || body.dispatch !== undefined) {

@@ -11,9 +11,9 @@ async function testIncrement() {
   console.log('Current highest contract in DB:', lastContract ? lastContract.contractNumber : 'none');
 
   const nextNumber =
-    lastContract && typeof lastContract.contractNumber === 'number' && lastContract.contractNumber >= 2200
+    lastContract && typeof lastContract.contractNumber === 'number' && lastContract.contractNumber >= 2240
       ? lastContract.contractNumber + 1
-      : 2200;
+      : 2240;
 
   console.log('Next contract will be assigned number:', nextNumber);
 

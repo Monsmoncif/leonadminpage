@@ -277,9 +277,9 @@ export async function POST(req: Request) {
         .lean();
 
       const nextContractNumber =
-        lastContract && typeof (lastContract as any).contractNumber === "number" && (lastContract as any).contractNumber >= 2200
+        lastContract && typeof (lastContract as any).contractNumber === "number" && (lastContract as any).contractNumber >= 2240
           ? (lastContract as any).contractNumber + 1
-          : 2200;
+          : 2240;
       assignedContractNumber = nextContractNumber;
     }
 

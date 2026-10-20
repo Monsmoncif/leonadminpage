@@ -272,7 +272,7 @@ export default function VehicleReturnPage() {
   }, [selectedContract, selectedContractData]);
 
   // Derived baseline information
-  const contractNum = selectedContractData?.contractNumber || selectedContractData?.id || selectedContractData?._id?.substring(0, 8)?.toUpperCase() || "2200";
+  const contractNum = selectedContractData?.contractNumber || selectedContractData?.id || selectedContractData?._id?.substring(0, 8)?.toUpperCase() || "2240";
   const vehicleName = selectedContractData?.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || "Vehicle";
   const plateNumber = selectedContractData?.vehiclePlate || selectedContractData?.unitId?.plate || "";
   const isPersonalized = Boolean(

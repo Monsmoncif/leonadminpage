@@ -52,7 +52,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
 
       const contractNum = contract.contractNumber
         ? String(contract.contractNumber)
-        : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2200");
+        : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2240");
       document.title = contractNum;
 
       if (!isHandedOver) return;
@@ -141,7 +141,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   // Form serial number
   const serialNo = contract.contractNumber
     ? String(contract.contractNumber)
-    : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2200");
+    : (contract._id ? contract._id.toString().substring(0, 8).toUpperCase() : "2240");
 
   const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned" || Boolean(contract.returnedAt);
 
