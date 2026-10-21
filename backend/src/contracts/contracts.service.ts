@@ -622,10 +622,7 @@ export class ContractsService {
           (e) => console.error('Admin return notify failed:', e),
         );
 
-        // Send VIP Thank You & Return Completion notification to client (No PDF attached)
-        this.sendClient({ contractId: updatedContract._id.toString(), type: 'final' }).catch(
-          (e) => console.error('Client final return notification failed:', e),
-        );
+        // Note: Client thank-you notification on contract completion is disabled as requested
 
         try {
           const returnOdo = Number(body.returnOdometer) || initialMileage;

@@ -454,10 +454,7 @@ export async function PUT(
           }).catch(err => console.error("Failed to notify admin on return:", err));
         } catch (e) { console.error("Admin return notify failed:", e); }
 
-        // Send VIP Thank You & Return Completion notification to client (No PDF attached)
-        sendClientContractNotification(updatedContract._id.toString(), "final").catch((finalErr) => {
-          console.error("Client final return notification failed:", finalErr);
-        });
+        // Note: Client thank-you notification on contract completion is disabled as requested
 
 
         // Automatically generate Before and After inspections for Comparison

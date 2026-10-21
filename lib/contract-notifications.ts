@@ -58,6 +58,12 @@ export async function sendClientContractNotification(
       return results;
     }
 
+    // Completion / "final" thank you notifications to client are disabled as requested
+    if (type === "final") {
+      console.log(`[ClientNotification] Skipping client notification for contract ${contractId}: completion thank you notifications are disabled.`);
+      return results;
+    }
+
     // Ensure client details are accessible even if populated partially
     let clientDoc = contract.clientId;
     if (!clientDoc.name || !clientDoc.phone) {
@@ -232,17 +238,7 @@ export async function sendClientContractNotification(
         console.log(`[ClientNotification] ▶ Starting WhatsApp send (${type}) to: "${clientPhone}"`);
         let whatsappMsg = "";
 
-        if (type === "final") {
-          whatsappMsg = `🌟 *LEON RENT CAR* | شكراً لثقتكم بنا ✨\n` +
-            `*Thank You for Choosing Leon Rent Car!*\n\n` +
-            `Hello *${clientName}*,\n` +
-            `Thank you for renting with Leon Rent Car! It was a pleasure serving you, and we hope you had a wonderful driving journey.\n\n` +
-            `🚗 *Vehicle / السيارة:* ${vehicleName}\n` +
-            `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n\n` +
-            `We look forward to welcoming you behind the wheel again very soon!\n` +
-            `Safe travels,\n` +
-            `— *Leon Rent Car Team*`;
-        } else if (type === "created") {
+        if (type === "created") {
           whatsappMsg = `🎉 *LEON RENT CAR* | تأكيد حجز سيارة\n` +
             `*Vehicle Reservation Confirmed*\n\n` +
             `Hello *${clientName}*,\n` +
