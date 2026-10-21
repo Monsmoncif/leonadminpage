@@ -642,6 +642,45 @@ export async function generateContractPdfFromPrintUrl(
     };
   }
 
+  // Share ONE render between concurrent callers (client email + admin email fire together on handover)
+  const updatedStamp = contractObj?.updatedAt ? new Date(contractObj.updatedAt).getTime() : "";
+  const cacheKey = `${contractId}:${updatedStamp}`;
+  const existingJob = pdfJobs.get(cacheKey);
+  if (existingJob) {
+    console.log(`[PdfGenerator] Reusing in-flight/recent PDF render for ${cacheKey}`);
+    return existingJob;
+  }
+
+  const job = renderPrintPagePdf(contractId, execPath);
+  pdfJobs.set(cacheKey, job);
+  job.then(
+    () => { setTimeout(() => pdfJobs.delete(cacheKey), 20000); },
+    () => { pdfJobs.delete(cacheKey); }
+  );
+  return job;
+}
+
+const pdfJobs = new Map<string, Promise<Buffer>>();
+
+/**
+ * Renders the REAL /bookings/[id]/print page with Puppeteer and prints it to PDF.
+ * Never uses a different template: if the page cannot be loaded it retries, then throws.
+ */
+async function renderPrintPagePdf(contractId: string, execPath: string): Promise<Buffer> {
+  const localPort = process.env.PORT || "3000";
+  const idPath = encodeURIComponent(contractId);
+  const query = "noprint=1&fresh=1";
+  const candidateUrls = Array.from(
+    new Set(
+      [
+        `http://localhost:${localPort}/bookings/${idPath}/print?${query}`,
+        `http://127.0.0.1:${localPort}/bookings/${idPath}/print?${query}`,
+        process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL.replace(/\/$/, "")}/bookings/${idPath}/print?${query}` : null,
+        localPort !== "3000" ? `http://localhost:3000/bookings/${idPath}/print?${query}` : null,
+      ].filter(Boolean) as string[]
+    )
+  );
+
   let browser: any = null;
   let page: any = null;
   try {
@@ -665,48 +704,47 @@ export async function generateContractPdfFromPrintUrl(
     page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
 
-    // 2. Try loading the real live Next.js print page URL first!
-    let renderedViaLiveUrl = false;
-    const localPort = process.env.PORT || "3000";
-    const candidateUrls = [
-      `http://127.0.0.1:${localPort}/bookings/${contractId}/print?noprint=1&fresh=1`,
-      `http://localhost:${localPort}/bookings/${contractId}/print?noprint=1&fresh=1`,
-      process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/bookings/${contractId}/print?noprint=1&fresh=1` : null,
-      `http://127.0.0.1:3000/bookings/${contractId}/print?noprint=1&fresh=1`,
-      `http://localhost:3000/bookings/${contractId}/print?noprint=1&fresh=1`,
-    ].filter(Boolean) as string[];
+    let loaded = false;
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= 2 && !loaded; attempt++) {
+      for (const printUrl of candidateUrls) {
+        try {
+          console.log(`[PdfGenerator] (attempt ${attempt}) Rendering real print page: ${printUrl}`);
+          await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+          // Only appears after the contract data has been loaded and rendered by the real page
+          await page.waitForSelector("#contract-page-1", { timeout: 30000 });
 
-    for (const printUrl of candidateUrls) {
-      try {
-        console.log(`[PdfGenerator] Attempting to render from live print URL: ${printUrl}`);
-        await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
-        await page.waitForSelector("#contract-page-1, #contract-print-content", { timeout: 10000 });
+          // Wait for every image (logo, signatures, inspection photos) to finish loading
+          await page.evaluate(async () => {
+            const imgs = Array.from(document.images);
+            await Promise.all(
+              imgs.map((img) =>
+                img.complete
+                  ? Promise.resolve()
+                  : new Promise<void>((resolve) => {
+                      img.onload = () => resolve();
+                      img.onerror = () => resolve();
+                      setTimeout(() => resolve(), 10000);
+                    })
+              )
+            );
+          });
 
-        // Hide print controls banner
-        await page.evaluate(() => {
-          const el = document.querySelector(".no-print");
-          if (el) (el as HTMLElement).style.display = "none";
-        });
-
-        renderedViaLiveUrl = true;
-        console.log(`[PdfGenerator] Successfully loaded live print page from ${printUrl}`);
-        break;
-      } catch (err: any) {
-        // Continue to next candidate URL
+          loaded = true;
+          console.log(`[PdfGenerator] Real print page loaded from ${printUrl}`);
+          break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`[PdfGenerator] Could not load ${printUrl}: ${err?.message || err}`);
+        }
       }
     }
 
-    // 3. Fallback to server-side HTML if live URL is unreachable
-    if (!renderedViaLiveUrl) {
-      if (!contractObj) {
-        throw new Error(`Contract ${contractId} could not be resolved to generate real contract PDF`);
-      }
-      console.log(`[PdfGenerator] Live URL unavailable, using exact server-side contract template for #${contractId}`);
-      const html = buildRealContractHtml(contractObj);
-      await page.setContent(html, { waitUntil: "domcontentloaded" });
+    if (!loaded) {
+      throw new Error(`Could not render the real print page for contract ${contractId}: ${lastError?.message || "unreachable"}`);
     }
 
-    // Wait for fonts & brand images to settle
+    // Wait for fonts to settle
     try {
       await page.evaluate(() => (document as any).fonts?.ready);
     } catch {}

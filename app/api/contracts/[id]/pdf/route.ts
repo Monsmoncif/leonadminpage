@@ -141,13 +141,8 @@ export async function GET(
       createdAt: new Date(contract.createdAt || Date.now()).toLocaleDateString("en-GB"),
     };
 
-    // 3. Generate PDF (exact browser print page or PDFKit fallback)
-    let pdfBuffer: Buffer;
-    try {
-      pdfBuffer = await generateContractPdfFromPrintUrl(id, fallbackData);
-    } catch {
-      pdfBuffer = await generateContractPdf(fallbackData);
-    }
+    // 3. Generate PDF from the real /bookings/[id]/print page
+    const pdfBuffer: Buffer = await generateContractPdfFromPrintUrl(id, fallbackData);
 
     // 4. Save to cache
     pdfCache.set(id, {

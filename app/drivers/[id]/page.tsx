@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -13,6 +14,11 @@ import {
   UserCircle,
   Clock,
   Loader2,
+  X,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -47,6 +53,39 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
   const [driver, setDriver] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewDocIndex, setPreviewDocIndex] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Lock background scroll when preview modal is open
+  useEffect(() => {
+    if (previewDocIndex !== null) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [previewDocIndex]);
+
+  useEffect(() => {
+    if (previewDocIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPreviewDocIndex(null);
+      } else if (e.key === "ArrowLeft") {
+        setPreviewDocIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+      } else if (e.key === "ArrowRight") {
+        setPreviewDocIndex((prev) => (prev !== null && driver?.documents && prev < driver.documents.length - 1 ? prev + 1 : prev));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewDocIndex, driver?.documents]);
 
   const fetchDriver = async () => {
     try {
@@ -249,19 +288,18 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
             <div className="flex flex-wrap gap-4">
               {driver.documents.map((doc: string, idx: number) => {
                 const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
-                const fileUrl = isPdf && doc.includes("cloudinary.com") ? doc.replace("/upload/", "/upload/fl_attachment/") : doc;
                 return (
-                  <a
+                  <button
                     key={idx}
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-28 h-28 rounded-xl border border-border overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all block group bg-gray-50"
+                    type="button"
+                    onClick={() => setPreviewDocIndex(idx)}
+                    className="w-28 h-28 rounded-xl border border-border overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all block group bg-gray-50 cursor-pointer relative text-left"
+                    title={`Click to view document ${idx + 1}`}
                   >
                     {isPdf ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-brand gap-1.5">
+                      <div className="w-full h-full flex flex-col items-center justify-center text-brand gap-1.5 p-2">
                         <FileText size={28} />
-                        <span className="text-[10px] font-semibold">PDF</span>
+                        <span className="text-[10px] font-semibold">PDF Document</span>
                       </div>
                     ) : (
                       <img
@@ -270,12 +308,127 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
                     )}
-                  </a>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white backdrop-blur-[1px]">
+                      <ZoomIn size={20} />
+                    </div>
+                  </button>
                 );
               })}
             </div>
           </div>
         </div>
+      )}
+
+      {/* Full-size Document Preview Lightbox (Mounted to document.body for true fullscreen black background) */}
+      {mounted && previewDocIndex !== null && driver?.documents?.[previewDocIndex] && typeof document !== "undefined" && createPortal(
+        (() => {
+          const currentDoc = driver.documents[previewDocIndex];
+          const isPdfDoc = currentDoc.includes("application/pdf") || currentDoc.endsWith(".pdf");
+          const downloadUrl = isPdfDoc && currentDoc.includes("cloudinary.com")
+            ? currentDoc.replace("/upload/", "/upload/fl_attachment/")
+            : currentDoc;
+          const totalDocs = driver.documents.length;
+
+          return (
+            <div
+              className="fixed inset-0 z-[99999] w-screen h-screen min-h-screen bg-black/95 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 animate-fade-in select-none"
+              onClick={() => setPreviewDocIndex(null)}
+            >
+              {/* Top Bar Controls */}
+              <div className="fixed top-0 left-0 right-0 z-[100000] flex items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-black/85 via-black/40 to-transparent pointer-events-none">
+                <div className="pointer-events-auto flex items-center gap-2">
+                  <span className="bg-white/10 text-white/90 border border-white/15 px-3.5 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md flex items-center gap-2 shadow-lg">
+                    <FileText size={14} className="text-white/70" />
+                    Document #{previewDocIndex + 1} of {totalDocs}
+                  </span>
+                </div>
+
+                <div className="pointer-events-auto flex items-center gap-2.5">
+                  <a
+                    href={downloadUrl}
+                    download={`driver-doc-${previewDocIndex + 1}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md flex items-center justify-center shadow-lg border border-white/10"
+                    title="Download original file"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Download size={18} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDocIndex(null)}
+                    className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md flex items-center justify-center shadow-lg border border-white/10"
+                    title="Close (Esc)"
+                    aria-label="Close image preview"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Previous Button (if multiple docs) */}
+              {totalDocs > 1 && (
+                <button
+                  type="button"
+                  disabled={previewDocIndex === 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewDocIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+                  }}
+                  className="fixed left-4 sm:left-6 top-1/2 -translate-y-1/2 z-[100000] p-3 rounded-full bg-white/10 hover:bg-white/25 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-md active:scale-95 shadow-2xl border border-white/10"
+                  title="Previous document (Left Arrow)"
+                >
+                  <ChevronLeft size={28} />
+                </button>
+              )}
+
+              {/* Centered Document / Image */}
+              <div
+                className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {isPdfDoc ? (
+                  <iframe
+                    src={currentDoc}
+                    className="w-[88vw] max-w-5xl h-[82vh] rounded-2xl bg-white shadow-2xl border border-white/20"
+                    title={`Document ${previewDocIndex + 1}`}
+                  />
+                ) : (
+                  <img
+                    src={currentDoc}
+                    alt={`Document ${previewDocIndex + 1}`}
+                    className="max-h-[85vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl border border-white/20 select-none animate-fade-in-scale"
+                  />
+                )}
+              </div>
+
+              {/* Next Button (if multiple docs) */}
+              {totalDocs > 1 && (
+                <button
+                  type="button"
+                  disabled={previewDocIndex === totalDocs - 1}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewDocIndex((prev) => (prev !== null && prev < totalDocs - 1 ? prev + 1 : prev));
+                  }}
+                  className="fixed right-4 sm:right-6 top-1/2 -translate-y-1/2 z-[100000] p-3 rounded-full bg-white/10 hover:bg-white/25 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-md active:scale-95 shadow-2xl border border-white/10"
+                  title="Next document (Right Arrow)"
+                >
+                  <ChevronRight size={28} />
+                </button>
+              )}
+
+              {/* Bottom Navigation / Shortcut Hint */}
+              <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100000] pointer-events-none">
+                <span className="bg-black/60 border border-white/10 text-white/70 text-[11px] font-medium px-3.5 py-1 rounded-full backdrop-blur-md shadow-lg">
+                  Use ← → to navigate • Press Esc to close
+                </span>
+              </div>
+            </div>
+          );
+        })(),
+        document.body
       )}
     </div>
   );

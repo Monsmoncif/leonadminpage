@@ -67,13 +67,17 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
       }
 
       // Background prefetch the PDF into server memory cache so clicking Download is instant
-      const prefetchTimer = setTimeout(() => {
-        fetch(`/api/contracts/${id}/pdf`).catch(() => {});
-      }, 500);
+      // (Skipped when rendered by the server-side PDF generator via ?noprint=1 to avoid recursive PDF generation)
+      const isServerRender = window.location.search.includes('noprint=1');
+      const prefetchTimer = isServerRender
+        ? null
+        : setTimeout(() => {
+            fetch(`/api/contracts/${id}/pdf`).catch(() => {});
+          }, 500);
 
       return () => {
         if (timer) clearTimeout(timer);
-        clearTimeout(prefetchTimer);
+        if (prefetchTimer) clearTimeout(prefetchTimer);
       };
     }
   }, [contract, id]);

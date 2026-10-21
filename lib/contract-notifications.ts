@@ -161,12 +161,7 @@ export async function sendClientContractNotification(
         pdfBuffer = await generateContractPdfFromPrintUrl(contract._id.toString(), contractPdfData);
         console.log(`[ClientNotification] Successfully generated exact real contract PDF (${pdfBuffer.length} bytes) for #${contractNum}`);
       } catch (browserErr) {
-        console.warn(`[ClientNotification] Real print PDF generation failed for contract #${contractNum}, using styled fallback:`, browserErr);
-        try {
-          pdfBuffer = await generateContractPdf(contractPdfData);
-        } catch (fallbackErr) {
-          console.error(`[ClientNotification] Both PDF generation methods failed:`, fallbackErr);
-        }
+        console.error(`[ClientNotification] Real print PDF generation failed for contract #${contractNum}; email will be sent without a PDF (link to the real contract is included):`, browserErr);
       }
     }
 
