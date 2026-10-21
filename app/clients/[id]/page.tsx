@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -68,6 +69,23 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewDocIndex, setPreviewDocIndex] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Lock background scroll when preview modal is open
+  useEffect(() => {
+    if (previewDocIndex !== null) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [previewDocIndex]);
 
   useEffect(() => {
     if (previewDocIndex === null) return;
@@ -392,51 +410,52 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {/* Full-size Image Preview Modal (Inspired by Booking & Handover Details) */}
-      {previewDocIndex !== null && client?.documents?.[previewDocIndex] && (() => {
-        const currentDoc = client.documents[previewDocIndex];
-        const isPdfDoc = currentDoc.includes("application/pdf") || currentDoc.endsWith(".pdf");
-        const downloadUrl = isPdfDoc && currentDoc.includes("cloudinary.com")
-          ? currentDoc.replace("/upload/", "/upload/fl_attachment/")
-          : currentDoc;
-        const totalDocs = client.documents.length;
+      {/* Full-size Image Preview Lightbox (Mounted to document.body for true fullscreen black background) */}
+      {mounted && previewDocIndex !== null && client?.documents?.[previewDocIndex] && typeof document !== "undefined" && createPortal(
+        (() => {
+          const currentDoc = client.documents[previewDocIndex];
+          const isPdfDoc = currentDoc.includes("application/pdf") || currentDoc.endsWith(".pdf");
+          const downloadUrl = isPdfDoc && currentDoc.includes("cloudinary.com")
+            ? currentDoc.replace("/upload/", "/upload/fl_attachment/")
+            : currentDoc;
+          const totalDocs = client.documents.length;
 
-        return (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in"
-            onClick={() => setPreviewDocIndex(null)}
-          >
+          return (
             <div
-              className="relative max-w-4xl max-h-[92vh] flex flex-col items-center"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-[99999] w-screen h-screen min-h-screen bg-black/95 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 animate-fade-in select-none"
+              onClick={() => setPreviewDocIndex(null)}
             >
-              {/* Top controls: Download and Close */}
-              <div className="absolute -top-11 right-0 sm:-top-10 sm:right-0 flex items-center gap-2">
-                <a
-                  href={downloadUrl}
-                  download={`client-doc-${previewDocIndex + 1}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-black/60 hover:bg-black/90 text-white p-2 rounded-full cursor-pointer transition-all active:scale-95 shadow-md flex items-center justify-center"
-                  title="Download or open original"
-                >
-                  <Download size={18} />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setPreviewDocIndex(null)}
-                  className="bg-black/60 hover:bg-black/90 text-white p-2 rounded-full cursor-pointer transition-all active:scale-95 shadow-md flex items-center justify-center"
-                  aria-label="Close image preview"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+              {/* Top Bar Controls */}
+              <div className="fixed top-0 left-0 right-0 z-[100000] flex items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-black/85 via-black/40 to-transparent pointer-events-none">
+                <div className="pointer-events-auto flex items-center gap-2">
+                  <span className="bg-white/10 text-white/90 border border-white/15 px-3.5 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md flex items-center gap-2 shadow-lg">
+                    <FileText size={14} className="text-white/70" />
+                    Document #{previewDocIndex + 1} of {totalDocs}
+                  </span>
+                </div>
 
-              {/* Top info badge (Document title & count) */}
-              <div className="absolute -top-11 left-0 sm:-top-10 sm:left-0 flex items-center gap-2 text-white/90 text-xs font-semibold select-none">
-                <span className="bg-black/50 px-2.5 py-1 rounded-full border border-white/10 backdrop-blur-xs">
-                  Document #{previewDocIndex + 1} {totalDocs > 1 ? `(${previewDocIndex + 1} / ${totalDocs})` : ""}
-                </span>
+                <div className="pointer-events-auto flex items-center gap-2.5">
+                  <a
+                    href={downloadUrl}
+                    download={`client-doc-${previewDocIndex + 1}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md flex items-center justify-center shadow-lg border border-white/10"
+                    title="Download original file"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Download size={18} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDocIndex(null)}
+                    className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md flex items-center justify-center shadow-lg border border-white/10"
+                    title="Close (Esc)"
+                    aria-label="Close image preview"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               {/* Previous Button (if multiple docs) */}
@@ -448,27 +467,32 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                     e.stopPropagation();
                     setPreviewDocIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
                   }}
-                  className="absolute -left-12 sm:-left-16 top-1/2 -translate-y-1/2 p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg active:scale-95"
+                  className="fixed left-4 sm:left-6 top-1/2 -translate-y-1/2 z-[100000] p-3 rounded-full bg-white/10 hover:bg-white/25 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-md active:scale-95 shadow-2xl border border-white/10"
                   title="Previous document (Left Arrow)"
                 >
-                  <ChevronLeft size={24} />
+                  <ChevronLeft size={28} />
                 </button>
               )}
 
-              {/* Main Content */}
-              {isPdfDoc ? (
-                <iframe
-                  src={currentDoc}
-                  className="w-[85vw] max-w-4xl h-[80vh] rounded-xl sm:rounded-2xl bg-white shadow-2xl border border-white/20"
-                  title={`Document ${previewDocIndex + 1}`}
-                />
-              ) : (
-                <img
-                  src={currentDoc}
-                  alt={`Document ${previewDocIndex + 1}`}
-                  className="max-h-[85vh] max-w-full rounded-xl sm:rounded-2xl object-contain shadow-2xl border border-white/20 select-none"
-                />
-              )}
+              {/* Centered Document / Image */}
+              <div
+                className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {isPdfDoc ? (
+                  <iframe
+                    src={currentDoc}
+                    className="w-[88vw] max-w-5xl h-[82vh] rounded-2xl bg-white shadow-2xl border border-white/20"
+                    title={`Document ${previewDocIndex + 1}`}
+                  />
+                ) : (
+                  <img
+                    src={currentDoc}
+                    alt={`Document ${previewDocIndex + 1}`}
+                    className="max-h-[85vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl border border-white/20 select-none animate-fade-in-scale"
+                  />
+                )}
+              </div>
 
               {/* Next Button (if multiple docs) */}
               {totalDocs > 1 && (
@@ -479,16 +503,24 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                     e.stopPropagation();
                     setPreviewDocIndex((prev) => (prev !== null && prev < totalDocs - 1 ? prev + 1 : prev));
                   }}
-                  className="absolute -right-12 sm:-right-16 top-1/2 -translate-y-1/2 p-2 sm:p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg active:scale-95"
+                  className="fixed right-4 sm:right-6 top-1/2 -translate-y-1/2 z-[100000] p-3 rounded-full bg-white/10 hover:bg-white/25 text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all cursor-pointer backdrop-blur-md active:scale-95 shadow-2xl border border-white/10"
                   title="Next document (Right Arrow)"
                 >
-                  <ChevronRight size={24} />
+                  <ChevronRight size={28} />
                 </button>
               )}
+
+              {/* Bottom Navigation / Shortcut Hint */}
+              <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100000] pointer-events-none">
+                <span className="bg-black/60 border border-white/10 text-white/70 text-[11px] font-medium px-3.5 py-1 rounded-full backdrop-blur-md shadow-lg">
+                  Use ← → to navigate • Press Esc to close
+                </span>
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 }
