@@ -215,14 +215,14 @@ export function buildRealContractHtml(contract: any): string {
       </div>
       <div style="padding: 2px 4px;">
         <div style="font-size: 6px; color: #6b7280; font-weight: bold;">HIRE MODE / نوع الاستئجار</div>
-        <div style="font-weight: bold; font-size: 8px;">${isPersonalized ? "Personal Use" : (contract.driverId ? "Chauffeur Driven" : "Self-Drive")}</div>
+        <div style="font-weight: bold; font-size: 8px;">${isPersonalized ? "Personal Use / شخصي" : (contract.driverId ? "Chauffeur Driven" : "Self-Drive")}</div>
       </div>
     </div>
 
     <!-- DUAL COLUMN -->
     <div class="grid-12 border-b-black">
-      <!-- HIRER INFO -->
-      <div class="col-5 border-r-black">
+      <!-- HIRER INFO (Col Span 5) -->
+      <div class="col-5 border-r-black" style="display: flex; flex-direction: column;">
         <div class="bg-gray-100 border-b-black" style="padding: 2px 4px; display: flex; justify-content: space-between; font-weight: bold; font-size: 7.5px;">
           <span>HIRER INFORMATION</span>
           <span style="direction: rtl;">معلومات المستأجر</span>
@@ -233,22 +233,32 @@ export function buildRealContractHtml(contract: any): string {
         </div>
         <div class="grid-2 border-b-black" style="font-size: 6.5px;">
           <div class="border-r-black" style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">LICENSE NO / رقم الرخصة</div>
+            <div style="font-size: 6px; color: #6b7280;">DRIVING LICENSE NO / رقم الرخصة</div>
             <div style="font-weight: bold;">${client.licenseNumber || "N/A"}</div>
           </div>
           <div style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">CUSTOMER / نوع العميل</div>
-            <div style="font-weight: bold;">${contract.customerType || "B2C"}</div>
+            <div style="font-size: 6px; color: #6b7280;">CUSTOMER TYPE / نوع العميل</div>
+            <div style="font-weight: bold;">${isPersonalized ? "Personal / شخصي" : (contract.customerType || "B2C")}</div>
           </div>
         </div>
         <div class="grid-2 border-b-black" style="font-size: 6.5px;">
           <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">LICENSE ISSUE DATE / تاريخ إصدار الرخصة</div>
+            <div style="font-weight: bold;">${formatDateDisplay(client.licenseIssuedDate) || client.licenseIssuedBy || "N/A"}</div>
+          </div>
+          <div style="padding: 2px 4px;">
             <div style="font-size: 6px; color: #6b7280;">LICENSE EXPIRY / انتهاء الرخصة</div>
             <div style="font-weight: bold;">${formatDateDisplay(client.licenseExpiry) || "N/A"}</div>
           </div>
+        </div>
+        <div class="grid-2 border-b-black" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">${isForeigner ? "PASSPORT NO / جواز السفر" : "EMIRATES ID NO / رقم الهوية"}</div>
+            <div style="font-weight: bold;">${client.passportNumber || client.idNumber || "N/A"}</div>
+          </div>
           <div style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">ID / PASSPORT / الهوية</div>
-            <div style="font-weight: bold;">${client.idNumber || client.passportNumber || "N/A"}</div>
+            <div style="font-size: 6px; color: #6b7280;">${isForeigner ? "PASSPORT EXPIRY / انتهاء الجواز" : "ID EXPIRY / انتهاء الهوية"}</div>
+            <div style="font-weight: bold;">${formatDateDisplay(client.passportExpiry || client.idExpiry) || "N/A"}</div>
           </div>
         </div>
         <div class="grid-2 border-b-black" style="font-size: 6.5px;">
@@ -257,35 +267,63 @@ export function buildRealContractHtml(contract: any): string {
             <div style="font-weight: bold;">${client.nationality || "N/A"}</div>
           </div>
           <div style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">PHONE / الهاتف</div>
-            <div style="font-weight: bold;">${client.phone || "N/A"}</div>
+            <div style="font-size: 6px; color: #6b7280;">DATE OF BIRTH / تاريخ الميلاد</div>
+            <div style="font-weight: bold;">${formatDateDisplay(client.dateOfBirth || client.dob) || "N/A"}</div>
           </div>
         </div>
+        <div class="grid-2 border-b-black" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">TEL/MOBILE / الهاتف</div>
+            <div style="font-weight: bold;">${client.phone || "N/A"}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">EMAIL / البريد</div>
+            <div style="font-weight: 600; font-size: 6px;">${client.email || "N/A"}</div>
+          </div>
+        </div>
+        <div class="border-b-black" style="padding: 2px 4px; font-size: 6.5px;">
+          <div style="font-size: 6px; color: #6b7280;">ADDRESS IN UAE / العنوان في الإمارات</div>
+          <div style="font-weight: 500;">${client.address || "N/A"}</div>
+        </div>
         <div style="padding: 2px 4px; font-size: 6.5px;">
-          <div style="font-size: 6px; color: #6b7280;">EMAIL / البريد</div>
-          <div style="font-weight: 600;">${client.email || "N/A"}</div>
+          <div style="font-size: 6px; color: #6b7280;">PERMANENT ADDRESS / العنوان الدائم</div>
+          <div style="font-weight: 500; color: #4b5563;">${client.permanentAddress || client.address || "Same as above"}</div>
         </div>
       </div>
 
-      <!-- VEHICLE & HIRE INFO -->
-      <div class="col-7">
+      <!-- VEHICLE & HIRE INFO (Col Span 7) -->
+      <div class="col-7" style="display: flex; flex-direction: column;">
         <div class="bg-gray-100 border-b-black" style="padding: 2px 4px; display: flex; justify-content: space-between; font-weight: bold; font-size: 7.5px;">
           <span>VEHICLE &amp; HIRE INFORMATION</span>
           <span style="direction: rtl;">معلومات المركبة والاستئجار</span>
         </div>
         <div class="grid-3 border-b-black" style="font-size: 6.5px;">
           <div class="col-span-2 border-r-black" style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">VEHICLE / المركبة</div>
-            <div style="font-weight: 900; font-size: 8.5px;">${unit.make || ""} ${unit.model || ""} (${unit.year || ""}) - ${unit.color || ""}</div>
+            <div style="font-size: 6px; color: #6b7280;">VEHICLE TYPE / نوع المركبة</div>
+            <div style="font-weight: 900; font-size: 8.5px;">${unit.make || ""} ${unit.model || ""}</div>
           </div>
           <div style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">PLATE / رقم اللوحة</div>
+            <div style="font-size: 6px; color: #6b7280;">TRAFFIC PLATE NO / رقم اللوحة</div>
             <div style="font-weight: 900; font-size: 9px; color: #dc2626;">${unit.plate || "N/A"}</div>
           </div>
         </div>
         <div class="grid-3 border-b-black" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">MODEL / سنة الصنع</div>
+            <div style="font-weight: bold;">${unit.year || "N/A"}</div>
+          </div>
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">COLOUR / اللون</div>
+            <div style="font-weight: bold;">${unit.color || "N/A"}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">KM PER DAY / كم يومي</div>
+            <div style="font-weight: bold;">${contract.dailyKmLimit > 0 ? `${contract.dailyKmLimit} km` : "Unlimited"}</div>
+          </div>
+        </div>
+        <div class="grid-3 border-b-black" style="font-size: 6.5px;">
           <div class="col-span-2 border-r-black" style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">HANDOVER / التسليم</div>
+            <div style="font-size: 6px; color: #6b7280;">HANDOVER DATE / تاريخ التسليم</div>
             <div style="font-weight: bold;">${handoverDisplay}</div>
           </div>
           <div style="padding: 2px 4px;">
@@ -299,43 +337,141 @@ export function buildRealContractHtml(contract: any): string {
             <div style="font-weight: bold;">${returnDisplay}</div>
           </div>
           <div style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">IN KM / عداد العودة</div>
+            <div style="font-size: 6px; color: #6b7280;">IN KM / عداد الإرجاع</div>
             <div style="font-weight: 900;">${returnMileageDisplay}</div>
+          </div>
+        </div>
+
+        <!-- HIRE RATES -->
+        <div class="bg-gray-100 border-b-black" style="padding: 2px 4px; display: flex; justify-content: space-between; font-weight: bold; font-size: 7.5px;">
+          <span>${isPersonalized ? "HIRE INFORMATION (PERSONAL USE)" : "HIRE INFORMATION"}</span>
+          <span style="direction: rtl;">${isPersonalized ? "معلومات الاستخدام (شخصي ومخصص)" : "معلومات الاستئجار"}</span>
+        </div>
+        <div class="grid-3 border-b-black" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">HIRE RATE 24H (AED) / الإيجار اليومي</div>
+            <div style="font-weight: bold;">AED ${isPersonalized ? "0.00" : (contract.dailyRate || 0)}</div>
+          </div>
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">DEPOSIT AMOUNT / التأمين</div>
+            <div style="font-weight: bold; color: #047857;">AED ${isPersonalized ? "0.00" : (contract.depositAmount || 0)}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">EXTRA KM / كم زائد</div>
+            <div style="font-weight: bold;">AED ${isPersonalized ? "0.00" : (contract.pricePerExtraKm || 0)}</div>
           </div>
         </div>
         <div class="grid-3 border-b-black" style="font-size: 6.5px;">
           <div class="border-r-black" style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">DAILY RATE / اليومي</div>
-            <div style="font-weight: bold;">AED ${contract.dailyRate || 0}</div>
+            <div style="font-size: 6px; color: #6b7280;">TOTAL CHARGES / الإجمالي</div>
+            <div style="font-weight: 900; font-size: 8.5px;">AED ${(Number(contract.totalAmount) || 0).toFixed(2)}</div>
           </div>
+          <div class="col-span-2" style="padding: 2px 4px; background: #fef3c7;">
+            <div style="font-size: 6px; color: #92400e; font-weight: bold;">BALANCE DUE / المستحق</div>
+            <div style="font-weight: 900; font-size: 8.5px; color: #b45309;">AED ${Math.max(0, (Number(contract.totalAmount) || 0) - (Number(contract.advancePayment) || 0)).toFixed(2)}</div>
+          </div>
+        </div>
+
+        <!-- ADDITIONAL DRIVER -->
+        <div class="bg-gray-100 border-b-black" style="padding: 2px 4px; display: flex; justify-content: space-between; font-weight: bold; font-size: 7.5px;">
+          <span>ADDITIONAL DRIVER DETAILS</span>
+          <span style="direction: rtl;">بيانات السائق الإضافي</span>
+        </div>
+        <div class="grid-2 border-b-black" style="font-size: 6.5px;">
           <div class="border-r-black" style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">DEPOSIT / التأمين</div>
-            <div style="font-weight: bold; color: #047857;">AED ${contract.depositAmount || 0}</div>
+            <div style="font-size: 6px; color: #6b7280;">NAME / الاسم</div>
+            <div style="font-weight: bold;">${contract.additionalDriverName || "N/A"}</div>
           </div>
           <div style="padding: 2px 4px;">
-            <div style="font-size: 6px; color: #6b7280;">TOTAL / الإجمالي</div>
-            <div style="font-weight: 900; font-size: 8.5px;">AED ${(Number(contract.totalAmount) || 0).toFixed(2)}</div>
+            <div style="font-size: 6px; color: #6b7280;">LICENSE NO / رقم الرخصة</div>
+            <div style="font-weight: bold;">${contract.additionalDriverLicense || "N/A"}</div>
+          </div>
+        </div>
+        <div class="grid-2" style="font-size: 6.5px;">
+          <div class="border-r-black" style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">NATIONALITY / الجنسية</div>
+            <div style="font-weight: bold;">${contract.additionalDriverNationality || "N/A"}</div>
+          </div>
+          <div style="padding: 2px 4px;">
+            <div style="font-size: 6px; color: #6b7280;">PHONE / الهاتف</div>
+            <div style="font-weight: bold;">${contract.additionalDriverPhone || "N/A"}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- NOTES TABLE -->
-    <div class="border-b-black" style="padding: 4px 6px; font-size: 6.5px; line-height: 1.25;">
-      <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 7.5px; background: #f3f4f6; padding: 2px 4px; margin-bottom: 2px;">
+    <!-- ===== TABLE 1: IMPORTANT NOTES FOR CUSTOMER ===== -->
+    <div class="border-b-black" style="background: #fff;">
+      <div style="display: flex; justify-content: space-between; background: #f3f4f6; border-bottom: 1px solid #000; padding: 2px 6px; font-weight: 900; font-size: 7.5px;">
         <span>IMPORTANT NOTES FOR CUSTOMER:</span>
         <span style="direction: rtl;">معلومات هامة للمستأجر:</span>
       </div>
-      <p style="text-align: center; direction: rtl; font-weight: bold; color: #111827;">
-        يكون لموظفي شركة ليون لتأجير السيارات ش.ذ.م.م كامل الصلاحية في تمديد فترة إيجار المركبة وزيادة رسومها المتفق عليها مع المستأجر.
-        التأمين لا يشمل أي ضرر لزجاج المركبة والإطارات والجنوط والأعطال الناتجة عن سوء الاستخدام.
-      </p>
-      <p style="text-align: center; font-size: 5.8px; color: #4b5563; margin-top: 1px;">
-        Hirer is obliged to obtain all extensions from authorized Leon Car Rental LLC staff. Insurance does not cover glass, tires, alloy wheels or negligence malfunctions.
-      </p>
-      <p style="text-align: center; font-weight: bold; color: #dc2626; margin-top: 2px;">
-        🚭 حظر التدخين داخل السيارة - غرامة 200 إلى 400 درهم | Smoking is strictly prohibited inside the vehicle (Fine AED 200-400) 🚭
-      </p>
+      <div style="border-bottom: 1px solid #000; padding: 2px 6px; text-align: center;">
+        <p style="font-weight: bold; font-size: 6.8px; direction: rtl; color: #030712;">يكون لموظفي شركة ليون لتأجير السيارات ش.ذ.م.م كامل الصلاحية في تمديد فترة إيجار المركبة وزيادة رسومها المتفق عليها مع المستأجر</p>
+        <p style="font-size: 6px; color: #374151; margin-top: 1px;">Hirer is obliged to obtain all extensions to this hire agreement from authorized Leon Car Rental LLC staff, All extensions may be subject to rate increases.</p>
+      </div>
+      <div style="border-bottom: 1px solid #000; padding: 2px 6px; text-align: center;">
+        <p style="font-weight: bold; font-size: 6.8px; direction: rtl; color: #030712;">التأمين لا يشمل أي ضرر لزجاج المركبة والإطارات وغطاء الإطارات والزنجات والأعطال الميكانيكية الناتجة عن إهمال المستأجر ويتحمل المستأجر مسؤولية تغطية قيمة الإصلاح أو الإستبدال</p>
+        <p style="font-size: 6px; color: #374151; margin-top: 1px;">Insurance does not cover or include any damage to the vehicle Glass, Tires, Tire cover or Alloy wheels, Mechanical malfunctions resulting from the Hirer negligence and the Hirer is responsible for covering the value of repair or replacement.</p>
+      </div>
+      <div style="border-bottom: 1px solid #000; padding: 2px 6px; text-align: center;">
+        <p style="font-weight: bold; font-size: 6.8px; direction: rtl; color: #030712;">أوافق على سداد رسوم عبور بوابات التعرفة المرورية (سالك / درب) وكذلك قيمة كل مخالفة مرورية ارتكبها شاملة الرسوم إن وجدت.</p>
+        <p style="font-size: 6px; color: #374151; margin-top: 1px;">I Agree to pay the Traffic Toll Gate charges (SALIK / DARB) &amp; each Traffic Violations &amp; service charge if any.</p>
+      </div>
+      <div style="border-bottom: 1px solid #000; padding: 2px 6px; text-align: center;">
+        <p style="font-weight: bold; font-size: 6.8px; direction: rtl; color: #030712;">فقدان المستأجر لمفتاح المركبة سيعرضه لسداد قيمة مفتاح جديد من وكيل المركبة المعتمد في الدولة فقط وبدون رسوم إضافية.</p>
+        <p style="font-size: 6px; color: #374151; margin-top: 1px;">In case the hirer loss the vehicle access key so he/she will pay the fees of get new Key from the vehicle agency that certified in UAE only.</p>
+      </div>
+      <div style="padding: 2px 6px; text-align: center;">
+        <p style="font-weight: bold; font-size: 6.8px; direction: rtl; color: #030712;">🚭 حظر التدخين داخل السيارة المستأجرة إذ كان السائق أو الراكب يدخن داخل السيارة، فهم مسؤولون عن دفع غرامة تتراوح بين 200 درهم إلى 400 درهم. 🚭</p>
+        <p style="font-size: 6px; font-weight: 600; color: #111827; margin-top: 1px;">Smoking is prohibited inside the rented vehicle. If the driver or passenger smokes inside the vehicle, they are responsible for paying a fine ranging from AED 200 to AED 400.</p>
+      </div>
+    </div>
+
+    <!-- ===== TABLE 2: NOTE / TERMS AND CONDITIONS ===== -->
+    <div class="border-b-black" style="background: #fff;">
+      <div style="display: flex; justify-content: space-between; background: #f3f4f6; border-bottom: 1px solid #000; padding: 2px 6px; font-weight: 900; font-size: 7.5px;">
+        <span>Note:</span>
+        <span style="direction: rtl;">ملاحظات:</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; background: #f9fafb; border-bottom: 1px solid #e5e7eb; padding: 2px 6px; font-weight: bold; font-size: 6.5px;">
+        <span>Terms and Conditions of Rental <span style="font-weight: normal; color: #6b7280;">(Subject to the laws of the United Arab Emirates)</span></span>
+        <span style="direction: rtl;">أحكام وشروط الإيجار <span style="font-weight: normal; color: #6b7280;">(خاضعة لأحكام وقانون دولة الإمارات العربية المتحدة)</span></span>
+      </div>
+      <div style="font-size: 5.8px; line-height: 1.15; padding: 2px 4px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f3f4f6; padding: 1.5px 0;">
+          <div>• If the vehicle is impounded by government authorities for any violation of the law, I agree to pay the rental charges until the vehicle is returned to Leon Car Rental L.L.C.</div>
+          <div style="text-align: right; direction: rtl; font-weight: 600;">• إذا تم حجز المركبة من قبل السلطات الحكومية لأي مخالفة للقانون فإنني أوافق على دفع تكاليف الاستئجار حتى يتم إعادة المركبة إلى شركة ليون لتأجير السيارات ش.ذ.م.م.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f3f4f6; padding: 1.5px 0;">
+          <div>• For all customers involved in collision accidents, total loss deductible starts from AED 3,000 + 10% deductible, plus an additional 10% for drivers under 25 years.</div>
+          <div style="text-align: right; direction: rtl; font-weight: 600;">• بالنسبة لجميع الزبائن الذين يرتكبون حوادث، في حالة الخسارة الكلية يتم احتساب ابتداءً من 3000 درهم بالإضافة إلى 10% تحمل، وتضاف 10% للسائق تحت 25 سنة.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f3f4f6; padding: 1.5px 0;">
+          <div>• A police report is mandatory in all cases.</div>
+          <div style="text-align: right; direction: rtl; font-weight: 600;">• تقرير الشرطة إلزامي في كل الأحوال.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f3f4f6; padding: 1.5px 0;">
+          <div>• The renter agrees to return the vehicle with the same amount of fuel as it had at the time of rental.</div>
+          <div style="text-align: right; direction: rtl; font-weight: 600;">• يوافق المستأجر على إعادة المركبة بنفس كمية الوقود التي كانت في المركبة عند استئجارها.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f3f4f6; padding: 1.5px 0;">
+          <div>• The rental period is calculated on a 24-hour basis.</div>
+          <div style="text-align: right; direction: rtl; font-weight: 600;">• يتم احتساب مدة التأجير على أساس 24 ساعة.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f3f4f6; padding: 1.5px 0;">
+          <div>• In the event of mechanical failures resulting from misuse, the renter shall bear the cost of damages and repairs.</div>
+          <div style="text-align: right; direction: rtl; font-weight: 600;">• في حالة الأعطال الميكانيكية الناتجة عن سوء الاستعمال يتحمل المستأجر قيمة الأضرار وإصلاحها.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f3f4f6; padding: 1.5px 0;">
+          <div>• By signing below, the renter shall be responsible for the first excess of insurance (10% of compulsory deductible).</div>
+          <div style="text-align: right; direction: rtl; font-weight: 600;">• بالتوقيع أدناه بهذه الصفحة يكون المستأجر مسؤولاً عن الزيادة الأولى في التأمين وهي 10% من قيمة التحمل الإجباري.</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 1.5px 0;">
+          <div>• Payment: The renter agrees to pay and settle all charges to Leon Car Rental L.L.C. on or before returning the vehicle.</div>
+          <div style="text-align: right; direction: rtl; font-weight: 600;">• السداد: يقبل المستأجر بدون مناقشة أن يدفع ويسدد كافة الرسوم المتعلقة بإيجار المركبة إلى ليون لتأجير السيارات ش.ذ.م.م.</div>
+        </div>
+      </div>
     </div>
 
     <!-- INSPECTION PHOTOS (8 ANGLES) -->
@@ -344,7 +480,7 @@ export function buildRealContractHtml(contract: any): string {
       <div style="border: 1px solid #000; padding: 3px; border-radius: 4px; background: #fafafa;">
         <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; margin-bottom: 3px;">
           <span>CHECK OUT (تسليم خروج)</span>
-          <span>KM: ${contract.checkoutMileage || unit.mileage || 0} | Fuel: ${contract.checkoutFuelLevel || 100}%</span>
+          <span style="color: #b45309;">KM: ${contract.checkoutMileage || unit.mileage || 0} | Fuel: ${contract.checkoutFuelLevel || 100}%</span>
         </div>
         <div class="grid-4" style="gap: 2px;">
           ${INSPECTION_ANGLES.map((angle, idx) => {
@@ -361,7 +497,7 @@ export function buildRealContractHtml(contract: any): string {
       <div style="border: 1px solid #000; padding: 3px; border-radius: 4px; background: #fafafa;">
         <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 2px; margin-bottom: 3px;">
           <span>CHECK IN (استلام عودة)</span>
-          <span>KM: ${returnMileageDisplay || "Pending"} | Fuel: ${contract.returnFuelLevel ? `${contract.returnFuelLevel}%` : "Pending"}</span>
+          <span style="color: #047857;">KM: ${returnMileageDisplay || "Pending"} | Fuel: ${contract.returnFuelLevel ? `${contract.returnFuelLevel}%` : "Pending"}</span>
         </div>
         <div class="grid-4" style="gap: 2px;">
           ${INSPECTION_ANGLES.map((angle, idx) => {
@@ -373,6 +509,12 @@ export function buildRealContractHtml(contract: any): string {
           }).join("")}
         </div>
       </div>
+    </div>
+
+    <!-- ACKNOWLEDGMENT LINE -->
+    <div style="display: flex; justify-content: space-between; font-size: 5.8px; color: #4b5563; padding: 2px 2px; border-bottom: 1px solid #e5e7eb;">
+      <span>By signing below, the hirer acknowledges vehicle condition inspection, verification of fuel and odometer, and agrees to all terms and conditions of this contract.</span>
+      <span style="direction: rtl;">بالتوقيع أدناه، يقر المستأجر بمعاينة حالة المركبة والتحقق من الوقود ومستوى العداد ويوافق على كافة الشروط والأحكام.</span>
     </div>
 
     <!-- SIGNATURES -->
@@ -439,7 +581,8 @@ export function buildRealContractHtml(contract: any): string {
 
 /**
  * Generates the EXACT official contract PDF matching the Admin Print page (/bookings/[id]/print)
- * 100% authentic, reliable, and renders completely server-side via Puppeteer without localhost dependencies.
+ * 1. Tries to load the real live print URL via Puppeteer (exact live React component).
+ * 2. If server loopback is unreachable, falls back to the exact high-fidelity template.
  */
 export async function generateContractPdfFromPrintUrl(
   contractId: string,
@@ -499,12 +642,6 @@ export async function generateContractPdfFromPrintUrl(
     };
   }
 
-  if (!contractObj) {
-    throw new Error(`Contract ${contractId} could not be resolved to generate real contract PDF`);
-  }
-
-  const html = buildRealContractHtml(contractObj);
-
   let browser: any = null;
   let page: any = null;
   try {
@@ -520,19 +657,60 @@ export async function generateContractPdfFromPrintUrl(
         "--no-default-browser-check",
         "--disable-extensions",
         "--ignore-certificate-errors",
+        "--allow-insecure-localhost",
         "--disable-web-security",
       ],
     });
 
     page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-    // Wait for fonts & rendering to settle
+    // 2. Try loading the real live Next.js print page URL first!
+    let renderedViaLiveUrl = false;
+    const localPort = process.env.PORT || "3000";
+    const candidateUrls = [
+      `http://127.0.0.1:${localPort}/bookings/${contractId}/print?noprint=1&fresh=1`,
+      `http://localhost:${localPort}/bookings/${contractId}/print?noprint=1&fresh=1`,
+      process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/bookings/${contractId}/print?noprint=1&fresh=1` : null,
+      `http://127.0.0.1:3000/bookings/${contractId}/print?noprint=1&fresh=1`,
+      `http://localhost:3000/bookings/${contractId}/print?noprint=1&fresh=1`,
+    ].filter(Boolean) as string[];
+
+    for (const printUrl of candidateUrls) {
+      try {
+        console.log(`[PdfGenerator] Attempting to render from live print URL: ${printUrl}`);
+        await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+        await page.waitForSelector("#contract-page-1, #contract-print-content", { timeout: 10000 });
+
+        // Hide print controls banner
+        await page.evaluate(() => {
+          const el = document.querySelector(".no-print");
+          if (el) (el as HTMLElement).style.display = "none";
+        });
+
+        renderedViaLiveUrl = true;
+        console.log(`[PdfGenerator] Successfully loaded live print page from ${printUrl}`);
+        break;
+      } catch (err: any) {
+        // Continue to next candidate URL
+      }
+    }
+
+    // 3. Fallback to server-side HTML if live URL is unreachable
+    if (!renderedViaLiveUrl) {
+      if (!contractObj) {
+        throw new Error(`Contract ${contractId} could not be resolved to generate real contract PDF`);
+      }
+      console.log(`[PdfGenerator] Live URL unavailable, using exact server-side contract template for #${contractId}`);
+      const html = buildRealContractHtml(contractObj);
+      await page.setContent(html, { waitUntil: "domcontentloaded" });
+    }
+
+    // Wait for fonts & brand images to settle
     try {
       await page.evaluate(() => (document as any).fonts?.ready);
     } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const pdfUint8Array = await page.pdf({
       format: "A4",

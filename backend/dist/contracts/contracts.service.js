@@ -538,7 +538,6 @@ let ContractsService = class ContractsService {
                     type: 'alert',
                 });
                 this.notifyAdmin({ contractId: updatedContract._id.toString(), type: 'vehicle_returned' }).catch((e) => console.error('Admin return notify failed:', e));
-                this.sendClient({ contractId: updatedContract._id.toString(), type: 'final' }).catch((e) => console.error('Client final return notification failed:', e));
                 try {
                     const returnOdo = Number(body.returnOdometer) || initialMileage;
                     const inspCount = await this.inspectionModel.countDocuments();
