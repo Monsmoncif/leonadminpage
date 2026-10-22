@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   X, 
   UserPlus, 
@@ -32,6 +33,7 @@ export default function CreateDriverModal({
   onSuccess,
   driverToEdit,
 }: CreateDriverModalProps) {
+  const [mounted, setMounted] = useState(false);
   const toast = useToast();
   const [formData, setFormData] = useState({
     name: "",
@@ -57,6 +59,21 @@ export default function CreateDriverModal({
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
   const scanCameraInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -380,10 +397,10 @@ export default function CreateDriverModal({
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] w-screen h-screen min-h-screen flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
       {/* Widescreen Modal (max-w-5xl) - Height maximized cleanly on mobile */}
-      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] sm:max-h-[90vh]">
+      <div className="bg-card w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] sm:max-h-[90vh] my-auto">
         
         {/* Header */}
         <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
@@ -823,4 +840,10 @@ export default function CreateDriverModal({
       </div>
     </div>
   );
+
+  if (mounted && typeof document !== "undefined") {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }

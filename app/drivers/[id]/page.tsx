@@ -169,9 +169,9 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in-up pb-8">
+    <div className="space-y-6 max-w-5xl mx-auto pb-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-1 animate-fade-in-up">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
             onClick={() => router.push("/drivers")}
