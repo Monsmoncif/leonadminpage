@@ -60,12 +60,37 @@ export async function POST(req: NextRequest) {
       body.email = body.email.trim();
     }
 
+    // Sanitize empty date strings to null so Mongoose does not throw CastError
+    const dateFields = [
+      "dateOfBirth",
+      "idIssuedDate",
+      "idExpiry",
+      "passportIssuedDate",
+      "passportExpiry",
+      "licenseIssuedDate",
+      "licenseExpiry",
+      "internationalLicenseIssuedDate",
+      "internationalLicenseExpiry",
+      "visaExpiry",
+    ];
+    for (const f of dateFields) {
+      if (body[f] === "" || body[f] === "null" || body[f] === "undefined") {
+        body[f] = null;
+      }
+    }
+
     // Validate Driving License Expiry
     if (body.licenseExpiry && typeof body.licenseExpiry === "string" && body.licenseExpiry.trim()) {
       const expDate = new Date(body.licenseExpiry);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (!isNaN(expDate.getTime()) && expDate < today) {
+
+      // If it's a Tourist with a valid international license, allow creation
+      const hasValidIntlLicense = body.clientType === "Tourist" && 
+        body.internationalLicenseNumber && 
+        (!body.internationalLicenseExpiry || new Date(body.internationalLicenseExpiry) >= today);
+
+      if (!isNaN(expDate.getTime()) && expDate < today && !hasValidIntlLicense) {
         return NextResponse.json(
           { error: "Driving license is expired. Cannot create client with an expired license. (رخصة القيادة منتهية الصلاحية)" },
           { status: 400 }

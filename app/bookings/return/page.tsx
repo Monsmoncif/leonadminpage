@@ -31,7 +31,9 @@ import {
   Plus,
   Trash2,
   Banknote,
-  Image as ImageIcon
+  Image as ImageIcon,
+  X,
+  Eye
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -45,6 +47,7 @@ import VehicleInspectionPhotoCapture, {
   EXTRA_PHOTO_PREFIX,
   getExtraPhotoKeys,
 } from "@/components/ui/VehicleInspectionPhotoCapture";
+import HandoverPhotosGallery from "@/components/contracts/HandoverPhotosGallery";
 
 // Step definitions matching driver/return and bookings/new pattern
 const SHOP_STEPS = [
@@ -162,6 +165,9 @@ function ReturnPageContent() {
   const [returnPhotos, setReturnPhotos] = useState<Record<string, string>>({});
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isAllMoneyConfirmed, setIsAllMoneyConfirmed] = useState(false);
+  const [fullContractData, setFullContractData] = useState<any | null>(null);
+  const [isLoadingContractDetails, setIsLoadingContractDetails] = useState(false);
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
 
   // Dispatch Driver form states
   const [returnDriverId, setReturnDriverId] = useState("");
@@ -236,6 +242,40 @@ function ReturnPageContent() {
   const selectedContract = useMemo(() => {
     return contracts.find(c => c._id === selectedContractId || c.id === selectedContractId);
   }, [contracts, selectedContractId]);
+
+  const activeContract = fullContractData || selectedContract;
+
+  // Fetch full contract details (including inspectionPhotos and full customer data)
+  useEffect(() => {
+    if (!selectedContractId) {
+      setFullContractData(null);
+      return;
+    }
+    let isMounted = true;
+    setIsLoadingContractDetails(true);
+    fetch(`/api/contracts/${selectedContractId}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data) {
+          setFullContractData(data);
+        }
+      })
+      .catch((err) => console.error("Failed to load full contract details:", err))
+      .finally(() => {
+        if (isMounted) setIsLoadingContractDetails(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedContractId]);
+
+  const handoverPhotos = useMemo(() => {
+    if (Array.isArray(activeContract?.inspectionPhotos)) {
+      return activeContract.inspectionPhotos.filter((url: any) => typeof url === "string" && url.trim().length > 0);
+    }
+    return [];
+  }, [activeContract]);
 
   // When selected contract changes, populate fields
   useEffect(() => {
@@ -346,45 +386,45 @@ function ReturnPageContent() {
   };
 
   // Calculations
-  const contractNum = selectedContract?.contractNumber || selectedContract?.id || selectedContract?._id?.substring(0, 8)?.toUpperCase() || "N/A";
-  const vehicleName = selectedContract?.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || (selectedContract?.unitId ? `${selectedContract.unitId.make} ${selectedContract.unitId.model}` : "Vehicle");
-  const plateMatch = (selectedContract?.vehicle || "").match(/\(([^)]+)\)/);
-  const plateNumber = selectedContract?.vehiclePlate || selectedContract?.unitId?.plate || (plateMatch ? plateMatch[1] : "");
-  const vehicleMake = selectedContract?.unitId?.make || "Vehicle";
-  const vehicleYear = selectedContract?.vehicleYear || selectedContract?.unitId?.year || "";
-  const vehicleColor = selectedContract?.vehicleColor || selectedContract?.unitId?.color || "";
-  const vehicleFuel = selectedContract?.vehicleFuel || selectedContract?.unitId?.fuelType || "Petrol";
-  const vehicleImage = selectedContract?.vehicleImage || selectedContract?.unitId?.images?.[0] || "";
-  const checkoutFuelLevel = selectedContract?.checkoutFuelLevel !== undefined ? Number(selectedContract.checkoutFuelLevel) : 100;
+  const contractNum = activeContract?.contractNumber || activeContract?.id || activeContract?._id?.substring(0, 8)?.toUpperCase() || "N/A";
+  const vehicleName = activeContract?.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || (activeContract?.unitId ? `${activeContract.unitId.make} ${activeContract.unitId.model}` : "Vehicle");
+  const plateMatch = (activeContract?.vehicle || "").match(/\(([^)]+)\)/);
+  const plateNumber = activeContract?.vehiclePlate || activeContract?.unitId?.plate || (plateMatch ? plateMatch[1] : "");
+  const vehicleMake = activeContract?.unitId?.make || "Vehicle";
+  const vehicleYear = activeContract?.vehicleYear || activeContract?.unitId?.year || "";
+  const vehicleColor = activeContract?.vehicleColor || activeContract?.unitId?.color || "";
+  const vehicleFuel = activeContract?.vehicleFuel || activeContract?.unitId?.fuelType || "Petrol";
+  const vehicleImage = activeContract?.vehicleImage || activeContract?.unitId?.images?.[0] || "";
+  const checkoutFuelLevel = activeContract?.checkoutFuelLevel !== undefined ? Number(activeContract.checkoutFuelLevel) : 100;
 
   const isPersonalized = Boolean(
-    selectedContract?.contractType === "Personalized" ||
-    selectedContract?.personalizedPersonName ||
-    selectedContract?.deliveryDriver === "Personal Use"
+    activeContract?.contractType === "Personalized" ||
+    activeContract?.personalizedPersonName ||
+    activeContract?.deliveryDriver === "Personal Use"
   );
 
   const isCompleted = Boolean(
-    selectedContract && (
-      selectedContract.status === "Completed" ||
-      selectedContract.deliveryStatus === "Returned" ||
-      selectedContract.returnedAt
+    activeContract && (
+      activeContract.status === "Completed" ||
+      activeContract.deliveryStatus === "Returned" ||
+      activeContract.returnedAt
     )
   );
 
-  const customerName = selectedContract?.personalizedPersonName || selectedContract?.customer || selectedContract?.clientId?.name || (isPersonalized ? "Personal Use" : "Customer");
-  const customerPhone = selectedContract?.customerPhone || selectedContract?.clientId?.phone || "";
-  const handoverLocation = selectedContract?.pickupLocation || "Main Office";
+  const customerName = activeContract?.personalizedPersonName || activeContract?.customer || activeContract?.clientId?.name || (isPersonalized ? "Personal Use" : "Customer");
+  const customerPhone = activeContract?.customerPhone || activeContract?.clientId?.phone || "";
+  const handoverLocation = activeContract?.pickupLocation || "Main Office";
 
-  const depositAmount = isPersonalized ? 0 : (Number(selectedContract?.depositAmount) || (selectedContract?.deposit ? Number(String(selectedContract.deposit).replace(/[^0-9.]/g, '')) : 0));
+  const depositAmount = isPersonalized ? 0 : (Number(activeContract?.depositAmount) || (activeContract?.deposit ? Number(String(activeContract.deposit).replace(/[^0-9.]/g, '')) : 0));
 
-  const initialMileage = Number(selectedContract?.checkoutMileage || selectedContract?.unitMileage || 0);
+  const initialMileage = Number(activeContract?.checkoutMileage || activeContract?.unitMileage || 0);
   const currentOdometerNum = returnOdometer.trim() !== "" ? (Number(returnOdometer) || 0) : initialMileage;
   const kmDriven = Math.max(0, currentOdometerNum - initialMileage);
-  const dailyKmLimit = isPersonalized ? 0 : Number(selectedContract?.dailyKmLimit || 0);
-  const totalDays = Number(selectedContract?.totalDays || 1);
+  const dailyKmLimit = isPersonalized ? 0 : Number(activeContract?.dailyKmLimit || 0);
+  const totalDays = Number(activeContract?.totalDays || 1);
   const totalIncludedKm = dailyKmLimit * totalDays;
   const extraKm = (!isPersonalized && dailyKmLimit > 0) ? Math.max(0, kmDriven - totalIncludedKm) : 0;
-  const pricePerExtraKm = isPersonalized ? 0 : Number(selectedContract?.pricePerExtraKm || 0);
+  const pricePerExtraKm = isPersonalized ? 0 : Number(activeContract?.pricePerExtraKm || 0);
   const extraKmCharge = isPersonalized ? 0 : extraKm * pricePerExtraKm;
   const damageChargeNum = hasDamages ? (Number(damageCost) || 0) : 0;
   const salikChargeNum = Number(salikCharge) || 0;
@@ -953,6 +993,25 @@ function ReturnPageContent() {
                   <span className="text-text-muted">{customerPhone || "No phone recorded"}</span>
                 </div>
               </div>
+
+              {/* Handover Photos Quick Button */}
+              <button
+                type="button"
+                onClick={() => setShowHandoverModal(true)}
+                className="w-full py-2.5 px-3.5 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-900 border border-blue-200/90 text-xs font-bold transition-all flex items-center justify-between shadow-2xs cursor-pointer group active:scale-[0.99] mt-2"
+              >
+                <span className="flex items-center gap-2">
+                  <Camera size={15} className="text-blue-600 group-hover:scale-110 transition-transform" />
+                  <span>Handover Photos (صور التسليم)</span>
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  handoverPhotos.length > 0 
+                    ? "bg-blue-600 text-white" 
+                    : "bg-gray-100 text-text-muted"
+                }`}>
+                  {handoverPhotos.length > 0 ? `${handoverPhotos.length} Photos` : "None"}
+                </span>
+              </button>
             </div>
 
             {/* Right: Return Schedule & Fuel (Shop mode) or Pickup Logistics (Dispatch mode) */}
@@ -1205,10 +1264,30 @@ function ReturnPageContent() {
         </div>
       </div>
 
+      {/* Handover Inspection Photos Gallery & Comparison */}
+      <HandoverPhotosGallery
+        photos={handoverPhotos}
+        returnPhotos={returnPhotos}
+        title="Handover Vehicle Reference Photos (صور تسليم واستلام المركبة)"
+        subtitle="Photos taken when the car was handed over to the client — compare side-by-side or angle-by-angle"
+        metadata={{
+          checkoutMileage: initialMileage,
+          checkoutFuelLevel: checkoutFuelLevel,
+          deliveredAt: activeContract?.deliveredAt || activeContract?.startDate,
+          deliveredBy: activeContract?.deliveredBy || activeContract?.deliveryDriver,
+          vehicleName: vehicleName,
+          contractNumber: contractNum,
+        }}
+        allowComparison={true}
+        defaultOpen={true}
+      />
+
       <VehicleInspectionPhotoCapture
         photos={returnPhotos}
         onChange={setReturnPhotos}
         allowExtra={true}
+        referencePhotos={handoverPhotos}
+        referenceLabel="Handover"
       />
     </div>
   );
@@ -1223,6 +1302,25 @@ function ReturnPageContent() {
           Inspect body panels, glass, and interior. Record any new damages discovered during return.
         </p>
       </div>
+
+      {/* Handover Reference for Damage Cross-Checking */}
+      <HandoverPhotosGallery
+        photos={handoverPhotos}
+        returnPhotos={returnPhotos}
+        title="Compare Handover Condition & Photos (صور وحالة السيارة عند الاستلام)"
+        subtitle="Verify preexisting scratches, dings, or body marks before recording new damage charges"
+        metadata={{
+          checkoutMileage: initialMileage,
+          checkoutFuelLevel: checkoutFuelLevel,
+          deliveredAt: activeContract?.deliveredAt || activeContract?.startDate,
+          deliveredBy: activeContract?.deliveredBy || activeContract?.deliveryDriver,
+          vehicleName: vehicleName,
+          contractNumber: contractNum,
+        }}
+        allowComparison={true}
+        defaultOpen={hasDamages}
+        collapsible={true}
+      />
 
       {/* Damage Status Toggle */}
       <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
@@ -2214,6 +2312,60 @@ function ReturnPageContent() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Handover Inspection Photos Modal */}
+      {showHandoverModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowHandoverModal(false)}
+        >
+          <div
+            className="bg-card w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-border flex items-center justify-between bg-blue-50/60 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                  <Camera size={16} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-text-primary text-sm sm:text-base truncate">
+                    Handover Inspection Photos — Contract #{contractNum}
+                  </h3>
+                  <p className="text-[11px] text-text-muted truncate">
+                    {vehicleName} {plateNumber ? `(${plateNumber})` : ""} • Initial condition recorded at delivery
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHandoverModal(false)}
+                className="p-1.5 rounded-lg hover:bg-gray-200 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-3 sm:p-5 overflow-y-auto flex-1 custom-scrollbar">
+              <HandoverPhotosGallery
+                photos={handoverPhotos}
+                returnPhotos={returnPhotos}
+                defaultOpen={true}
+                collapsible={false}
+                allowComparison={true}
+                metadata={{
+                  checkoutMileage: initialMileage,
+                  checkoutFuelLevel: checkoutFuelLevel,
+                  deliveredAt: activeContract?.deliveredAt || activeContract?.startDate,
+                  deliveredBy: activeContract?.deliveredBy || activeContract?.deliveryDriver,
+                  vehicleName: vehicleName,
+                  contractNumber: contractNum,
+                }}
+              />
             </div>
           </div>
         </div>

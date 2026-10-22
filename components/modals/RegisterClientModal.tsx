@@ -226,31 +226,64 @@ export default function RegisterClientModal({
     if (isOpen) {
       if (clientToEdit) {
         setActiveTab("register");
-        const type = clientToEdit.clientType || "Resident";
+        const rawType = String(clientToEdit.clientType || "").trim().toLowerCase();
+        const isTourist = rawType === "tourist" || (!rawType && Boolean(
+          clientToEdit.passportNumber ||
+          clientToEdit.internationalLicenseNumber ||
+          clientToEdit.visaNumber ||
+          (clientToEdit.nationality && clientToEdit.nationality !== "Emirati" && clientToEdit.idNumber && !clientToEdit.idNumber.startsWith("784-"))
+        ));
+        const type: "Resident" | "Tourist" = isTourist ? "Tourist" : "Resident";
         setClientType(type);
+
+        let firstName = clientToEdit.firstName || "";
+        let middleName = clientToEdit.middleName || "";
+        let lastName = clientToEdit.lastName || "";
+        if (!firstName && clientToEdit.name) {
+          const parts = clientToEdit.name.trim().split(/\s+/);
+          if (parts.length === 1) {
+            firstName = parts[0];
+            lastName = parts[0];
+          } else if (parts.length === 2) {
+            firstName = parts[0];
+            lastName = parts[1];
+          } else {
+            firstName = parts[0];
+            middleName = parts.slice(1, -1).join(" ");
+            lastName = parts[parts.length - 1];
+          }
+        }
+        const fullName = clientToEdit.name || [firstName, middleName, lastName].filter(Boolean).join(" ");
+
+        const resolvedPassport = clientToEdit.passportNumber || 
+          (type === "Tourist" ? clientToEdit.idNumber || "" : "") ||
+          (clientToEdit.idNumber && !clientToEdit.idNumber.startsWith("784-") ? clientToEdit.idNumber : "");
+        const resolvedIdNumber = clientToEdit.idNumber || resolvedPassport || "";
+        const resolvedLicense = clientToEdit.licenseNumber || clientToEdit.internationalLicenseNumber || "";
+
         setFormData({
-          name: clientToEdit.name || "",
-          firstName: clientToEdit.firstName || "",
-          middleName: clientToEdit.middleName || "",
-          lastName: clientToEdit.lastName || "",
+          name: fullName,
+          firstName: firstName,
+          middleName: middleName,
+          lastName: lastName,
           gender: clientToEdit.gender || "",
           dateOfBirth: clientToEdit.dateOfBirth ? new Date(clientToEdit.dateOfBirth).toISOString().split("T")[0] : "",
 
           phone: clientToEdit.phone || "",
           email: clientToEdit.email || "",
           nationality: clientToEdit.nationality || (type === "Tourist" ? "" : "Emirati"),
-          idNumber: clientToEdit.idNumber || "",
+          idNumber: resolvedIdNumber,
           idIssuedBy: (clientToEdit as any).idIssuedBy || "",
           idIssuedDate: (clientToEdit as any).idIssuedDate ? new Date((clientToEdit as any).idIssuedDate).toISOString().split("T")[0] : "",
           idExpiry: clientToEdit.idExpiry ? new Date(clientToEdit.idExpiry).toISOString().split("T")[0] : "",
           address: clientToEdit.address || "",
 
-          passportNumber: clientToEdit.passportNumber || (type === "Tourist" ? clientToEdit.idNumber || "" : ""),
+          passportNumber: resolvedPassport,
           passportIssuedBy: clientToEdit.passportIssuedBy || "",
           passportIssuedDate: clientToEdit.passportIssuedDate ? new Date(clientToEdit.passportIssuedDate).toISOString().split("T")[0] : "",
           passportExpiry: clientToEdit.passportExpiry ? new Date(clientToEdit.passportExpiry).toISOString().split("T")[0] : "",
 
-          licenseNumber: clientToEdit.licenseNumber || "",
+          licenseNumber: resolvedLicense,
           licenseIssuedBy: clientToEdit.licenseIssuedBy || "",
           licenseIssuedDate: clientToEdit.licenseIssuedDate ? new Date(clientToEdit.licenseIssuedDate).toISOString().split("T")[0] : "",
           licenseExpiry: clientToEdit.licenseExpiry ? new Date(clientToEdit.licenseExpiry).toISOString().split("T")[0] : "",
@@ -800,7 +833,8 @@ export default function RegisterClientModal({
     }
 
     // BLOCK CREATION: If Licence Expiry is late (expired in the past)
-    if (formData.licenseExpiry && isLicenseExpired) {
+    const touristHasValidIntlLicense = clientType === "Tourist" && Boolean(formData.internationalLicenseNumber && !isInternationalLicenseExpired);
+    if (formData.licenseExpiry && isLicenseExpired && !touristHasValidIntlLicense) {
       const expiredMsg = "Driving licence is expired! Cannot create client with an expired licence. (رخصة القيادة منتهية الصلاحية! لا يمكن إنشاء العميل برخصة منتهية)";
       setError(expiredMsg);
       toast.error(expiredMsg);
@@ -1223,9 +1257,15 @@ export default function RegisterClientModal({
                     type="button"
                     onClick={() => {
                       setClientType("Resident");
-                      if (!formData.nationality || formData.nationality === "International") {
-                        setFormData(prev => ({ ...prev, nationality: "Emirati" }));
-                      }
+                      setFormData(prev => {
+                        const computedName = prev.name || [prev.firstName, prev.middleName, prev.lastName].filter(Boolean).join(" ");
+                        return {
+                          ...prev,
+                          name: computedName,
+                          idNumber: prev.idNumber || prev.passportNumber,
+                          nationality: (!prev.nationality || prev.nationality === "International") ? "Emirati" : prev.nationality,
+                        };
+                      });
                     }}
                     className={`py-1.5 sm:py-2.5 px-2 sm:px-4 rounded-md sm:rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
                       clientType === "Resident"
@@ -1245,9 +1285,34 @@ export default function RegisterClientModal({
                     type="button"
                     onClick={() => {
                       setClientType("Tourist");
-                      if (formData.nationality === "Emirati" || formData.nationality === "Moroccan") {
-                        setFormData(prev => ({ ...prev, nationality: "" }));
-                      }
+                      setFormData(prev => {
+                        let fName = prev.firstName;
+                        let mName = prev.middleName;
+                        let lName = prev.lastName;
+                        if (!fName && prev.name) {
+                          const parts = prev.name.trim().split(/\s+/);
+                          if (parts.length === 1) {
+                            fName = parts[0];
+                            lName = parts[0];
+                          } else if (parts.length === 2) {
+                            fName = parts[0];
+                            lName = parts[1];
+                          } else {
+                            fName = parts[0];
+                            mName = parts.slice(1, -1).join(" ");
+                            lName = parts[parts.length - 1];
+                          }
+                        }
+                        return {
+                          ...prev,
+                          firstName: fName,
+                          middleName: mName,
+                          lastName: lName,
+                          passportNumber: prev.passportNumber || prev.idNumber,
+                          idNumber: prev.idNumber || prev.passportNumber,
+                          nationality: prev.nationality === "Emirati" ? "" : prev.nationality,
+                        };
+                      });
                     }}
                     className={`py-1.5 sm:py-2.5 px-2 sm:px-4 rounded-md sm:rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
                       clientType === "Tourist"
@@ -1563,9 +1628,14 @@ export default function RegisterClientModal({
                           placeholder="e.g. 1234567890"
                           className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand uppercase font-mono"
                           value={formData.passportNumber}
-                          onChange={(e) =>
-                            setFormData({ ...formData, passportNumber: e.target.value.toUpperCase() })
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setFormData(prev => ({
+                              ...prev,
+                              passportNumber: val,
+                              idNumber: prev.idNumber && prev.idNumber !== prev.passportNumber ? prev.idNumber : val,
+                            }));
+                          }}
                         />
                       </div>
                       <div>
@@ -1661,7 +1731,7 @@ export default function RegisterClientModal({
                           </div>
                         )}
                         <input
-                          id="reg-client-license-expiry-resident"
+                          id="reg-client-license-expiry-tourist"
                           type="date"
                           className={`w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
                             isLicenseExpired
@@ -1794,9 +1864,14 @@ export default function RegisterClientModal({
                           placeholder="e.g. John"
                           className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
                           value={formData.firstName}
-                          onChange={(e) =>
-                            setFormData({ ...formData, firstName: e.target.value })
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData(prev => ({
+                              ...prev,
+                              firstName: val,
+                              name: [val, prev.middleName, prev.lastName].filter(Boolean).join(" ")
+                            }));
+                          }}
                         />
                       </div>
                       <div>
@@ -1807,9 +1882,14 @@ export default function RegisterClientModal({
                           placeholder="e.g. Robert"
                           className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                           value={formData.middleName}
-                          onChange={(e) =>
-                            setFormData({ ...formData, middleName: e.target.value })
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData(prev => ({
+                              ...prev,
+                              middleName: val,
+                              name: [prev.firstName, val, prev.lastName].filter(Boolean).join(" ")
+                            }));
+                          }}
                         />
                       </div>
                       <div>
@@ -1821,9 +1901,14 @@ export default function RegisterClientModal({
                           placeholder="e.g. Doe"
                           className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
                           value={formData.lastName}
-                          onChange={(e) =>
-                            setFormData({ ...formData, lastName: e.target.value })
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData(prev => ({
+                              ...prev,
+                              lastName: val,
+                              name: [prev.firstName, prev.middleName, val].filter(Boolean).join(" ")
+                            }));
+                          }}
                         />
                       </div>
                     </div>
@@ -2117,9 +2202,28 @@ export default function RegisterClientModal({
                           placeholder="e.g. Ahmed Al Rashid / أحمد الراشدي"
                           className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
                           value={formData.name}
-                          onChange={(e) =>
-                            setFormData({ ...formData, name: e.target.value })
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const parts = val.trim().split(/\s+/);
+                            let f = parts[0] || "";
+                            let m = "";
+                            let l = "";
+                            if (parts.length === 2) {
+                              l = parts[1];
+                            } else if (parts.length > 2) {
+                              m = parts.slice(1, -1).join(" ");
+                              l = parts[parts.length - 1];
+                            } else {
+                              l = f;
+                            }
+                            setFormData(prev => ({
+                              ...prev,
+                              name: val,
+                              firstName: f,
+                              middleName: m,
+                              lastName: l
+                            }));
+                          }}
                         />
                       </div>
 

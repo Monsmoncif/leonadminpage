@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { 
   X, 
   Loader2, 
@@ -14,7 +15,9 @@ import {
   CreditCard,
   Coins,
   Camera,
-  Fuel
+  Fuel,
+  Eye,
+  ImageIcon
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -25,6 +28,7 @@ import VehicleInspectionPhotoCapture, {
   EXTRA_PHOTO_PREFIX,
   getExtraPhotoKeys,
 } from "@/components/ui/VehicleInspectionPhotoCapture";
+import HandoverPhotosGallery from "@/components/contracts/HandoverPhotosGallery";
 
 interface ReturnVehicleModalProps {
   isOpen: boolean;
@@ -39,6 +43,7 @@ export default function ReturnVehicleModal({
   onSuccess,
   contract,
 }: ReturnVehicleModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(1);
   const [returnOdometer, setReturnOdometer] = useState("");
   const [returnFuelLevel, setReturnFuelLevel] = useState<number>(100);
@@ -54,7 +59,15 @@ export default function ReturnVehicleModal({
   const [damages, setDamages] = useState<any[]>([]);
   const [allDamages, setAllDamages] = useState<any[]>([]);
   const [returnPaymentMethod, setReturnPaymentMethod] = useState<string>("Cash");
+  const [fullContractData, setFullContractData] = useState<any | null>(null);
+  const [isLoadingContract, setIsLoadingContract] = useState(false);
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
+
   const toast = useToast();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen && contract) {
@@ -79,6 +92,22 @@ export default function ReturnVehicleModal({
         });
       }
       setReturnPhotos(initialPhotos);
+
+      // Fetch full contract details (which includes unstripped inspectionPhotos)
+      const contractId = contract._id || contract.id;
+      if (contractId) {
+        setIsLoadingContract(true);
+        fetch(`/api/contracts/${contractId}`, { cache: "no-store" })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data) {
+              setFullContractData(data);
+            }
+          })
+          .catch((err) => console.error("Error fetching full contract details:", err))
+          .finally(() => setIsLoadingContract(false));
+      }
+
       fetch("/api/damages")
         .then(res => res.json())
         .then(data => {
@@ -92,6 +121,8 @@ export default function ReturnVehicleModal({
           }
         })
         .catch(err => console.error("Error fetching damages:", err));
+    } else {
+      setFullContractData(null);
     }
   }, [isOpen, contract]);
 
@@ -103,22 +134,36 @@ export default function ReturnVehicleModal({
     }
   }, [isOpen]);
 
-  if (!isOpen || !contract) return null;
+  const activeContract = fullContractData || contract;
+
+  const handoverPhotos = useMemo(() => {
+    if (Array.isArray(activeContract?.inspectionPhotos)) {
+      return activeContract.inspectionPhotos.filter((url: any) => typeof url === "string" && url.trim().length > 0);
+    }
+    return [];
+  }, [activeContract]);
+
+  const vehicleName = activeContract?.carDetails || activeContract?.car || 
+    (activeContract?.vehicle?.make ? `${activeContract.vehicle.make} ${activeContract.vehicle.model}` : "Vehicle");
+  const contractNum = activeContract?.contractNumber || activeContract?.id || activeContract?._id || "Contract";
+  const checkoutFuelLevel = activeContract?.checkoutFuelLevel !== undefined ? Number(activeContract.checkoutFuelLevel) : 100;
+
+  if (!isOpen || !contract || !mounted) return null;
 
   const isPersonalized = Boolean(
-    contract.contractType === "Personalized" ||
-    contract.personalizedPersonName ||
-    contract.deliveryDriver === "Personal Use"
+    activeContract.contractType === "Personalized" ||
+    activeContract.personalizedPersonName ||
+    activeContract.deliveryDriver === "Personal Use"
   );
 
-  const initialMileage = contract.checkoutMileage || contract.unitMileage || 0;
+  const initialMileage = activeContract.checkoutMileage || activeContract.unitMileage || 0;
   const currentOdometer = Number(returnOdometer) || initialMileage;
   
   // Calculate extra KMs
-  const totalLimit = (contract.dailyKmLimit || 0) * (contract.totalDays || 1);
+  const totalLimit = (activeContract.dailyKmLimit || 0) * (activeContract.totalDays || 1);
   const kmDriven = Math.max(0, currentOdometer - initialMileage);
   const extraKm = (!isPersonalized && totalLimit > 0) ? Math.max(0, kmDriven - totalLimit) : 0;
-  const pricePerExtraKm = isPersonalized ? 0 : (contract.pricePerExtraKm || 0);
+  const pricePerExtraKm = isPersonalized ? 0 : (activeContract.pricePerExtraKm || 0);
   const extraKmCharge = isPersonalized ? 0 : extraKm * pricePerExtraKm;
 
   const damageChargeNum = damages.reduce((sum, d) => sum + (d.cost || 0), 0);
@@ -221,7 +266,7 @@ export default function ReturnVehicleModal({
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-purple-700 font-medium">Recipient</span>
-                  <span className="font-semibold text-purple-900">{contract.personalizedPersonName || contract.customer || "Personal Use"}</span>
+                  <span className="font-semibold text-purple-900">{activeContract.personalizedPersonName || activeContract.customer || "Personal Use"}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-purple-700 font-medium">Rental Charges &amp; KM Limit</span>
@@ -233,15 +278,15 @@ export default function ReturnVehicleModal({
                 <h3 className="text-sm font-bold text-blue-900 mb-2">Contract Data</h3>
                 <div className="flex justify-between text-sm">
                   <span className="text-blue-700 font-medium">Daily Rate</span>
-                  <span className="font-semibold text-blue-900">AED {contract.dailyRate || 0}</span>
+                  <span className="font-semibold text-blue-900">AED {activeContract.dailyRate || 0}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-blue-700 font-medium">Daily KM Limit</span>
-                  <span className="font-semibold text-blue-900">{contract.dailyKmLimit ? `${contract.dailyKmLimit} km` : "Unlimited"}</span>
+                  <span className="font-semibold text-blue-900">{activeContract.dailyKmLimit ? `${activeContract.dailyKmLimit} km` : "Unlimited"}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-blue-700 font-medium">Price per Extra KM</span>
-                  <span className="font-semibold text-blue-900">AED {contract.pricePerExtraKm || 0}</span>
+                  <span className="font-semibold text-blue-900">AED {activeContract.pricePerExtraKm || 0}</span>
                 </div>
               </div>
             )}
@@ -280,7 +325,7 @@ export default function ReturnVehicleModal({
                 value={returnFuelLevel}
                 onChange={(val) => setReturnFuelLevel(val)}
                 label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
-                sublabel={`Vehicle fuel percentage upon return (Initial was ${contract.checkoutFuelLevel !== undefined ? contract.checkoutFuelLevel : 100}%)`}
+                sublabel={`Vehicle fuel percentage upon return (Initial was ${checkoutFuelLevel}%)`}
               />
             </div>
 
@@ -312,6 +357,28 @@ export default function ReturnVehicleModal({
           <div className="space-y-5 animate-fade-in-up">
             <h3 className="text-lg font-bold flex items-center gap-2"><ExecutiveCarIcon size={18} className="text-brand"/> Step 2: Damages & Condition</h3>
             
+            {/* Handover Reference for Damage Cross-Checking */}
+            {handoverPhotos.length > 0 && (
+              <HandoverPhotosGallery
+                photos={handoverPhotos}
+                returnPhotos={returnPhotos}
+                title="Compare Handover Condition & Photos (صور وحالة السيارة عند الاستلام)"
+                subtitle="Verify preexisting scratches, dings, or body marks before recording new damage charges"
+                metadata={{
+                  checkoutMileage: initialMileage,
+                  checkoutFuelLevel: checkoutFuelLevel,
+                  deliveredAt: activeContract?.deliveredAt || activeContract?.startDate,
+                  deliveredBy: activeContract?.deliveredBy || activeContract?.deliveryDriver,
+                  vehicleName: vehicleName,
+                  contractNumber: contractNum,
+                }}
+                allowComparison={true}
+                defaultOpen={damages.length > 0}
+                collapsible={true}
+                compact={true}
+              />
+            )}
+
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-bold text-text-primary uppercase tracking-wider text-muted">Damages Recorded</h4>
@@ -346,8 +413,8 @@ export default function ReturnVehicleModal({
                   className="w-full text-sm border border-border rounded-xl px-4 py-3 bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                 >
                   <option value="">No new damages</option>
-                  {allDamages.filter(d => contract && (d.contractId?._id === contract._id || d.contractId === contract._id || d.contractId === contract.id)).map(d => (
-                    <option key={d._id} value={d.description}>Damage Contract {d.contractId?.id || contract.id} - {d.description}</option>
+                  {allDamages.filter(d => activeContract && (d.contractId?._id === activeContract._id || d.contractId === activeContract._id || d.contractId === activeContract.id)).map(d => (
+                    <option key={d._id} value={d.description}>Damage Contract {d.contractId?.id || activeContract.id} - {d.description}</option>
                   ))}
                 </select>
               </div>
@@ -357,14 +424,41 @@ export default function ReturnVehicleModal({
 
       case 3:
         return (
-          <div className="space-y-4 animate-fade-in-up">
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <Camera size={18} className="text-brand" /> Step 3: Return Inspection Photos
-            </h3>
+          <div className="space-y-5 animate-fade-in-up">
+            <div>
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Camera size={18} className="text-brand" /> Step 3: Return Inspection Photos
+              </h3>
+              <p className="text-xs text-text-muted mt-0.5">
+                Capture return angles and compare directly with vehicle handover photos
+              </p>
+            </div>
+
+            {/* Handover Inspection Photos Gallery & Comparison */}
+            <HandoverPhotosGallery
+              photos={handoverPhotos}
+              returnPhotos={returnPhotos}
+              title="Handover Vehicle Reference Photos (صور تسليم واستلام المركبة)"
+              subtitle="Photos taken when the car was handed over to the client — compare side-by-side or angle-by-angle"
+              metadata={{
+                checkoutMileage: initialMileage,
+                checkoutFuelLevel: checkoutFuelLevel,
+                deliveredAt: activeContract?.deliveredAt || activeContract?.startDate,
+                deliveredBy: activeContract?.deliveredBy || activeContract?.deliveryDriver,
+                vehicleName: vehicleName,
+                contractNumber: contractNum,
+              }}
+              allowComparison={true}
+              defaultOpen={true}
+              collapsible={true}
+            />
+
             <VehicleInspectionPhotoCapture
               photos={returnPhotos}
               onChange={setReturnPhotos}
               allowExtra={true}
+              referencePhotos={handoverPhotos}
+              referenceLabel="Handover"
             />
           </div>
         );
@@ -544,12 +638,31 @@ export default function ReturnVehicleModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="bg-card w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden border border-border flex flex-col max-h-[82vh] sm:max-h-[90vh]">
+  const modalContent = (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="bg-card w-full max-w-2xl lg:max-w-3xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-border flex flex-col max-h-[92vh] sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex justify-between items-center bg-gray-50/50 shrink-0">
-          <h2 className="text-base sm:text-lg font-bold text-text-primary">Return Vehicle</h2>
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex justify-between items-center bg-gray-50/50 shrink-0 gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <h2 className="text-base sm:text-lg font-bold text-text-primary truncate">Return Vehicle</h2>
+            {isLoadingContract ? (
+              <span className="flex items-center gap-1 text-[11px] text-text-muted bg-gray-100 px-2 py-0.5 rounded">
+                <Loader2 size={12} className="animate-spin" />
+                <span>Loading...</span>
+              </span>
+            ) : handoverPhotos.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowHandoverModal(true)}
+                className="px-2.5 py-1 text-xs font-bold text-brand bg-brand/10 hover:bg-brand/20 border border-brand/20 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                title="View full handover inspection photos"
+              >
+                <Eye size={13} />
+                <span className="hidden xs:inline">Handover Photos</span>
+                <span>({handoverPhotos.length})</span>
+              </button>
+            ) : null}
+          </div>
           <button onClick={onClose} className="p-1.5 text-text-muted hover:bg-gray-200 rounded-lg transition-colors cursor-pointer" aria-label="Close modal">
             <X size={18} />
           </button>
@@ -615,6 +728,50 @@ export default function ReturnVehicleModal({
           )}
         </div>
       </div>
+
+      {/* Standalone Quick-Access Handover Photos Modal */}
+      {showHandoverModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-2.5 sm:p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="bg-card w-full max-w-4xl rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-gray-50/80">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={18} className="text-brand" />
+                <h3 className="text-sm sm:text-base font-bold text-text-primary">
+                  Handover Photos — Contract #{contractNum}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHandoverModal(false)}
+                className="p-1.5 rounded-lg hover:bg-gray-200 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-3 sm:p-5 overflow-y-auto flex-1 custom-scrollbar">
+              <HandoverPhotosGallery
+                photos={handoverPhotos}
+                returnPhotos={returnPhotos}
+                defaultOpen={true}
+                collapsible={false}
+                allowComparison={true}
+                metadata={{
+                  checkoutMileage: initialMileage,
+                  checkoutFuelLevel: checkoutFuelLevel,
+                  deliveredAt: activeContract?.deliveredAt || activeContract?.startDate,
+                  deliveredBy: activeContract?.deliveredBy || activeContract?.deliveryDriver,
+                  vehicleName: vehicleName,
+                  contractNumber: contractNum,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
+

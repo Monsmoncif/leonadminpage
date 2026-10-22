@@ -145,6 +145,13 @@ export default function ClientsPage() {
     }
   };
 
+  const handleViewClient = (client: any) => {
+    try {
+      sessionStorage.setItem(`cached_client_${client._id}`, JSON.stringify(client));
+    } catch {}
+    router.push(`/clients/${client._id}`);
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -376,7 +383,8 @@ export default function ClientsPage() {
                       paginatedClients.map((client: any, idx: number) => (
                         <tr
                           key={client._id}
-                          onClick={() => router.push(`/clients/${client._id}`)}
+                          onMouseEnter={() => router.prefetch(`/clients/${client._id}`)}
+                          onClick={() => handleViewClient(client)}
                           className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up cursor-pointer"
                           style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
                         >
@@ -457,9 +465,10 @@ export default function ClientsPage() {
                                 type="button"
                                 className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
                                 title="View Details"
+                                onMouseEnter={() => router.prefetch(`/clients/${client._id}`)}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  router.push(`/clients/${client._id}`);
+                                  handleViewClient(client);
                                 }}
                               >
                                 <Eye size={14} />

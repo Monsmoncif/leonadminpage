@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Camera, Image as ImageIcon, X, Loader2, CheckCircle2, AlertCircle, Plus } from "lucide-react";
+import { Camera, Image as ImageIcon, X, Loader2, CheckCircle2, AlertCircle, Plus, Eye } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 
 export const VEHICLE_ANGLES = [
@@ -42,6 +42,9 @@ interface VehicleInspectionPhotoCaptureProps {
   subtitle?: string;
   badgeLabel?: string;
   allowExtra?: boolean;
+  referencePhotos?: Record<string, string> | string[];
+  referenceLabel?: string;
+  onPreviewReference?: (url: string, angle: string) => void;
 }
 
 // Fast client-side image compression to prevent 5-10MB photo timeouts
@@ -108,11 +111,41 @@ export default function VehicleInspectionPhotoCapture({
   title,
   subtitle,
   badgeLabel,
-  allowExtra = false
+  allowExtra = false,
+  referencePhotos,
+  referenceLabel = "Handover",
+  onPreviewReference,
 }: VehicleInspectionPhotoCaptureProps) {
   const toast = useToast();
   const [uploadMode, setUploadMode] = useState<"camera" | "gallery">("camera");
   const [uploadingAngle, setUploadingAngle] = useState<string | null>(null);
+  const [activeRefPreview, setActiveRefPreview] = useState<{ url: string; angle: string } | null>(null);
+
+  // Normalize reference photos into angle-to-url map
+  const refMap: Record<string, string> = React.useMemo(() => {
+    if (!referencePhotos) return {};
+    if (Array.isArray(referencePhotos)) {
+      const map: Record<string, string> = {};
+      referencePhotos.forEach((url, idx) => {
+        if (!url || typeof url !== "string") return;
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        const angle = idx < VEHICLE_ANGLES.length ? VEHICLE_ANGLES[idx] : `${EXTRA_PHOTO_PREFIX}${idx - VEHICLE_ANGLES.length + 1}`;
+        map[angle] = trimmed;
+      });
+      return map;
+    }
+    if (typeof referencePhotos === "object") {
+      const map: Record<string, string> = {};
+      Object.entries(referencePhotos).forEach(([k, v]) => {
+        if (typeof v === "string" && v.trim()) {
+          map[k] = v.trim();
+        }
+      });
+      return map;
+    }
+    return {};
+  }, [referencePhotos]);
 
   // Local state ensures instant, reliable rendering independent of async parent re-renders
   const [localPhotos, setLocalPhotos] = React.useState<Record<string, string>>(photos || {});
@@ -272,10 +305,29 @@ export default function VehicleInspectionPhotoCapture({
           const isUploading = uploadingAngle === angle;
 
           return (
-            <div key={angle} className="flex flex-col gap-2">
-              <span className="text-xs font-semibold text-text-secondary text-center truncate" title={angle}>
-                {angle}
-              </span>
+            <div key={angle} className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-1 px-0.5">
+                <span className="text-xs font-semibold text-text-secondary truncate" title={angle}>
+                  {angle}
+                </span>
+                {refMap[angle] && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onPreviewReference) {
+                        onPreviewReference(refMap[angle], angle);
+                      } else {
+                        setActiveRefPreview({ url: refMap[angle], angle });
+                      }
+                    }}
+                    className="text-[9px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 px-1.5 py-0.5 rounded flex items-center gap-0.5 cursor-pointer shrink-0 transition-colors shadow-2xs"
+                    title={`View ${referenceLabel} Photo (${angle})`}
+                  >
+                    <Eye size={10} />
+                    <span>{referenceLabel}</span>
+                  </button>
+                )}
+              </div>
 
               {photoUrl ? (
                 <div className="relative aspect-square rounded-xl border border-border overflow-hidden group shadow-2xs">
@@ -398,6 +450,45 @@ export default function VehicleInspectionPhotoCapture({
                   <span className="text-[10px] font-semibold">Add Photo</span>
                 </label>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reference Photo Preview Modal */}
+      {activeRefPreview && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-sm animate-fade-in"
+          onClick={() => setActiveRefPreview(null)}
+        >
+          <div
+            className="relative max-w-3xl w-full bg-gray-950 rounded-2xl border border-white/20 p-4 shadow-2xl flex flex-col items-center gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between text-white pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-600 text-white">
+                  {referenceLabel} Reference
+                </span>
+                <span className="text-sm font-semibold text-white/90">
+                  {activeRefPreview.angle}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveRefPreview(null)}
+                className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                aria-label="Close preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="max-h-[75vh] w-full flex items-center justify-center overflow-hidden rounded-xl bg-black">
+              <img
+                src={activeRefPreview.url}
+                alt={`${referenceLabel} ${activeRefPreview.angle}`}
+                className="max-h-[70vh] max-w-full object-contain rounded-lg"
+              />
             </div>
           </div>
         </div>

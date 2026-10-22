@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   Camera, 
   Gauge, 
@@ -40,6 +40,7 @@ import VehicleInspectionPhotoCapture, {
   EXTRA_PHOTO_PREFIX,
   getExtraPhotoKeys,
 } from "@/components/ui/VehicleInspectionPhotoCapture";
+import HandoverPhotosGallery from "@/components/contracts/HandoverPhotosGallery";
 
 const DEFAULT_STEPS = [
   { id: 1, title: "Vehicle & Mileage", arTitle: "المركبة والعداد" },
@@ -134,6 +135,8 @@ export default function VehicleReturnPage() {
 
   // Photos
   const [returnPhotos, setReturnPhotos] = useState<Record<string, string>>({});
+  const [fullContractData, setFullContractData] = useState<any | null>(null);
+  const [showHandoverModal, setShowHandoverModal] = useState<boolean>(false);
 
   // Damages
   const [hasNewDamage, setHasNewDamage] = useState(false);
@@ -226,6 +229,34 @@ export default function VehicleReturnPage() {
   }, [searchParams, session]);
 
   const selectedContractData = contracts.find((c) => c._id === selectedContract || c.id === selectedContract);
+  const activeContractData = fullContractData || selectedContractData;
+
+  useEffect(() => {
+    if (!selectedContract) {
+      setFullContractData(null);
+      return;
+    }
+    let isMounted = true;
+    fetch(`/api/contracts/${selectedContract}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data) {
+          setFullContractData(data);
+        }
+      })
+      .catch((err) => console.error("Error fetching full contract for driver return:", err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedContract]);
+
+  const handoverPhotos = useMemo(() => {
+    if (Array.isArray(activeContractData?.inspectionPhotos)) {
+      return activeContractData.inspectionPhotos.filter((url: any) => typeof url === "string" && url.trim().length > 0);
+    }
+    return [];
+  }, [activeContractData]);
 
   // Synchronize form when selected contract changes
   useEffect(() => {
@@ -272,30 +303,30 @@ export default function VehicleReturnPage() {
   }, [selectedContract, selectedContractData]);
 
   // Derived baseline information
-  const contractNum = selectedContractData?.contractNumber || selectedContractData?.id || selectedContractData?._id?.substring(0, 8)?.toUpperCase() || "2240";
-  const vehicleName = selectedContractData?.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || "Vehicle";
-  const plateNumber = selectedContractData?.vehiclePlate || selectedContractData?.unitId?.plate || "";
+  const contractNum = activeContractData?.contractNumber || activeContractData?.id || activeContractData?._id?.substring(0, 8)?.toUpperCase() || "2240";
+  const vehicleName = activeContractData?.vehicle?.replace(/\s*\([^)]*\)/, "").trim() || "Vehicle";
+  const plateNumber = activeContractData?.vehiclePlate || activeContractData?.unitId?.plate || "";
   const isPersonalized = Boolean(
-    selectedContractData?.contractType === "Personalized" ||
-    selectedContractData?.personalizedPersonName ||
-    selectedContractData?.deliveryDriver === "Personal Use"
+    activeContractData?.contractType === "Personalized" ||
+    activeContractData?.personalizedPersonName ||
+    activeContractData?.deliveryDriver === "Personal Use"
   );
 
-  const customerName = selectedContractData?.personalizedPersonName || selectedContractData?.customer || selectedContractData?.clientId?.name || (isPersonalized ? "Personal Use" : "Client");
-  const customerPhone = selectedContractData?.customerPhone || selectedContractData?.clientId?.phone || "";
-  const returnLocation = selectedContractData?.dropoffLocation || selectedContractData?.pickupLocation || "Main Office";
-  const initialMileage = Number(selectedContractData?.checkoutMileage || selectedContractData?.unitMileage || 0);
+  const customerName = activeContractData?.personalizedPersonName || activeContractData?.customer || activeContractData?.clientId?.name || (isPersonalized ? "Personal Use" : "Client");
+  const customerPhone = activeContractData?.customerPhone || activeContractData?.clientId?.phone || "";
+  const returnLocation = activeContractData?.dropoffLocation || activeContractData?.pickupLocation || "Main Office";
+  const initialMileage = Number(activeContractData?.checkoutMileage || activeContractData?.unitMileage || 0);
   const currentOdoNum = Number(returnOdometer) || initialMileage;
   const kmDriven = Math.max(0, currentOdoNum - initialMileage);
-  const vehicleMake = selectedContractData?.unitId?.make || "Vehicle";
-  const vehicleYear = selectedContractData?.vehicleYear || selectedContractData?.unitId?.year || "";
-  const vehicleColor = selectedContractData?.vehicleColor || selectedContractData?.unitId?.color || "";
-  const vehicleFuel = selectedContractData?.vehicleFuel || selectedContractData?.unitId?.fuelType || "Petrol";
-  const vehicleImage = selectedContractData?.vehicleImage || selectedContractData?.unitId?.images?.[0] || "";
-  const checkoutFuelLevel = selectedContractData?.checkoutFuelLevel !== undefined ? Number(selectedContractData.checkoutFuelLevel) : 100;
-  const dailyKmLimit = isPersonalized ? 0 : Number(selectedContractData?.dailyKmLimit || 0);
-  const pricePerExtraKm = isPersonalized ? 0 : Number(selectedContractData?.pricePerExtraKm || 0);
-  const totalDays = Number(selectedContractData?.totalDays || 1);
+  const vehicleMake = activeContractData?.unitId?.make || "Vehicle";
+  const vehicleYear = activeContractData?.vehicleYear || activeContractData?.unitId?.year || "";
+  const vehicleColor = activeContractData?.vehicleColor || activeContractData?.unitId?.color || "";
+  const vehicleFuel = activeContractData?.vehicleFuel || activeContractData?.unitId?.fuelType || "Petrol";
+  const vehicleImage = activeContractData?.vehicleImage || activeContractData?.unitId?.images?.[0] || "";
+  const checkoutFuelLevel = activeContractData?.checkoutFuelLevel !== undefined ? Number(activeContractData.checkoutFuelLevel) : 100;
+  const dailyKmLimit = isPersonalized ? 0 : Number(activeContractData?.dailyKmLimit || 0);
+  const pricePerExtraKm = isPersonalized ? 0 : Number(activeContractData?.pricePerExtraKm || 0);
+  const totalDays = Number(activeContractData?.totalDays || 1);
   const totalIncludedKm = dailyKmLimit * totalDays;
   const extraKm = (!isPersonalized && dailyKmLimit > 0) ? Math.max(0, kmDriven - totalIncludedKm) : 0;
   const extraKmCharge = isPersonalized ? 0 : extraKm * pricePerExtraKm;
@@ -307,10 +338,10 @@ export default function VehicleReturnPage() {
   const totalReturnCharges = extraKmCharge + damageChargeNum + salikChargeNum + parkingChargeNum + finesChargeNum + fuelChargeNum;
 
   // Breakdown of money collected (Rental collection + deposit + return charges)
-  const contractTotalRent = isPersonalized ? 0 : Number(selectedContractData?.totalAmount || 0);
-  const contractAdvance = isPersonalized ? 0 : Number(selectedContractData?.advancePayment || 0);
+  const contractTotalRent = isPersonalized ? 0 : Number(activeContractData?.totalAmount || 0);
+  const contractAdvance = isPersonalized ? 0 : Number(activeContractData?.advancePayment || 0);
   const contractRentalCollection = Math.max(0, contractTotalRent - contractAdvance);
-  const contractDeposit = isPersonalized ? 0 : (Number(selectedContractData?.depositAmount) || (selectedContractData?.deposit ? Number(String(selectedContractData.deposit).replace(/[^0-9.]/g, '')) : 0));
+  const contractDeposit = isPersonalized ? 0 : (Number(activeContractData?.depositAmount) || (activeContractData?.deposit ? Number(String(activeContractData.deposit).replace(/[^0-9.]/g, '')) : 0));
 
   const moneyBreakdownParts: string[] = [];
   if (contractRentalCollection > 0) {
@@ -706,6 +737,25 @@ export default function VehicleReturnPage() {
             <div className="flex items-center justify-between">
               <strong className="text-text-primary font-bold">{customerName}</strong>
             </div>
+
+            {/* Handover Photos Quick Button */}
+            <button
+              type="button"
+              onClick={() => setShowHandoverModal(true)}
+              className="w-full mt-2 py-2 px-3 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-900 border border-blue-200/90 text-xs font-bold transition-all flex items-center justify-between shadow-2xs cursor-pointer group active:scale-[0.99]"
+            >
+              <span className="flex items-center gap-2">
+                <Camera size={14} className="text-blue-600 group-hover:scale-110 transition-transform" />
+                <span>Handover Photos (صور التسليم)</span>
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                handoverPhotos.length > 0 
+                  ? "bg-blue-600 text-white" 
+                  : "bg-gray-100 text-text-muted"
+              }`}>
+                {handoverPhotos.length > 0 ? `${handoverPhotos.length} Photos` : "None"}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -857,10 +907,30 @@ export default function VehicleReturnPage() {
         </div>
       </div>
 
+      {/* Handover Inspection Photos Reference */}
+      <HandoverPhotosGallery
+        photos={handoverPhotos}
+        returnPhotos={returnPhotos}
+        title="Handover Vehicle Reference Photos (صور تسليم واستلام المركبة)"
+        subtitle="Compare vehicle condition with photos taken when delivered to the customer"
+        metadata={{
+          checkoutMileage: initialMileage,
+          checkoutFuelLevel: checkoutFuelLevel,
+          deliveredAt: activeContractData?.deliveredAt || activeContractData?.startDate,
+          deliveredBy: activeContractData?.deliveredBy || activeContractData?.deliveryDriver,
+          vehicleName: vehicleName,
+          contractNumber: contractNum,
+        }}
+        allowComparison={true}
+        defaultOpen={true}
+      />
+
       <VehicleInspectionPhotoCapture
         photos={returnPhotos}
         onChange={setReturnPhotos}
         allowExtra={true}
+        referencePhotos={handoverPhotos}
+        referenceLabel="Handover"
       />
     </div>
   );
@@ -874,6 +944,25 @@ export default function VehicleReturnPage() {
           Inspect body panels, glass, and interior. Record any new damages discovered during return pickup.
         </p>
       </div>
+
+      {/* Handover Reference for Damage Cross-Checking */}
+      <HandoverPhotosGallery
+        photos={handoverPhotos}
+        returnPhotos={returnPhotos}
+        title="Compare Handover Condition & Photos (صور وحالة السيارة عند الاستلام)"
+        subtitle="Verify preexisting scratches, dings, or body marks before recording new damage charges"
+        metadata={{
+          checkoutMileage: initialMileage,
+          checkoutFuelLevel: checkoutFuelLevel,
+          deliveredAt: activeContractData?.deliveredAt || activeContractData?.startDate,
+          deliveredBy: activeContractData?.deliveredBy || activeContractData?.deliveryDriver,
+          vehicleName: vehicleName,
+          contractNumber: contractNum,
+        }}
+        allowComparison={true}
+        defaultOpen={hasNewDamage}
+        collapsible={true}
+      />
 
       {/* Damage Status Toggle */}
       <div className="space-y-4 bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
@@ -1715,6 +1804,60 @@ export default function VehicleReturnPage() {
                 src={previewPhotoUrl}
                 alt="Full Preview"
                 className="max-h-[75vh] w-auto max-w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Handover Inspection Photos Modal */}
+      {showHandoverModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowHandoverModal(false)}
+        >
+          <div
+            className="bg-card w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-border flex items-center justify-between bg-blue-50/60 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                  <Camera size={16} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-text-primary text-sm sm:text-base truncate">
+                    Handover Inspection Photos — Contract #{contractNum}
+                  </h3>
+                  <p className="text-[11px] text-text-muted truncate">
+                    {vehicleName} {plateNumber ? `(${plateNumber})` : ""} • Initial condition recorded at delivery
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHandoverModal(false)}
+                className="p-1.5 rounded-lg hover:bg-gray-200 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-3 sm:p-5 overflow-y-auto flex-1 custom-scrollbar">
+              <HandoverPhotosGallery
+                photos={handoverPhotos}
+                returnPhotos={returnPhotos}
+                defaultOpen={true}
+                collapsible={false}
+                allowComparison={true}
+                metadata={{
+                  checkoutMileage: initialMileage,
+                  checkoutFuelLevel: checkoutFuelLevel,
+                  deliveredAt: activeContractData?.deliveredAt || activeContractData?.startDate,
+                  deliveredBy: activeContractData?.deliveredBy || activeContractData?.deliveryDriver,
+                  vehicleName: vehicleName,
+                  contractNumber: contractNum,
+                }}
               />
             </div>
           </div>

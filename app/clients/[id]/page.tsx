@@ -67,8 +67,16 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const router = useRouter();
   
-  const [client, setClient] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [client, setClient] = useState<any>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem(`cached_client_${id}`);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => !client);
   const [error, setError] = useState<string | null>(null);
   const [previewDocIndex, setPreviewDocIndex] = useState<number | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -105,22 +113,27 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [previewDocIndex, client?.documents]);
 
-  const fetchClient = async () => {
+  const fetchClient = async (showSkeleton = false) => {
     try {
-      setLoading(true);
-      const res = await fetch(`/api/clients/${id}`, { cache: 'no-store' });
+      if (showSkeleton) setLoading(true);
+      const res = await fetch(`/api/clients/${id}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch customer details");
       const data = await res.json();
       setClient(data);
+      try {
+        sessionStorage.setItem(`cached_client_${id}`, JSON.stringify(data));
+      } catch {}
     } catch (err: any) {
-      setError(err.message);
+      if (!client) {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchClient();
+    fetchClient(!client);
   }, [id]);
 
   if (loading) {
@@ -253,15 +266,33 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
           <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
             <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
               <CreditCard size={15} className="text-text-muted shrink-0" />
-              <span className="text-xs sm:text-sm font-medium text-text-muted">Passport / ID</span>
+              <span className="text-xs sm:text-sm font-medium text-text-muted">
+                {client.clientType === "Tourist" ? "Passport Number" : "Emirates ID / Passport"}
+              </span>
             </div>
-            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0 break-all">{client.idNumber || "—"}</span>
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0 break-all">
+              {client.passportNumber || client.idNumber || "—"}
+            </span>
           </div>
+
+          {client.passportExpiry && (
+            <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+              <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+                <Calendar size={15} className="text-text-muted shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-text-muted">Passport Expiry</span>
+              </div>
+              <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">
+                {new Date(client.passportExpiry).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+              </span>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
             <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
               <FileText size={15} className="text-text-muted shrink-0" />
-              <span className="text-xs sm:text-sm font-medium text-text-muted">License Number</span>
+              <span className="text-xs sm:text-sm font-medium text-text-muted">
+                {client.clientType === "Tourist" ? "Driving License (Home)" : "License Number"}
+              </span>
             </div>
             <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0 break-all">{client.licenseNumber || "—"}</span>
           </div>
@@ -277,6 +308,40 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                 : "—"}
             </span>
           </div>
+
+          {client.internationalLicenseNumber && (
+            <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+              <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+                <FileText size={15} className="text-text-muted shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-text-muted">International License</span>
+              </div>
+              <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0 break-all">
+                {client.internationalLicenseNumber}
+                {client.internationalLicenseExpiry && (
+                  <span className="text-xs text-text-muted font-normal ml-2">
+                    (Exp: {new Date(client.internationalLicenseExpiry).toLocaleDateString("en-GB")})
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {client.visaNumber && (
+            <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+              <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+                <CreditCard size={15} className="text-text-muted shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-text-muted">Visa / Entry Stamp</span>
+              </div>
+              <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0 break-all">
+                {client.visaNumber}
+                {client.visaExpiry && (
+                  <span className="text-xs text-text-muted font-normal ml-2">
+                    (Exp: {new Date(client.visaExpiry).toLocaleDateString("en-GB")})
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
             <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
@@ -468,6 +533,11 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
                 </div>
               ))}
             </div>
+          </div>
+        ) : !Array.isArray(client.contracts) ? (
+          <div className="p-8 sm:p-10 text-center">
+            <Loader2 size={24} className="text-brand animate-spin mx-auto mb-2" />
+            <p className="text-xs text-text-muted">Loading rental history...</p>
           </div>
         ) : (
           <div className="p-8 sm:p-10 text-center">

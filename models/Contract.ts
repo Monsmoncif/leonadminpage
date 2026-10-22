@@ -218,6 +218,8 @@ const contractSchema = new Schema<IContract>(
   { timestamps: true }
 );
 
+contractSchema.index({ clientId: 1, createdAt: -1 });
+
 if (mongoose.models.Contract) {
   mongoose.deleteModel("Contract");
 }

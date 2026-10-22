@@ -11,22 +11,31 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    if (!id || typeof id !== "string") {
+      return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
+    }
+
     await connectDB();
-    const client = await Client.findById(id).lean();
+    const _u = Unit; // ensure Unit model is loaded for population
+
+    // Execute client query and lightweight contracts query in parallel
+    const [client, contracts] = await Promise.all([
+      Client.findById(id).lean(),
+      Contract.find({ clientId: id })
+        .sort({ createdAt: -1 })
+        .select("_id contractNumber unitId startDate endDate totalAmount status createdAt")
+        .populate({ path: "unitId", select: "make model plate" })
+        .lean(),
+    ]);
+
     if (!client) {
       return NextResponse.json(
         { error: "Client not found" },
         { status: 404 }
       );
     }
-    
-    const _u = Unit; // ensure Unit model is loaded for population
-    const contracts = await Contract.find({ clientId: id })
-      .sort({ createdAt: -1 })
-      .populate({ path: "unitId", select: "make model plate images" })
-      .lean();
 
-    return NextResponse.json({ ...client, contracts });
+    return NextResponse.json({ ...client, contracts: contracts || [] });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -49,12 +58,37 @@ export async function PUT(
       }
     }
 
+    // Sanitize empty date strings to null so Mongoose does not throw CastError
+    const dateFields = [
+      "dateOfBirth",
+      "idIssuedDate",
+      "idExpiry",
+      "passportIssuedDate",
+      "passportExpiry",
+      "licenseIssuedDate",
+      "licenseExpiry",
+      "internationalLicenseIssuedDate",
+      "internationalLicenseExpiry",
+      "visaExpiry",
+    ];
+    for (const f of dateFields) {
+      if (body[f] === "" || body[f] === "null" || body[f] === "undefined") {
+        body[f] = null;
+      }
+    }
+
     // Validate Driving License Expiry
     if (body.licenseExpiry && typeof body.licenseExpiry === "string" && body.licenseExpiry.trim()) {
       const expDate = new Date(body.licenseExpiry);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (!isNaN(expDate.getTime()) && expDate < today) {
+
+      // If it's a Tourist with a valid international license, allow update
+      const hasValidIntlLicense = body.clientType === "Tourist" && 
+        body.internationalLicenseNumber && 
+        (!body.internationalLicenseExpiry || new Date(body.internationalLicenseExpiry) >= today);
+
+      if (!isNaN(expDate.getTime()) && expDate < today && !hasValidIntlLicense) {
         return NextResponse.json(
           { error: "Driving license is expired. Cannot update client with an expired license. (رخصة القيادة منتهية الصلاحية)" },
           { status: 400 }

@@ -57,6 +57,21 @@ export async function GET(
       );
     }
 
+    // Fallback: If inspectionPhotos is empty or undefined, check Inspection model for "Before Rental"
+    if (!contract.inspectionPhotos || (Array.isArray(contract.inspectionPhotos) && contract.inspectionPhotos.length === 0)) {
+      try {
+        const beforeInsp = await Inspection.findOne({ 
+          contractId: contract._id, 
+          type: "Before Rental" 
+        }).lean();
+        if (beforeInsp && Array.isArray(beforeInsp.photos) && beforeInsp.photos.length > 0) {
+          contract.inspectionPhotos = beforeInsp.photos;
+        }
+      } catch (inspErr) {
+        console.warn("Could not check fallback inspection photos:", inspErr);
+      }
+    }
+
     return NextResponse.json(contract, { status: 200 });
   } catch (error: any) {
     console.error("Error fetching contract:", error);
