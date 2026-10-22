@@ -67,6 +67,7 @@ export async function GET() {
           status: u.status === "inactive" ? "Deactivated" : "Active",
           completedContracts: driverContracts.filter((c: any) => c.status === "Completed").length,
           activeRentals: driverContracts.filter((c: any) => c.status === "Active").length,
+          documents: [],
           createdAt: u.createdAt
         });
       }

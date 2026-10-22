@@ -45,6 +45,7 @@ export default function CreateClientModal({
   const [uploadMode, setUploadMode] = useState<"camera" | "gallery">("camera");
   const [error, setError] = useState<string | null>(null);
   const [docPreviews, setDocPreviews] = useState<string[]>([]);
+  const [loadingClientDocs, setLoadingClientDocs] = useState(false);
 
   // Resident specific document previews
   const [licensePreviews, setLicensePreviews] = useState<string[]>([]);
@@ -235,10 +236,28 @@ export default function CreateClientModal({
           visaNumber: clientToEdit.visaNumber || "",
           visaExpiry: formatDateForInput(clientToEdit.visaExpiry),
         });
-        const docs = clientToEdit.documents || [];
+        const docs = Array.isArray(clientToEdit.documents) ? clientToEdit.documents : [];
         setDocPreviews(docs);
         setLicensePreviews(docs);
         setIdCardPreviews(docs);
+
+        // If documents were not loaded in clientToEdit, fetch the full client from API
+        if (clientToEdit._id && (!clientToEdit.documents || clientToEdit.documents.length === 0)) {
+          setLoadingClientDocs(true);
+          fetch(`/api/clients/${clientToEdit._id}`, { cache: "no-store" })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((fullClient) => {
+              if (fullClient) {
+                if (Array.isArray(fullClient.documents) && fullClient.documents.length > 0) {
+                  setDocPreviews(fullClient.documents);
+                  setLicensePreviews(fullClient.documents);
+                  setIdCardPreviews(fullClient.documents);
+                }
+              }
+            })
+            .catch((err) => console.error("Failed to fetch full client documents:", err))
+            .finally(() => setLoadingClientDocs(false));
+        }
       } else {
         setClientType("Resident");
         resetForm();
@@ -291,6 +310,7 @@ export default function CreateClientModal({
     setLicenseFrontThumb(null);
     setLicenseBackThumb(null);
     setAutoScannedSuccess(false);
+    setLoadingClientDocs(false);
   };
 
   const handleLicenseDocChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -748,10 +768,10 @@ export default function CreateClientModal({
       return;
     }
 
-    // MANDATORY: Documents are strictly required to create a client
+    const isEditing = Boolean(clientToEdit?._id);
     const totalDocs = docPreviews.length;
 
-    if (totalDocs === 0) {
+    if (!isEditing && totalDocs === 0) {
       const docMsg = clientType === "Tourist"
         ? "Upload Passport & Driver Licence (Front & Back) is required. Without upload we cannot create client. (يرجى تحميل جواز السفر ورخصة القيادة - الأمام والخلف)"
         : "Upload Emirates ID & UAE Driving Licence (Front & Back) is required. Without upload we cannot create client. (يرجى تحميل بطاقة الهوية الإماراتية ورخصة القيادة - الأمام والخلف)";
@@ -767,8 +787,8 @@ export default function CreateClientModal({
       const allPreviewsToUpload = docPreviews;
 
       // 1. Upload new base64 documents if any
-      const newFiles = allPreviewsToUpload.filter((img) => img.startsWith("data:image") || img.startsWith("data:application/pdf"));
-      const existingUrls = allPreviewsToUpload.filter((img) => img.startsWith("http"));
+      const newFiles = allPreviewsToUpload.filter((img) => img.startsWith("data:"));
+      const existingUrls = allPreviewsToUpload.filter((img) => !img.startsWith("data:"));
       let uploadedUrls: string[] = [];
 
       if (newFiles.length > 0) {
@@ -1127,6 +1147,12 @@ export default function CreateClientModal({
               </div>
 
               <div className="flex flex-wrap gap-2 sm:gap-3">
+                {loadingClientDocs && (
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-dashed border-brand/40 bg-brand/5 flex flex-col items-center justify-center shrink-0 animate-pulse">
+                    <Loader2 size={18} className="animate-spin text-brand" />
+                    <span className="text-[9px] font-medium text-brand mt-1">Loading...</span>
+                  </div>
+                )}
                 {docPreviews.map((doc, idx) => {
                   const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
                   return (

@@ -23,16 +23,16 @@ export async function GET(
       driver = await Driver.findById(id).lean();
       if (!driver) {
         user = await User.findById(id).lean();
-        if (user) {
-          driver = await Driver.findOne({ email: user.email }).lean();
+        if (user?.email) {
+          driver = await Driver.findOne({ email: { $regex: new RegExp(`^${user.email.trim()}$`, "i") } }).lean();
         }
       }
     } else {
-      driver = await Driver.findOne({ $or: [{ driverId: id }, { email: id }] }).lean();
+      driver = await Driver.findOne({ $or: [{ driverId: id }, { email: { $regex: new RegExp(`^${id.trim()}$`, "i") } }] }).lean();
       if (!driver) {
-        user = await User.findOne({ $or: [{ email: id }, { phone: id }] }).lean();
-        if (user) {
-          driver = await Driver.findOne({ email: user.email }).lean();
+        user = await User.findOne({ $or: [{ email: { $regex: new RegExp(`^${id.trim()}$`, "i") } }, { phone: id }] }).lean();
+        if (user?.email) {
+          driver = await Driver.findOne({ email: { $regex: new RegExp(`^${user.email.trim()}$`, "i") } }).lean();
         }
       }
     }
@@ -105,15 +105,21 @@ export async function PUT(
       if (!driverDoc) {
         userDoc = await User.findById(id);
         if (userDoc?.email) {
-          driverDoc = await Driver.findOne({ email: userDoc.email });
+          driverDoc = await Driver.findOne({ email: { $regex: new RegExp(`^${userDoc.email.trim()}$`, "i") } });
         }
       }
     } else {
-      driverDoc = await Driver.findOne({ $or: [{ driverId: id }, { email: id }] });
+      driverDoc = await Driver.findOne({ $or: [{ driverId: id }, { email: { $regex: new RegExp(`^${id.trim()}$`, "i") } }] });
+      if (!driverDoc) {
+        userDoc = await User.findOne({ $or: [{ email: { $regex: new RegExp(`^${id.trim()}$`, "i") } }, { phone: id }] });
+        if (userDoc?.email) {
+          driverDoc = await Driver.findOne({ email: { $regex: new RegExp(`^${userDoc.email.trim()}$`, "i") } });
+        }
+      }
     }
 
     if (!userDoc && driverDoc?.email) {
-      userDoc = await User.findOne({ email: driverDoc.email });
+      userDoc = await User.findOne({ email: { $regex: new RegExp(`^${driverDoc.email.trim()}$`, "i") } });
     }
 
     if (!driverDoc && !userDoc) {
@@ -141,6 +147,14 @@ export async function PUT(
         driverData,
         { new: true, runValidators: true }
       );
+    } else if (userDoc) {
+      updatedDriver = await Driver.create({
+        ...driverData,
+        email: driverData.email || userDoc.email,
+        name: driverData.name || userDoc.name,
+        phone: driverData.phone || userDoc.phone,
+        status: driverData.status || (userDoc.status === "inactive" ? "Deactivated" : "Active"),
+      });
     }
 
     // Also update User account if exists

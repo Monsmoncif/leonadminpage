@@ -74,7 +74,7 @@ export default function ClientsPage() {
     const MAX_RETRIES = 3;
     setLoading(true);
     try {
-      const res = await fetch("/api/clients", { cache: "no-store" });
+      const res = await fetch("/api/clients?full=true", { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to fetch clients data (${res.status})`);
       const json = await res.json();
       if (Array.isArray(json)) {

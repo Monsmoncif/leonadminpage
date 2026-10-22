@@ -26,8 +26,10 @@ import {
   Eye,
   Maximize2,
   Camera,
+  Edit,
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
+import CreateClientModal from "@/components/modals/CreateClientModal";
 
 const getInitials = (name: string) => {
   return name
@@ -69,6 +71,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewDocIndex, setPreviewDocIndex] = useState<number | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -124,7 +127,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
     return (
       <div className="space-y-6 max-w-5xl mx-auto animate-pulse">
         {/* Header Skeleton */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gray-200 rounded-xl" />
             <div className="space-y-2">
@@ -132,10 +135,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
               <div className="w-64 h-4 bg-gray-200 rounded-md" />
             </div>
           </div>
-          <div className="flex gap-3">
-            <div className="w-32 h-10 bg-gray-200 rounded-xl" />
-            <div className="w-32 h-10 bg-gray-200 rounded-xl" />
-          </div>
+          <div className="w-32 h-10 bg-gray-200 rounded-xl" />
         </div>
 
         {/* Profile Card Skeleton */}
@@ -184,50 +184,64 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in-up">
+    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in-up pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-1">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
             onClick={() => router.push("/clients")}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer text-text-muted hover:text-text-primary"
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer text-text-muted hover:text-text-primary shrink-0"
+            aria-label="Back to customers"
           >
             <ArrowLeft size={20} />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-text-primary">Customer Details</h1>
-            <p className="text-sm text-text-secondary mt-0.5">View and manage customer information</p>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary truncate">Customer Details</h1>
+            <p className="text-xs sm:text-sm text-text-secondary mt-0.5 truncate">View and manage customer information</p>
           </div>
         </div>
+
+        <button
+          onClick={() => setIsEditModalOpen(true)}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer active:scale-98"
+        >
+          <Edit size={15} />
+          <span>Edit Customer (تعديل العميل)</span>
+        </button>
       </div>
 
       {/* Profile Card */}
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         {/* Profile Header */}
-        <div className="p-6 border-b border-border bg-gray-50/30">
-          <div className="flex items-center gap-4">
+        <div className="p-4 sm:p-6 border-b border-border bg-gray-50/30">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 sm:gap-4">
             <div
-              className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold shadow-sm ${getAvatarColor(client.name)}`}
+              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold shadow-sm shrink-0 ${getAvatarColor(client.name)}`}
             >
               {getInitials(client.name)}
             </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-text-primary">{client.name}</h2>
-                <span className={`text-[11px] uppercase tracking-wider font-semibold px-2.5 py-0.5 rounded-full border ${
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h2 className="text-lg sm:text-xl font-bold text-text-primary break-words">{client.name}</h2>
+                <span className={`text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold px-2.5 py-0.5 rounded-full border shrink-0 ${
                   client.status === "Deactivated"
                     ? "bg-gray-100 text-gray-700 border-gray-200"
                     : "bg-emerald-50 text-emerald-700 border-emerald-200"
                 }`}>
                   {client.status || "Active"}
                 </span>
+                {client.clientType && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 shrink-0">
+                    {client.clientType}
+                  </span>
+                )}
               </div>
-              <div className="flex items-center gap-4 mt-1.5">
-                <span className="text-sm text-text-muted flex items-center gap-1.5">
-                  <Globe size={14} /> {client.nationality}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 mt-2">
+                <span className="text-xs sm:text-sm text-text-muted flex items-center gap-1.5 truncate">
+                  <Globe size={14} className="shrink-0" /> {client.nationality || "Unknown"}
                 </span>
-                <span className="text-sm text-text-muted flex items-center gap-1.5">
-                  <Clock size={14} /> Member since {client.createdAt ? new Date(client.createdAt).toLocaleDateString("en-GB") : "Unknown"}
+                <span className="text-xs sm:text-sm text-text-muted flex items-center gap-1.5 truncate">
+                  <Clock size={14} className="shrink-0" /> Member since {client.createdAt ? new Date(client.createdAt).toLocaleDateString("en-GB") : "Unknown"}
                 </span>
               </div>
             </div>
@@ -236,58 +250,76 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
 
         {/* Info Table */}
         <div className="divide-y divide-border">
-          <div className="flex items-center px-6 py-4 hover:bg-gray-50/50 transition-colors">
-            <div className="flex items-center gap-3 w-48 shrink-0">
-              <CreditCard size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Passport / ID</span>
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <CreditCard size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Passport / ID</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary">{client.idNumber || "—"}</span>
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0 break-all">{client.idNumber || "—"}</span>
           </div>
-          <div className="flex items-center px-6 py-4 hover:bg-gray-50/50 transition-colors">
-            <div className="flex items-center gap-3 w-48 shrink-0">
-              <FileText size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">License Number</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <FileText size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">License Number</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary">{client.licenseNumber || "—"}</span>
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0 break-all">{client.licenseNumber || "—"}</span>
           </div>
-          <div className="flex items-center px-6 py-4 hover:bg-gray-50/50 transition-colors">
-            <div className="flex items-center gap-3 w-48 shrink-0">
-              <Calendar size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">License Expiry</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <Calendar size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">License Expiry</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary">
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">
               {client.licenseExpiry
                 ? new Date(client.licenseExpiry).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
                 : "—"}
             </span>
           </div>
-          <div className="flex items-center px-6 py-4 hover:bg-gray-50/50 transition-colors">
-            <div className="flex items-center gap-3 w-48 shrink-0">
-              <Mail size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Email</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <Mail size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Email</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary">{client.email || "—"}</span>
+            {client.email ? (
+              <a href={`mailto:${client.email}`} className="text-xs sm:text-sm font-semibold text-brand hover:underline pl-6 sm:pl-0 break-all">
+                {client.email}
+              </a>
+            ) : (
+              <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">—</span>
+            )}
           </div>
-          <div className="flex items-center px-6 py-4 hover:bg-gray-50/50 transition-colors">
-            <div className="flex items-center gap-3 w-48 shrink-0">
-              <Phone size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Phone</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <Phone size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Phone</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary">{client.phone || "—"}</span>
+            {client.phone ? (
+              <a href={`tel:${client.phone}`} className="text-xs sm:text-sm font-semibold text-brand hover:underline pl-6 sm:pl-0">
+                {client.phone}
+              </a>
+            ) : (
+              <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">—</span>
+            )}
           </div>
-          <div className="flex items-center px-6 py-4 hover:bg-gray-50/50 transition-colors">
-            <div className="flex items-center gap-3 w-48 shrink-0">
-              <Globe size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Nationality</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <Globe size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Nationality</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary">{client.nationality || "—"}</span>
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">{client.nationality || "—"}</span>
           </div>
-          <div className="flex items-center px-6 py-4 hover:bg-gray-50/50 transition-colors">
-            <div className="flex items-center gap-3 w-48 shrink-0">
-              <MapPin size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Address</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <MapPin size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Address</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary">{client.address || "—"}</span>
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">{client.address || "—"}</span>
           </div>
         </div>
       </div>
@@ -295,17 +327,17 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
       {/* Documents */}
       {client.documents && client.documents.length > 0 && (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-border bg-gray-50/30">
+          <div className="p-4 sm:p-5 border-b border-border bg-gray-50/30">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
               <FileText size={16} className="text-text-muted" />
-              Documents
-              <span className="text-xs font-medium text-text-muted bg-gray-100 px-2 py-0.5 rounded-md">
+              Documents (الوثائق والمستندات)
+              <span className="text-xs font-semibold text-text-muted bg-gray-100 px-2 py-0.5 rounded-md">
                 {client.documents.length}
               </span>
             </h3>
           </div>
-          <div className="p-5">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+          <div className="p-3.5 sm:p-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4">
               {client.documents.map((doc: string, idx: number) => {
                 const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
                 return (
@@ -349,66 +381,113 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
 
       {/* Rental History */}
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-border bg-gray-50/30 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-border bg-gray-50/30 flex items-center justify-between">
           <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <History size={16} className="text-text-muted" />
-            Rental History
+            Rental History (سجل التأجير)
           </h3>
-          <span className="text-xs font-medium text-text-muted">
+          <span className="text-xs font-semibold text-text-muted bg-gray-100 px-2 py-0.5 rounded-md">
             {client.contracts?.length || 0} contracts
           </span>
         </div>
 
         {client.contracts && client.contracts.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-gray-50/50">
-                  <th className="text-left py-3 px-4 text-text-muted font-semibold">Vehicle</th>
-                  <th className="text-left py-3 px-4 text-text-muted font-semibold">Period</th>
-                  <th className="text-left py-3 px-4 text-text-muted font-semibold">Amount (AED)</th>
-                  <th className="text-left py-3 px-4 text-text-muted font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {client.contracts.map((contract: any, idx: number) => (
-                  <tr
-                    key={idx}
-                    className="border-b border-border/50 bg-white animate-fade-in-up"
-                  >
-                    <td className="py-3 px-4">
-                      <a href={`/bookings/${contract._id}`} className="font-semibold text-text-primary group-hover:text-brand transition-colors flex items-center gap-2">
-                        <ExecutiveCarIcon size={14} className="text-text-muted" />
-                        {contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Unknown Vehicle"}
-                        {contract.unitId?.plate && (
-                          <span className="text-text-muted font-normal text-xs">({contract.unitId.plate})</span>
-                        )}
-                      </a>
-                    </td>
-                    <td className="py-3 px-4 text-text-secondary">
-                      {new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} → {new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-text-primary">
-                      AED {Number(contract.totalAmount || 0).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border ${getContractStatusColor(contract.status)}`}>
-                        {contract.status}
-                      </span>
-                    </td>
+          <div>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-gray-50/50">
+                    <th className="text-left py-3 px-4 text-text-muted font-semibold">Vehicle</th>
+                    <th className="text-left py-3 px-4 text-text-muted font-semibold">Period</th>
+                    <th className="text-left py-3 px-4 text-text-muted font-semibold">Amount (AED)</th>
+                    <th className="text-left py-3 px-4 text-text-muted font-semibold">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {client.contracts.map((contract: any, idx: number) => (
+                    <tr
+                      key={idx}
+                      className="border-b border-border/50 bg-white hover:bg-gray-50/50 transition-colors animate-fade-in-up"
+                    >
+                      <td className="py-3 px-4">
+                        <a href={`/bookings/${contract._id}`} className="font-semibold text-text-primary hover:text-brand transition-colors flex items-center gap-2">
+                          <ExecutiveCarIcon size={14} className="text-text-muted" />
+                          {contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Unknown Vehicle"}
+                          {contract.unitId?.plate && (
+                            <span className="text-text-muted font-normal text-xs">({contract.unitId.plate})</span>
+                          )}
+                        </a>
+                      </td>
+                      <td className="py-3 px-4 text-text-secondary">
+                        {new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} → {new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-text-primary">
+                        AED {Number(contract.totalAmount || 0).toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border ${getContractStatusColor(contract.status)}`}>
+                          {contract.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="block md:hidden divide-y divide-border">
+              {client.contracts.map((contract: any, idx: number) => (
+                <div key={idx} className="p-4 space-y-2.5 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <a href={`/bookings/${contract._id}`} className="font-bold text-sm text-text-primary hover:text-brand transition-colors flex items-center gap-1.5 truncate">
+                      <ExecutiveCarIcon size={15} className="text-brand shrink-0" />
+                      <span className="truncate">{contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Unknown Vehicle"}</span>
+                    </a>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${getContractStatusColor(contract.status)}`}>
+                      {contract.status}
+                    </span>
+                  </div>
+
+                  {contract.unitId?.plate && (
+                    <div className="text-xs text-text-muted">
+                      Plate: <span className="font-semibold text-text-secondary">{contract.unitId.plate}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-border/50">
+                    <span className="text-text-muted flex items-center gap-1">
+                      <Calendar size={12} />
+                      {new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} → {new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </span>
+                    <span className="font-bold text-emerald-700">
+                      AED {Number(contract.totalAmount || 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="p-10 text-center">
+          <div className="p-8 sm:p-10 text-center">
             <ExecutiveCarIcon size={32} className="text-gray-300 mx-auto mb-3" />
             <p className="text-sm font-semibold text-text-secondary">No rental history</p>
             <p className="text-xs text-text-muted mt-1">This customer hasn't made any rentals yet.</p>
           </div>
         )}
       </div>
+
+      {/* Edit Client Modal */}
+      <CreateClientModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={() => {
+          setIsEditModalOpen(false);
+          fetchClient();
+        }}
+        clientToEdit={client}
+      />
 
       {/* Full-size Image Preview Lightbox (Mounted to document.body for true fullscreen black background) */}
       {mounted && previewDocIndex !== null && client?.documents?.[previewDocIndex] && typeof document !== "undefined" && createPortal(

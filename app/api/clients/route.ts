@@ -7,9 +7,9 @@ import { Contract } from "@/models/Contract";
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    const isFull = req.nextUrl.searchParams.get("full") === "true";
+    const isCompact = req.nextUrl.searchParams.get("compact") === "true";
     let query = Client.find().sort({ createdAt: -1 });
-    if (!isFull) {
+    if (isCompact) {
       query = query.select("-documents");
     }
     const clients = await query.lean();

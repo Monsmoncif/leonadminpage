@@ -263,10 +263,24 @@ export default function RegisterClientModal({
           visaNumber: clientToEdit.visaNumber || "",
           visaExpiry: clientToEdit.visaExpiry ? new Date(clientToEdit.visaExpiry).toISOString().split("T")[0] : "",
         });
-        const docs = clientToEdit.documents || [];
+        const docs = Array.isArray(clientToEdit.documents) ? clientToEdit.documents : [];
         setDocPreviews(docs);
         setLicensePreviews(docs);
         setIdCardPreviews(docs);
+
+        // If documents were not loaded in clientToEdit, fetch the full client from API
+        if (clientToEdit._id && (!clientToEdit.documents || clientToEdit.documents.length === 0)) {
+          fetch(`/api/clients/${clientToEdit._id}`, { cache: "no-store" })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((fullClient) => {
+              if (fullClient && Array.isArray(fullClient.documents) && fullClient.documents.length > 0) {
+                setDocPreviews(fullClient.documents);
+                setLicensePreviews(fullClient.documents);
+                setIdCardPreviews(fullClient.documents);
+              }
+            })
+            .catch((err) => console.error("Failed to load client documents:", err));
+        }
       } else {
         setActiveTab("search");
         setClientType("Resident");
@@ -805,10 +819,10 @@ export default function RegisterClientModal({
       return;
     }
 
-    // MANDATORY: Documents are strictly required to create a client
+    const isEditing = Boolean(clientToEdit?._id);
     const totalDocs = docPreviews.length;
 
-    if (totalDocs === 0) {
+    if (!isEditing && totalDocs === 0) {
       const docMsg = clientType === "Tourist"
         ? "Upload Passport & Driver Licence (Front & Back) is required. Without upload we cannot create client. (يرجى تحميل جواز السفر ورخصة القيادة - الأمام والخلف)"
         : "Upload Emirates ID & UAE Driving Licence (Front & Back) is required. Without upload we cannot create client. (يرجى تحميل بطاقة الهوية الإماراتية ورخصة القيادة - الأمام والخلف)";
@@ -824,8 +838,8 @@ export default function RegisterClientModal({
       const allPreviewsToUpload = docPreviews;
 
       // 1. Upload documents
-      const newFiles = allPreviewsToUpload.filter((img) => img.startsWith("data:image") || img.startsWith("data:application/pdf"));
-      const existingUrls = allPreviewsToUpload.filter((img) => img.startsWith("http"));
+      const newFiles = allPreviewsToUpload.filter((img) => img.startsWith("data:"));
+      const existingUrls = allPreviewsToUpload.filter((img) => !img.startsWith("data:"));
       let uploadedUrls: string[] = [];
 
       if (newFiles.length > 0) {

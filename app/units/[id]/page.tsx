@@ -439,23 +439,24 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="max-w-[1600px] mx-auto pb-12">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8 border-b border-border pb-5 animate-fade-in-up stagger-1">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 border-b border-border pb-5 animate-fade-in-up stagger-1">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={() => router.push("/units")}
-            className="p-2 text-text-muted hover:bg-gray-100 hover:text-text-primary rounded-xl transition-all cursor-pointer"
+            className="p-2 text-text-muted hover:bg-gray-100 hover:text-text-primary rounded-xl transition-all cursor-pointer shrink-0"
+            aria-label="Back to fleet"
           >
             <ChevronLeft size={20} />
           </button>
-          <div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-text-muted mb-1">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-text-muted mb-1 truncate">
               <span className="cursor-pointer hover:text-brand transition-colors" onClick={() => router.push("/units")}>Fleet</span>
-              <ChevronRight size={12} />
-              <span className="text-text-secondary">{unit.make} {unit.model}</span>
+              <ChevronRight size={12} className="shrink-0" />
+              <span className="text-text-secondary truncate">{unit.make} {unit.model}</span>
             </div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-text-primary leading-tight">{unit.make} {unit.model}</h1>
-              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wider font-bold ring-1 ring-black/5 ${status.bg} ${status.text}`}>
+            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary leading-tight truncate">{unit.make} {unit.model}</h1>
+              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wider font-bold ring-1 ring-black/5 ${status.bg} ${status.text} shrink-0`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${status.dot} ${status.glow}`}></div>
                 {unit.status}
               </div>
@@ -463,10 +464,10 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <button 
             onClick={openVidangeModal}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-xs ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-xs whitespace-nowrap ${
               isVidangeOverdue 
                 ? 'bg-red-50 text-red-700 border-red-300 hover:bg-red-100 animate-pulse'
                 : isVidangeSoon
@@ -476,27 +477,27 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
             title="Record Oil Change (Vidange 10,000 KM) / تسجيل تغيير الزيت"
           >
             <Droplet size={14} className={isVidangeOverdue ? "text-red-600" : isVidangeSoon ? "text-amber-600" : "text-brand"} />
-            <span>Record Vidange</span>
+            <span>Vidange</span>
           </button>
           <button 
             onClick={() => setIsEditModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-border text-text-primary rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer shadow-xs"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 bg-white border border-border text-text-primary rounded-xl text-xs sm:text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer shadow-xs whitespace-nowrap"
           >
-            <Edit size={15} />
-            Edit Vehicle
+            <Edit size={14} />
+            <span>Edit</span>
           </button>
           <button 
             onClick={() => router.push("/bookings/new")}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl text-sm font-semibold hover:bg-brand-dark transition-all cursor-pointer shadow-sm hover:shadow-md"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 bg-brand text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-brand-dark transition-all cursor-pointer shadow-sm hover:shadow-md whitespace-nowrap"
           >
-            <Plus size={15} />
-            New Booking
+            <Plus size={14} />
+            <span>Booking</span>
           </button>
         </div>
       </div>
 
       {/* ===== Top 4 KPI StatCards (Inspired by Fleet Units Page) ===== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <div className="stagger-1">
           <StatCard
             icon={ExecutiveCarIcon}
@@ -574,24 +575,24 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 animate-fade-in-up stagger-2">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 animate-fade-in-up stagger-2">
         {/* Left Column */}
-        <div className="w-full lg:w-[55%] xl:w-[60%] flex flex-col gap-6">
+        <div className="w-full lg:w-[55%] xl:w-[60%] flex flex-col gap-5 sm:gap-6">
           
           {/* ===== Hero: Gallery + Car Title ===== */}
           <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm card-hover">
             {/* Gallery: Alone in one line across full width */}
-            <div className="relative w-full aspect-[16/9] bg-gradient-to-b from-gray-50 to-gray-100/60 flex items-center justify-center overflow-hidden">
+            <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] bg-gradient-to-b from-gray-50 to-gray-100/60 flex items-center justify-center overflow-hidden">
               {unit.images && unit.images.length > 0 ? (
                 <img
                   src={unit.images[activeImageIndex] || unit.images[0]}
                   alt={unit.model}
-                  className="w-full h-full object-contain p-6 drop-shadow-xl transition-all duration-500"
+                  className="w-full h-full object-contain p-4 sm:p-6 drop-shadow-xl transition-all duration-500"
                 />
               ) : (
-                <div className="flex flex-col items-center gap-3 text-gray-300">
-                  <ExecutiveCarIcon size={64} />
-                  <span className="text-sm font-medium text-gray-400">No images available</span>
+                <div className="flex flex-col items-center gap-2.5 sm:gap-3 text-gray-300">
+                  <ExecutiveCarIcon size={52} className="sm:w-16 sm:h-16" />
+                  <span className="text-xs sm:text-sm font-medium text-gray-400">No images available</span>
                 </div>
               )}
 
@@ -599,19 +600,19 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                 <>
                   <button
                     onClick={() => setActiveImageIndex((activeImageIndex - 1 + unit.images.length) % unit.images.length)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white border border-border shadow-sm flex items-center justify-center text-text-secondary hover:text-brand transition-all cursor-pointer"
+                    className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/90 hover:bg-white border border-border shadow-sm flex items-center justify-center text-text-secondary hover:text-brand transition-all cursor-pointer"
                     aria-label="Previous image"
                   >
                     <ChevronLeft size={18} />
                   </button>
                   <button
                     onClick={() => setActiveImageIndex((activeImageIndex + 1) % unit.images.length)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white border border-border shadow-sm flex items-center justify-center text-text-secondary hover:text-brand transition-all cursor-pointer"
+                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/90 hover:bg-white border border-border shadow-sm flex items-center justify-center text-text-secondary hover:text-brand transition-all cursor-pointer"
                     aria-label="Next image"
                   >
                     <ChevronRight size={18} />
                   </button>
-                  <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-[11px] font-semibold px-2.5 py-1 rounded-lg">
+                  <div className="absolute bottom-2.5 right-2.5 sm:bottom-3 sm:right-3 bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-[11px] font-semibold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg">
                     {activeImageIndex + 1} / {unit.images.length}
                   </div>
                 </>
@@ -620,32 +621,33 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
 
             {/* Thumbnails */}
             {unit.images && unit.images.length > 1 && (
-              <div className="p-3 border-t border-border bg-white">
-                <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
+              <div className="p-2.5 sm:p-3 border-t border-border bg-white">
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                   {unit.images.map((img: string, i: number) => (
-                    <div
+                    <button
+                      type="button"
                       key={i}
                       onClick={() => setActiveImageIndex(i)}
-                      className={`w-[68px] h-[48px] shrink-0 rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
+                      className={`w-[60px] sm:w-[68px] h-[42px] sm:h-[48px] shrink-0 rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
                         activeImageIndex === i
                           ? 'border-brand ring-2 ring-brand/20'
                           : 'border-transparent hover:border-gray-300 opacity-60 hover:opacity-100'
                       }`}
                     >
                       <img src={img} alt={`${unit.model} ${i + 1}`} className="w-full h-full object-cover" />
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
             )}
 
             {/* Below images: Just name of car */}
-            <div className="p-5 border-t border-border bg-white flex items-center justify-between flex-wrap gap-3">
+            <div className="p-4 sm:p-5 border-t border-border bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
               <div>
-                <h2 className="text-2xl font-bold text-text-primary leading-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-text-primary leading-tight">
                   {unit.make} {unit.model}
                 </h2>
-                <div className="flex items-center gap-2 mt-1.5">
+                <div className="flex items-center gap-2 mt-1 sm:mt-1.5 flex-wrap">
                   {unit.year && (
                     <span className="text-xs font-semibold text-text-muted">{unit.year}</span>
                   )}
@@ -669,32 +671,32 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* ===== Specifications ===== */}
           <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover">
-            <div className="px-6 py-4 border-b border-border bg-gray-50/50 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center">
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-border bg-gray-50/50 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
                 <Settings size={16} />
               </div>
-              <h3 className="text-base font-bold text-text-primary">Specifications</h3>
+              <h3 className="text-sm sm:text-base font-bold text-text-primary">Specifications</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 divide-border/60">
               {specs.map((spec, i) => (
                 <div
                   key={i}
-                  className={`group flex items-center justify-between gap-3 px-6 py-3.5 hover:bg-gray-50/70 transition-colors ${
+                  className={`group flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-3.5 hover:bg-gray-50/70 transition-colors ${
                     i >= 2 ? "sm:border-t sm:border-border/60" : ""
                   } ${i % 2 === 0 ? "sm:border-r sm:border-border/60" : ""}`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-white border border-border/60 shadow-sm flex items-center justify-center text-text-muted group-hover:text-brand transition-colors shrink-0">
-                      <spec.icon size={15} />
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-border/60 shadow-xs flex items-center justify-center text-text-muted group-hover:text-brand transition-colors shrink-0">
+                      <spec.icon size={14} className="sm:w-[15px] sm:h-[15px]" />
                     </div>
-                    <span className="text-xs text-text-muted font-semibold">{spec.label}</span>
+                    <span className="text-xs text-text-muted font-semibold truncate">{spec.label}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-sm font-bold text-text-primary truncate" title={String(spec.value)}>{spec.value}</span>
+                  <div className="flex items-center gap-1.5 min-w-0 shrink-0 max-w-[55%] sm:max-w-[60%] justify-end">
+                    <span className="text-xs sm:text-sm font-bold text-text-primary truncate" title={String(spec.value)}>{spec.value}</span>
                     {spec.copyable && spec.value !== "N/A" && (
                       <button
                         onClick={() => copyToClipboard(String(spec.value), spec.label)}
-                        className="p-1 hover:bg-gray-100 rounded-md transition-all cursor-pointer"
+                        className="p-1 hover:bg-gray-100 rounded-md transition-all cursor-pointer shrink-0"
                         title={`Copy ${spec.label}`}
                       >
                         {copiedField === spec.label ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} className="text-text-muted" />}
@@ -709,41 +711,41 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* Right Column */}
-        <div className="w-full lg:w-[45%] xl:w-[40%] flex flex-col gap-6">
+        <div className="w-full lg:w-[45%] xl:w-[40%] flex flex-col gap-5 sm:gap-6">
 
           {/* Mileage Activity Chart */}
-          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-5">
+          <div className="bg-card rounded-2xl border border-border p-4 sm:p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4 sm:mb-5">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
                   <BarChart3 size={16} className="text-brand" />
                 </div>
-                <h3 className="text-base font-bold text-text-primary">Mileage Activity</h3>
+                <h3 className="text-sm sm:text-base font-bold text-text-primary">Mileage Activity</h3>
               </div>
-              <span className="text-[11px] border border-border rounded-lg px-2.5 py-1 text-text-secondary bg-gray-50/80 font-medium">
+              <span className="text-[10px] sm:text-[11px] border border-border rounded-lg px-2.5 py-1 text-text-secondary bg-gray-50/80 font-medium">
                 Progression
               </span>
             </div>
 
             {/* Current reading */}
-            <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-gray-50 to-transparent border border-border/50 mb-5">
-              <div>
-                <p className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-1">
+            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-gray-50 to-transparent border border-border/50 mb-4 sm:mb-5 gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-[11px] text-text-muted font-medium uppercase tracking-wider mb-1 truncate">
                   {hasRealHistory ? 'Odometer Reading' : 'Current Odometer'}
                 </p>
-                <p className="text-2xl font-black text-text-primary">
-                  {(unit.mileage || 0).toLocaleString()} <span className="text-sm font-semibold text-text-muted">km</span>
+                <p className="text-xl sm:text-2xl font-black text-text-primary">
+                  {(unit.mileage || 0).toLocaleString()} <span className="text-xs sm:text-sm font-semibold text-text-muted">km</span>
                 </p>
               </div>
               {hasRealHistory && totalTraveled > 0 && (
-                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg ring-1 ring-emerald-200/50">
+                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 sm:px-3 py-1.5 rounded-lg ring-1 ring-emerald-200/50 shrink-0">
                   <TrendingUp size={14} />
-                  <span className="text-sm font-bold">+{totalTraveled.toLocaleString()} km</span>
+                  <span className="text-xs sm:text-sm font-bold">+{totalTraveled.toLocaleString()} km</span>
                 </div>
               )}
             </div>
 
-            <div className="h-48 w-full">
+            <div className="h-44 sm:h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 8, right: 4, left: -15, bottom: 0 }}>
                   <defs>
@@ -803,63 +805,63 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
           </div>
           
           {/* Quick Vehicle Rental Summary KPI Card */}
-          <div className="bg-card rounded-2xl border border-border p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-5">
+          <div className="bg-card rounded-2xl border border-border p-4 sm:p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4 sm:mb-5">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
                   <History size={16} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-text-primary">Rental Summary</h3>
-                  <p className="text-[11px] text-text-muted">Vehicle performance at a glance</p>
+                  <h3 className="text-sm sm:text-base font-bold text-text-primary">Rental Summary</h3>
+                  <p className="text-[10px] sm:text-[11px] text-text-muted">Vehicle performance at a glance</p>
                 </div>
               </div>
-              <span className="text-xs font-bold text-text-primary bg-gray-100 px-3 py-1 rounded-lg">
+              <span className="text-xs font-bold text-text-primary bg-gray-100 px-2.5 sm:px-3 py-1 rounded-lg shrink-0">
                 {totalRentals} {totalRentals === 1 ? "Booking" : "Bookings"}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-gray-50/80 rounded-xl p-3.5 border border-border/50">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mb-4">
+              <div className="bg-gray-50/80 rounded-xl p-3 sm:p-3.5 border border-border/50">
                 <div className="flex items-center gap-1.5 text-text-muted mb-1">
-                  <DollarSign size={13} className="text-emerald-600" />
-                  <span className="text-[10px] uppercase font-bold tracking-wider">Revenue</span>
+                  <DollarSign size={13} className="text-emerald-600 shrink-0" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider truncate">Revenue</span>
                 </div>
-                <p className="text-lg font-black text-text-primary">
+                <p className="text-base sm:text-lg font-black text-text-primary truncate">
                   AED {totalRevenue.toLocaleString()}
                 </p>
               </div>
 
-              <div className="bg-gray-50/80 rounded-xl p-3.5 border border-border/50">
+              <div className="bg-gray-50/80 rounded-xl p-3 sm:p-3.5 border border-border/50">
                 <div className="flex items-center gap-1.5 text-text-muted mb-1">
-                  <Calendar size={13} className="text-blue-600" />
-                  <span className="text-[10px] uppercase font-bold tracking-wider">Days Rented</span>
+                  <Calendar size={13} className="text-blue-600 shrink-0" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider truncate">Days Rented</span>
                 </div>
-                <p className="text-lg font-black text-text-primary">
+                <p className="text-base sm:text-lg font-black text-text-primary truncate">
                   {totalDaysRented} <span className="text-xs font-semibold text-text-muted">days</span>
                 </p>
               </div>
 
-              <div className="bg-gray-50/80 rounded-xl p-3.5 border border-border/50">
+              <div className="bg-gray-50/80 rounded-xl p-3 sm:p-3.5 border border-border/50">
                 <div className="flex items-center gap-1.5 text-text-muted mb-1">
-                  <Gauge size={13} className="text-purple-600" />
-                  <span className="text-[10px] uppercase font-bold tracking-wider">Km On Trips</span>
+                  <Gauge size={13} className="text-purple-600 shrink-0" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider truncate">Km On Trips</span>
                 </div>
-                <p className="text-lg font-black text-text-primary">
+                <p className="text-base sm:text-lg font-black text-text-primary truncate">
                   {totalKmDriven > 0 ? `+${totalKmDriven.toLocaleString()}` : "0"} <span className="text-xs font-semibold text-text-muted">km</span>
                 </p>
               </div>
 
               <div className="bg-gray-50/80 rounded-xl p-3.5 border border-border/50">
                 <div className="flex items-center gap-1.5 text-text-muted mb-1">
-                  <Activity size={13} className="text-amber-600" />
-                  <span className="text-[10px] uppercase font-bold tracking-wider">Current State</span>
+                  <Activity size={13} className="text-amber-600 shrink-0" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider truncate">Current State</span>
                 </div>
-                <p className="text-sm font-bold text-text-primary truncate">
+                <p className="text-xs sm:text-sm font-bold text-text-primary truncate">
                   {activeRental ? (
-                    <span className="text-emerald-600">Rented (#{activeRental.contractNumber})</span>
+                    <span className="text-emerald-600 truncate">Rented (#{activeRental.contractNumber})</span>
                   ) : pendingRental ? (
-                    <span className="text-amber-600">Pending Delivery (#{pendingRental.contractNumber})</span>
+                    <span className="text-amber-600 truncate">Pending (#{pendingRental.contractNumber})</span>
                   ) : (
                     <span className="text-text-muted">Available</span>
                   )}
@@ -868,7 +870,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {activeRental ? (
-              <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-xl p-3 text-xs flex items-center justify-between">
+              <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-xl p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
                   <p className="font-bold text-emerald-900">
                     Currently delivered to {activeRental.clientId?.name || "Client"}
@@ -882,13 +884,13 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     setSelectedContractForModal(activeRental);
                     setIsContractDetailsOpen(true);
                   }}
-                  className="px-2.5 py-1 bg-emerald-600 text-white font-semibold rounded-lg text-[11px] hover:bg-emerald-700 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-emerald-600 text-white font-semibold rounded-lg text-xs hover:bg-emerald-700 transition-colors cursor-pointer self-start sm:self-auto"
                 >
-                  View
+                  View Contract
                 </button>
               </div>
             ) : pendingRental ? (
-              <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-xs flex items-center justify-between gap-2">
+              <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
                   <p className="font-bold text-amber-900">
                     Delivery pending for {pendingRental.clientId?.name || "Client"}
@@ -897,16 +899,16 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     Starts {new Date(pendingRental.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                   <button
                     onClick={() => handleConfirmDelivery(pendingRental)}
                     disabled={deliveringContractId === pendingRental._id}
-                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                    className="flex-1 sm:flex-initial px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap"
                   >
                     {deliveringContractId === pendingRental._id ? (
-                      <Loader2 size={11} className="animate-spin" />
+                      <Loader2 size={12} className="animate-spin" />
                     ) : (
-                      <CheckCircle2 size={12} />
+                      <CheckCircle2 size={13} />
                     )}
                     <span>Confirm Delivered</span>
                   </button>
@@ -915,7 +917,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                       setSelectedContractForModal(pendingRental);
                       setIsContractDetailsOpen(true);
                     }}
-                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-text-primary font-semibold rounded-lg text-[11px] transition-colors cursor-pointer"
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-text-primary font-semibold rounded-lg text-xs transition-colors cursor-pointer"
                   >
                     View
                   </button>
@@ -927,25 +929,25 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
           {/* ================= Vidange 10,000 KM Maintenance Tracker Card (Specifications Style) ================= */}
           <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden card-hover animate-fade-in-up">
             {/* Header matching Specifications */}
-            <div className="px-6 py-4 border-b border-border bg-gray-50/50 flex items-center justify-between gap-3">
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-border bg-gray-50/50 flex items-center justify-between gap-2.5 flex-wrap sm:flex-nowrap">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
                   <Droplet size={16} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-text-primary">Oil Change (Vidange)</h3>
-                  <p className="text-[11px] text-text-muted">10,000 KM Maintenance Cycle</p>
+                  <h3 className="text-sm sm:text-base font-bold text-text-primary">Oil Change (Vidange)</h3>
+                  <p className="text-[10px] sm:text-[11px] text-text-muted">10,000 KM Maintenance Cycle</p>
                 </div>
               </div>
 
               {/* Status Badge */}
               {isVidangeOverdue ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-200 animate-pulse">
+                <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-200 animate-pulse shrink-0">
                   <AlertTriangle size={13} className="text-red-600" />
                   Overdue
                 </span>
               ) : isVidangeSoon ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                   <Clock size={13} className="text-amber-600" />
                   Due Soon
                 </span>
@@ -953,12 +955,12 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Oil Life Progress strip */}
-            <div className="px-6 py-3.5 bg-gray-50/30 border-b border-border/60">
+            <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-gray-50/30 border-b border-border/60">
               <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-semibold text-text-secondary">
+                <span className="font-semibold text-text-secondary text-[11px] sm:text-xs">
                   Oil Life ({progressPct.toFixed(0)}% used)
                 </span>
-                <span className={isVidangeOverdue ? "text-red-600 font-bold" : isVidangeSoon ? "text-amber-600 font-bold" : "text-emerald-600 font-bold"}>
+                <span className={`text-[11px] sm:text-xs ${isVidangeOverdue ? "text-red-600 font-bold" : isVidangeSoon ? "text-amber-600 font-bold" : "text-emerald-600 font-bold"}`}>
                   {isVidangeOverdue ? `Overdue by ${Math.abs(remainingKm).toLocaleString()} km` : `${remainingKm.toLocaleString()} km remaining`}
                 </span>
               </div>
@@ -1013,19 +1015,19 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               ].map((item, i) => (
                 <div
                   key={i}
-                  className="group flex items-center justify-between gap-3 px-6 py-3.5 hover:bg-gray-50/70 transition-colors"
+                  className="group flex items-center justify-between gap-2.5 sm:gap-3 px-4 sm:px-6 py-3 sm:py-3.5 hover:bg-gray-50/70 transition-colors"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-white border border-border/60 shadow-sm flex items-center justify-center text-text-muted group-hover:text-brand transition-colors shrink-0">
-                      <item.icon size={15} />
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-border/60 shadow-xs flex items-center justify-center text-text-muted group-hover:text-brand transition-colors shrink-0">
+                      <item.icon size={14} className="sm:w-[15px] sm:h-[15px]" />
                     </div>
-                    <div>
-                      <span className="text-xs text-text-muted font-semibold block">{item.label}</span>
-                      {item.sub && <span className="text-[10px] text-text-muted">{item.sub}</span>}
+                    <div className="min-w-0">
+                      <span className="text-xs text-text-muted font-semibold block truncate">{item.label}</span>
+                      {item.sub && <span className="text-[10px] text-text-muted block truncate">{item.sub}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className={`text-sm font-bold ${item.valueColor || 'text-text-primary'}`}>
+                  <div className="flex items-center gap-1.5 min-w-0 shrink-0 text-right">
+                    <span className={`text-xs sm:text-sm font-bold ${item.valueColor || 'text-text-primary'} whitespace-nowrap`}>
                       {item.value}
                     </span>
                   </div>
@@ -1035,7 +1037,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
 
             {/* Warning Banner if Overdue or Due Soon */}
             {isVidangeOverdue && (
-              <div className="p-4 bg-red-50 border-t border-red-200 flex items-start gap-2.5 text-xs text-red-900">
+              <div className="p-3.5 sm:p-4 bg-red-50 border-t border-red-200 flex items-start gap-2.5 text-xs text-red-900">
                 <AlertTriangle size={15} className="text-red-600 shrink-0 mt-0.5" />
                 <p className="font-semibold leading-relaxed">
                   🚨 حان موعد تغيير الزيت فوراً! تجاوزت السيارة دورة الـ 10,000 كم بمقدار {Math.abs(remainingKm).toLocaleString()} كم.
@@ -1043,7 +1045,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             )}
             {isVidangeSoon && (
-              <div className="p-4 bg-amber-50 border-t border-amber-200 flex items-start gap-2.5 text-xs text-amber-900">
+              <div className="p-3.5 sm:p-4 bg-amber-50 border-t border-amber-200 flex items-start gap-2.5 text-xs text-amber-900">
                 <Clock size={15} className="text-amber-600 shrink-0 mt-0.5" />
                 <p className="font-semibold leading-relaxed">
                   ⚠️ اقترب موعد تغيير الزيت (متبقي {remainingKm.toLocaleString()} كم). يرجى التجهيز للصيانة قريباً.
@@ -1052,10 +1054,10 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
             )}
 
             {/* Footer with Action Button */}
-            <div className="p-4 bg-gray-50/50 border-t border-border">
+            <div className="p-3.5 sm:p-4 bg-gray-50/50 border-t border-border">
               <button
                 onClick={openVidangeModal}
-                className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs ${
+                className={`w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs ${
                   isVidangeOverdue
                     ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-200'
                     : 'bg-brand hover:bg-brand-dark text-white'
@@ -1071,16 +1073,16 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* ==================== FULL-WIDTH RENTAL HISTORY SECTION ==================== */}
-      <div className="mt-10 bg-card rounded-2xl border border-border shadow-sm overflow-hidden animate-fade-in-up stagger-3">
+      <div className="mt-8 sm:mt-10 bg-card rounded-2xl border border-border shadow-sm overflow-hidden animate-fade-in-up stagger-3">
         {/* Section Header */}
-        <div className="p-6 border-b border-border bg-gray-50/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
-              <History size={20} />
+        <div className="p-4 sm:p-6 border-b border-border bg-gray-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
+              <History size={18} className="sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-text-primary">Rental History (سجل التأجير)</h2>
-              <p className="text-xs text-text-muted mt-0.5">
+              <h2 className="text-base sm:text-lg font-bold text-text-primary">Rental History (سجل التأجير)</h2>
+              <p className="text-[11px] sm:text-xs text-text-muted mt-0.5 line-clamp-1 sm:line-clamp-none">
                 Complete record of all contracts, renters, mileage, and revenue for this vehicle
               </p>
             </div>
@@ -1088,17 +1090,17 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
 
           <button
             onClick={() => router.push("/bookings/new")}
-            className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-all cursor-pointer shadow-xs self-start md:self-auto"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-all cursor-pointer shadow-xs"
           >
             <Plus size={14} />
-            Create Booking for this Car
+            <span>Create Booking for this Car</span>
           </button>
         </div>
 
         {/* Filter & Search Bar */}
-        <div className="p-4 border-b border-border bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="p-3 sm:p-4 border-b border-border bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Status Tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0" style={{ scrollbarWidth: 'none' }}>
             <button
               onClick={() => setHistoryStatusFilter("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
@@ -1139,7 +1141,6 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
             >
               Completed ({statusCounts.Completed})
             </button>
-            
           </div>
 
           {/* Search Input */}
@@ -1150,7 +1151,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               placeholder="Search by renter, contract #, phone..."
               value={historySearchQuery}
               onChange={(e) => setHistorySearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-1.5 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+              className="w-full pl-9 pr-8 py-2 sm:py-1.5 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             />
             {historySearchQuery && (
               <button
@@ -1163,259 +1164,464 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {/* Rental History Table */}
+        {/* Rental History Content */}
         {filteredContracts.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-border bg-gray-50/60 text-text-muted font-bold uppercase tracking-wider text-[11px]">
-                  <th className="py-3 px-5">Contract #</th>
-                  <th className="py-3 px-5">Renter / Client</th>
-                  <th className="py-3 px-5">Rental Period</th>
-                  <th className="py-3 px-5">Mileage (Out → In)</th>
-                  <th className="py-3 px-5">Financials</th>
-                  <th className="py-3 px-5">Status</th>
-                  <th className="py-3 px-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredContracts.map((contract: any) => {
-                  const effectiveStatus = getEffectiveStatus(contract);
-                  const statusBadge = getContractStatusBadge(effectiveStatus);
-                  const paymentBadge = getPaymentBadge(contract.paymentStatus);
-                  const isCarDelivered = effectiveStatus === "Active";
+          <div>
+            {/* Desktop Table View (hidden on small screens) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-gray-50/60 text-text-muted font-bold uppercase tracking-wider text-[11px]">
+                    <th className="py-3 px-5">Contract #</th>
+                    <th className="py-3 px-5">Renter / Client</th>
+                    <th className="py-3 px-5">Rental Period</th>
+                    <th className="py-3 px-5">Mileage (Out → In)</th>
+                    <th className="py-3 px-5">Financials</th>
+                    <th className="py-3 px-5">Status</th>
+                    <th className="py-3 px-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredContracts.map((contract: any) => {
+                    const effectiveStatus = getEffectiveStatus(contract);
+                    const statusBadge = getContractStatusBadge(effectiveStatus);
+                    const paymentBadge = getPaymentBadge(contract.paymentStatus);
+                    const isCarDelivered = effectiveStatus === "Active";
 
-                  const startFormatted = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-                  const endFormatted = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                    const startFormatted = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                    const endFormatted = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-                  const checkoutKm = contract.checkoutMileage != null ? contract.checkoutMileage : 0;
-                  const returnKm = contract.returnOdometer;
-                  const kmTraveled = returnKm && returnKm > checkoutKm ? returnKm - checkoutKm : null;
+                    const checkoutKm = contract.checkoutMileage != null ? contract.checkoutMileage : 0;
+                    const returnKm = contract.returnOdometer;
+                    const kmTraveled = returnKm && returnKm > checkoutKm ? returnKm - checkoutKm : null;
 
-                  const clientName = contract.clientId?.name || "Walk-in Customer";
-                  const clientPhone = contract.clientId?.phone || "N/A";
-                  const clientNationality = contract.clientId?.nationality;
+                    const clientName = contract.clientId?.name || "Walk-in Customer";
+                    const clientPhone = contract.clientId?.phone || "N/A";
+                    const clientNationality = contract.clientId?.nationality;
 
-                  return (
-                    <tr 
-                      key={contract._id} 
-                      className="hover:bg-gray-50/60 transition-colors group"
-                    >
-                      {/* Contract # */}
-                      <td className="py-4 px-5">
-                        <div className="flex flex-col">
-                          <button
-                            onClick={() => {
-                              setSelectedContractForModal(contract);
-                              setIsContractDetailsOpen(true);
-                            }}
-                            className="font-bold text-text-primary hover:text-brand transition-colors text-left flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <span>#{contract.contractNumber || contract._id.slice(-6)}</span>
-                            <Eye size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
-                          </button>
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="text-[10px] font-semibold text-text-muted bg-gray-100 px-1.5 py-0.5 rounded">
-                              {contract.contractType || "Delivery"}
-                            </span>
-                            {contract.rentalType && (
-                              <span className="text-[10px] font-medium text-text-muted">
-                                • {contract.rentalType}
+                    return (
+                      <tr 
+                        key={contract._id} 
+                        className="hover:bg-gray-50/60 transition-colors group"
+                      >
+                        {/* Contract # */}
+                        <td className="py-4 px-5">
+                          <div className="flex flex-col">
+                            <button
+                              onClick={() => {
+                                setSelectedContractForModal(contract);
+                                setIsContractDetailsOpen(true);
+                              }}
+                              className="font-bold text-text-primary hover:text-brand transition-colors text-left flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <span>#{contract.contractNumber || contract._id.slice(-6)}</span>
+                              <Eye size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
+                            </button>
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="text-[10px] font-semibold text-text-muted bg-gray-100 px-1.5 py-0.5 rounded">
+                                {contract.contractType || "Delivery"}
                               </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Renter / Client */}
-                      <td className="py-4 px-5">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${getAvatarColor(clientName)}`}>
-                            {getInitials(clientName)}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-text-primary truncate max-w-[180px]">
-                              {clientName}
-                            </span>
-                            <div className="flex items-center gap-1.5 text-text-muted text-[11px] mt-0.5">
-                              {clientPhone !== "N/A" && (
-                                <span className="flex items-center gap-0.5">
-                                  <Phone size={10} />
-                                  {clientPhone}
-                                </span>
-                              )}
-                              {clientNationality && (
-                                <span className="truncate max-w-[100px]">
-                                  • {clientNationality}
+                              {contract.rentalType && (
+                                <span className="text-[10px] font-medium text-text-muted">
+                                  • {contract.rentalType}
                                 </span>
                               )}
                             </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Rental Period */}
-                      <td className="py-4 px-5">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5 font-semibold text-text-primary">
-                            <span>{startFormatted}</span>
-                            <span className="text-text-muted text-[10px]">→</span>
-                            <span>{endFormatted}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-[10px] font-bold text-text-muted bg-gray-100 px-2 py-0.5 rounded">
-                              {contract.totalDays || 1} {contract.totalDays === 1 ? "day" : "days"}
-                            </span>
-                            {isCarDelivered ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Delivered & Active
+                        {/* Renter / Client */}
+                        <td className="py-4 px-5">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${getAvatarColor(clientName)}`}>
+                              {getInitials(clientName)}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-text-primary truncate max-w-[180px]">
+                                {clientName}
                               </span>
-                            ) : effectiveStatus === "Pending" ? (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                  Pending Handover
-                                </span>
-                                <button
-                                  onClick={() => handleConfirmDelivery(contract)}
-                                  disabled={deliveringContractId === contract._id}
-                                  title="Confirm Car Delivered to Client"
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 px-2 py-0.5 rounded-full border border-emerald-300 transition-colors cursor-pointer"
-                                >
-                                  {deliveringContractId === contract._id ? (
-                                    <Loader2 size={10} className="animate-spin" />
-                                  ) : (
-                                    <CheckCircle2 size={11} className="text-emerald-600" />
-                                  )}
-                                  <span>Confirm Delivered</span>
-                                </button>
+                              <div className="flex items-center gap-1.5 text-text-muted text-[11px] mt-0.5">
+                                {clientPhone !== "N/A" && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Phone size={10} />
+                                    {clientPhone}
+                                  </span>
+                                )}
+                                {clientNationality && (
+                                  <span className="truncate max-w-[100px]">
+                                    • {clientNationality}
+                                  </span>
+                                )}
                               </div>
-                            ) : null}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Rental Period */}
+                        <td className="py-4 px-5">
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5 font-semibold text-text-primary">
+                              <span>{startFormatted}</span>
+                              <span className="text-text-muted text-[10px]">→</span>
+                              <span>{endFormatted}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="text-[10px] font-bold text-text-muted bg-gray-100 px-2 py-0.5 rounded">
+                                {contract.totalDays || 1} {contract.totalDays === 1 ? "day" : "days"}
+                              </span>
+                              {isCarDelivered ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  Delivered & Active
+                                </span>
+                              ) : effectiveStatus === "Pending" ? (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                    Pending Handover
+                                  </span>
+                                  <button
+                                    onClick={() => handleConfirmDelivery(contract)}
+                                    disabled={deliveringContractId === contract._id}
+                                    title="Confirm Car Delivered to Client"
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 px-2 py-0.5 rounded-full border border-emerald-300 transition-colors cursor-pointer"
+                                  >
+                                    {deliveringContractId === contract._id ? (
+                                      <Loader2 size={10} className="animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 size={11} className="text-emerald-600" />
+                                    )}
+                                    <span>Confirm Delivered</span>
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Mileage (Out → In) */}
+                        <td className="py-4 px-5">
+                          <div className="flex flex-col">
+                            <div className="flex items-baseline gap-1.5 font-medium text-text-primary">
+                              <span className="text-[11px] text-text-muted">Out:</span>
+                              <span className="text-xs font-bold text-text-primary">
+                                {checkoutKm.toLocaleString()}
+                              </span>
+                              <span className="text-[10px] text-text-muted font-normal">km</span>
+                            </div>
+                            <div className="flex items-baseline gap-1.5 mt-0.5 font-medium text-text-primary">
+                              <span className="text-[11px] text-text-muted">In:</span>
+                              {returnKm != null && returnKm > 0 ? (
+                                <>
+                                  <span className="text-xs font-bold text-text-primary">
+                                    {returnKm.toLocaleString()}
+                                  </span>
+                                  <span className="text-[10px] text-text-muted font-normal">km</span>
+                                </>
+                              ) : (
+                                <span className="text-[11px] text-text-muted italic font-normal">
+                                  {isCarDelivered ? "In Use" : "N/A"}
+                                </span>
+                              )}
+                            </div>
+                            {kmTraveled != null && (
+                              <div className="mt-1 flex items-baseline gap-1">
+                                <span className="text-xs font-black text-emerald-700">
+                                  +{kmTraveled.toLocaleString()}
+                                </span>
+                                <span className="text-[10px] font-semibold text-emerald-600">km traveled</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Financials */}
+                        <td className="py-4 px-5">
+                          {effectiveStatus === "Pending" ? (
+                            <span className="text-text-muted text-xs font-semibold">—</span>
+                          ) : (
+                            <div className="flex flex-col">
+                              <div className="flex items-baseline gap-1 font-bold text-text-primary">
+                                <span className="text-sm font-black text-emerald-700">
+                                  AED {(contract.totalAmount || 0).toLocaleString()}
+                                </span>
+                                {contract.dailyRate && (
+                                  <span className="text-[10px] text-text-muted font-normal">
+                                    ({contract.dailyRate} AED/d)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${paymentBadge}`}>
+                                  {contract.paymentStatus || "Pending"}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-4 px-5">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${statusBadge.bg}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`}></span>
+                            {statusBadge.label}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-4 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {effectiveStatus === "Pending" && (
+                              <button
+                                onClick={() => handleConfirmDelivery(contract)}
+                                disabled={deliveringContractId === contract._id}
+                                title="Confirm Car Delivered to Client (تأكيد تسليم السيارة)"
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer"
+                              >
+                                {deliveringContractId === contract._id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <CheckCircle2 size={13} />
+                                )}
+                                <span className="hidden sm:inline">Confirm Delivered</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedContractForModal(contract);
+                                setIsContractDetailsOpen(true);
+                              }}
+                              title="View Contract Details"
+                              className="p-1.5 bg-gray-100 hover:bg-brand/10 text-text-muted hover:text-brand rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Eye size={14} />
+                            </button>
+                            {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
+                              <a
+                                href={`/bookings/${contract._id}/print`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Print / View Contract PDF"
+                                className="p-1.5 bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-text-primary rounded-lg transition-colors inline-block"
+                              >
+                                <Printer size={14} />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View (visible only on small screens) */}
+            <div className="block md:hidden divide-y divide-border">
+              {filteredContracts.map((contract: any) => {
+                const effectiveStatus = getEffectiveStatus(contract);
+                const statusBadge = getContractStatusBadge(effectiveStatus);
+                const paymentBadge = getPaymentBadge(contract.paymentStatus);
+                const isCarDelivered = effectiveStatus === "Active";
+
+                const startFormatted = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                const endFormatted = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+                const checkoutKm = contract.checkoutMileage != null ? contract.checkoutMileage : 0;
+                const returnKm = contract.returnOdometer;
+                const kmTraveled = returnKm && returnKm > checkoutKm ? returnKm - checkoutKm : null;
+
+                const clientName = contract.clientId?.name || "Walk-in Customer";
+                const clientPhone = contract.clientId?.phone || "N/A";
+                const clientNationality = contract.clientId?.nationality;
+
+                return (
+                  <div key={contract._id} className="p-4 space-y-3 hover:bg-gray-50/40 transition-colors">
+                    {/* Header Row: Contract # + Type + Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <button
+                          onClick={() => {
+                            setSelectedContractForModal(contract);
+                            setIsContractDetailsOpen(true);
+                          }}
+                          className="font-bold text-sm text-text-primary hover:text-brand transition-colors text-left truncate flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>#{contract.contractNumber || contract._id.slice(-6)}</span>
+                          <Eye size={12} className="text-brand shrink-0" />
+                        </button>
+                        <span className="text-[10px] font-semibold text-text-muted bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
+                          {contract.contractType || "Delivery"}
+                        </span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border shrink-0 ${statusBadge.bg}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`}></span>
+                        {statusBadge.label}
+                      </span>
+                    </div>
+
+                    {/* Client Information */}
+                    <div className="flex items-center gap-2.5 bg-gray-50/70 p-2.5 rounded-xl border border-border/50">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${getAvatarColor(clientName)}`}>
+                        {getInitials(clientName)}
+                      </div>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="font-bold text-xs text-text-primary truncate">
+                          {clientName}
+                        </span>
+                        <div className="flex items-center gap-2 text-text-muted text-[11px] mt-0.5 truncate">
+                          {clientPhone !== "N/A" && (
+                            <a 
+                              href={`tel:${clientPhone}`} 
+                              className="flex items-center gap-1 hover:text-brand transition-colors font-medium"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Phone size={10} />
+                              <span>{clientPhone}</span>
+                            </a>
+                          )}
+                          {clientNationality && (
+                            <span className="truncate">
+                              • {clientNationality}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2-Column Info Grid: Period & Mileage */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {/* Period Box */}
+                      <div className="bg-gray-50/70 rounded-xl p-2.5 border border-border/50 flex flex-col justify-between">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
+                            <Calendar size={11} className="text-text-muted" />
+                            <span>Period</span>
+                          </div>
+                          <div className="font-semibold text-text-primary text-[11px] leading-tight">
+                            {startFormatted}
+                            <span className="text-text-muted mx-1">→</span>
+                            {endFormatted}
                           </div>
                         </div>
-                      </td>
-
-                      {/* Mileage (Out → In) - Formatted like Financials font */}
-                      <td className="py-4 px-5">
-                        <div className="flex flex-col">
-                          <div className="flex items-baseline gap-1.5 font-medium text-text-primary">
-                            <span className="text-[11px] text-text-muted">Out:</span>
-                            <span className="text-xs font-bold text-text-primary">
-                              {checkoutKm.toLocaleString()}
+                        <div className="mt-2 flex items-center gap-1 flex-wrap">
+                          <span className="text-[10px] font-bold text-text-muted bg-white border border-border px-1.5 py-0.5 rounded">
+                            {contract.totalDays || 1}d
+                          </span>
+                          {isCarDelivered ? (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">
+                              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Active
                             </span>
-                            <span className="text-[10px] text-text-muted font-normal">km</span>
+                          ) : effectiveStatus === "Pending" ? (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">
+                              <span className="w-1 h-1 rounded-full bg-amber-500"></span>
+                              Pending
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Mileage Box */}
+                      <div className="bg-gray-50/70 rounded-xl p-2.5 border border-border/50 flex flex-col justify-between">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
+                            <Gauge size={11} className="text-text-muted" />
+                            <span>Mileage</span>
                           </div>
-                          <div className="flex items-baseline gap-1.5 mt-0.5 font-medium text-text-primary">
-                            <span className="text-[11px] text-text-muted">In:</span>
+                          <div className="flex items-center justify-between text-[11px] font-medium text-text-primary">
+                            <span className="text-text-muted text-[10px]">Out:</span>
+                            <span className="font-bold">{checkoutKm.toLocaleString()} km</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] font-medium text-text-primary mt-0.5">
+                            <span className="text-text-muted text-[10px]">In:</span>
                             {returnKm != null && returnKm > 0 ? (
-                              <>
-                                <span className="text-xs font-bold text-text-primary">
-                                  {returnKm.toLocaleString()}
-                                </span>
-                                <span className="text-[10px] text-text-muted font-normal">km</span>
-                              </>
+                              <span className="font-bold">{returnKm.toLocaleString()} km</span>
                             ) : (
-                              <span className="text-[11px] text-text-muted italic font-normal">
+                              <span className="text-text-muted italic text-[10px]">
                                 {isCarDelivered ? "In Use" : "N/A"}
                               </span>
                             )}
                           </div>
-                          {kmTraveled != null && (
-                            <div className="mt-1 flex items-baseline gap-1">
-                              <span className="text-xs font-black text-emerald-700">
-                                +{kmTraveled.toLocaleString()}
-                              </span>
-                              <span className="text-[10px] font-semibold text-emerald-600">km traveled</span>
-                            </div>
-                          )}
                         </div>
-                      </td>
-
-                      {/* Financials - Hidden for Pending contracts */}
-                      <td className="py-4 px-5">
-                        {effectiveStatus === "Pending" ? (
-                          <span className="text-text-muted text-xs font-semibold">—</span>
-                        ) : (
-                          <div className="flex flex-col">
-                            <div className="flex items-baseline gap-1 font-bold text-text-primary">
-                              <span className="text-sm font-black text-emerald-700">
-                                AED {(contract.totalAmount || 0).toLocaleString()}
-                              </span>
-                              {contract.dailyRate && (
-                                <span className="text-[10px] text-text-muted font-normal">
-                                  ({contract.dailyRate} AED/d)
-                                </span>
-                              )}
-                            </div>
-                            <div className="mt-1">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${paymentBadge}`}>
-                                {contract.paymentStatus || "Pending"}
-                              </span>
-                            </div>
+                        {kmTraveled != null ? (
+                          <div className="mt-1 text-right">
+                            <span className="text-[10px] font-black text-emerald-700">+{kmTraveled.toLocaleString()} km</span>
                           </div>
+                        ) : (
+                          <div className="h-3"></div>
                         )}
-                      </td>
+                      </div>
+                    </div>
 
-                      {/* Status */}
-                      <td className="py-4 px-5">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${statusBadge.bg}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`}></span>
-                          {statusBadge.label}
-                        </span>
-                      </td>
+                    {/* Bottom Row: Financials & Action Buttons */}
+                    <div className="pt-2 border-t border-border/50 flex items-center justify-between gap-2 flex-wrap">
+                      {/* Financials */}
+                      {effectiveStatus === "Pending" ? (
+                        <div className="text-text-muted text-xs font-semibold">
+                          <span>Rate: {contract.dailyRate || "—"} AED/d</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-black text-emerald-700">
+                            AED {(contract.totalAmount || 0).toLocaleString()}
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${paymentBadge}`}>
+                            {contract.paymentStatus || "Pending"}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Actions */}
-                      <td className="py-4 px-5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {effectiveStatus === "Pending" && (
-                            <button
-                              onClick={() => handleConfirmDelivery(contract)}
-                              disabled={deliveringContractId === contract._id}
-                              title="Confirm Car Delivered to Client (تأكيد تسليم السيارة)"
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer"
-                            >
-                              {deliveringContractId === contract._id ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <CheckCircle2 size={13} />
-                              )}
-                              <span className="hidden sm:inline">Confirm Delivered</span>
-                            </button>
-                          )}
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        {effectiveStatus === "Pending" && (
                           <button
-                            onClick={() => {
-                              setSelectedContractForModal(contract);
-                              setIsContractDetailsOpen(true);
-                            }}
-                            title="View Contract Details"
-                            className="p-1.5 bg-gray-100 hover:bg-brand/10 text-text-muted hover:text-brand rounded-lg transition-colors cursor-pointer"
+                            onClick={() => handleConfirmDelivery(contract)}
+                            disabled={deliveringContractId === contract._id}
+                            title="Confirm Car Delivered to Client"
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer"
                           >
-                            <Eye size={14} />
+                            {deliveringContractId === contract._id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <CheckCircle2 size={12} />
+                            )}
+                            <span>Deliver</span>
                           </button>
-                          {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
-                            <a
-                              href={`/bookings/${contract._id}/print`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Print / View Contract PDF"
-                              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-text-primary rounded-lg transition-colors inline-block"
-                            >
-                              <Printer size={14} />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedContractForModal(contract);
+                            setIsContractDetailsOpen(true);
+                          }}
+                          title="View Contract Details"
+                          className="px-2.5 py-1.5 bg-gray-100 hover:bg-brand/10 text-text-secondary hover:text-brand rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Eye size={13} />
+                          <span>Details</span>
+                        </button>
+                        {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
+                          <a
+                            href={`/bookings/${contract._id}/print`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Print / View Contract PDF"
+                            className="p-1.5 bg-gray-100 hover:bg-gray-200 text-text-muted hover:text-text-primary rounded-lg transition-colors inline-flex items-center"
+                          >
+                            <Printer size={13} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
-          <div className="p-12 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-200 text-gray-400 flex items-center justify-center mx-auto mb-3">
-              <History size={28} />
+          <div className="p-8 sm:p-12 text-center">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gray-50 border border-gray-200 text-gray-400 flex items-center justify-center mx-auto mb-3">
+              <History size={24} className="sm:w-7 sm:h-7" />
             </div>
             {contractsList.length === 0 ? (
               <>
@@ -1478,19 +1684,19 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* ================= Record Oil Change Modal (نافذة تسجيل تغيير الزيت) ================= */}
       {isVidangeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-border overflow-hidden animate-scale-up">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-border overflow-hidden animate-scale-up my-auto max-h-[92vh] flex flex-col">
             {/* Modal Header */}
-            <div className="p-5 border-b border-border bg-gray-50/70 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
-                  <Droplet size={20} />
+            <div className="p-4 sm:p-5 border-b border-border bg-gray-50/70 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                  <Droplet size={18} className="sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-text-primary">
+                  <h3 className="text-sm sm:text-base font-bold text-text-primary">
                     تسجيل تغيير الزيت (Record Vidange)
                   </h3>
-                  <p className="text-xs text-text-muted">
+                  <p className="text-[11px] sm:text-xs text-text-muted">
                     إعادة ضبط دورة الـ 10,000 كم للمركبة
                   </p>
                 </div>
@@ -1504,7 +1710,7 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSaveVidange} className="p-5 space-y-4">
+            <form onSubmit={handleSaveVidange} className="p-4 sm:p-5 space-y-3.5 sm:space-y-4 overflow-y-auto flex-1">
               {/* Car details badge */}
               <div className="bg-gray-50 rounded-xl p-3 border border-border/60 flex items-center justify-between">
                 <div>
@@ -1515,23 +1721,23 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
                     Plate: {unit.plate || 'No Plate'} • Current: {(unit.mileage || 0).toLocaleString()} km
                   </span>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-1 bg-brand/10 text-brand rounded-lg">
+                <span className="text-[10px] font-bold px-2 py-1 bg-brand/10 text-brand rounded-lg shrink-0">
                   10k Cycle
                 </span>
               </div>
 
               {/* Odometer Input */}
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1 gap-2">
                   <label className="text-xs font-semibold text-text-primary">
-                    عداد الكيلومترات عند التغيير (Odometer km) <span className="text-red-500">*</span>
+                    عداد الكيلومترات (Odometer km) <span className="text-red-500">*</span>
                   </label>
                   <button
                     type="button"
                     onClick={() => setVidangeOdometer(unit.mileage || 0)}
-                    className="text-[10px] font-bold text-brand hover:underline cursor-pointer"
+                    className="text-[10px] font-bold text-brand hover:underline cursor-pointer shrink-0"
                   >
-                    استخدام العداد الحالي ({unit.mileage || 0} km)
+                    العداد الحالي ({unit.mileage || 0} km)
                   </button>
                 </div>
                 <div className="relative">
@@ -1590,18 +1796,18 @@ export default function UnitDetailPage({ params }: { params: Promise<{ id: strin
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsVidangeModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-text-secondary rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-3.5 sm:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-text-secondary rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                 >
                   إلغاء (Cancel)
                 </button>
                 <button
                   type="submit"
                   disabled={savingVidange}
-                  className="px-5 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  className="px-4 sm:px-5 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                 >
                   {savingVidange ? (
                     <>

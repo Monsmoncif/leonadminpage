@@ -46,6 +46,7 @@ export default function CreateDriverModal({
 
   const [documents, setDocuments] = useState<File[]>([]);
   const [docPreviews, setDocPreviews] = useState<string[]>([]);
+  const [loadingDriverDocs, setLoadingDriverDocs] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scanningDoc, setScanningDoc] = useState(false);
   const [autoScannedSuccess, setAutoScannedSuccess] = useState(false);
@@ -70,7 +71,22 @@ export default function CreateDriverModal({
           status: driverToEdit.status || "Active",
           password: "", // don't load password on edit
         });
-        setDocPreviews(driverToEdit.documents || []);
+        const initialDocs = Array.isArray(driverToEdit.documents) ? driverToEdit.documents : [];
+        setDocPreviews(initialDocs);
+
+        // If documents were not loaded on driverToEdit, fetch the full driver record from API
+        if (driverToEdit._id && (!driverToEdit.documents || driverToEdit.documents.length === 0)) {
+          setLoadingDriverDocs(true);
+          fetch(`/api/drivers/${driverToEdit._id}`, { cache: "no-store" })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((fullDriver) => {
+              if (fullDriver && Array.isArray(fullDriver.documents) && fullDriver.documents.length > 0) {
+                setDocPreviews(fullDriver.documents);
+              }
+            })
+            .catch((err) => console.error("Failed to load driver documents:", err))
+            .finally(() => setLoadingDriverDocs(false));
+        }
       } else {
         setFormData({
           name: "",
@@ -87,6 +103,7 @@ export default function CreateDriverModal({
       setDocuments([]);
       setError("");
       setAutoScannedSuccess(false);
+      setLoadingDriverDocs(false);
     }
   }, [isOpen, driverToEdit]);
 
@@ -302,32 +319,24 @@ export default function CreateDriverModal({
 
     try {
       let uploadedDocUrls: string[] = [];
-      const existingDocs = docPreviews.filter(
-        (doc) => doc.startsWith("http") || doc.startsWith("/")
-      );
-      
-      const newImagesToUpload = docPreviews.filter(
-        (doc) => doc.startsWith("data:image")
-      );
-      const newPdfsToUpload = docPreviews.filter(
-        (doc) => doc.startsWith("data:application/pdf")
-      );
+      const existingDocs = docPreviews.filter((doc) => !doc.startsWith("data:"));
+      const newDocs = docPreviews.filter((doc) => doc.startsWith("data:"));
 
-      if (newImagesToUpload.length > 0 || newPdfsToUpload.length > 0) {
-        const allNewDocs = [...newImagesToUpload, ...newPdfsToUpload];
-        
-        for (const doc of allNewDocs) {
+      if (newDocs.length > 0) {
+        const uploadPromises = newDocs.map(async (doc) => {
           const res = await fetch("/api/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ image: doc }),
+            body: JSON.stringify({ image: doc, folder: "driver-documents" }),
           });
-          const data = await res.json();
-          if (!res.ok || !data.url) {
+          if (!res.ok) {
             throw new Error("Failed to upload one or more documents");
           }
-          uploadedDocUrls.push(data.url);
-        }
+          const data = await res.json();
+          return (data.url || data.secure_url) as string;
+        });
+        const results = await Promise.all(uploadPromises);
+        uploadedDocUrls.push(...results);
       }
 
       const allDocs = [...existingDocs, ...uploadedDocUrls];
@@ -517,6 +526,12 @@ export default function CreateDriverModal({
               </div>
 
               <div className="flex flex-wrap gap-2 sm:gap-3">
+                {loadingDriverDocs && (
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-dashed border-brand/40 bg-brand/5 flex flex-col items-center justify-center shrink-0 animate-pulse">
+                    <Loader2 size={18} className="animate-spin text-brand" />
+                    <span className="text-[9px] font-medium text-brand mt-1">Loading...</span>
+                  </div>
+                )}
                 {docPreviews.map((doc, idx) => {
                   const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
                   return (

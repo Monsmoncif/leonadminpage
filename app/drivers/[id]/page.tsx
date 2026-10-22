@@ -19,9 +19,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ZoomIn,
+  Edit,
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
+import CreateDriverModal from "@/components/modals/CreateDriverModal";
 
 const getInitials = (name: string) => {
   if (!name) return "";
@@ -54,6 +56,7 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewDocIndex, setPreviewDocIndex] = useState<number | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -107,19 +110,22 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
 
   if (loading) {
     return (
-      <div className="space-y-6 max-w-5xl mx-auto p-6 animate-pulse">
+      <div className="space-y-6 max-w-5xl mx-auto p-4 sm:p-6 animate-pulse">
         {/* Header Skeleton */}
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-gray-200 rounded-xl" />
-          <div className="space-y-2">
-            <div className="w-48 h-6 bg-gray-200 rounded-md" />
-            <div className="w-64 h-4 bg-gray-200 rounded-md" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-200 rounded-xl" />
+            <div className="space-y-2">
+              <div className="w-48 h-6 bg-gray-200 rounded-md" />
+              <div className="w-64 h-4 bg-gray-200 rounded-md" />
+            </div>
           </div>
+          <div className="w-32 h-10 bg-gray-200 rounded-xl" />
         </div>
 
         {/* Profile Card Skeleton */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+          <div className="p-4 sm:p-6 border-b border-gray-100 bg-gray-50/50">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-200 rounded-full shrink-0" />
               <div className="space-y-3 w-full">
@@ -130,7 +136,7 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
           </div>
           <div className="divide-y divide-gray-100">
             {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <div key={i} className="flex flex-col sm:flex-row sm:items-center px-6 py-4 gap-2 sm:gap-0">
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-4 gap-2 sm:gap-0">
                 <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
                   <div className="w-4 h-4 bg-gray-200 rounded" />
                   <div className="w-24 h-4 bg-gray-200 rounded" />
@@ -140,7 +146,6 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
             ))}
           </div>
         </div>
-
       </div>
     );
   }
@@ -164,46 +169,55 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in-up">
+    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in-up pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-1">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
             onClick={() => router.push("/drivers")}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer text-text-muted hover:text-text-primary"
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer text-text-muted hover:text-text-primary shrink-0"
+            aria-label="Back to drivers"
           >
             <ArrowLeft size={20} />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-text-primary">Driver Details</h1>
-            <p className="text-sm text-text-secondary mt-0.5">View and manage driver information</p>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary truncate">Driver Details</h1>
+            <p className="text-xs sm:text-sm text-text-secondary mt-0.5 truncate">View and manage driver information</p>
           </div>
         </div>
+
+        <button
+          onClick={() => setIsEditModalOpen(true)}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer active:scale-98"
+        >
+          <Edit size={15} />
+          <span>Edit Driver (تعديل السائق)</span>
+        </button>
       </div>
 
       {/* Profile Card */}
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         {/* Profile Header */}
-        <div className="p-6 border-b border-border bg-gray-50/30">
+        <div className="p-4 sm:p-6 border-b border-border bg-gray-50/30">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
             <div
-              className={`w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-bold shadow-sm ${getAvatarColor(driver.name)}`}
+              className={`w-14 h-14 sm:w-20 sm:h-20 shrink-0 rounded-full flex items-center justify-center text-xl sm:text-3xl font-bold shadow-sm ${getAvatarColor(driver.name)}`}
             >
               {getInitials(driver.name)}
             </div>
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <h2 className="text-xl sm:text-2xl font-bold text-text-primary">{driver.name}</h2>
-                <div className="w-fit">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h2 className="text-lg sm:text-2xl font-bold text-text-primary break-words">{driver.name}</h2>
+                <div className="w-fit shrink-0">
                   <StatusBadge variant={driver.status?.toLowerCase() as any} text={driver.status} />
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2">
-                <span className="text-sm text-text-muted flex items-center gap-1.5">
-                  <UserCircle size={14} /> ID: {driver.driverId}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 mt-2">
+                <span className="text-xs sm:text-sm text-text-muted flex items-center gap-1.5 truncate">
+                  <UserCircle size={14} className="shrink-0" /> ID: {driver.driverId}
                 </span>
-                <span className="text-sm text-text-muted flex items-center gap-1.5">
-                  <Clock size={14} /> Member since {driver.createdAt ? new Date(driver.createdAt).toLocaleDateString("en-GB") : "Unknown"}
+                <span className="text-xs sm:text-sm text-text-muted flex items-center gap-1.5 truncate">
+                  <Clock size={14} className="shrink-0" /> Member since {driver.createdAt ? new Date(driver.createdAt).toLocaleDateString("en-GB") : "Unknown"}
                 </span>
               </div>
             </div>
@@ -212,62 +226,80 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
 
         {/* Info Table */}
         <div className="divide-y divide-border">
-          <div className="flex flex-col sm:flex-row sm:items-center px-6 py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
-            <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
-              <FileText size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">License Number</span>
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <FileText size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">License Number</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0">{driver.license || "—"}</span>
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0 break-all">{driver.license || "—"}</span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center px-6 py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
-            <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
-              <Calendar size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">License Expiry</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <Calendar size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">License Expiry</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0">
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">
               {driver.licenseExpiry
                 ? new Date(driver.licenseExpiry).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
                 : "—"}
             </span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center px-6 py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
-            <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
-              <Mail size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Email</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <Mail size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Email</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0 break-all">{driver.email || "—"}</span>
+            {driver.email ? (
+              <a href={`mailto:${driver.email}`} className="text-xs sm:text-sm font-semibold text-brand hover:underline pl-6 sm:pl-0 break-all">
+                {driver.email}
+              </a>
+            ) : (
+              <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">—</span>
+            )}
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center px-6 py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
-            <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
-              <Phone size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Phone</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <Phone size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Phone</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0">{driver.phone || "—"}</span>
+            {driver.phone ? (
+              <a href={`tel:${driver.phone}`} className="text-xs sm:text-sm font-semibold text-brand hover:underline pl-6 sm:pl-0">
+                {driver.phone}
+              </a>
+            ) : (
+              <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">—</span>
+            )}
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center px-6 py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
-            <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
-              <MapPin size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Address</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <MapPin size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Address</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0">{driver.address || "—"}</span>
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">{driver.address || "—"}</span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center px-6 py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
-            <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
-              <Calendar size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Registered Since</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <Calendar size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Registered Since</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0">
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">
               {driver.createdAt
                 ? new Date(driver.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
                 : "—"}
             </span>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center px-6 py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
-            <div className="flex items-center gap-3 w-full sm:w-48 shrink-0">
-              <ExecutiveCarIcon size={16} className="text-text-muted" />
-              <span className="text-sm font-medium text-text-muted">Completed Contracts</span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors gap-1 sm:gap-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-48 shrink-0">
+              <ExecutiveCarIcon size={15} className="text-text-muted shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-text-muted">Completed Contracts</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary ml-7 sm:ml-0">{driver.completedContracts || 0}</span>
+            <span className="text-xs sm:text-sm font-semibold text-text-primary pl-6 sm:pl-0">{driver.completedContracts || 0}</span>
           </div>
         </div>
       </div>
@@ -275,17 +307,17 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
       {/* Documents */}
       {driver.documents && driver.documents.length > 0 && (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-border bg-gray-50/30">
+          <div className="p-4 sm:p-5 border-b border-border bg-gray-50/30">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
               <FileText size={16} className="text-text-muted" />
-              Documents
-              <span className="text-xs font-medium text-text-muted bg-gray-100 px-2 py-0.5 rounded-md">
+              Documents (الوثائق والمستندات)
+              <span className="text-xs font-semibold text-text-muted bg-gray-100 px-2 py-0.5 rounded-md">
                 {driver.documents.length}
               </span>
             </h3>
           </div>
-          <div className="p-5">
-            <div className="flex flex-wrap gap-4">
+          <div className="p-3.5 sm:p-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4">
               {driver.documents.map((doc: string, idx: number) => {
                 const isPdf = doc.includes("application/pdf") || doc.endsWith(".pdf");
                 return (
@@ -293,11 +325,11 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
                     key={idx}
                     type="button"
                     onClick={() => setPreviewDocIndex(idx)}
-                    className="w-28 h-28 rounded-xl border border-border overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all block group bg-gray-50 cursor-pointer relative text-left"
+                    className="relative h-28 sm:h-32 md:h-36 w-full rounded-xl border border-border overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all block group bg-gray-50 cursor-pointer text-left"
                     title={`Click to view document ${idx + 1}`}
                   >
                     {isPdf ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-brand gap-1.5 p-2">
+                      <div className="w-full h-full flex flex-col items-center justify-center text-brand gap-1.5 p-2 text-center bg-gray-50">
                         <FileText size={28} />
                         <span className="text-[10px] font-semibold">PDF Document</span>
                       </div>
@@ -318,6 +350,17 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       )}
+
+      {/* Edit Driver Modal */}
+      <CreateDriverModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={() => {
+          setIsEditModalOpen(false);
+          fetchDriver();
+        }}
+        driverToEdit={driver}
+      />
 
       {/* Full-size Document Preview Lightbox (Mounted to document.body for true fullscreen black background) */}
       {mounted && previewDocIndex !== null && driver?.documents?.[previewDocIndex] && typeof document !== "undefined" && createPortal(
