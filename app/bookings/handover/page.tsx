@@ -239,27 +239,34 @@ function ConfirmHandoverPageContent() {
         setIsLoadingContract(true);
         setError(null);
 
-        // Fetch all contracts for switching/lookup
-        let allContracts: any[] = [];
-        try {
-          const listRes = await fetch("/api/contracts", { cache: "no-store" });
-          if (listRes.ok) {
-            const listData = await listRes.json();
-            allContracts = listData.contracts || [];
-            setContractsList(allContracts);
-          }
-        } catch (lErr) {
-          console.warn("Could not load contracts list:", lErr);
-        }
-
         let targetContractId = contractId;
+
+        // If no contractId in URL, fetch list to find target contract
         if (!targetContractId) {
-          const pending = allContracts.find((c: any) => c.deliveryStatus !== "Delivered" && c.status !== "Completed" && c.status !== "Cancelled");
-          if (pending) {
-            targetContractId = pending._id || pending.id;
-          } else if (allContracts.length > 0) {
-            targetContractId = allContracts[0]._id || allContracts[0].id;
+          try {
+            const listRes = await fetch("/api/contracts", { cache: "no-store" });
+            if (listRes.ok) {
+              const listData = await listRes.json();
+              const allContracts = listData.contracts || [];
+              setContractsList(allContracts);
+              const pending = allContracts.find((c: any) => c.deliveryStatus !== "Delivered" && c.status !== "Completed" && c.status !== "Cancelled");
+              if (pending) {
+                targetContractId = pending._id || pending.id;
+              } else if (allContracts.length > 0) {
+                targetContractId = allContracts[0]._id || allContracts[0].id;
+              }
+            }
+          } catch (lErr) {
+            console.warn("Could not load contracts list:", lErr);
           }
+        } else {
+          // If contractId is already in URL, fetch contracts switcher list in background without blocking!
+          fetch("/api/contracts", { cache: "no-store" })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.contracts) setContractsList(data.contracts);
+            })
+            .catch(() => {});
         }
 
         if (!targetContractId) {
@@ -268,25 +275,25 @@ function ConfirmHandoverPageContent() {
           return;
         }
 
-        // Fetch target contract
-        const res = await fetch(`/api/contracts/${targetContractId}`, { cache: "no-store" });
+        // Fetch target contract immediately and clients in parallel (Fast non-blocking)
+        const [res] = await Promise.all([
+          fetch(`/api/contracts/${targetContractId}`, { cache: "no-store" }),
+          fetch("/api/clients", { cache: "no-store" })
+            .then((cRes) => (cRes.ok ? cRes.json() : null))
+            .then((clientData) => {
+              if (clientData) {
+                const list = Array.isArray(clientData) ? clientData : clientData.clients || [];
+                setClients(list);
+              }
+            })
+            .catch((cErr) => console.warn("Could not load clients list:", cErr)),
+        ]);
+
         if (!res.ok) {
           throw new Error("Failed to load contract details. Contract may not exist.");
         }
         const contractData = await res.json();
         setContract(contractData);
-
-        // Fetch all clients
-        try {
-          const clientRes = await fetch("/api/clients", { cache: "no-store" });
-          if (clientRes.ok) {
-            const clientData = await clientRes.json();
-            const list = Array.isArray(clientData) ? clientData : clientData.clients || [];
-            setClients(list);
-          }
-        } catch (cErr) {
-          console.warn("Could not load clients list:", cErr);
-        }
 
         // Initialize primary client
         if (contractData.clientId) {

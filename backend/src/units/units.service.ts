@@ -92,6 +92,10 @@ export class UnitsService {
 
   async create(createDto: any) {
     try {
+      if (!createDto.vin || !createDto.vin.trim()) {
+        const cleanPlate = (createDto.plate || 'CAR').trim().toUpperCase().replace(/[^A-Za-z0-9]/g, '');
+        createDto.vin = `VN-${cleanPlate}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      }
       const unit = await this.unitModel.create(createDto);
       return unit;
     } catch (error: any) {

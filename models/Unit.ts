@@ -5,7 +5,7 @@ export interface IUnit {
   model: string;
   year: number;
   plate: string;
-  vin: string;
+  vin?: string;
   color: string;
   mileage: number;
   status: "Available" | "Rented" | "Maintenance" | "Out of Service";
@@ -35,7 +35,7 @@ const unitSchema = new Schema<IUnit>(
     model: { type: String, required: true },
     year: { type: Number, required: true },
     plate: { type: String, required: true, unique: true },
-    vin: { type: String, required: true, unique: true },
+    vin: { type: String, required: false, sparse: true },
     color: { type: String, required: true },
     mileage: { type: Number, required: true, default: 0 },
     initialMileage: { type: Number, default: 0 },

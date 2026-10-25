@@ -183,7 +183,10 @@ export default function ContractsPage() {
 
   useEffect(() => {
     fetchContracts();
-  }, []);
+    try {
+      router.prefetch("/bookings/handover");
+    } catch {}
+  }, [router]);
 
   const handleDeleteConfirm = async () => {
     if (!contractToDelete) return;
@@ -725,6 +728,11 @@ export default function ContractsPage() {
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleOpenHandoverPage(contract);
+                                        }}
+                                        onMouseEnter={() => {
+                                          try {
+                                            router.prefetch(`/bookings/handover?contractId=${contract._id}`);
+                                          } catch {}
                                         }}
                                         title={
                                           isFuture

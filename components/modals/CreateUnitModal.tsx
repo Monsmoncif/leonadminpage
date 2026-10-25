@@ -21,15 +21,37 @@ import {
 import { useToast } from "@/components/providers/ToastProvider";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { CarMakeCombobox, CarModelCombobox } from "@/components/ui/CarMakeModelCombobox";
+import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 interface CreateUnitModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (newUnit?: any) => void;
   unitToEdit?: any;
+  isDriver?: boolean;
+  hideCardScan?: boolean;
 }
 
-export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit }: CreateUnitModalProps) {
+export default function CreateUnitModal({ 
+  isOpen, 
+  onClose, 
+  onSuccess, 
+  unitToEdit,
+  isDriver,
+  hideCardScan 
+}: CreateUnitModalProps) {
+  const pathname = usePathname();
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role;
+  const isDriverMode = Boolean(
+    isDriver || 
+    hideCardScan || 
+    pathname?.startsWith("/driver") || 
+    pathname?.includes("/driver/") ||
+    userRole === "driver"
+  );
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -471,11 +493,17 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
         ? specifiedVidange
         : (unitToEdit?.lastOilChangeMileage ?? currentMileage);
 
+      const cleanPlate = (formData.plate || "CAR").trim().toUpperCase();
+      const finalVin = formData.vin?.trim().toUpperCase() || 
+        (unitToEdit?.vin || `VN-${cleanPlate.replace(/[^A-Za-z0-9]/g, "")}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
+          plate: cleanPlate,
+          vin: finalVin,
           year: Number(formData.year),
           mileage: currentMileage,
           initialMileage: unitToEdit?.initialMileage ?? currentMileage,
@@ -494,8 +522,9 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
         throw new Error(errorData.error || "Failed to save vehicle.");
       }
       
+      const savedUnit = await res.json();
       toast.success(unitToEdit ? "Vehicle updated successfully! ✓" : "Vehicle created successfully! ✓");
-      onSuccess();
+      onSuccess(savedUnit);
     } catch (err: any) {
       setError(err.message);
       toast.error(err.message);
@@ -526,7 +555,9 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
             <p className="text-[10px] sm:text-xs text-text-secondary mt-0.5 line-clamp-1 sm:line-clamp-none">
               {unitToEdit
                 ? "Update vehicle specifications, rental rates, and profile picture."
-                : "Register a new vehicle with technical specifications and pricing to your fleet."}
+                : isDriverMode
+                  ? "Enter vehicle name, plate number, and rental rate."
+                  : "Register a new vehicle with technical specifications and pricing to your fleet."}
             </p>
           </div>
           <button
@@ -560,169 +591,177 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
               capture="environment"
               className="hidden"
             />
-            {/* Hidden Inputs for Vehicle License / Mulkiya OCR Scan */}
-            <input
-              type="file"
-              ref={scanCardFileInputRef}
-              onChange={handleVehicleCardFileChange}
-              accept="image/*"
-              multiple
-              className="hidden"
-            />
-            <input
-              type="file"
-              ref={scanCardCameraInputRef}
-              onChange={handleVehicleCardFileChange}
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-            />
+            {/* Hidden Inputs for Vehicle License / Mulkiya OCR Scan - only for non-driver */}
+            {!isDriverMode && (
+              <>
+                <input
+                  type="file"
+                  ref={scanCardFileInputRef}
+                  onChange={handleVehicleCardFileChange}
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  ref={scanCardCameraInputRef}
+                  onChange={handleVehicleCardFileChange}
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                />
 
-            {/* SECTION 1: VEHICLE LICENSE CARD (MULKIYA / CARTE GRISE) & AI SCANNING */}
-            <div className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
-                <div className="flex items-center justify-between w-full sm:w-auto">
-                  <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                    <FileText size={15} className="text-brand shrink-0" />
-                    <span>Vehicle License Card (بطاقة ملكية المركبة / Carte Grise)</span>
-                    <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
-                      {documents.length}/3
-                    </span>
-                  </label>
-                  {cardScannedSuccess && (
-                    <span className="sm:hidden text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <CheckCircle2 size={10} /> Auto-Filled
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
-                  {cardScannedSuccess && (
-                    <span className="hidden sm:flex text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full items-center gap-1">
-                      <CheckCircle2 size={11} /> Auto-Filled by AI
-                    </span>
-                  )}
-
-                  {/* Mode Switcher: Camera vs Gallery (like Add New Driver) */}
-                  <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setCardUploadMode("camera")}
-                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
-                        cardUploadMode === "camera"
-                          ? "bg-white text-brand shadow-xs font-bold"
-                          : "text-text-muted hover:text-text-primary"
-                      }`}
-                      title="Camera Mode (التقاط بالكاميرا)"
-                    >
-                      <Camera size={12} className={cardUploadMode === "camera" ? "text-brand" : "text-text-muted"} />
-                      <span>Camera</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCardUploadMode("gallery")}
-                      className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
-                        cardUploadMode === "gallery"
-                          ? "bg-white text-brand shadow-xs font-bold"
-                          : "text-text-muted hover:text-text-primary"
-                      }`}
-                      title="Gallery / Files Mode (رفع من الملفات)"
-                    >
-                      <ImageIcon size={12} className={cardUploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
-                      <span>Gallery</span>
-                    </button>
-                  </div>
-
-                  {documents.length > 0 && (
-                    <button
-                      type="button"
-                      disabled={scanningCard || submitting}
-                      onClick={() => scanUploadedCard()}
-                      className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
-                    >
-                      {scanningCard ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" />
-                          <span>Scanning...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ScanLine size={12} />
-                          <span>Scan License (مسح الملكية)</span>
-                        </>
+                {/* SECTION 1: VEHICLE LICENSE CARD (MULKIYA / CARTE GRISE) & AI SCANNING */}
+                <div className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5">
+                    <div className="flex items-center justify-between w-full sm:w-auto flex-wrap gap-1.5">
+                      <label className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5 flex-wrap">
+                        <FileText size={15} className="text-brand shrink-0" />
+                        <span>Vehicle License Card (بطاقة ملكية المركبة / Carte Grise)</span>
+                        <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                          Optional / اختياري
+                        </span>
+                        <span className="text-[11px] sm:text-xs text-gray-500 font-normal">
+                          {documents.length}/3
+                        </span>
+                      </label>
+                      {cardScannedSuccess && (
+                        <span className="sm:hidden text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 size={10} /> Auto-Filled
+                        </span>
                       )}
-                    </button>
-                  )}
-                </div>
-              </div>
+                    </div>
 
-              {/* Card Previews Grid */}
-              <div className="flex flex-wrap gap-2 sm:gap-3">
-                {documents.map((doc, idx) => (
-                  <div
-                    key={idx}
-                    className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs shrink-0"
-                  >
-                    <img
-                      src={doc}
-                      alt={`Vehicle License ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeDocument(idx)}
-                      className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
-                      title="Remove Document"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1.5 sm:gap-2 justify-between sm:justify-end w-full sm:w-auto flex-wrap">
+                      {cardScannedSuccess && (
+                        <span className="hidden sm:flex text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full items-center gap-1">
+                          <CheckCircle2 size={11} /> Auto-Filled by AI
+                        </span>
+                      )}
+
+                      {/* Mode Switcher: Camera vs Gallery (like Add New Driver) */}
+                      <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setCardUploadMode("camera")}
+                          className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                            cardUploadMode === "camera"
+                              ? "bg-white text-brand shadow-xs font-bold"
+                              : "text-text-muted hover:text-text-primary"
+                          }`}
+                          title="Camera Mode (التقاط بالكاميرا)"
+                        >
+                          <Camera size={12} className={cardUploadMode === "camera" ? "text-brand" : "text-text-muted"} />
+                          <span>Camera</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCardUploadMode("gallery")}
+                          className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                            cardUploadMode === "gallery"
+                              ? "bg-white text-brand shadow-xs font-bold"
+                              : "text-text-muted hover:text-text-primary"
+                          }`}
+                          title="Gallery / Files Mode (رفع من الملفات)"
+                        >
+                          <ImageIcon size={12} className={cardUploadMode === "gallery" ? "text-brand" : "text-text-muted"} />
+                          <span>Gallery</span>
+                        </button>
+                      </div>
+
+                      {documents.length > 0 && (
+                        <button
+                          type="button"
+                          disabled={scanningCard || submitting}
+                          onClick={() => scanUploadedCard()}
+                          className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer shrink-0 animate-in fade-in"
+                        >
+                          {scanningCard ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              <span>Scanning...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ScanLine size={12} />
+                              <span>Scan License (مسح الملكية)</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ))}
 
-                {/* Single Contextual Trigger Button matching active cardUploadMode */}
-                {documents.length < 3 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (cardUploadMode === "camera") {
-                        if (typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function") {
-                          startWebcam("card");
-                        } else {
-                          scanCardCameraInputRef.current?.click();
-                        }
-                      } else {
-                        scanCardFileInputRef.current?.click();
-                      }
-                    }}
-                    className={`w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
-                      cardUploadMode === "camera"
-                        ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
-                        : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
-                    }`}
-                    title={cardUploadMode === "camera" ? "Take Photo with Camera (التقاط بالكاميرا)" : "Upload File (رفع ملف)"}
-                  >
-                    {cardUploadMode === "camera" ? (
-                      <>
-                        <Camera size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-brand" />
-                        <span className="text-[9px] sm:text-[10px] font-bold text-brand leading-tight">Take Photo</span>
-                        <span className="text-[7px] sm:text-[8px] opacity-70">Camera</span>
-                      </>
-                    ) : (
-                      <>
-                        <ImagePlus size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
-                        <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 group-hover:text-brand leading-tight">Upload</span>
-                        <span className="text-[7px] sm:text-[8px] opacity-70">Card Image</span>
-                      </>
+                  {/* Card Previews Grid */}
+                  <div className="flex flex-wrap gap-2 sm:gap-3">
+                    {documents.map((doc, idx) => (
+                      <div
+                        key={idx}
+                        className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border border-gray-200 overflow-hidden group shadow-2xs shrink-0"
+                      >
+                        <img
+                          src={doc}
+                          alt={`Vehicle License ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeDocument(idx)}
+                          className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
+                          title="Remove Document"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Single Contextual Trigger Button matching active cardUploadMode */}
+                    {documents.length < 3 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (cardUploadMode === "camera") {
+                            if (typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function") {
+                              startWebcam("card");
+                            } else {
+                              scanCardCameraInputRef.current?.click();
+                            }
+                          } else {
+                            scanCardFileInputRef.current?.click();
+                          }
+                        }}
+                        className={`w-16 h-16 sm:w-24 sm:h-24 rounded-lg sm:rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer group shadow-2xs shrink-0 ${
+                          cardUploadMode === "camera"
+                            ? "border-brand bg-brand/[0.04] text-brand hover:bg-brand/10"
+                            : "border-gray-300 text-gray-500 hover:border-brand hover:text-brand hover:bg-brand/5"
+                        }`}
+                        title={cardUploadMode === "camera" ? "Take Photo with Camera (التقاط بالكاميرا)" : "Upload File (رفع ملف)"}
+                      >
+                        {cardUploadMode === "camera" ? (
+                          <>
+                            <Camera size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-brand" />
+                            <span className="text-[9px] sm:text-[10px] font-bold text-brand leading-tight">Take Photo</span>
+                            <span className="text-[7px] sm:text-[8px] opacity-70">Camera</span>
+                          </>
+                        ) : (
+                          <>
+                            <ImagePlus size={16} className="mb-0.5 group-hover:scale-110 transition-transform text-gray-600 group-hover:text-brand" />
+                            <span className="text-[9px] sm:text-[10px] font-bold text-gray-700 group-hover:text-brand leading-tight">Upload</span>
+                            <span className="text-[7px] sm:text-[8px] opacity-70">Card Image</span>
+                          </>
+                        )}
+                      </button>
                     )}
-                  </button>
-                )}
-              </div>
+                  </div>
 
-
-              <p className="text-[10px] sm:text-xs text-gray-500">
-                Supported formats: PNG, JPG, WebP. Take picture or upload vehicle registration card (Mulkiya / Carte Grise) to auto-extract plate, owner, VIN, make, model & dates.
-              </p>
-            </div>
+                  <p className="text-[11px] text-gray-500 bg-gray-50 p-2.5 rounded-xl border border-gray-100 leading-relaxed">
+                    💡 <strong>ملاحظة:</strong> مسح بطاقة رخصة المركبة (Carte Grise) اختياري تماماً. إذا لم تكن البطاقة بحوزتك، يمكنك إدخال اسم السيارة ورقم اللوحة والمواصفات يدوياً بالأسفل مباشرة.
+                    <br />
+                    <span className="text-[10px] text-gray-400">Scanning the vehicle registration card is completely optional. If you don&apos;t have it, simply enter the vehicle make, model, plate number, and details below.</span>
+                  </p>
+                </div>
+              </>
+            )}
 
             {/* SECTION 2: VEHICLE PHOTOS */}
             <div className="bg-white p-2.5 sm:p-5 rounded-xl sm:rounded-2xl border border-border shadow-xs space-y-2 sm:space-y-3">
@@ -955,41 +994,6 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                     value={formData.color}
                     onChange={(e) => setFormData({...formData, color: e.target.value})}
                   />
-                  {/* Quick color selector chips */}
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {[
-                      { name: "White", ar: "أبيض", bg: "#ffffff", border: "#cbd5e1" },
-                      { name: "Black", ar: "أسود", bg: "#0f172a", border: "#0f172a" },
-                      { name: "Grey", ar: "رمادي", bg: "#64748b", border: "#64748b" },
-                      { name: "Silver", ar: "فضي", bg: "#e2e8f0", border: "#94a3b8" },
-                      { name: "Dark Blue", ar: "كحلي", bg: "#1e3a8a", border: "#1e3a8a" },
-                      { name: "Blue", ar: "أزرق", bg: "#2563eb", border: "#2563eb" },
-                      { name: "Red", ar: "أحمر", bg: "#dc2626", border: "#dc2626" },
-                      { name: "Burgundy", ar: "عنابي", bg: "#831843", border: "#831843" },
-                      { name: "Beige", ar: "بيج", bg: "#fef3c7", border: "#d97706" },
-                      { name: "Gold", ar: "ذهبي", bg: "#f59e0b", border: "#b45309" },
-                      { name: "White/Black", ar: "أبيض/أسود", bg: "linear-gradient(135deg, #ffffff 50%, #000000 50%)", border: "#94a3b8" },
-                    ].map((c) => (
-                      <button
-                        key={c.name}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, color: c.name })}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-medium flex items-center gap-1 border transition-all cursor-pointer ${
-                          formData.color?.toLowerCase() === c.name.toLowerCase()
-                            ? "border-brand bg-brand/10 text-brand font-bold shadow-xs"
-                            : "border-gray-200 bg-gray-50/70 text-gray-700 hover:bg-gray-100"
-                        }`}
-                        title={`${c.name} - ${c.ar}`}
-                      >
-                        <span
-                          className="w-2.5 h-2.5 rounded-full inline-block shrink-0 shadow-2xs"
-                          style={{ background: c.bg, border: `1px solid ${c.border}` }}
-                        />
-                        <span>{c.name}</span>
-                        <span className="text-gray-400 text-[9px]">({c.ar})</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 <div>
@@ -1007,11 +1011,10 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
 
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    VIN Number <span className="text-red-500">*</span>
+                    VIN Number <span className="text-[10px] font-normal text-gray-500">(Optional / اختياري)</span>
                   </label>
                   <input 
-                    required
-                    placeholder="17-character VIN" 
+                    placeholder="Leave empty to auto-generate (اختياري - يتم التوليد تلقائياً)" 
                     className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white uppercase font-mono"
                     value={formData.vin}
                     onChange={(e) => setFormData({...formData, vin: e.target.value.toUpperCase()})}
@@ -1078,7 +1081,7 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                  <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="Last Oil Change / Vidange (km) (آخر تغيير زيت)">
                     Last Oil Change / Vidange (km) (آخر تغيير زيت)
                   </label>
                   <input 
@@ -1089,11 +1092,6 @@ export default function CreateUnitModal({ isOpen, onClose, onSuccess, unitToEdit
                     value={formData.lastOilChangeMileage !== "" && formData.lastOilChangeMileage !== undefined ? formData.lastOilChangeMileage : ""}
                     onChange={(e) => setFormData({...formData, lastOilChangeMileage: e.target.value === "" ? "" : parseInt(e.target.value) || 0})}
                   />
-                  <span className="text-[10px] text-text-muted mt-1 block">
-                    {!unitToEdit 
-                      ? "يبدأ العدّ تلقائياً من عداد السيارة عند إنشائها ويطلب التغيير بعد كل 10,000 كم (Starts from creation mileage + 10,000 km)"
-                      : "دورة الصيانة كل 10,000 كم (Interval of 10,000 km)"}
-                  </span>
                 </div>
               </div>
             </div>

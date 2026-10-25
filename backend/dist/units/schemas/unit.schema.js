@@ -31,7 +31,7 @@ __decorate([
     __metadata("design:type", String)
 ], Unit.prototype, "plate", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true, unique: true }),
+    (0, mongoose_1.Prop)({ required: false, sparse: true }),
     __metadata("design:type", String)
 ], Unit.prototype, "vin", void 0);
 __decorate([

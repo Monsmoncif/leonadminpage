@@ -19,7 +19,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '../.env.local'],
+      envFilePath: ['.env', '../.env', '../.env.local'],
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],

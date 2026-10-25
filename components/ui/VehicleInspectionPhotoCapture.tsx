@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Camera, Image as ImageIcon, X, Loader2, CheckCircle2, AlertCircle, Plus, Eye } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -117,9 +118,25 @@ export default function VehicleInspectionPhotoCapture({
   onPreviewReference,
 }: VehicleInspectionPhotoCaptureProps) {
   const toast = useToast();
+  const [mounted, setMounted] = useState(false);
   const [uploadMode, setUploadMode] = useState<"camera" | "gallery">("camera");
   const [uploadingAngle, setUploadingAngle] = useState<string | null>(null);
   const [activeRefPreview, setActiveRefPreview] = useState<{ url: string; angle: string } | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (activeRefPreview) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [activeRefPreview]);
 
   // Normalize reference photos into angle-to-url map
   const refMap: Record<string, string> = React.useMemo(() => {
@@ -157,7 +174,6 @@ export default function VehicleInspectionPhotoCapture({
   }, [photos]);
 
   const mergedPhotos = { ...(photos || {}), ...localPhotos };
-  const capturedCount = VEHICLE_ANGLES.filter((a) => Boolean(mergedPhotos[a])).length;
   const extraKeys = getExtraPhotoKeys(mergedPhotos);
   const nextExtraKey = `${EXTRA_PHOTO_PREFIX}${
     extraKeys.length > 0 ? Number(extraKeys[extraKeys.length - 1].slice(EXTRA_PHOTO_PREFIX.length)) + 1 : 1
@@ -282,19 +298,6 @@ export default function VehicleInspectionPhotoCapture({
               <span>Gallery</span>
             </button>
           </div>
-
-          {/* Captured Progress Counter */}
-          <span
-            className={`text-xs font-bold px-3 py-1.5 rounded-full shrink-0 border ${
-              capturedCount === 8
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : capturedCount > 0
-                ? "bg-blue-50 text-blue-700 border-blue-200"
-                : "bg-gray-100 text-text-muted border-gray-200"
-            }`}
-          >
-            {capturedCount}/8 angles{extraKeys.length > 0 ? ` + ${extraKeys.length}` : ""}
-          </span>
         </div>
       </div>
 
@@ -320,7 +323,7 @@ export default function VehicleInspectionPhotoCapture({
                         setActiveRefPreview({ url: refMap[angle], angle });
                       }
                     }}
-                    className="text-[9px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 px-1.5 py-0.5 rounded flex items-center gap-0.5 cursor-pointer shrink-0 transition-colors shadow-2xs"
+                    className="text-[9px] font-bold text-brand bg-red-50 hover:bg-red-100 border border-red-200/80 px-1.5 py-0.5 rounded flex items-center gap-0.5 cursor-pointer shrink-0 transition-colors shadow-2xs"
                     title={`View ${referenceLabel} Photo (${angle})`}
                   >
                     <Eye size={10} />
@@ -455,43 +458,35 @@ export default function VehicleInspectionPhotoCapture({
         </div>
       )}
 
-      {/* Reference Photo Preview Modal */}
-      {activeRefPreview && (
+      {/* Simple Reference Photo Preview Modal */}
+      {mounted && activeRefPreview && createPortal(
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-sm animate-fade-in"
           onClick={() => setActiveRefPreview(null)}
         >
           <div
-            className="relative max-w-3xl w-full bg-gray-950 rounded-2xl border border-white/20 p-4 shadow-2xl flex flex-col items-center gap-3"
+            className="relative flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-full flex items-center justify-between text-white pb-2 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-600 text-white">
-                  {referenceLabel} Reference
-                </span>
-                <span className="text-sm font-semibold text-white/90">
-                  {activeRefPreview.angle}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveRefPreview(null)}
-                className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-                aria-label="Close preview"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="max-h-[75vh] w-full flex items-center justify-center overflow-hidden rounded-xl bg-black">
-              <img
-                src={activeRefPreview.url}
-                alt={`${referenceLabel} ${activeRefPreview.angle}`}
-                className="max-h-[70vh] max-w-full object-contain rounded-lg"
-              />
-            </div>
+            {/* Close Button top-right */}
+            <button
+              type="button"
+              onClick={() => setActiveRefPreview(null)}
+              className="absolute -top-3.5 -right-3.5 sm:-top-4 sm:-right-4 w-9 h-9 rounded-full bg-black/80 hover:bg-black text-white flex items-center justify-center transition-all cursor-pointer shadow-xl z-20 border border-white/20 hover:scale-105 active:scale-95"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Image */}
+            <img
+              src={activeRefPreview.url}
+              alt={`${referenceLabel} ${activeRefPreview.angle}`}
+              className="max-h-[85vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl border border-white/10"
+            />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

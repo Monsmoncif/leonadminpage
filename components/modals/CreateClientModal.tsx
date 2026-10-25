@@ -1459,7 +1459,7 @@ export default function CreateClientModal({
                   {/* 2. Home Country Driving License Row */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-gray-100">
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="Driving License No (رخصة القيادة الأصلية)">
                         Driving License No (رخصة القيادة الأصلية)
                       </label>
                       <input
@@ -1472,7 +1472,7 @@ export default function CreateClientModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="License Issued By (جهة الإصدار)">
                         License Issued By (جهة الإصدار)
                       </label>
                       <input
@@ -1485,7 +1485,7 @@ export default function CreateClientModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="License Issue Date (تاريخ الإصدار)">
                         License Issue Date (تاريخ الإصدار)
                       </label>
                       <input
@@ -1498,7 +1498,7 @@ export default function CreateClientModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="License Expiry (تاريخ انتهاء صلاحية الرخصة)">
                         License Expiry (تاريخ انتهاء صلاحية الرخصة)
                       </label>
                       {isLicenseExpired && (
@@ -1526,7 +1526,7 @@ export default function CreateClientModal({
                   {/* 3. International Driving License Row */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-gray-100">
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="International Driving License">
                         International Driving License
                       </label>
                       <input
@@ -1539,7 +1539,7 @@ export default function CreateClientModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="International Driving License Issued By">
                         International Driving License Issued By
                       </label>
                       <input
@@ -1552,7 +1552,7 @@ export default function CreateClientModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="International License Issued">
                         International License Issued
                       </label>
                       <input
@@ -1565,7 +1565,7 @@ export default function CreateClientModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      <label className="block text-xs font-semibold text-text-secondary mb-1 whitespace-nowrap" title="International License Expiry">
                         International License Expiry
                       </label>
                       {isInternationalLicenseExpired && (

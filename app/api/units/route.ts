@@ -87,6 +87,12 @@ export async function POST(req: NextRequest) {
       body.lastOilChangeDate = new Date();
     }
     
+    // Auto-generate fallback unique VIN if driver doesn't have the registration card
+    const cleanPlate = (body.plate || "CAR").trim().toUpperCase().replace(/[^A-Za-z0-9]/g, "");
+    if (!body.vin || !body.vin.trim()) {
+      body.vin = `VN-${cleanPlate}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    }
+    
     const unit = await Unit.create(body);
     return NextResponse.json(unit, { status: 201 });
   } catch (error: any) {

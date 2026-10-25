@@ -39,6 +39,7 @@ import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/providers/ToastProvider";
 import CreateClientModal from "@/components/modals/CreateClientModal";
+import CreateUnitModal from "@/components/modals/CreateUnitModal";
 import AdditionalDriverModal from "@/components/modals/AdditionalDriverModal";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
@@ -153,6 +154,7 @@ export function NewRentalAdminPageContent() {
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [isCreateUnitModalOpen, setIsCreateUnitModalOpen] = useState(false);
   const [isSelectSecondDriverModalOpen, setIsSelectSecondDriverModalOpen] = useState(false);
   const [secondDriverClient, setSecondDriverClient] = useState<any | null>(null);
   const [isAddingForSecondDriver, setIsAddingForSecondDriver] = useState(false);
@@ -1249,6 +1251,15 @@ export function NewRentalAdminPageContent() {
               className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCreateUnitModalOpen(true)}
+            className="px-3.5 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
+          >
+            <ExecutiveCarIcon size={14} />
+            <span>+ New Car (إضافة سيارة)</span>
+          </button>
         </div>
       </div>
 
@@ -1265,6 +1276,16 @@ export function NewRentalAdminPageContent() {
               ? "All cars are currently booked or under maintenance. Switch to All Cars to view fleet."
               : "No cars match your search keywords. Try searching by make, model, or license plate."}
           </p>
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setIsCreateUnitModalOpen(true)}
+              className="px-4 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+            >
+              <ExecutiveCarIcon size={14} />
+              <span>+ Add Vehicle to Fleet (إضافة سيارة جديدة)</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -3175,6 +3196,35 @@ export function NewRentalAdminPageContent() {
           setIsAddingForSecondDriver(false);
         }}
         onSuccess={handleClientModalSuccess}
+      />
+
+      {/* Modal for creating a new vehicle on the fly (no card scan required) */}
+      <CreateUnitModal
+        isOpen={isCreateUnitModalOpen}
+        isDriver={true}
+        hideCardScan={true}
+        onClose={() => setIsCreateUnitModalOpen(false)}
+        onSuccess={(newUnit) => {
+          setIsCreateUnitModalOpen(false);
+          fetchUnits();
+          if (newUnit && (newUnit._id || newUnit.id)) {
+            const newId = newUnit._id || newUnit.id;
+            setSelectedVehicle(newId);
+            const start = new Date(rentalData.startDate);
+            const end = new Date(rentalData.endDate);
+            const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+            const defaultRate = newUnit.dailyRate || 85;
+            setRentalData((prev) => ({
+              ...prev,
+              dailyRate: defaultRate,
+              collectionAmount: defaultRate * days,
+              dailyKmLimit: newUnit.dailyKmLimit || 0,
+              pricePerExtraKm: newUnit.pricePerExtraKm || 0,
+              checkoutMileage: newUnit.mileage || 0,
+            }));
+            toast.success(`Vehicle "${newUnit.make} ${newUnit.model}" (${newUnit.plate}) registered and selected! ✓`);
+          }
+        }}
       />
 
       {/* Modal for selecting or creating second driver */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { 
   Camera, 
   Gauge, 
@@ -137,6 +138,11 @@ export default function VehicleReturnPage() {
   const [returnPhotos, setReturnPhotos] = useState<Record<string, string>>({});
   const [fullContractData, setFullContractData] = useState<any | null>(null);
   const [showHandoverModal, setShowHandoverModal] = useState<boolean>(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Damages
   const [hasNewDamage, setHasNewDamage] = useState(false);
@@ -667,7 +673,7 @@ export default function VehicleReturnPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left: Vehicle Profile Card (Matching Handover / New Booking Car Card Style) */}
-        <div className="bg-card rounded-2xl border border-brand bg-brand-light/10 ring-2 ring-brand/30 p-5 space-y-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-card rounded-2xl border border-brand bg-brand-light/10 ring-2 ring-brand/30 p-5 space-y-4 shadow-sm self-start">
           <div className="space-y-4">
             <div className="flex justify-between items-start">
               <div>
@@ -695,7 +701,7 @@ export default function VehicleReturnPage() {
 
             <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
               {plateNumber && (
-                <span className="font-mono text-brand font-bold bg-brand/10 px-2.5 py-1 rounded-md border border-brand/20">
+                <span className="text-xs font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-md border border-gray-200 tracking-wider">
                   {plateNumber}
                 </span>
               )}
@@ -725,37 +731,18 @@ export default function VehicleReturnPage() {
           </div>
 
           {/* Customer / Contract Info Pill */}
-          <div className="bg-white p-3.5 rounded-xl border border-border/80 space-y-1.5 text-xs mt-2">
+          <div className="bg-white p-3.5 rounded-xl border border-border/80 space-y-1.5 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-text-muted text-[11px]">
                 {isPersonalized ? "Personal Recipient (المستفيد)" : "Primary Customer"}
               </span>
-              <span className="font-mono text-[10px] text-brand bg-brand/10 px-2 py-0.5 rounded font-bold">
+              <span className="text-xs font-bold text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">
                 Contract #{contractNum}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <strong className="text-text-primary font-bold">{customerName}</strong>
             </div>
-
-            {/* Handover Photos Quick Button */}
-            <button
-              type="button"
-              onClick={() => setShowHandoverModal(true)}
-              className="w-full mt-2 py-2 px-3 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-900 border border-blue-200/90 text-xs font-bold transition-all flex items-center justify-between shadow-2xs cursor-pointer group active:scale-[0.99]"
-            >
-              <span className="flex items-center gap-2">
-                <Camera size={14} className="text-blue-600 group-hover:scale-110 transition-transform" />
-                <span>Handover Photos (صور التسليم)</span>
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                handoverPhotos.length > 0 
-                  ? "bg-blue-600 text-white" 
-                  : "bg-gray-100 text-text-muted"
-              }`}>
-                {handoverPhotos.length > 0 ? `${handoverPhotos.length} Photos` : "None"}
-              </span>
-            </button>
           </div>
         </div>
 
@@ -949,8 +936,8 @@ export default function VehicleReturnPage() {
       <HandoverPhotosGallery
         photos={handoverPhotos}
         returnPhotos={returnPhotos}
-        title="Compare Handover Condition & Photos (صور وحالة السيارة عند الاستلام)"
-        subtitle="Verify preexisting scratches, dings, or body marks before recording new damage charges"
+        title="Compare"
+        subtitle=""
         metadata={{
           checkoutMileage: initialMileage,
           checkoutFuelLevel: checkoutFuelLevel,
@@ -960,7 +947,9 @@ export default function VehicleReturnPage() {
           contractNumber: contractNum,
         }}
         allowComparison={true}
-        defaultOpen={hasNewDamage}
+        defaultMode="comparison"
+        onlyComparison={true}
+        defaultOpen={true}
         collapsible={true}
       />
 
@@ -1811,20 +1800,17 @@ export default function VehicleReturnPage() {
       )}
 
       {/* Handover Inspection Photos Modal */}
-      {showHandoverModal && (
+      {mounted && showHandoverModal && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fade-in"
           onClick={() => setShowHandoverModal(false)}
         >
           <div
             className="bg-card w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-border flex items-center justify-between bg-blue-50/60 shrink-0">
+            <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-border flex items-center justify-between bg-red-50/40 shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
-                  <Camera size={16} />
-                </div>
                 <div className="min-w-0">
                   <h3 className="font-bold text-text-primary text-sm sm:text-base truncate">
                     Handover Inspection Photos — Contract #{contractNum}
@@ -1861,7 +1847,8 @@ export default function VehicleReturnPage() {
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

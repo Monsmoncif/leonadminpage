@@ -17,8 +17,8 @@ export class Unit {
   @Prop({ required: true, unique: true })
   plate: string;
 
-  @Prop({ required: true, unique: true })
-  vin: string;
+  @Prop({ required: false, sparse: true })
+  vin?: string;
 
   @Prop({ required: true })
   color: string;
