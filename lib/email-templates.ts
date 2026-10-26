@@ -199,6 +199,11 @@ export interface ClientContractEmailParams {
   contractUrl?: string;
 }
 
+export function cleanVehicleName(name?: string): string {
+  if (!name) return "";
+  return name.replace(/\s*\(?(?:19|20)\d{2}\)?\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+}
+
 /**
  * 1. Client Contract Email (New Booking, Handover, or Final Return)
  * Full official contract layout with vehicle details, hirer info, handover metrics, and AED financials.
@@ -208,21 +213,23 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
   const isHandover = params.type === "initial";
   const isCreated = params.type === "created";
 
+  const safeVehicleName = cleanVehicleName(params.vehicleName);
+
   const formatAED = (amount?: number) => {
     if (amount === undefined || amount === null || isNaN(amount)) return "0 AED";
     return `${Number(amount).toLocaleString()} AED`;
   };
 
-  const vehicleDisplay = `${params.vehicleName}${params.vehicleYear ? ` (${params.vehicleYear})` : ""}${params.vehicleColor ? ` - ${params.vehicleColor}` : ""}`;
+  const vehicleDisplay = `${safeVehicleName}${params.vehicleColor ? ` - ${params.vehicleColor}` : ""}`;
   const rentalPeriod = `${params.startDate}${params.startTime ? ` at ${params.startTime}` : ""} to ${params.endDate}${params.endTime ? ` at ${params.endTime}` : ""}`;
 
   // ========================================================
   // MODE A: FINAL RETURN & COMPLETION (VIP THANK YOU - NO PDF)
   // ========================================================
   if (isFinal) {
-    const subject = `🌟 Thank You for Choosing Leon Rent Car! | Return Completed — ${params.vehicleName}`;
+    const subject = `🌟 Thank You for Choosing Leon Rent Car! | Return Completed — ${safeVehicleName}`;
     const title = "Thank You for Driving with Leon Rent Car!";
-    const subtitle = `Vehicle return successfully completed for ${params.vehicleName}.`;
+    const subtitle = `Vehicle return successfully completed for ${safeVehicleName}.`;
 
     const contentHtml = `
       <p style="margin: 0 0 16px; font-size: 15px; color: #1e293b;">
@@ -234,7 +241,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
       </p>
 
       <p style="margin: 0 0 22px; font-size: 13.5px; color: #475569; line-height: 1.65;">
-        We truly hope you had a comfortable, seamless, and memorable driving experience in the <strong>${params.vehicleName}</strong>. Your vehicle return inspection has been successfully completed, and your rental account is officially finalized with all settlements cleared.
+        We truly hope you had a comfortable, seamless, and memorable driving experience in the <strong>${safeVehicleName}</strong>. Your vehicle return inspection has been successfully completed, and your rental account is officially finalized with all settlements cleared.
       </p>
 
       <!-- Status Banner -->
@@ -257,7 +264,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
           Completed Journey Summary / ملخص الرحلة المكتملة
         </div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-          ${buildDetailRow("Rented Vehicle", params.vehicleName)}
+          ${buildDetailRow("Rented Vehicle", safeVehicleName)}
           ${buildDetailRow("Rental Duration", `${params.startDate} ➔ ${params.endDate}`, !params.totalDays)}
           ${params.totalDays ? buildDetailRow("Total Days", `${params.totalDays} Day${params.totalDays > 1 ? "s" : ""}`, true) : ""}
         </table>
@@ -285,7 +292,7 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
   // MODE B: NEW BOOKING CONFIRMED (ORDER DONE - NO PDF)
   // ========================================================
   if (isCreated) {
-    const subject = `🎉 Booking Confirmed — ${params.vehicleName} | Leon Rent Car`;
+    const subject = `🎉 Booking Confirmed — ${safeVehicleName} | Leon Rent Car`;
     const title = "Vehicle Booking Confirmed";
     const subtitle = "Your vehicle reservation has been received and confirmed.";
 
@@ -382,9 +389,9 @@ export function buildClientContractEmail(params: ClientContractEmailParams): { s
   // MODE C: HANDOVER CONFIRMATION (CAR DELIVERED - WITH OFFICIAL PDF)
   // ========================================================
   const title = "Official Rental Agreement & Handover Confirmation";
-  const subtitle = `Vehicle has been officially handed over (${params.vehicleName}).`;
+  const subtitle = `Vehicle has been officially handed over (${safeVehicleName}).`;
   const statusBadge = "Vehicle Delivered (تم التسليم وبدء العقد)";
-  const subject = `Official Handover Agreement — ${params.vehicleName} | Leon Rent Car`;
+  const subject = `Official Handover Agreement — ${safeVehicleName} | Leon Rent Car`;
 
   const contentHtml = `
     <p style="margin: 0 0 14px; font-size: 15px; color: #1e293b;">
@@ -507,16 +514,17 @@ export function buildDriverTaskEmail(params: {
   isDelivery: boolean;
   actionUrl?: string;
 }): { subject: string; html: string } {
+  const safeVehicleName = cleanVehicleName(params.vehicleName);
   const taskTitle = params.isDelivery ? "Vehicle Delivery Assignment" : "Vehicle Return Collection";
   const taskSubtitle = params.isDelivery
     ? "Vehicle handover task assigned for dispatch"
     : "Vehicle collection and return inspection assigned";
 
-  const subject = `[Dispatch] ${taskTitle} — ${params.clientName} (${params.vehicleName})`;
+  const subject = `[Dispatch] ${taskTitle} — ${params.clientName} (${safeVehicleName})`;
 
   const rows = [
     buildDetailRow("Task", params.isDelivery ? "Client Delivery / Handover" : "Vehicle Return Collection"),
-    buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
+    buildDetailRow("Vehicle", `${safeVehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
     buildDetailRow("Client", params.clientName),
     buildDetailRow(params.isDelivery ? "Delivery Location" : "Collection Location", params.location),
     buildDetailRow("Scheduled Time", params.time),
@@ -529,7 +537,7 @@ export function buildDriverTaskEmail(params: {
     </p>
 
     <p style="margin: 0 0 20px; font-size: 13px; color: #475569; line-height: 1.6;">
-      You have been assigned an operational task for client <strong>${params.clientName}</strong> (${params.vehicleName}). Please find the task details below:
+      You have been assigned an operational task for client <strong>${params.clientName}</strong> (${safeVehicleName}). Please find the task details below:
     </p>
 
     <!-- Schedule Table -->
@@ -576,19 +584,20 @@ export function buildAdminHandoverReminderEmail(params: {
   timingLabel: "Tomorrow" | "Today";
   viewUrl: string;
 }): { subject: string; html: string } {
+  const safeVehicleName = cleanVehicleName(params.vehicleName);
   const isTomorrow = params.timingLabel === "Tomorrow";
   const title = `Handover Scheduled: ${isTomorrow ? "Tomorrow" : "Today"}`;
-  const subtitle = `Scheduled vehicle handover for ${params.clientName} (${params.vehicleName})`;
+  const subtitle = `Scheduled vehicle handover for ${params.clientName} (${safeVehicleName})`;
 
   // Display Client Name and Vehicle Name in subject instead of contract number
-  const subject = `[Handover Reminder] ${params.timingLabel}: ${params.clientName} — ${params.vehicleName}`;
+  const subject = `[Handover Reminder] ${params.timingLabel}: ${params.clientName} — ${safeVehicleName}`;
 
   const cleanContractNum = params.contractNumber ? params.contractNumber.replace(/^#+/, "").trim() : "";
   const isRealContractNumber = cleanContractNum !== "" && !/^[0-9a-fA-F]{8}$/.test(cleanContractNum);
 
   const rows = [
     buildDetailRow("Client", `${params.clientName}${params.clientPhone ? ` (${params.clientPhone})` : ''}`),
-    buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
+    buildDetailRow("Vehicle", `${safeVehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
   ];
 
   if (isRealContractNumber) {
@@ -664,6 +673,8 @@ export function buildAdminEventNoticeEmail(params: {
     displayDriverName = "Assigned Driver";
   }
 
+  const safeVehicleName = cleanVehicleName(params.vehicleName);
+
   const title = params.isDelivered 
     ? (isShop ? "Vehicle Handover Completed (Shop)" : "Vehicle Handover Completed") 
     : (isShop ? "Vehicle Return Processed (Shop)" : "Vehicle Return Processed");
@@ -672,10 +683,10 @@ export function buildAdminEventNoticeEmail(params: {
     ? `Vehicle handed over to client ${params.clientName}`
     : `Vehicle collected and returned for client ${params.clientName}`;
 
-  const subject = `[Status Update] ${title} — ${params.clientName} (${params.vehicleName})`;
+  const subject = `[Status Update] ${title} — ${params.clientName} (${safeVehicleName})`;
 
   const rows = [
-    buildDetailRow("Vehicle", `${params.vehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
+    buildDetailRow("Vehicle", `${safeVehicleName}${params.vehiclePlate ? ` (${params.vehiclePlate})` : ''}`),
     buildDetailRow("Client", params.clientName),
     isShop
       ? buildDetailRow("Handover", `Shop / Agency (${params.location || "Office"})`)

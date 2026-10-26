@@ -29,6 +29,11 @@ function getTransporter() {
   });
 }
 
+function cleanVehicleName(name?: string): string {
+  if (!name) return "";
+  return name.replace(/\s*\(?(?:19|20)\d{2}\)?\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+}
+
 /**
  * Sends automated WhatsApp + Gmail notification to Client
  * Supports types: "created" (new booking), "initial" (car delivered), "final" (car returned)
@@ -58,12 +63,6 @@ export async function sendClientContractNotification(
       return results;
     }
 
-    // Completion / "final" thank you notifications to client are disabled as requested
-    if (type === "final") {
-      console.log(`[ClientNotification] Skipping client notification for contract ${contractId}: completion thank you notifications are disabled.`);
-      return results;
-    }
-
     // Ensure client details are accessible even if populated partially
     let clientDoc = contract.clientId;
     if (!clientDoc.name || !clientDoc.phone) {
@@ -76,10 +75,11 @@ export async function sendClientContractNotification(
     const clientPhone = clientDoc.phone;
 
     const contractNum = contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase();
-    const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
+    const rawVehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : (contract.vehicle || "Vehicle");
+    const vehicleName = cleanVehicleName(rawVehicleName);
     const vehiclePlate = contract.unitId?.plate || "";
     const vehicleColor = contract.unitId?.color || "";
-    const vehicleYear = contract.unitId?.year || "";
+    const vehicleYear = ""; // Do not show car year in client notifications
 
     const startDate = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
     const endDate = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -246,6 +246,16 @@ export async function sendClientContractNotification(
             `📄 *سيتم إتمام الفحص وتوقيع العقد الرسمي وتسليم المفاتيح عند استلام السيارة.*\n\n` +
             `Need any assistance? Reply directly to this chat.\n` +
             `— *Leon Rent Car*`;
+        } else if (type === "final") {
+          whatsappMsg = `🌟 *LEON RENT CAR* | شكراً لاختياركم ليون لتأجير السيارات\n` +
+            `*Thank You for Choosing Leon Rent Car!*\n\n` +
+            `Hello *${clientName}*,\n` +
+            `Thank you for choosing Leon Rent Car. Your vehicle return inspection has been successfully completed, and your rental account is officially finalized! 🤝\n\n` +
+            `🚗 *Vehicle / السيارة:* ${vehicleName}\n` +
+            `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n\n` +
+            `✨ نتمنى أن تكون قد استمتعت برحلتك وبتجربة قيادة مريحة معنا، ونتطلع لخدمتك مجدداً في أقرب وقت!\n` +
+            `We truly hope you had a great driving experience and look forward to welcoming you behind the wheel again soon!\n\n` +
+            `— *Leon Rent Car*`;
         } else {
           whatsappMsg = `🌟 *LEON RENT CAR* | عقد إيجار سيارة رسمي والتسليم\n` +
             `*Vehicle Rental Agreement & Handover*\n\n` +
@@ -328,7 +338,8 @@ export async function sendDriverTaskNotification(
       ? `Order #${contract._id.toString().substring(0, 8).toUpperCase()}`
       : (contract.contractNumber ? `#${contract.contractNumber}` : `Order #${contract._id.toString().substring(0, 8).toUpperCase()}`);
 
-    const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
+    const rawVehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : (contract.vehicle || "Vehicle");
+    const vehicleName = cleanVehicleName(rawVehicleName);
     const vehiclePlate = contract.unitId?.plate || "";
     const clientName = contract.clientId?.name || "Client";
     const startDate = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -460,7 +471,8 @@ export async function sendHandoverReminderNotification(
     const clientPhone = clientDoc?.phone || (contract as any).additionalDriverPhone || "";
     const contractNum = contract.contractNumber ? String(contract.contractNumber) : "";
 
-    const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
+    const rawVehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : (contract.vehicle || "Vehicle");
+    const vehicleName = cleanVehicleName(rawVehicleName);
     const vehiclePlate = contract.unitId?.plate || "";
     const location = contract.pickupLocation || "Main Office";
     const checkoutTime = contract.checkoutTime || "08:00 AM";

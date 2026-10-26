@@ -366,6 +366,25 @@ export async function PUT(
       } catch (e) { console.error("Admin notify trigger failed:", e); }
     }
 
+    // Auto-send thank you notification to client when vehicle is returned and contract is completed
+    const isReturnCompletion = 
+      (body.status === "Completed" && existingContract.status !== "Completed") ||
+      (body.deliveryStatus === "Returned" && existingContract.deliveryStatus !== "Returned");
+
+    if (isReturnCompletion) {
+      sendClientContractNotification(resolvedParams.id, "final").catch(e => console.error("Client return completion send trigger failed (background):", e));
+
+      // Auto-notify admin that vehicle was returned
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+        fetch(`${baseUrl}/api/contracts/notify-admin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contractId: updatedContract._id.toString(), type: "vehicle_returned" }),
+        }).catch(err => console.error("Failed to notify admin on return:", err));
+      } catch (e) { console.error("Admin notify return trigger failed:", e); }
+    }
+
     // Send notifications to driver if newly assigned (delivery or return) in background
     // Delivery driver assigned
     if (body.deliveryDriverId && body.deliveryDriverId !== existingContract.deliveryDriverId?.toString()) {

@@ -36,7 +36,8 @@ export async function POST(req: Request) {
       ? String(contract.contractNumber) 
       : contract._id.toString().substring(0, 8).toUpperCase();
 
-    const vehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : "Vehicle";
+    const rawVehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : (contract.vehicle || "Vehicle");
+    const vehicleName = rawVehicleName.replace(/\s*\(?(?:19|20)\d{2}\)?\s*/g, " ").replace(/\s{2,}/g, " ").trim();
     const vehiclePlate = contract.unitId?.plate || "";
     const clientName = contract.clientId?.name || "Client";
     const isDelivered = type === "vehicle_delivered";
