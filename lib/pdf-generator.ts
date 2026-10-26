@@ -229,7 +229,7 @@ export function buildRealContractHtml(contract: any): string {
         </div>
         <div class="border-b-black" style="padding: 2px 4px;">
           <div style="font-size: 6px; color: #6b7280; font-weight: bold;">NAME / الاسم</div>
-          <div style="font-weight: 900; font-size: 8.5px;">${contract.personalizedPersonName || client.name || "N/A"}</div>
+          <div style="font-weight: 900; font-size: 8.5px;">${isPersonalized ? (contract.personalizedPersonName || client.name || "Personal Use") : (client.name || contract.personalizedPersonName || "N/A")}</div>
         </div>
         <div class="grid-2 border-b-black" style="font-size: 6.5px;">
           <div class="border-r-black" style="padding: 2px 4px;">
@@ -661,6 +661,18 @@ export async function generateContractPdfFromPrintUrl(
 }
 
 const pdfJobs = new Map<string, Promise<Buffer>>();
+
+export function clearPdfJobs(contractId?: string) {
+  if (contractId) {
+    for (const key of Array.from(pdfJobs.keys())) {
+      if (key.startsWith(`${contractId}:`)) {
+        pdfJobs.delete(key);
+      }
+    }
+  } else {
+    pdfJobs.clear();
+  }
+}
 
 /**
  * Renders the REAL /bookings/[id]/print page with Puppeteer and prints it to PDF.

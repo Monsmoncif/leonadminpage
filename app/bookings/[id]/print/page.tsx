@@ -26,7 +26,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/contracts/${id}`, { cache: 'no-store' })
+    fetch(`/api/contracts/${id}?t=${Date.now()}`, { cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load contract details");
         return res.json();
@@ -72,7 +72,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
       const prefetchTimer = isServerRender
         ? null
         : setTimeout(() => {
-            fetch(`/api/contracts/${id}/pdf`).catch(() => {});
+            fetch(`/api/contracts/${id}/pdf?fresh=1&t=${Date.now()}`).catch(() => {});
           }, 500);
 
       return () => {
@@ -219,7 +219,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
     if (isDownloading) return;
     try {
       setIsDownloading(true);
-      const res = await fetch(`/api/contracts/${id}/pdf`);
+      const res = await fetch(`/api/contracts/${id}/pdf?fresh=1&t=${Date.now()}`);
       if (!res.ok) throw new Error("Failed to load PDF");
       const blob = await res.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -232,7 +232,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
       document.body.removeChild(a);
     } catch (err: any) {
       console.error("PDF download failed:", err);
-      window.open(`/api/contracts/${id}/pdf`, "_blank");
+      window.open(`/api/contracts/${id}/pdf?fresh=1&t=${Date.now()}`, "_blank");
     } finally {
       setIsDownloading(false);
     }
@@ -470,7 +470,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               <div className="col-span-2 px-1 py-[1.5px] border-b border-black flex flex-col">
                 <span className="text-gray-500 font-bold uppercase text-[6px]">Name / الاسم</span>
                 <span className="font-bold text-[8.5px] truncate">
-                  {contract.personalizedPersonName || client.name || contract.customer || "N/A"}
+                  {isPersonalized ? (contract.personalizedPersonName || client.name || "Personal Use") : (client.name || contract.personalizedPersonName || contract.customer || "N/A")}
                 </span>
               </div>
               {isForeigner ? (

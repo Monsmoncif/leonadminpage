@@ -1,23 +1,25 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { generateContractPdfFromPrintUrl, generateContractPdf } from "@/lib/pdf-generator";
+import { generateContractPdfFromPrintUrl, generateContractPdf, clearPdfJobs } from "@/lib/pdf-generator";
 import connectDB from "@/lib/db";
 import { Contract } from "@/models/Contract";
 import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
 
 // In-memory cache for fast repeated and prefetched downloads
-export const pdfCache = new Map<string, { buffer: Buffer; updatedAt?: string; timestamp: number }>();
+export const pdfCache = new Map<string, { buffer: Buffer; updatedAt?: string; clientUpdatedAt?: string; timestamp: number }>();
 export const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export function clearPdfCache(contractId?: string) {
   if (contractId) {
     pdfCache.delete(contractId);
-    console.log(`[PdfCache] Cleared PDF cache for contract ${contractId}`);
+    clearPdfJobs(contractId);
+    console.log(`[PdfCache] Cleared PDF cache and jobs for contract ${contractId}`);
   } else {
     pdfCache.clear();
-    console.log("[PdfCache] Cleared all PDF cache");
+    clearPdfJobs();
+    console.log("[PdfCache] Cleared all PDF cache and jobs");
   }
 }
 
@@ -53,16 +55,26 @@ export async function GET(
 
     const contractNum = contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase();
     const contractUpdatedAt = contract.updatedAt ? new Date(contract.updatedAt).toISOString() : "";
+    const clientDoc = contract.clientId || {};
+    const clientUpdatedAt = clientDoc?.updatedAt ? new Date(clientDoc.updatedAt).toISOString() : "";
 
     const url = new URL(req.url);
     const forceFresh = url.searchParams.get("fresh") === "1" || url.searchParams.has("t");
 
-    // 1. Check in-memory cache for instant 0ms return if not explicitly asking for fresh
+    if (forceFresh) {
+      clearPdfCache(id);
+      if (contract.contractNumber) {
+        clearPdfCache(String(contract.contractNumber));
+      }
+    }
+
+    // 1. Check in-memory cache for instant return if not explicitly asking for fresh
     if (!forceFresh) {
       const cached = pdfCache.get(id);
       if (
         cached &&
         (!contractUpdatedAt || cached.updatedAt === contractUpdatedAt) &&
+        (!clientUpdatedAt || cached.clientUpdatedAt === clientUpdatedAt) &&
         Date.now() - cached.timestamp < CACHE_TTL_MS
       ) {
         return new NextResponse(new Uint8Array(cached.buffer), {
@@ -70,7 +82,9 @@ export async function GET(
           headers: {
             "Content-Type": "application/pdf",
             "Content-Disposition": `attachment; filename="Contract-${contractNum}.pdf"`,
-            "Cache-Control": "public, max-age=3600",
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
             "X-PDF-Cache": "HIT",
           },
         });
@@ -78,7 +92,6 @@ export async function GET(
     }
 
     // 2. Prepare fallback data for instant reliability
-    const clientDoc = contract.clientId || {};
     const unitDoc = contract.unitId || {};
     const isPersonalized = Boolean(
       contract.contractType === "Personalized" ||
@@ -101,7 +114,9 @@ export async function GET(
 
     const fallbackData = {
       contractNumber: contractNum,
-      clientName: contract.personalizedPersonName || clientDoc.name || "Customer",
+      clientName: isPersonalized 
+        ? (contract.personalizedPersonName || clientDoc.name || "Customer") 
+        : (clientDoc.name || contract.personalizedPersonName || contract.customer || "Customer"),
       clientPhone: clientDoc.phone || "",
       clientEmail: clientDoc.email || "",
       clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
@@ -148,6 +163,7 @@ export async function GET(
     pdfCache.set(id, {
       buffer: pdfBuffer,
       updatedAt: contractUpdatedAt,
+      clientUpdatedAt,
       timestamp: Date.now(),
     });
 
@@ -156,7 +172,9 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="Contract-${contractNum}.pdf"`,
-        "Cache-Control": "public, max-age=3600",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
         "X-PDF-Cache": "MISS",
       },
     });

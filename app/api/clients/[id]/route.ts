@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import { Client } from "@/models/Client";
 import { Contract } from "@/models/Contract";
 import { Unit } from "@/models/Unit";
+import { clearPdfCache } from "@/app/api/contracts/[id]/pdf/route";
 
 export async function GET(
   req: NextRequest,
@@ -106,6 +107,24 @@ export async function PUT(
         { status: 404 }
       );
     }
+
+    // Touch all contracts associated with this client so their updatedAt changes and cache is invalidated
+    try {
+      await Contract.updateMany(
+        { clientId: id },
+        { $set: { updatedAt: new Date() } }
+      );
+      const associatedContracts = await Contract.find({ clientId: id }).select("_id contractNumber").lean();
+      for (const c of associatedContracts) {
+        clearPdfCache(c._id.toString());
+        if (c.contractNumber) {
+          clearPdfCache(String(c.contractNumber));
+        }
+      }
+    } catch (touchErr) {
+      console.warn("Could not bump contract updatedAt on client update:", touchErr);
+    }
+
     return NextResponse.json(client);
   } catch (error: any) {
     if (error.code === 11000) {

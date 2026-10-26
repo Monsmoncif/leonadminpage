@@ -33,7 +33,9 @@ import {
   ChevronDown,
   ChevronUp,
   Image as ImageIcon,
-  Trash2
+  Trash2,
+  Edit,
+  Edit2
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -154,6 +156,7 @@ export function NewRentalAdminPageContent() {
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [clientToEdit, setClientToEdit] = useState<any>(null);
   const [isCreateUnitModalOpen, setIsCreateUnitModalOpen] = useState(false);
   const [isSelectSecondDriverModalOpen, setIsSelectSecondDriverModalOpen] = useState(false);
   const [secondDriverClient, setSecondDriverClient] = useState<any | null>(null);
@@ -206,10 +209,11 @@ export function NewRentalAdminPageContent() {
         if (contractType === "Personalized") {
           setPersonName(newClient.name);
         }
-        toast.success(`Registered "${newClient.name}" and selected as Primary Customer!`);
+        toast.success(clientToEdit ? `Customer "${newClient.name}" updated successfully! (تم تحديث بيانات العميل بنجاح) ✓` : `Registered "${newClient.name}" and selected as Primary Customer!`);
       }
     }
     setIsClientModalOpen(false);
+    setClientToEdit(null);
   };
 
   const getCurrentFormattedTime = () => {
@@ -1466,6 +1470,19 @@ export function NewRentalAdminPageContent() {
                 <CheckCircle2 size={13} className="text-brand shrink-0" />
                 <button
                   type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setClientToEdit(selectedClientObj);
+                    setIsAddingForSecondDriver(false);
+                    setIsClientModalOpen(true);
+                  }}
+                  className="p-0.5 text-gray-400 hover:text-brand transition-colors cursor-pointer"
+                  title="Edit customer details (تعديل بيانات العميل)"
+                >
+                  <Edit2 size={12} />
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSelectedClient(null)}
                   className="text-gray-400 hover:text-red-600 transition-colors cursor-pointer ml-0.5"
                   title="Remove selected customer"
@@ -1531,11 +1548,26 @@ export function NewRentalAdminPageContent() {
                     <p className="text-xs text-text-muted truncate">{client.phone || "No phone"}</p>
                   </div>
                 </div>
-                {isSelected ? (
-                  <span className="bg-brand text-white p-1 rounded-full shrink-0"><CheckCircle2 size={16} /></span>
-                ) : (
-                  <div className="w-5 h-5 rounded-full border border-gray-300 group-hover:border-brand shrink-0" />
-                )}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setClientToEdit(client);
+                      setIsAddingForSecondDriver(false);
+                      setIsClientModalOpen(true);
+                    }}
+                    className="p-1 text-gray-400 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer"
+                    title="Edit customer details (تعديل بيانات العميل)"
+                  >
+                    <Edit2 size={13} />
+                  </button>
+                  {isSelected ? (
+                    <span className="bg-brand text-white p-1 rounded-full shrink-0"><CheckCircle2 size={16} /></span>
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border border-gray-300 group-hover:border-brand shrink-0" />
+                  )}
+                </div>
               </div>
             );
           })}
@@ -3188,12 +3220,14 @@ export function NewRentalAdminPageContent() {
         </div>
       </div>
 
-      {/* Modal for creating a new client on the fly (with OCR scanner) */}
+      {/* Modal for creating or editing a client on the fly (with OCR scanner) */}
       <CreateClientModal
         isOpen={isClientModalOpen}
+        clientToEdit={clientToEdit}
         onClose={() => {
           setIsClientModalOpen(false);
           setIsAddingForSecondDriver(false);
+          setClientToEdit(null);
         }}
         onSuccess={handleClientModalSuccess}
       />

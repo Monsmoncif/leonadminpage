@@ -339,6 +339,12 @@ export async function PUT(
 
     // Invalidate cached PDF so fresh PDF with latest handover mileage, fuel, and signature is generated
     clearPdfCache(resolvedParams.id);
+    if (updatedContract.contractNumber) {
+      clearPdfCache(String(updatedContract.contractNumber));
+    }
+    if (existingContract.contractNumber) {
+      clearPdfCache(String(existingContract.contractNumber));
+    }
 
     // Auto-send initial contract PDF to client once vehicle handover is confirmed (Delivered)
     const isHandoverConfirmation = 
