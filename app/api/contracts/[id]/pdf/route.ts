@@ -6,6 +6,7 @@ import connectDB from "@/lib/db";
 import { Contract } from "@/models/Contract";
 import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
+import { formatDateDMY } from "@/lib/date-utils";
 
 // In-memory cache for fast repeated and prefetched downloads
 export const pdfCache = new Map<string, { buffer: Buffer; updatedAt?: string; clientUpdatedAt?: string; timestamp: number }>();
@@ -123,12 +124,12 @@ export async function GET(
       clientType: isForeigner ? "Tourist" : (clientDoc.clientType || "Resident"),
       clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
       licenseIssuedBy: clientDoc.licenseIssuedBy || clientDoc.licenseIssuedAt || "",
-      licenseIssuedDate: clientDoc.licenseIssuedDate ? new Date(clientDoc.licenseIssuedDate).toLocaleDateString("en-GB") : "",
-      licenseExpiry: clientDoc.licenseExpiry ? new Date(clientDoc.licenseExpiry).toLocaleDateString("en-GB") : "",
+      licenseIssuedDate: clientDoc.licenseIssuedDate ? formatDateDMY(clientDoc.licenseIssuedDate) : "",
+      licenseExpiry: clientDoc.licenseExpiry ? formatDateDMY(clientDoc.licenseExpiry) : "",
       internationalLicenseNumber: clientDoc.internationalLicenseNumber || "",
       passportNumber: clientDoc.passportNumber || (isForeigner ? clientDoc.idNumber : ""),
       passportIssuedBy: clientDoc.passportIssuedBy || (isForeigner ? clientDoc.nationality : ""),
-      passportExpiry: clientDoc.passportExpiry ? new Date(clientDoc.passportExpiry).toLocaleDateString("en-GB") : (isForeigner && clientDoc.idExpiry ? new Date(clientDoc.idExpiry).toLocaleDateString("en-GB") : ""),
+      passportExpiry: clientDoc.passportExpiry ? formatDateDMY(clientDoc.passportExpiry) : (isForeigner && clientDoc.idExpiry ? formatDateDMY(clientDoc.idExpiry) : ""),
       nationality: clientDoc.nationality || "",
       documents: Array.isArray(clientDoc.documents) ? clientDoc.documents : [],
       vehicleName: unitDoc.make ? `${unitDoc.make} ${unitDoc.model}` : "Vehicle",
@@ -137,8 +138,8 @@ export async function GET(
       vehicleYear: unitDoc.year || "",
       checkoutMileage: contract.checkoutMileage || contract.startMileage || 0,
       checkoutFuelLevel: contract.checkoutFuelLevel !== undefined ? Number(contract.checkoutFuelLevel) : 100,
-      startDate: new Date(contract.startDate).toLocaleDateString("en-GB"),
-      endDate: new Date(contract.endDate).toLocaleDateString("en-GB"),
+      startDate: formatDateDMY(contract.startDate),
+      endDate: formatDateDMY(contract.endDate),
       status: contract.status,
       deliveryStatus: contract.deliveryStatus,
       returnedAt: contract.returnedAt || contract.updatedAt,
@@ -153,7 +154,7 @@ export async function GET(
       fuelCharge: isPersonalized ? 0 : Number(contract.fuelCharge || contract.fuelFees || 0),
       notes: contract.notes || "",
       customerSignature: contract.customerSignature || contract.signature,
-      createdAt: new Date(contract.createdAt || Date.now()).toLocaleDateString("en-GB"),
+      createdAt: formatDateDMY(contract.createdAt || Date.now()),
     };
 
     // 3. Generate PDF from the real /bookings/[id]/print page

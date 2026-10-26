@@ -109,14 +109,32 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
     contract.status === "Completed"
   );
 
-  // Format Helper functions
+  // Format Helper functions (Strict Day/Month/Year DD/MM/YYYY)
   const formatDate = (dateStr: any) => {
     if (!dateStr) return "";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    try {
+      if (typeof dateStr === "string") {
+        const trimmed = dateStr.trim();
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+          return trimmed;
+        }
+        const match = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+        if (match) {
+          const year = match[1];
+          const month = match[2].padStart(2, "0");
+          const day = match[3].padStart(2, "0");
+          return `${day}/${month}/${year}`;
+        }
+      }
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return String(dateStr);
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return String(dateStr);
+    }
   };
 
   const client = contract.clientId || {};

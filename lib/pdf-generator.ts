@@ -79,9 +79,25 @@ function getBrowserExecutablePath(): string | null {
 function formatDateDisplay(dateVal: any): string {
   if (!dateVal) return "";
   try {
+    if (typeof dateVal === "string") {
+      const trimmed = dateVal.trim();
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+        return trimmed;
+      }
+      const match = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+      if (match) {
+        const year = match[1];
+        const month = match[2].padStart(2, "0");
+        const day = match[3].padStart(2, "0");
+        return `${day}/${month}/${year}`;
+      }
+    }
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return String(dateVal);
-    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
     return String(dateVal);
   }
@@ -145,7 +161,7 @@ export function buildRealContractHtml(contract: any): string {
     : "";
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="utf-8" />
   <title>${serialNo}</title>

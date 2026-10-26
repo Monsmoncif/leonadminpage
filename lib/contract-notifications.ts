@@ -13,6 +13,7 @@ import {
   buildAdminHandoverReminderEmail,
   getEmailLogoAttachment,
 } from "@/lib/email-templates";
+import { formatDateDMY } from "@/lib/date-utils";
 
 function getTransporter() {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
@@ -123,12 +124,12 @@ export async function sendClientContractNotification(
         clientType: isForeigner ? "Tourist" : (clientDoc.clientType || "Resident"),
         clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
         licenseIssuedBy: clientDoc.licenseIssuedBy || clientDoc.licenseIssuedAt || "",
-        licenseIssuedDate: clientDoc.licenseIssuedDate ? new Date(clientDoc.licenseIssuedDate).toLocaleDateString("en-GB") : "",
-        licenseExpiry: clientDoc.licenseExpiry ? new Date(clientDoc.licenseExpiry).toLocaleDateString("en-GB") : "",
+        licenseIssuedDate: clientDoc.licenseIssuedDate ? formatDateDMY(clientDoc.licenseIssuedDate) : "",
+        licenseExpiry: clientDoc.licenseExpiry ? formatDateDMY(clientDoc.licenseExpiry) : "",
         internationalLicenseNumber: clientDoc.internationalLicenseNumber || "",
         passportNumber: clientDoc.passportNumber || (isForeigner ? clientDoc.idNumber : ""),
         passportIssuedBy: clientDoc.passportIssuedBy || (isForeigner ? clientDoc.nationality : ""),
-        passportExpiry: clientDoc.passportExpiry ? new Date(clientDoc.passportExpiry).toLocaleDateString("en-GB") : (isForeigner && clientDoc.idExpiry ? new Date(clientDoc.idExpiry).toLocaleDateString("en-GB") : ""),
+        passportExpiry: clientDoc.passportExpiry ? formatDateDMY(clientDoc.passportExpiry) : (isForeigner && clientDoc.idExpiry ? formatDateDMY(clientDoc.idExpiry) : ""),
         nationality: clientDoc.nationality || "",
         documents: Array.isArray(clientDoc.documents) ? clientDoc.documents : [],
         vehicleName,
@@ -153,7 +154,7 @@ export async function sendClientContractNotification(
         fuelCharge: Number(contract.fuelCharge || contract.fuelFees || 0),
         notes: contract.notes || "",
         customerSignature: contract.customerSignature || contract.signature,
-        createdAt: new Date(contract.createdAt || Date.now()).toLocaleDateString("en-GB"),
+        createdAt: formatDateDMY(contract.createdAt || Date.now()),
       };
 
       try {

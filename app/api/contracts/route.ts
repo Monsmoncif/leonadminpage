@@ -14,6 +14,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { sendClientContractNotification, sendDriverTaskNotification, sendHandoverReminderNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
+import { formatDateWords } from "@/lib/date-utils";
 
 const emptyResponse = {
   contracts: [],
@@ -109,8 +110,8 @@ export async function GET(req: Request) {
       checkinTime: c.checkinTime || "",
       deliveredAt: c.deliveredAt || null,
       returnedAt: c.returnedAt || (c.status === "Completed" ? (c.updatedAt || new Date().toISOString()) : null),
-      startDate: new Date(c.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
-      endDate: new Date(c.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+      startDate: formatDateWords(c.startDate),
+      endDate: formatDateWords(c.endDate),
       deposit: `$${c.depositAmount || 0}`,
       advancePayment: c.advancePayment || 0,
       rentAmount: `$${c.totalAmount || 0}`,
