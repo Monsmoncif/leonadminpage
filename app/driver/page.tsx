@@ -596,17 +596,10 @@ export default function DriverDashboard() {
             Welcome back, {session?.user?.name?.split(" ")[0] || "Driver"}. Manage your assigned delivery handovers and vehicle returns.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
-          <Link
-            href="/driver/return"
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
-          >
-            <ArrowLeftRight size={18} />
-            <span>Return Contract (استرجاع سيارة)</span>
-          </Link>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Link
             href="/driver/contracts/new"
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
           >
             <Plus size={18} />
             <span>New Contract</span>
