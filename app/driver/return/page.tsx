@@ -28,7 +28,8 @@ import {
   DollarSign,
   Banknote,
   Image as ImageIcon,
-  FileText
+  FileText,
+  Search
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -119,6 +120,7 @@ export default function VehicleReturnPage() {
 
   const [contracts, setContracts] = useState<any[]>([]);
   const [selectedContract, setSelectedContract] = useState("");
+  const [contractSearchQuery, setContractSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -176,29 +178,35 @@ export default function VehicleReturnPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentStep]);
 
-  // Load contracts assigned to this return driver
+  // Filtered contracts list based on search query
+  const filteredContracts = useMemo(() => {
+    if (!contractSearchQuery.trim()) return contracts;
+    const q = contractSearchQuery.toLowerCase();
+    return contracts.filter((c) => {
+      const matchVehicle = (c.vehicle || "").toLowerCase().includes(q);
+      const matchPlate = (c.vehiclePlate || c.unitId?.plate || "").toLowerCase().includes(q);
+      const matchCustomer = (c.customer || c.clientId?.name || c.personalizedPersonName || "").toLowerCase().includes(q);
+      const matchContractNum = String(c.contractNumber || c.id || c._id || "").toLowerCase().includes(q);
+      return matchVehicle || matchPlate || matchCustomer || matchContractNum;
+    });
+  }, [contracts, contractSearchQuery]);
+
+  // Load active and delivered contracts available for vehicle return
   useEffect(() => {
-    const driverId = (session?.user as any)?.id;
-    const userRole = (session?.user as any)?.role;
     const qId = searchParams.get("contractId");
 
-    const contractsUrl = driverId && userRole !== "admin" 
-      ? `/api/contracts?driverId=${driverId}`
-      : `/api/contracts`;
-
-    fetch(contractsUrl, { cache: "no-store" })
+    fetch("/api/contracts", { cache: "no-store" })
       .then((res) => res.json())
       .then(async (contractsData) => {
         const allList = contractsData.contracts || [];
         
-        // Filter contracts for this return driver (or all for admin)
+        // Any active or delivered contract out with client is available for return
         let activeContracts = allList.filter((c: any) => 
-          (c.status === "Active" || c.deliveryStatus === "Delivered") && 
-          (!driverId || userRole === "admin" || c.returnDriverId === driverId || c.returnDriverId?._id === driverId)
+          c.status === "Active" || c.deliveryStatus === "Delivered"
         );
 
         if (qId) {
-          const match = allList.find((c: any) => c._id === qId || c.id === qId);
+          const match = allList.find((c: any) => c._id === qId || c.id === qId || String(c.contractNumber) === String(qId));
           if (match) {
             if (!activeContracts.some((c: any) => c._id === match._id)) {
               activeContracts = [match, ...activeContracts];
@@ -568,6 +576,8 @@ export default function VehicleReturnPage() {
         notes: returnNotes.trim() ? `${selectedContractData?.notes || ""}\n[Return Remarks: ${returnNotes.trim()}]`.trim() : selectedContractData?.notes,
         returnedAt: new Date().toISOString(),
         returnedBy: (session?.user as any)?.name || "Driver",
+        returnDriverId: (session?.user as any)?.id || (session?.user as any)?._id,
+        returnDriver: (session?.user as any)?.name || "Driver",
       };
 
       const res = await fetch(`/api/contracts/${selectedContract}`, {
@@ -627,9 +637,9 @@ export default function VehicleReturnPage() {
         </button>
         <div className="bg-white p-10 rounded-2xl border border-border text-center space-y-3 shadow-sm">
           <CheckCircle size={40} className="mx-auto text-emerald-500/60" />
-          <h2 className="text-lg font-bold text-text-primary">No Active Return Tasks Assigned</h2>
+          <h2 className="text-lg font-bold text-text-primary">No Active Rentals Awaiting Return (لا توجد عقود مؤجرة بانتظار الاسترجاع)</h2>
           <p className="text-xs text-text-muted max-w-md mx-auto">
-            You currently have no return pickups assigned to you. When an admin assigns you to collect a vehicle from a client, it will appear here and on your dashboard.
+            All vehicles in the fleet are currently returned or not out on rent. When a vehicle is rented out to a client, it will appear here for return inspection and settlement.
           </p>
           <button
             onClick={() => router.push("/driver")}
@@ -655,15 +665,25 @@ export default function VehicleReturnPage() {
           </p>
         </div>
         {contracts.length > 1 && (
-          <div className="w-full sm:w-auto">
+          <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search car, plate, client..."
+                value={contractSearchQuery}
+                onChange={(e) => setContractSearchQuery(e.target.value)}
+                className="w-full sm:w-56 pl-8 pr-3 py-1.5 bg-white border border-border rounded-xl text-xs text-text-primary placeholder:text-text-muted focus:ring-2 focus:ring-brand/20 outline-none shadow-2xs"
+              />
+            </div>
             <select
               value={selectedContract}
               onChange={(e) => setSelectedContract(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 bg-gray-50 border border-border rounded-xl text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 outline-none cursor-pointer"
+              className="w-full sm:w-auto px-3 py-2 bg-gray-50 border border-border rounded-xl text-xs font-bold text-text-primary focus:ring-2 focus:ring-brand/20 outline-none cursor-pointer max-w-full sm:max-w-xs truncate shadow-2xs"
             >
-              {contracts.map((c) => (
-                <option key={c._id} value={c._id}>
-                  Contract #{c.contractNumber || c.id || c._id.substring(0, 8)} • {c.vehicle || "Vehicle"} {c.contractType === "Personalized" || c.personalizedPersonName ? `(Personal: ${c.personalizedPersonName || "Personal Use"})` : ""}
+              {filteredContracts.map((c) => (
+                <option key={c._id || c.id} value={c._id || c.id}>
+                  Contract #{c.contractNumber || c.id || c._id?.substring(0, 8)} • {c.vehicle || "Vehicle"} {c.contractType === "Personalized" || c.personalizedPersonName ? `(Personal: ${c.personalizedPersonName || "Personal Use"})` : ""}
                 </option>
               ))}
             </select>

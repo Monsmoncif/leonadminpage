@@ -596,10 +596,17 @@ export default function DriverDashboard() {
             Welcome back, {session?.user?.name?.split(" ")[0] || "Driver"}. Manage your assigned delivery handovers and vehicle returns.
           </p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+          <Link
+            href="/driver/return"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
+          >
+            <ArrowLeftRight size={18} />
+            <span>Return Contract (استرجاع سيارة)</span>
+          </Link>
           <Link
             href="/driver/contracts/new"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
           >
             <Plus size={18} />
             <span>New Contract</span>
@@ -1105,7 +1112,7 @@ export default function DriverDashboard() {
                               <Eye size={16} />
                             </button>
                           </div>
-                        ) : isDelivered && !isReturned && isReturnForMe && activeTab === "tasks" ? (
+                        ) : isDelivered && !isReturned ? (
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -1113,29 +1120,11 @@ export default function DriverDashboard() {
                                 e.stopPropagation();
                                 router.push(`/driver/return?contractId=${contract._id || contract.id}`);
                               }}
-                              className="flex-1 py-2.5 px-3 bg-brand hover:bg-brand-dark active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-sm cursor-pointer"
+                              className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 transition-all shadow-xs hover:shadow-sm cursor-pointer"
                             >
                               <ArrowLeftRight size={15} />
-                              <span>Process Return (استلام السيارة)</span>
+                              <span>Process Return (استرجاع السيارة)</span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/driver/contracts/${contract._id || contract.id}`);
-                              }}
-                              className="p-2.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-xl border border-border/80 hover:border-brand/30 transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 shadow-2xs"
-                              title="View Contract Details"
-                            >
-                              <Eye size={16} />
-                            </button>
-                          </div>
-                        ) : isDelivered && !isReturned ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 py-2.5 px-3 rounded-xl bg-blue-50/80 border border-blue-200 text-blue-800 text-center text-xs font-semibold flex items-center justify-center gap-1.5">
-                              <CheckCircle2 size={13} className="text-blue-600 shrink-0" />
-                              <span>On Rent • With Client (مع العميل)</span>
-                            </div>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1333,15 +1322,15 @@ export default function DriverDashboard() {
                                   <CheckCircle2 size={13} />
                                   <span>Handover</span>
                                 </button>
-                              ) : isDelivered && !isReturned && isReturnForMe && activeTab === "tasks" ? (
+                              ) : isDelivered && !isReturned ? (
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     router.push(`/driver/return?contractId=${contract._id || contract.id}`);
                                   }}
-                                  className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-[10.5px] sm:text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
-                                  title="Process vehicle return"
+                                  className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10.5px] sm:text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                                  title="Process vehicle return (استرجاع السيارة)"
                                 >
                                   <ArrowLeftRight size={13} />
                                   <span>Return</span>

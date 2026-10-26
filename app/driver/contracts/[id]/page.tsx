@@ -18,7 +18,8 @@ import {
   Loader2,
   Mail,
   Phone,
-  Send
+  Send,
+  ArrowLeftRight
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -295,7 +296,16 @@ export default function DriverContractDetailsPage({ params }: { params: Promise<
 
         {/* Action Footer */}
         {isHandedOver ? (
-          <div className="px-3.5 sm:px-6 py-3.5 sm:py-5 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2 sm:gap-3">
+          <div className="px-3.5 sm:px-6 py-3.5 sm:py-5 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2 sm:gap-3 flex-wrap">
+            {contractDetails.status !== "Completed" && contractDetails.deliveryStatus !== "Returned" && (
+              <button
+                onClick={() => router.push(`/driver/return?contractId=${contractDetails._id}`)}
+                className="flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                <ArrowLeftRight size={15} />
+                <span>Process Return (استرجاع السيارة)</span>
+              </button>
+            )}
             <button
               onClick={() => window.open(`/bookings/${contractDetails._id}/print`, "_blank")}
               className="flex items-center justify-center gap-1.5 sm:gap-2 bg-brand text-white text-xs sm:text-sm font-bold px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:bg-brand-dark cursor-pointer"
