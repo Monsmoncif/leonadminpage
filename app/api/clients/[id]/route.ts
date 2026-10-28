@@ -110,11 +110,15 @@ export async function PUT(
 
     // Touch all contracts associated with this client so their updatedAt changes and cache is invalidated
     try {
+      const mongoose = (await import("mongoose")).default;
+      const objId = mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : null;
       await Contract.updateMany(
-        { clientId: id },
+        { $or: [{ clientId: id }, ...(objId ? [{ clientId: objId }] : [])] },
         { $set: { updatedAt: new Date() } }
       );
-      const associatedContracts = await Contract.find({ clientId: id }).select("_id contractNumber").lean();
+      const associatedContracts = await Contract.find({
+        $or: [{ clientId: id }, ...(objId ? [{ clientId: objId }] : [])]
+      }).select("_id contractNumber").lean();
       for (const c of associatedContracts) {
         clearPdfCache(c._id.toString());
         if (c.contractNumber) {

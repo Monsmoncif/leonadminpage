@@ -208,8 +208,8 @@ function ReturnPageContent() {
   // Load contracts and drivers
   useEffect(() => {
     Promise.all([
-      fetch("/api/contracts", { cache: "no-store" }).then(res => res.json()),
-      fetch("/api/drivers", { cache: "no-store" }).then(res => res.json())
+      fetch(`/api/contracts?t=${Date.now()}`, { cache: "no-store" }).then(res => res.json()),
+      fetch(`/api/drivers?t=${Date.now()}`, { cache: "no-store" }).then(res => res.json())
     ])
       .then(([contractsData, driversData]) => {
         const list = contractsData.contracts || [];
@@ -259,7 +259,7 @@ function ReturnPageContent() {
     }
     let isMounted = true;
     setIsLoadingContractDetails(true);
-    fetch(`/api/contracts/${selectedContractId}`, { cache: "no-store" })
+    fetch(`/api/contracts/${selectedContractId}?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (isMounted && data) {

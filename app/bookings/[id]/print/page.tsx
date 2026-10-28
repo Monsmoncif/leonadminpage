@@ -31,7 +31,27 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
         if (!res.ok) throw new Error("Failed to load contract details");
         return res.json();
       })
-      .then((data) => {
+      .then(async (data) => {
+        // Guarantee populated client even if clientId is an unpopulated string ID
+        if (data && typeof data.clientId === "string" && data.clientId.length > 5) {
+          try {
+            const clientRes = await fetch(`/api/clients/${data.clientId}?t=${Date.now()}`, { cache: 'no-store' });
+            if (clientRes.ok) {
+              const fullClient = await clientRes.json();
+              data.clientId = fullClient;
+            }
+          } catch {}
+        }
+        // Guarantee populated unit even if unitId is an unpopulated string ID
+        if (data && typeof data.unitId === "string" && data.unitId.length > 5) {
+          try {
+            const unitRes = await fetch(`/api/units/${data.unitId}?t=${Date.now()}`, { cache: 'no-store' });
+            if (unitRes.ok) {
+              const fullUnit = await unitRes.json();
+              data.unitId = fullUnit;
+            }
+          } catch {}
+        }
         setContract(data);
         setLoading(false);
       })
@@ -497,8 +517,8 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                   <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                     <span className="text-gray-500 font-bold uppercase text-[6px]">Driving License No / رقم الرخصة</span>
                     <span className="font-bold truncate">
-                      {client.licenseNumber || "N/A"}
-                      {(client.licenseIssuedBy || client.licenseIssuedAt) ? ` (${client.licenseIssuedBy || client.licenseIssuedAt})` : ""}
+                      {client.licenseNumber || contract.additionalDriverLicense || "N/A"}
+                      {(client.licenseIssuedBy || client.licenseIssuedAt || contract.additionalDriverIssuedAt) ? ` (${client.licenseIssuedBy || client.licenseIssuedAt || contract.additionalDriverIssuedAt})` : ""}
                     </span>
                   </div>
                   <div className="px-1 py-[1.5px] border-b border-black flex flex-col">
@@ -562,8 +582,8 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                   <div className="px-1 py-[1.5px] border-r border-black border-b border-black flex flex-col">
                     <span className="text-gray-500 font-bold uppercase text-[6px]">Driving License No / رقم الرخصة</span>
                     <span className="font-bold truncate">
-                      {client.licenseNumber || "N/A"}
-                      {(client.licenseIssuedBy || client.licenseIssuedAt) ? ` (${client.licenseIssuedBy || client.licenseIssuedAt})` : ""}
+                      {client.licenseNumber || contract.additionalDriverLicense || "N/A"}
+                      {(client.licenseIssuedBy || client.licenseIssuedAt || contract.additionalDriverIssuedAt) ? ` (${client.licenseIssuedBy || client.licenseIssuedAt || contract.additionalDriverIssuedAt})` : ""}
                     </span>
                   </div>
                   <div className="px-1 py-[1.5px] border-b border-black flex flex-col">

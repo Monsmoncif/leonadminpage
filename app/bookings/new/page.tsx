@@ -588,7 +588,7 @@ export function NewRentalAdminPageContent() {
   const fetchContract = async () => {
     if (!contractId) return;
     try {
-      const res = await fetch(`/api/contracts/${contractId}`, { cache: "no-store" });
+      const res = await fetch(`/api/contracts/${contractId}?t=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Contract not found");
       const c = await res.json();
       setEditingContract(c);

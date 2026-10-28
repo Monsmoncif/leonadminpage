@@ -6,6 +6,8 @@ import { Contract } from "@/models/Contract";
 import { Client } from "@/models/Client";
 import { Driver } from "@/models/Driver";
 import { syncUnitStatuses } from "@/lib/unit-status";
+import { clearPdfCache } from "@/app/api/contracts/[id]/pdf/route";
+import mongoose from "mongoose";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -134,6 +136,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           
         await contract.save();
       }
+    }
+
+    // Touch associated contracts and invalidate PDF cache so vehicle edits reflect immediately
+    try {
+      const objId = mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : null;
+      await Contract.updateMany(
+        { $or: [{ unitId: id }, ...(objId ? [{ unitId: objId }] : [])] },
+        { $set: { updatedAt: new Date() } }
+      );
+      const associatedContracts = await Contract.find({
+        $or: [{ unitId: id }, ...(objId ? [{ unitId: objId }] : [])]
+      }).select("_id contractNumber").lean();
+      for (const c of associatedContracts) {
+        clearPdfCache(c._id.toString());
+        if (c.contractNumber) {
+          clearPdfCache(String(c.contractNumber));
+        }
+      }
+    } catch (touchErr) {
+      console.warn("Could not bump contract updatedAt on unit update:", touchErr);
     }
 
     return NextResponse.json(unit);

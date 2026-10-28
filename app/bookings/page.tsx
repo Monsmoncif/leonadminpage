@@ -163,7 +163,7 @@ export default function ContractsPage() {
     const MAX_RETRIES = 3;
     setLoading(true);
     try {
-      const res = await fetch("/api/contracts", { cache: 'no-store' });
+      const res = await fetch(`/api/contracts?t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`Failed to fetch contracts data (${res.status})`);
       const json = await res.json();
       setData(json);
@@ -186,6 +186,14 @@ export default function ContractsPage() {
     try {
       router.prefetch("/bookings/handover");
     } catch {}
+
+    const onFocus = () => {
+      fetchContracts();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
   }, [router]);
 
   const handleDeleteConfirm = async () => {

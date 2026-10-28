@@ -660,7 +660,9 @@ export async function generateContractPdfFromPrintUrl(
 
   // Share ONE render between concurrent callers (client email + admin email fire together on handover)
   const updatedStamp = contractObj?.updatedAt ? new Date(contractObj.updatedAt).getTime() : "";
-  const cacheKey = `${contractId}:${updatedStamp}`;
+  const clientUpdatedStamp = contractObj?.clientId?.updatedAt ? new Date(contractObj.clientId.updatedAt).getTime() : "";
+  const unitUpdatedStamp = contractObj?.unitId?.updatedAt ? new Date(contractObj.unitId.updatedAt).getTime() : "";
+  const cacheKey = `${contractId}:${updatedStamp}:${clientUpdatedStamp}:${unitUpdatedStamp}`;
   const existingJob = pdfJobs.get(cacheKey);
   if (existingJob) {
     console.log(`[PdfGenerator] Reusing in-flight/recent PDF render for ${cacheKey}`);

@@ -54,7 +54,7 @@ export async function GET(req: Request) {
 
     let contractsQuery = Contract.find(filter)
       .sort({ createdAt: -1 })
-      .populate({ path: "clientId", select: "name phone", strictPopulate: false })
+      .populate({ path: "clientId", select: "name phone licenseNumber licenseExpiry idNumber nationality address clientType licenseIssuedDate licenseIssuedBy", strictPopulate: false })
       .populate({ path: "unitId", select: "make model plate mileage images color year fuelType", strictPopulate: false })
       .populate({ path: "driverId", select: "name", strictPopulate: false })
       .populate({ path: "deliveryDriverId", select: "name", strictPopulate: false })
@@ -86,6 +86,7 @@ export async function GET(req: Request) {
       isDispatched: Boolean(c.isDispatched || c.contractNumber || c.status === "Active" || c.deliveryStatus === "Delivered"),
       _id: c._id.toString(), // Real ID
       clientId: c.clientId?._id?.toString() || c.clientId || "",
+      clientObj: typeof c.clientId === "object" ? c.clientId : null,
       unitId: c.unitId?._id?.toString() || c.unitId || "",
       driverId: c.driverId?._id?.toString() || c.driverId || "",
       deliveryDriverId: c.deliveryDriverId?._id?.toString() || c.deliveryDriverId || "",
@@ -93,6 +94,9 @@ export async function GET(req: Request) {
       customer: c.personalizedPersonName || c.clientId?.name || (c.contractType === "Personalized" ? (c.additionalDriverName || "Personal Use") : "Unknown"),
       personalizedPersonName: c.personalizedPersonName || "",
       customerPhone: c.clientId?.phone || c.additionalDriverPhone || "",
+      customerLicense: c.clientId?.licenseNumber || c.additionalDriverLicense || "",
+      customerLicenseExpiry: c.clientId?.licenseExpiry || c.additionalDriverExpiry || "",
+      customerLicenseIssuedDate: c.clientId?.licenseIssuedDate || c.additionalDriverIssuedAt || "",
       driver: c.contractType === "Personalized" ? "Personal Use" : (c.deliveryDriverId?.name || c.driverId?.name || "None"),
       deliveryDriver: c.contractType === "Personalized" ? "Personal Use" : (c.deliveryDriverId?.name || (c.driverId && !c.returnDriverId ? c.driverId?.name : "None")),
       returnDriver: c.returnDriverId?.name || "None",

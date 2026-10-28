@@ -9,7 +9,7 @@ import { Unit } from "@/models/Unit";
 import { formatDateDMY } from "@/lib/date-utils";
 
 // In-memory cache for fast repeated and prefetched downloads
-export const pdfCache = new Map<string, { buffer: Buffer; updatedAt?: string; clientUpdatedAt?: string; timestamp: number }>();
+export const pdfCache = new Map<string, { buffer: Buffer; updatedAt?: string; clientUpdatedAt?: string; unitUpdatedAt?: string; timestamp: number }>();
 export const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export function clearPdfCache(contractId?: string) {
@@ -58,6 +58,8 @@ export async function GET(
     const contractUpdatedAt = contract.updatedAt ? new Date(contract.updatedAt).toISOString() : "";
     const clientDoc = contract.clientId || {};
     const clientUpdatedAt = clientDoc?.updatedAt ? new Date(clientDoc.updatedAt).toISOString() : "";
+    const unitDoc = contract.unitId || {};
+    const unitUpdatedAt = unitDoc?.updatedAt ? new Date(unitDoc.updatedAt).toISOString() : "";
 
     const url = new URL(req.url);
     const forceFresh = url.searchParams.get("fresh") === "1" || url.searchParams.has("t");
@@ -76,6 +78,7 @@ export async function GET(
         cached &&
         (!contractUpdatedAt || cached.updatedAt === contractUpdatedAt) &&
         (!clientUpdatedAt || cached.clientUpdatedAt === clientUpdatedAt) &&
+        (!unitUpdatedAt || cached.unitUpdatedAt === unitUpdatedAt) &&
         Date.now() - cached.timestamp < CACHE_TTL_MS
       ) {
         return new NextResponse(new Uint8Array(cached.buffer), {
@@ -93,7 +96,6 @@ export async function GET(
     }
 
     // 2. Prepare fallback data for instant reliability
-    const unitDoc = contract.unitId || {};
     const isPersonalized = Boolean(
       contract.contractType === "Personalized" ||
       contract.personalizedPersonName ||
@@ -165,8 +167,18 @@ export async function GET(
       buffer: pdfBuffer,
       updatedAt: contractUpdatedAt,
       clientUpdatedAt,
+      unitUpdatedAt,
       timestamp: Date.now(),
     });
+    if (contract.contractNumber && String(contract.contractNumber) !== String(id)) {
+      pdfCache.set(String(contract.contractNumber), {
+        buffer: pdfBuffer,
+        updatedAt: contractUpdatedAt,
+        clientUpdatedAt,
+        unitUpdatedAt,
+        timestamp: Date.now(),
+      });
+    }
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,

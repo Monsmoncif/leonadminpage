@@ -236,13 +236,13 @@ export default function ContractDetailsModal({
     }
   }, [activeTab, isOpen]);
 
-  const refreshContractData = () => {
-    const contractId = contractData?._id || contractData?.id || contract?._id || contract?.id;
+  const refreshContractData = (explicitId?: string) => {
+    const contractId = explicitId || contractData?._id || contractData?.id || contract?._id || contract?.id;
     if (contractId) {
       setIsLoadingDetails(true);
       Promise.all([
-        fetch(`/api/contracts/${contractId}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)),
-        fetch(`/api/damages?contractId=${contractId}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : []))
+        fetch(`/api/contracts/${contractId}?t=${Date.now()}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)),
+        fetch(`/api/damages?contractId=${contractId}&t=${Date.now()}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : []))
       ])
         .then(([fresh, damagesData]) => {
           if (fresh) {
@@ -250,10 +250,11 @@ export default function ContractDetailsModal({
               ...prev,
               ...fresh,
               customer: fresh.personalizedPersonName || fresh.clientId?.name || prev?.customer,
-              customerPhone: fresh.clientId?.phone || prev?.customerPhone,
+              customerPhone: fresh.clientId?.phone || fresh.additionalDriverPhone || prev?.customerPhone,
               customerEmail: fresh.clientId?.email || prev?.customerEmail,
-              customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev?.customerLicense,
-              customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || prev?.customerLicenseIssuedDate,
+              customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || fresh.additionalDriverLicense || prev?.customerLicense,
+              customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || fresh.additionalDriverIssuedAt || prev?.customerLicenseIssuedDate,
+              customerLicenseExpiry: fresh.clientId?.licenseExpiry || fresh.additionalDriverExpiry || prev?.customerLicenseExpiry,
               deliveryDriver: fresh.deliveryDriverId?.name || (fresh.driverId && !fresh.returnDriverId ? fresh.driverId.name : prev?.deliveryDriver),
               returnDriver: fresh.returnDriverId?.name || prev?.returnDriver,
               vehicle: fresh.unitId ? `${fresh.unitId.make} ${fresh.unitId.model} (${fresh.unitId.plate})` : prev?.vehicle,
@@ -277,41 +278,9 @@ export default function ContractDetailsModal({
     if (contract && isOpen) {
       setContractData(contract);
       const contractId = contract._id || contract.id;
-      if (contractId && contractId !== lastFetchedIdRef.current) {
-        lastFetchedIdRef.current = String(contractId);
-        setIsLoadingDetails(true);
-        Promise.all([
-          fetch(`/api/contracts/${contractId}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)),
-          fetch(`/api/damages?contractId=${contractId}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : []))
-        ])
-          .then(([fresh, damagesData]) => {
-            if (fresh) {
-              setContractData((prev: any) => ({
-                ...prev,
-                ...fresh,
-                customer: fresh.personalizedPersonName || fresh.clientId?.name || prev?.customer,
-                customerPhone: fresh.clientId?.phone || prev?.customerPhone,
-                customerEmail: fresh.clientId?.email || prev?.customerEmail,
-                customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || prev?.customerLicense,
-                customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || prev?.customerLicenseIssuedDate,
-                deliveryDriver: fresh.deliveryDriverId?.name || (fresh.driverId && !fresh.returnDriverId ? fresh.driverId.name : prev?.deliveryDriver),
-                returnDriver: fresh.returnDriverId?.name || prev?.returnDriver,
-                vehicle: fresh.unitId ? `${fresh.unitId.make} ${fresh.unitId.model} (${fresh.unitId.plate})` : prev?.vehicle,
-                vehiclePlate: fresh.unitId?.plate || prev?.vehiclePlate,
-                vehicleColor: fresh.unitId?.color || prev?.vehicleColor,
-                vehicleYear: fresh.unitId?.year || prev?.vehicleYear,
-                vehicleFuel: fresh.unitId?.fuelType || prev?.vehicleFuel,
-              }));
-            }
-            if (Array.isArray(damagesData)) {
-              setDamages(damagesData);
-            }
-          })
-          .catch((err) => console.error("Error fetching full contract details:", err))
-          .finally(() => setIsLoadingDetails(false));
+      if (contractId) {
+        refreshContractData(String(contractId));
       }
-    } else if (!isOpen) {
-      lastFetchedIdRef.current = null;
     }
   }, [contract?._id, contract?.id, isOpen]);
 
@@ -938,6 +907,14 @@ export default function ContractDetailsModal({
                               <span className="text-text-muted text-[11px]">License Issue Date:</span>
                               <strong className="font-semibold text-text-secondary truncate text-right">
                                 {formatDisplayDate(contractData.clientId?.licenseIssuedDate || contractData.customerLicenseIssuedDate)}
+                              </strong>
+                            </div>
+                          )}
+                          {(contractData.clientId?.licenseExpiry || contractData.customerLicenseExpiry) && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-text-muted text-[11px]">License Expiry:</span>
+                              <strong className="font-semibold text-text-secondary truncate text-right">
+                                {formatDisplayDate(contractData.clientId?.licenseExpiry || contractData.customerLicenseExpiry)}
                               </strong>
                             </div>
                           )}
