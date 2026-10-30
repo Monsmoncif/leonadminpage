@@ -93,4 +93,10 @@ const clientSchema = new Schema<IClient>(
   { timestamps: true }
 );
 
+clientSchema.index({ createdAt: -1 });
+clientSchema.index({ status: 1 });
+clientSchema.index({ name: 1 });
+clientSchema.index({ phone: 1 });
+clientSchema.index({ idNumber: 1 });
+
 export const Client: Model<IClient> = mongoose.models.Client || mongoose.model<IClient>("Client", clientSchema);

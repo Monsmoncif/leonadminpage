@@ -32,13 +32,19 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const driverId = searchParams.get("driverId");
+    const status = searchParams.get("status");
+    const search = searchParams.get("search")?.trim();
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+    const page = pageParam ? Math.max(1, parseInt(pageParam, 10)) : null;
+    const limit = limitParam ? Math.max(1, parseInt(limitParam, 10)) : null;
 
-    let filter: any = {};
+    let baseFilter: any = {};
     if (driverId) {
       const isValidObjectId = mongoose.Types.ObjectId.isValid(driverId);
       const objectId = isValidObjectId ? new mongoose.Types.ObjectId(driverId) : null;
 
-      filter.$or = [
+      baseFilter.$or = [
         { driverId: driverId },
         { deliveryDriverId: driverId },
         { returnDriverId: driverId },
@@ -50,7 +56,100 @@ export async function GET(req: Request) {
       ];
     }
 
+    let filter: any = { ...baseFilter };
+
+    if (status && status !== "All") {
+      filter.status = status;
+    }
+
+    if (search) {
+      const escaped = search.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      const searchRegex = new RegExp(escaped, "i");
+
+      // Find matching clients, units, and drivers in parallel
+      const [matchingClients, matchingUnits, matchingUsers] = await Promise.all([
+        Client.find({
+          $or: [
+            { name: searchRegex },
+            { phone: searchRegex },
+          ]
+        }).select("_id").lean(),
+        Unit.find({
+          $or: [
+            { plate: searchRegex },
+            { make: searchRegex },
+            { model: searchRegex }
+          ]
+        }).select("_id").lean(),
+        User.find({
+          name: searchRegex
+        }).select("_id").lean()
+      ]);
+
+      const clientIds = matchingClients.map((c: any) => c._id);
+      const unitIds = matchingUnits.map((u: any) => u._id);
+      const userIds = matchingUsers.map((u: any) => u._id);
+
+      const orConditions: any[] = [
+        { personalizedPersonName: searchRegex },
+        { additionalDriverName: searchRegex },
+        { notes: searchRegex },
+      ];
+
+      const numSearch = Number(search);
+      if (!isNaN(numSearch)) {
+        orConditions.push({ contractNumber: numSearch });
+      }
+
+      if (clientIds.length > 0) {
+        orConditions.push({ clientId: { $in: clientIds } });
+      }
+
+      if (unitIds.length > 0) {
+        orConditions.push({ unitId: { $in: unitIds } });
+      }
+
+      if (userIds.length > 0) {
+        orConditions.push(
+          { driverId: { $in: userIds } },
+          { deliveryDriverId: { $in: userIds } },
+          { returnDriverId: { $in: userIds } }
+        );
+      }
+
+      if (filter.$or) {
+        filter = {
+          $and: [
+            { $or: filter.$or },
+            { $or: orConditions }
+          ]
+        };
+      } else {
+        filter.$or = orConditions;
+      }
+    }
+
     const isFull = searchParams.get("full") === "true";
+
+    // Fast parallel calculations using database indexes
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const statsFilter = driverId ? baseFilter : {};
+
+    const [totalCount, activeCount, draftCount, completedMonthCount, cancelledCount] = await Promise.all([
+      Contract.countDocuments(filter),
+      Contract.countDocuments({ ...statsFilter, status: "Active" }),
+      Contract.countDocuments({ ...statsFilter, status: "Draft" }),
+      Contract.countDocuments({ ...statsFilter, status: "Completed", updatedAt: { $gte: startOfMonth } }),
+      Contract.countDocuments({ ...statsFilter, status: "Cancelled" }),
+    ]);
+
+    const stats = {
+      activeContracts: activeCount,
+      pendingSignatures: draftCount,
+      completedThisMonth: completedMonthCount,
+      cancelled: cancelledCount,
+    };
 
     let contractsQuery = Contract.find(filter)
       .sort({ createdAt: -1 })
@@ -62,22 +161,15 @@ export async function GET(req: Request) {
 
     if (!isFull) {
       contractsQuery = contractsQuery.select(
-        "-adminSignature -customerSignature -returnCustomerSignature -inspectionPhotos -returnPhotos -damagePhotos -moneyPhotos -returnMoneyPhotos"
+        "-adminSignature -customerSignature -returnCustomerSignature -inspectionPhotos -returnPhotos -damagePhotos -moneyPhotos -returnMoneyPhotos -privacyConsentDoc"
       );
     }
 
+    if (page && limit) {
+      contractsQuery = contractsQuery.skip((page - 1) * limit).limit(limit);
+    }
+
     const contracts = await contractsQuery.lean();
-
-    // Calculate stats
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const stats = {
-      activeContracts: contracts.filter((c: any) => c.status === "Active").length,
-      pendingSignatures: contracts.filter((c: any) => c.status === "Draft").length,
-      completedThisMonth: contracts.filter((c: any) => c.status === "Completed" && new Date(c.updatedAt) >= startOfMonth).length,
-      cancelled: contracts.filter((c: any) => c.status === "Cancelled").length,
-    };
 
     const formattedContracts = contracts.map((c: any) => ({
       ...c,
@@ -140,7 +232,14 @@ export async function GET(req: Request) {
       adminSignature: c.adminSignature || "",
     }));
 
-    return NextResponse.json({ contracts: formattedContracts, stats });
+    return NextResponse.json({
+      contracts: formattedContracts,
+      stats,
+      totalCount,
+      totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+      page: page || 1,
+      limit: limit || totalCount,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: "Failed to load contracts data", message: (error as Error).message },

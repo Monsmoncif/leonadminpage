@@ -63,4 +63,8 @@ const unitSchema = new Schema<IUnit>(
   { timestamps: true }
 );
 
+unitSchema.index({ status: 1 });
+unitSchema.index({ make: 1, model: 1 });
+unitSchema.index({ createdAt: -1 });
+
 export const Unit: Model<IUnit> = mongoose.models.Unit || mongoose.model<IUnit>("Unit", unitSchema);

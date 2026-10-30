@@ -59,25 +59,6 @@ export async function GET(
       );
     }
 
-    // Guarantee latest client and unit directly from database
-    if (contract.clientId) {
-      const cId = typeof contract.clientId === "object" ? (contract.clientId._id || contract.clientId.id) : contract.clientId;
-      if (cId && mongoose.Types.ObjectId.isValid(cId)) {
-        try {
-          const freshClient = await Client.findById(cId).lean();
-          if (freshClient) contract.clientId = freshClient;
-        } catch {}
-      }
-    }
-    if (contract.unitId) {
-      const uId = typeof contract.unitId === "object" ? (contract.unitId._id || contract.unitId.id) : contract.unitId;
-      if (uId && mongoose.Types.ObjectId.isValid(uId)) {
-        try {
-          const freshUnit = await Unit.findById(uId).lean();
-          if (freshUnit) contract.unitId = freshUnit;
-        } catch {}
-      }
-    }
 
     // Fallback: If inspectionPhotos is empty or undefined, check Inspection model for "Before Rental"
     if (!contract.inspectionPhotos || (Array.isArray(contract.inspectionPhotos) && contract.inspectionPhotos.length === 0)) {

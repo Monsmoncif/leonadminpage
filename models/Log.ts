@@ -25,5 +25,8 @@ const logSchema = new Schema<ILog>(
   { timestamps: true }
 );
 
+logSchema.index({ createdAt: -1 });
+logSchema.index({ type: 1, createdAt: -1 });
+
 // Prevent mongoose from compiling the model multiple times during Next.js hot reload
 export const Log: Model<ILog> = mongoose.models.Log || mongoose.model<ILog>("Log", logSchema);

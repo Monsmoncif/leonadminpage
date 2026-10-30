@@ -14,27 +14,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id } = await params;
     await connectDB();
     await syncUnitStatuses(id);
-    const unit = await Unit.findById(id).lean();
-    if (!unit) {
-      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
-    }
 
     // Ensure models are registered for population
     const _c = Client;
     const _d = Driver;
 
-    // Fetch all contracts associated with this vehicle (latest first)
-    const allContracts = await Contract.find({ unitId: id })
-      .sort({ startDate: -1, createdAt: -1 })
-      .populate({
-        path: "clientId",
-        select: "name firstName lastName phone nationality idNumber email clientType"
-      })
-      .populate({
-        path: "driverId",
-        select: "name phone"
-      })
-      .lean();
+    // Fetch the unit and all contracts for this vehicle (latest first) in parallel,
+    // excluding heavy signature/photo fields that the vehicle page doesn't use.
+    const [unit, allContracts] = await Promise.all([
+      Unit.findById(id).lean(),
+      Contract.find({ unitId: id })
+        .select("-adminSignature -customerSignature -returnCustomerSignature -inspectionPhotos -returnPhotos -damagePhotos -moneyPhotos -returnMoneyPhotos -privacyConsentDoc")
+        .sort({ startDate: -1, createdAt: -1 })
+        .populate({
+          path: "clientId",
+          select: "name firstName lastName phone nationality idNumber email clientType"
+        })
+        .populate({
+          path: "driverId",
+          select: "name phone"
+        })
+        .lean(),
+    ]);
+    if (!unit) {
+      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    }
 
     // Build mileage history from real contract data (Completed & Active)
     const contracts = allContracts

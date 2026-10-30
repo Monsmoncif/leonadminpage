@@ -24,6 +24,7 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { useSidebar } from "@/components/layout/SidebarContext";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
+import { useUnreadNotifications } from "@/lib/unread-notifications";
 
 /* ── Navigation structure ───────────────────────────────────────── */
 
@@ -63,24 +64,9 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { collapsed, setCollapsed } = useSidebar();
-  const [unreadCount, setUnreadCount] = useState(0);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-
-  /* Fetch notifications */
-  useEffect(() => {
-    const fetchNotifs = () => {
-      fetch("/api/notifications")
-        .then((res) => res.json())
-        .then((data) => {
-          const unread = (data || []).filter((n: any) => !n.read).length;
-          setUnreadCount(unread);
-        })
-        .catch(console.error);
-    };
-    fetchNotifs();
-    const interval = setInterval(fetchNotifs, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  /* Unread badge – shared single poller (count-only, 30s, pauses when tab hidden) */
+  const unreadCount = useUnreadNotifications(true);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";

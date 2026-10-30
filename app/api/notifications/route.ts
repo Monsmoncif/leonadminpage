@@ -8,7 +8,18 @@ import { sendHandoverReminderNotification } from "@/lib/contract-notifications";
 
 export const dynamic = "force-dynamic";
 
+// The reminder scan is idempotent (atomic claim per contract), so it does not need to run
+// on every poll. Throttle it to once every few minutes per server process.
+const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
 async function checkUpcomingHandoverReminders() {
+  const g = globalThis as any;
+  const nowTs = Date.now();
+  if (g.__lastHandoverReminderCheck && nowTs - g.__lastHandoverReminderCheck < REMINDER_CHECK_INTERVAL_MS) {
+    return;
+  }
+  g.__lastHandoverReminderCheck = nowTs;
+
   try {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
@@ -71,10 +82,18 @@ async function checkUpcomingHandoverReminders() {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await connectDB();
     await checkUpcomingHandoverReminders();
+
+    // Lightweight mode used by the header/sidebar badge: return only the unread count.
+    const { searchParams } = new URL(req.url);
+    if (searchParams.get("countOnly") === "true") {
+      const unread = await Notification.countDocuments({ read: false });
+      return NextResponse.json({ unread });
+    }
+
     const rawNotifications = await Notification.find({}).sort({ createdAt: -1 }).lean();
     const sanitized = rawNotifications.map((n: any) => {
       let msg = n.message || "";
@@ -97,6 +116,10 @@ export async function GET() {
     return NextResponse.json(sanitized);
   } catch (error: any) {
     console.warn("Notifications API: MongoDB not available, returning empty data.", error.message);
+    const { searchParams } = new URL(req.url);
+    if (searchParams.get("countOnly") === "true") {
+      return NextResponse.json({ unread: 0 });
+    }
     return NextResponse.json([]);
   }
 }

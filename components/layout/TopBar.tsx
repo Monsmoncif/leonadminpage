@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Settings, Bell, LogOut, ChevronDown } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useSidebar } from "@/components/layout/SidebarContext";
+import { useUnreadNotifications } from "@/lib/unread-notifications";
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -35,7 +36,14 @@ export default function TopBar() {
   
   const [realAvatar, setRealAvatar] = useState("");
   const [realName, setRealName] = useState("");
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [driverUnreadCount, setDriverUnreadCount] = useState(0);
+
+  const isDriverRoute = pathname.startsWith("/driver");
+  const sessionUserId = (session?.user as any)?.id as string | undefined;
+
+  // Admin badge: one shared 30s count-only poller (shared with the Sidebar).
+  const adminUnreadCount = useUnreadNotifications(!!session?.user && !isDriverRoute);
+  const unreadCount = isDriverRoute ? driverUnreadCount : adminUnreadCount;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -47,71 +55,63 @@ export default function TopBar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Profile is fetched once per logged-in user (not on every page navigation).
   useEffect(() => {
-    const fetchUser = async () => {
-      const userId = (session?.user as any)?.id;
-      if (userId) {
-        try {
-          const res = await fetch(`/api/users/${userId}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.avatarUrl) setRealAvatar(data.avatarUrl);
-            if (data.name) setRealName(data.name);
-          }
-        } catch (error) {
-          console.error("Failed to fetch user profile", error);
-        }
-      }
-    };
-    
-    const fetchNotifications = async () => {
+    if (!sessionUserId) return;
+    let cancelled = false;
+    (async () => {
       try {
-        if (pathname.startsWith("/driver")) {
-          // Driver notifications
-          const driverId = (session?.user as any)?.id;
-          if (!driverId) return;
-          const res = await fetch("/api/contracts");
-          if (res.ok) {
-            const data = await res.json();
-            
-            const myContracts = (data.contracts || []).filter((c: any) => 
-              c.driverId?._id === driverId || c.driverId === driverId
-            );
-
-            let count = 0;
-            const today = new Date();
-            today.setHours(0,0,0,0);
-
-            myContracts.forEach((contract: any) => {
-              if (contract.status === "Active") {
-                const endDate = new Date(contract.endDate);
-                endDate.setHours(0,0,0,0);
-                if (endDate.getTime() <= today.getTime()) count++;
-              }
-            });
-            setUnreadCount(count);
-          }
-        } else {
-          // Admin notifications
-          const res = await fetch("/api/notifications");
-          if (res.ok) {
-            const data = await res.json();
-            const unread = (data || []).filter((n: any) => !n.read).length;
-            setUnreadCount(unread);
-          }
+        const res = await fetch(`/api/users/${sessionUserId}`);
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          if (data.avatarUrl) setRealAvatar(data.avatarUrl);
+          if (data.name) setRealName(data.name);
         }
+      } catch (error) {
+        console.error("Failed to fetch user profile", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUserId]);
+
+  // Driver badge: only this driver's contracts (server-side filtered), every 30s while visible.
+  useEffect(() => {
+    if (!isDriverRoute || !sessionUserId) return;
+
+    const fetchDriverNotifications = async () => {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const res = await fetch(`/api/contracts?driverId=${sessionUserId}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const myContracts = (data.contracts || []).filter((c: any) =>
+          c.driverId?._id === sessionUserId || c.driverId === sessionUserId
+        );
+
+        let count = 0;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        myContracts.forEach((contract: any) => {
+          if (contract.status === "Active") {
+            const endDate = new Date(contract.endDate);
+            endDate.setHours(0, 0, 0, 0);
+            if (endDate.getTime() <= today.getTime()) count++;
+          }
+        });
+        setDriverUnreadCount(count);
       } catch (error) {
         console.error("Failed to fetch notifications");
       }
     };
-    
-    fetchUser();
-    if (session?.user) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [session, pathname]);
+
+    fetchDriverNotifications();
+    const interval = setInterval(fetchDriverNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [isDriverRoute, sessionUserId]);
 
   const title =
     pageTitles[pathname] ||

@@ -47,8 +47,9 @@ export default function DriverSidebar() {
   useEffect(() => {
     const fetchNotifs = async () => {
       if (!session?.user?.id) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       try {
-        const res = await fetch("/api/contracts");
+        const res = await fetch(`/api/contracts?driverId=${session.user.id}`, { cache: "no-store" });
         const data = await res.json();
         const driverId = session.user.id;
         
@@ -79,7 +80,7 @@ export default function DriverSidebar() {
 
     if (session?.user) {
       fetchNotifs();
-      const interval = setInterval(fetchNotifs, 5000);
+      const interval = setInterval(fetchNotifs, 30000);
       return () => clearInterval(interval);
     }
   }, [session]);

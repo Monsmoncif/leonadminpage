@@ -7,27 +7,29 @@ import { Contract } from "@/models/Contract";
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    const isCompact = req.nextUrl.searchParams.get("compact") === "true";
+    const isFullDocs = req.nextUrl.searchParams.get("withDocuments") === "true";
     let query = Client.find().sort({ createdAt: -1 });
-    if (isCompact) {
+    if (!isFullDocs) {
       query = query.select("-documents");
     }
-    const clients = await query.lean();
-    
-    // Count active contracts for all clients
-    const activeRentalsCount = await Contract.countDocuments({ status: "Active" });
 
-    // Calculate stats
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
+    // Run client query and stats counting in parallel using database indexes
+    const [clients, totalCustomers, newThisMonth, activeRentals, blacklisted] = await Promise.all([
+      query.lean(),
+      Client.countDocuments(),
+      Client.countDocuments({ createdAt: { $gte: startOfMonth } }),
+      Contract.countDocuments({ status: "Active" }),
+      Client.countDocuments({ status: "Blacklisted" }),
+    ]);
+
     const stats = {
-      totalCustomers: clients.length,
-      newThisMonth: clients.filter(
-        (c: any) => new Date(c.createdAt) >= startOfMonth
-      ).length,
-      activeRentals: activeRentalsCount,
-      blacklisted: clients.filter((c: any) => c.status === "Blacklisted").length,
+      totalCustomers,
+      newThisMonth,
+      activeRentals,
+      blacklisted,
     };
 
     return NextResponse.json({ clients, stats });

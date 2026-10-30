@@ -33,6 +33,10 @@ const damageSchema = new Schema<IDamage>(
   { timestamps: true }
 );
 
+damageSchema.index({ unitId: 1, createdAt: -1 });
+damageSchema.index({ contractId: 1 });
+damageSchema.index({ status: 1 });
+
 // Prevent mongoose from compiling the model multiple times during Next.js hot reload
 export const Damage: Model<IDamage> =
   mongoose.models.Damage || mongoose.model<IDamage>("Damage", damageSchema);

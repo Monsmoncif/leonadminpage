@@ -35,6 +35,10 @@ const inspectionSchema = new Schema<IInspection>(
   { timestamps: true }
 );
 
+inspectionSchema.index({ contractId: 1, type: 1 });
+inspectionSchema.index({ unitId: 1, createdAt: -1 });
+inspectionSchema.index({ status: 1 });
+
 // Prevent mongoose from compiling the model multiple times during Next.js hot reload
 export const Inspection: Model<IInspection> =
   mongoose.models.Inspection || mongoose.model<IInspection>("Inspection", inspectionSchema);

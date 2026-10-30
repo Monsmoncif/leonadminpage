@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -94,7 +94,7 @@ const getCarStatusBadge = (status: string) => {
 };
 
 export default function ContractsPage() {
-  const [data, setData] = useState<{ contracts: any[], stats: any } | null>(null);
+  const [data, setData] = useState<{ contracts: any[], stats: any, totalCount?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -159,42 +159,72 @@ export default function ContractsPage() {
     }
   };
 
-  const fetchContracts = async (retryCount = 0) => {
+  const lastFetchRef = useRef(0);
+  const isFirstRender = useRef(true);
+
+  const fetchContracts = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
-      const res = await fetch(`/api/contracts?t=${Date.now()}`, { cache: 'no-store' });
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(itemsPerPage),
+        status: statusFilter,
+        t: String(Date.now()),
+      });
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim());
+      }
+      const res = await fetch(`/api/contracts?${params.toString()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`Failed to fetch contracts data (${res.status})`);
       const json = await res.json();
       setData(json);
       setError(null);
+      lastFetchRef.current = Date.now();
     } catch (err: any) {
       console.error(`Contracts fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise(res => setTimeout(res, delay));
-        return fetchContracts(retryCount + 1);
+        return fetchContracts(retryCount + 1, silent);
       }
-      setError(err.message);
+      if (!silent) setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      fetchContracts();
+      return;
+    }
     fetchContracts();
+  }, [currentPage, itemsPerPage, statusFilter]);
+
+  useEffect(() => {
+    if (isFirstRender.current) return;
+    const timer = setTimeout(() => {
+      fetchContracts();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     try {
       router.prefetch("/bookings/handover");
     } catch {}
 
     const onFocus = () => {
-      fetchContracts();
+      // Silent background refresh, throttled so tab switching doesn't reload the page
+      if (Date.now() - lastFetchRef.current > 20000) fetchContracts(0, true);
     };
     window.addEventListener("focus", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
     };
-  }, [router]);
+  }, [router, currentPage, itemsPerPage, statusFilter, searchQuery]);
 
   const handleDeleteConfirm = async () => {
     if (!contractToDelete) return;
@@ -209,11 +239,16 @@ export default function ContractsPage() {
         const newContracts = data.contracts.filter(
           (c: any) => c._id !== contractToDelete._id
         );
-        setData({ ...data, contracts: newContracts });
+        setData({
+          ...data,
+          contracts: newContracts,
+          totalCount: Math.max(0, (data.totalCount ?? newContracts.length) - 1)
+        });
       }
       toast.success("Contract deleted successfully.");
       setIsDeleteDialogOpen(false);
       setContractToDelete(null);
+      fetchContracts(0, true);
     } catch (err: any) {
       toast.error(err.message || "Failed to delete contract");
     } finally {
@@ -250,8 +285,10 @@ export default function ContractsPage() {
     cancelled: 0,
   };
 
-  // Search & Status filtering
-  const filteredContracts = contracts.filter((c: any) => {
+  const isServerPaginated = data?.totalCount !== undefined;
+
+  // Fallback client-side filtering if server pagination wasn't returned
+  const filteredContracts = isServerPaginated ? contracts : contracts.filter((c: any) => {
     const query = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
@@ -266,11 +303,20 @@ export default function ContractsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const totalPages = Math.ceil(filteredContracts.length / itemsPerPage);
-  const paginatedContracts = filteredContracts.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const totalItems = isServerPaginated ? (data?.totalCount ?? 0) : filteredContracts.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const paginatedContracts = isServerPaginated
+    ? contracts
+    : filteredContracts.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+      );
+
+  const hasAnyContractsTotal =
+    (stats.activeContracts + stats.pendingSignatures + stats.completedThisMonth + stats.cancelled) > 0 ||
+    (data?.totalCount ?? 0) > 0 ||
+    contracts.length > 0;
+  const showZeroTotalState = !loading && !hasAnyContractsTotal && !searchQuery && statusFilter === "All";
 
   const sparklineData = {
     active: [10, 15, 12, 18, 24, 22, 28],
@@ -392,7 +438,7 @@ export default function ContractsPage() {
       )}
 
       {/* Empty State (Matches Clients Page) */}
-      {!loading && contracts.length === 0 && (
+      {showZeroTotalState && (
         <div className="flex flex-col items-center justify-center min-h-[50vh] bg-card rounded-2xl border border-dashed border-border">
           <div className="w-20 h-20 bg-gray-50/50 rounded-full flex items-center justify-center mb-6">
             <FileText size={32} className="text-text-muted" />
@@ -414,7 +460,7 @@ export default function ContractsPage() {
       )}
 
       {/* Data Loaded */}
-      {!loading && contracts.length > 0 && (
+      {!loading && !showZeroTotalState && (
         <div className="grid grid-cols-12 gap-6 animate-fade-in-up stagger-2">
           {/* Contracts Table Area */}
           <div className="col-span-12 flex flex-col gap-6">
@@ -502,7 +548,7 @@ export default function ContractsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {filteredContracts.length === 0 ? (
+                    {paginatedContracts.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 px-5 text-center">
                           <div className="flex flex-col items-center justify-center">
@@ -511,7 +557,7 @@ export default function ContractsPage() {
                             <p className="text-gray-500 text-xs sm:text-sm mb-4">No contracts match your search criteria.</p>
                             <button
                               type="button"
-                              onClick={() => { setSearchQuery(""); setStatusFilter("All"); }}
+                              onClick={() => { setSearchQuery(""); setStatusFilter("All"); setCurrentPage(1); }}
                               className="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-brand border border-brand/20 rounded-lg hover:bg-brand/5 transition-colors cursor-pointer"
                             >
                               Clear Search
@@ -864,10 +910,13 @@ export default function ContractsPage() {
               <TablePagination
                 currentPage={currentPage}
                 totalPages={totalPages}
-                totalItems={filteredContracts.length}
+                totalItems={totalItems}
                 itemsPerPage={itemsPerPage}
                 onPageChange={setCurrentPage}
-                onItemsPerPageChange={setItemsPerPage}
+                onItemsPerPageChange={(limit) => {
+                  setItemsPerPage(limit);
+                  setCurrentPage(1);
+                }}
               />
             </div>
           </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Bell, Check, Trash2, Calendar, FileText, AlertTriangle, Clock, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
+import { refreshUnreadNotifications } from "@/lib/unread-notifications";
 
 interface NotificationResponse {
   _id: string;
@@ -94,6 +95,8 @@ export default function NotificationsPage() {
         // Revert on error
         fetchNotifications();
         toast.error("Failed to mark as read");
+      } else {
+        refreshUnreadNotifications();
       }
     } catch (err) {
       fetchNotifications();
@@ -108,6 +111,7 @@ export default function NotificationsPage() {
       const res = await fetch("/api/notifications", { method: "PATCH" });
       if (res.ok) {
         toast.success("All notifications marked as read");
+        refreshUnreadNotifications();
       } else {
         fetchNotifications();
         toast.error("Failed to mark all as read");
@@ -125,6 +129,7 @@ export default function NotificationsPage() {
       if (res.ok) {
         toast.success("Notification deleted");
         setNotifications(prev => prev.filter(n => n._id !== deleteTarget._id));
+        refreshUnreadNotifications();
       } else {
         toast.error("Failed to delete notification");
       }
