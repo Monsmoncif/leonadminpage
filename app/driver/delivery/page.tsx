@@ -43,6 +43,7 @@ import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys } from "@/components/ui/VehicleInspectionPhotoCapture";
 import CreateClientModal from "@/components/modals/CreateClientModal";
+import { calculateRentalDays } from "@/lib/date-utils";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -848,13 +849,7 @@ export default function ConfirmDeliveryPage() {
   const vehicleImage = contract.vehicleImage || contract.unitId?.images?.[0] || "";
   const pickupLoc = contract.pickupLocation || rentalData.pickupLocation || "Main Office";
 
-  const totalDays = Math.max(
-    1,
-    Math.ceil(
-      (new Date(rentalData.endDate).getTime() - new Date(rentalData.startDate).getTime()) /
-        (1000 * 3600 * 24)
-    )
-  );
+  const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
   const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
   const rawCollectionTotal = Number(rentalData.collectionAmount || 0) + extraFees;
   const advancePaid = Number(contract?.advancePayment || rentalData.advancePayment || 0);
@@ -1340,9 +1335,7 @@ export default function ConfirmDeliveryPage() {
                 value={rentalData.startDate}
                 onChange={(e) => {
                   const newStart = e.target.value;
-                  const s = new Date(newStart);
-                  const end = new Date(rentalData.endDate);
-                  const days = Math.max(1, Math.ceil((end.getTime() - s.getTime()) / (1000 * 3600 * 24)));
+                  const days = calculateRentalDays(newStart, rentalData.endDate);
                   const rate = Number(rentalData.dailyRate) || 0;
                   setRentalData(prev => ({
                     ...prev,
@@ -1362,9 +1355,7 @@ export default function ConfirmDeliveryPage() {
                 value={rentalData.endDate}
                 onChange={(e) => {
                   const newEnd = e.target.value;
-                  const start = new Date(rentalData.startDate);
-                  const eDate = new Date(newEnd);
-                  const days = Math.max(1, Math.ceil((eDate.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+                  const days = calculateRentalDays(rentalData.startDate, newEnd);
                   const rate = Number(rentalData.dailyRate) || 0;
                   setRentalData(prev => ({
                     ...prev,

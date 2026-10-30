@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       status: { $in: ["Active", "Draft"] },
       deliveryStatus: { $ne: "Returned" },
     })
-      .select("_id contractNumber unitId startDate endDate status")
+      .select("_id contractNumber unitId startDate endDate status checkoutTime checkinTime returnedAt")
       .lean();
 
     const bookingsByUnit: Record<string, any[]> = {};
@@ -49,6 +49,9 @@ export async function GET(req: NextRequest) {
         startDate: c.startDate,
         endDate: c.endDate,
         status: c.status,
+        checkoutTime: c.checkoutTime || "",
+        checkinTime: c.checkinTime || "",
+        returnedAt: c.returnedAt || null,
       });
     }
 

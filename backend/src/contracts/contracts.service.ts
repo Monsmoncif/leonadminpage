@@ -181,7 +181,10 @@ export class ContractsService {
 
     const start = new Date(body.startDate);
     const end = new Date(body.endDate);
-    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24));
+    const days = Math.max(1, diffDays + 1);
 
     const isPersonalized = body.contractType === 'Personalized';
 
@@ -392,8 +395,12 @@ export class ContractsService {
     const fuelFees = body.fuelFees !== undefined ? Number(body.fuelFees) : (body.fuelCharge !== undefined ? Number(body.fuelCharge) : (existingContract.fuelFees || existingContract.fuelCharge || 0));
     const cleaningFees = body.cleaningFees !== undefined ? Number(body.cleaningFees) : existingContract.cleaningFees || 0;
 
-    const diffTime = Math.abs(endDateVal.getTime() - startDateVal.getTime());
-    const totalDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const sDate = new Date(startDateVal);
+    const eDate = new Date(endDateVal);
+    sDate.setHours(0, 0, 0, 0);
+    eDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.round(Math.abs(eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24));
+    const totalDays = Math.max(1, diffDays + 1);
 
     const extraKmCharge = body.extraKmCharge !== undefined ? Number(body.extraKmCharge) : existingContract.extraKmCharge || 0;
     const damageCharge = body.damageCharge !== undefined ? Number(body.damageCharge) : existingContract.damageCharge || 0;

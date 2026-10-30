@@ -7,6 +7,7 @@ import { Contract } from "@/models/Contract";
 import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
 import { formatDateDMY } from "@/lib/date-utils";
+import { isResidentClient } from "@/lib/client-utils";
 
 // In-memory cache for fast repeated and prefetched downloads
 export const pdfCache = new Map<string, { buffer: Buffer; updatedAt?: string; clientUpdatedAt?: string; unitUpdatedAt?: string; timestamp: number }>();
@@ -52,6 +53,26 @@ export async function GET(
 
     if (!contract) {
       return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+    }
+
+    // Guarantee latest client and unit directly from database
+    if (contract.clientId) {
+      const cId = typeof contract.clientId === "object" ? (contract.clientId._id || contract.clientId.id) : contract.clientId;
+      if (cId && mongoose.Types.ObjectId.isValid(cId)) {
+        try {
+          const freshClient = await Client.findById(cId).lean();
+          if (freshClient) contract.clientId = freshClient;
+        } catch {}
+      }
+    }
+    if (contract.unitId) {
+      const uId = typeof contract.unitId === "object" ? (contract.unitId._id || contract.unitId.id) : contract.unitId;
+      if (uId && mongoose.Types.ObjectId.isValid(uId)) {
+        try {
+          const freshUnit = await Unit.findById(uId).lean();
+          if (freshUnit) contract.unitId = freshUnit;
+        } catch {}
+      }
     }
 
     const contractNum = contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase();
@@ -102,18 +123,8 @@ export async function GET(
       contract.deliveryDriver === "Personal Use"
     );
 
-    const hasEmiratesId = Boolean(
-      clientDoc.idNumber && (
-        clientDoc.idNumber.startsWith("784-") ||
-        /^\d{3}-\d{4}-\d{7}-\d{1}$/.test(clientDoc.idNumber)
-      )
-    );
-    const isForeigner = Boolean(
-      clientDoc.clientType === "Tourist" ||
-      clientDoc.passportNumber ||
-      (clientDoc.licenseIssuedBy && !["uae", "dubai", "abu dhabi", "sharjah", "ajman", "fujairah", "rak", "uaq", "united arab emirates"].includes(clientDoc.licenseIssuedBy.toLowerCase().trim())) ||
-      (clientDoc.nationality && !["uae", "united arab emirates", "emirati", "إماراتي"].includes(clientDoc.nationality.toLowerCase().trim()) && !hasEmiratesId)
-    );
+    const isResident = isResidentClient(clientDoc, contract);
+    const isForeigner = !isResident;
 
     const fallbackData = {
       contractNumber: contractNum,
@@ -122,16 +133,22 @@ export async function GET(
         : (clientDoc.name || contract.personalizedPersonName || contract.customer || "Customer"),
       clientPhone: clientDoc.phone || "",
       clientEmail: clientDoc.email || "",
-      clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
+      clientIdNumber: !isForeigner 
+        ? (clientDoc.idNumber || contract.customerIdNumber || clientDoc.passportNumber || "")
+        : (clientDoc.passportNumber || contract.passportNumber || clientDoc.idNumber || ""),
       clientType: isForeigner ? "Tourist" : (clientDoc.clientType || "Resident"),
       clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
       licenseIssuedBy: clientDoc.licenseIssuedBy || clientDoc.licenseIssuedAt || "",
       licenseIssuedDate: clientDoc.licenseIssuedDate ? formatDateDMY(clientDoc.licenseIssuedDate) : "",
       licenseExpiry: clientDoc.licenseExpiry ? formatDateDMY(clientDoc.licenseExpiry) : "",
       internationalLicenseNumber: clientDoc.internationalLicenseNumber || "",
-      passportNumber: clientDoc.passportNumber || (isForeigner ? clientDoc.idNumber : ""),
+      passportNumber: isForeigner
+        ? (clientDoc.passportNumber || contract.passportNumber || clientDoc.idNumber || "")
+        : (clientDoc.passportNumber || ""),
       passportIssuedBy: clientDoc.passportIssuedBy || (isForeigner ? clientDoc.nationality : ""),
       passportExpiry: clientDoc.passportExpiry ? formatDateDMY(clientDoc.passportExpiry) : (isForeigner && clientDoc.idExpiry ? formatDateDMY(clientDoc.idExpiry) : ""),
+      idNumber: clientDoc.idNumber || "",
+      idExpiry: clientDoc.idExpiry ? formatDateDMY(clientDoc.idExpiry) : "",
       nationality: clientDoc.nationality || "",
       documents: Array.isArray(clientDoc.documents) ? clientDoc.documents : [],
       vehicleName: unitDoc.make ? `${unitDoc.make} ${unitDoc.model}` : "Vehicle",

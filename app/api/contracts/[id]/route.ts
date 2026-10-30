@@ -16,6 +16,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { sendClientContractNotification, sendDriverTaskNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
 import { clearPdfCache } from "@/app/api/contracts/[id]/pdf/route";
+import { clearConsentPdfCache } from "@/app/api/contracts/[id]/consent-pdf/route";
+import { calculateRentalDays } from "@/lib/date-utils";
 
 export async function GET(
   request: Request,
@@ -55,6 +57,26 @@ export async function GET(
         { error: "Contract not found" },
         { status: 404 }
       );
+    }
+
+    // Guarantee latest client and unit directly from database
+    if (contract.clientId) {
+      const cId = typeof contract.clientId === "object" ? (contract.clientId._id || contract.clientId.id) : contract.clientId;
+      if (cId && mongoose.Types.ObjectId.isValid(cId)) {
+        try {
+          const freshClient = await Client.findById(cId).lean();
+          if (freshClient) contract.clientId = freshClient;
+        } catch {}
+      }
+    }
+    if (contract.unitId) {
+      const uId = typeof contract.unitId === "object" ? (contract.unitId._id || contract.unitId.id) : contract.unitId;
+      if (uId && mongoose.Types.ObjectId.isValid(uId)) {
+        try {
+          const freshUnit = await Unit.findById(uId).lean();
+          if (freshUnit) contract.unitId = freshUnit;
+        } catch {}
+      }
     }
 
     // Fallback: If inspectionPhotos is empty or undefined, check Inspection model for "Before Rental"
@@ -138,7 +160,7 @@ export async function PUT(
     const fuelFees = body.fuelFees !== undefined ? Number(body.fuelFees) : (body.fuelCharge !== undefined ? Number(body.fuelCharge) : (existingContract.fuelFees || existingContract.fuelCharge || 0));
     const cleaningFees = isPersonalized ? 0 : (body.cleaningFees !== undefined ? Number(body.cleaningFees) : (existingContract.cleaningFees || 0));
 
-    const totalDays = Math.max(1, Math.round((endDateVal.getTime() - startDateVal.getTime()) / (1000 * 60 * 60 * 24)));
+    const totalDays = calculateRentalDays(startDateVal, endDateVal);
     
     const extraKmCharge = isPersonalized ? 0 : (body.extraKmCharge !== undefined ? Number(body.extraKmCharge) : (existingContract.extraKmCharge || 0));
     const damageCharge = body.damageCharge !== undefined ? Number(body.damageCharge) : (existingContract.damageCharge || 0);
@@ -184,13 +206,16 @@ export async function PUT(
         startDate: targetStartDate,
         endDate: targetEndDate,
         excludeContractId: resolvedParams.id,
+        checkoutTime: body.checkoutTime || existingContract.checkoutTime,
+        checkinTime: body.checkinTime || existingContract.checkinTime,
       });
 
       if (conflictingContract) {
         const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
         const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+        const returnHour = conflictingContract.checkinTime || conflictingContract.checkoutTime || "10:00 AM";
         return NextResponse.json(
-          { error: `Date Conflict: Vehicle (${targetUnitDoc.make} ${targetUnitDoc.model} - ${targetUnitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates.` },
+          { error: `Date Conflict: Vehicle (${targetUnitDoc.make} ${targetUnitDoc.model} - ${targetUnitDoc.plate}) is booked until ${conflictEnd} (${returnHour}). Please select a checkout time after ${returnHour} or choose another car.` },
           { status: 400 }
         );
       }
@@ -339,11 +364,14 @@ export async function PUT(
 
     // Invalidate cached PDF so fresh PDF with latest handover mileage, fuel, and signature is generated
     clearPdfCache(resolvedParams.id);
+    clearConsentPdfCache(resolvedParams.id);
     if (updatedContract.contractNumber) {
       clearPdfCache(String(updatedContract.contractNumber));
+      clearConsentPdfCache(String(updatedContract.contractNumber));
     }
     if (existingContract.contractNumber) {
       clearPdfCache(String(existingContract.contractNumber));
+      clearConsentPdfCache(String(existingContract.contractNumber));
     }
 
     // Auto-send initial contract PDF to client once vehicle handover is confirmed (Delivered)
@@ -586,6 +614,18 @@ export async function PUT(
       await syncUnitStatuses(body.unitId);
     } else if (existingContract.unitId) {
       await syncUnitStatuses(existingContract.unitId);
+    }
+
+    // Invalidate cached PDFs so changes to return details, client or photos are immediately reflected
+    clearPdfCache(resolvedParams.id);
+    clearConsentPdfCache(resolvedParams.id);
+    if (updatedContract.contractNumber) {
+      clearPdfCache(String(updatedContract.contractNumber));
+      clearConsentPdfCache(String(updatedContract.contractNumber));
+    }
+    if (existingContract.contractNumber) {
+      clearPdfCache(String(existingContract.contractNumber));
+      clearConsentPdfCache(String(existingContract.contractNumber));
     }
 
     return NextResponse.json(updatedContract, { status: 200 });

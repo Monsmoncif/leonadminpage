@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { CONTRACT_TERMS } from "@/lib/contractTerms";
+import { isResidentClient } from "@/lib/client-utils";
 
 const INSPECTION_ANGLES = [
   { en: "Front View", ar: "الأمام" },
@@ -32,25 +33,31 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
         return res.json();
       })
       .then(async (data) => {
-        // Guarantee populated client even if clientId is an unpopulated string ID
-        if (data && typeof data.clientId === "string" && data.clientId.length > 5) {
+        // Guarantee freshest populated client directly from database
+        const clientIdStr = data?.clientId ? (typeof data.clientId === "object" ? (data.clientId._id || data.clientId.id) : data.clientId) : null;
+        if (clientIdStr && typeof clientIdStr === "string" && clientIdStr.length > 5) {
           try {
-            const clientRes = await fetch(`/api/clients/${data.clientId}?t=${Date.now()}`, { cache: 'no-store' });
+            const clientRes = await fetch(`/api/clients/${clientIdStr}?t=${Date.now()}`, { cache: 'no-store' });
             if (clientRes.ok) {
               const fullClient = await clientRes.json();
-              data.clientId = fullClient;
+              data.clientId = { ...(typeof data.clientId === "object" ? data.clientId : {}), ...fullClient };
             }
-          } catch {}
+          } catch (cErr) {
+            console.warn("Could not fetch fresh client:", cErr);
+          }
         }
-        // Guarantee populated unit even if unitId is an unpopulated string ID
-        if (data && typeof data.unitId === "string" && data.unitId.length > 5) {
+        // Guarantee freshest populated unit directly from database
+        const unitIdStr = data?.unitId ? (typeof data.unitId === "object" ? (data.unitId._id || data.unitId.id) : data.unitId) : null;
+        if (unitIdStr && typeof unitIdStr === "string" && unitIdStr.length > 5) {
           try {
-            const unitRes = await fetch(`/api/units/${data.unitId}?t=${Date.now()}`, { cache: 'no-store' });
+            const unitRes = await fetch(`/api/units/${unitIdStr}?t=${Date.now()}`, { cache: 'no-store' });
             if (unitRes.ok) {
               const fullUnit = await unitRes.json();
-              data.unitId = fullUnit;
+              data.unitId = { ...(typeof data.unitId === "object" ? data.unitId : {}), ...fullUnit };
             }
-          } catch {}
+          } catch (uErr) {
+            console.warn("Could not fetch fresh unit:", uErr);
+          }
         }
         setContract(data);
         setLoading(false);
@@ -160,20 +167,9 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   const client = contract.clientId || {};
   const unit = contract.unitId || {};
   const driver = contract.driverId || {};
-  // Check if client is a UAE Resident (has 784- Emirates ID or UAE nationality) vs Foreigner / Tourist
-  const hasEmiratesId = Boolean(
-    client.idNumber && (
-      client.idNumber.startsWith("784-") ||
-      /^\d{3}-\d{4}-\d{7}-\d{1}$/.test(client.idNumber)
-    )
-  );
-  const isForeigner = Boolean(
-    client.clientType === "Tourist" ||
-    client.passportNumber ||
-    (client.licenseIssuedBy && !["uae", "dubai", "abu dhabi", "sharjah", "ajman", "fujairah", "rak", "uaq", "united arab emirates"].includes(client.licenseIssuedBy.toLowerCase().trim())) ||
-    (client.nationality && !["uae", "united arab emirates", "emirati", "إماراتي"].includes(client.nationality.toLowerCase().trim()) && !hasEmiratesId)
-  );
-  const isResident = !isForeigner;
+  // Check if client is a UAE Resident (has Emirates ID, UAE license, Resident type, or UAE nationality) vs Foreigner / Tourist
+  const isResident = isResidentClient(client, contract);
+  const isForeigner = !isResident;
   const isPersonalized = Boolean(
     contract.contractType === "Personalized" ||
     contract.personalizedPersonName ||

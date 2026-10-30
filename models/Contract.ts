@@ -86,6 +86,7 @@ export interface IContract extends Document {
   returnCustomerSignature?: string;
   returnedAt?: Date | string;
   returnedBy?: string;
+  privacyConsentDoc?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -214,6 +215,7 @@ const contractSchema = new Schema<IContract>(
     returnCustomerSignature: { type: String, required: false, default: null },
     returnedAt: { type: Date, required: false },
     returnedBy: { type: String, required: false },
+    privacyConsentDoc: { type: String, required: false },
   },
   { timestamps: true }
 );

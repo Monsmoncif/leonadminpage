@@ -5,6 +5,7 @@ import { Client } from "@/models/Client";
 import { Contract } from "@/models/Contract";
 import { Unit } from "@/models/Unit";
 import { clearPdfCache } from "@/app/api/contracts/[id]/pdf/route";
+import { clearConsentPdfCache } from "@/app/api/contracts/[id]/consent-pdf/route";
 
 export async function GET(
   req: NextRequest,
@@ -121,8 +122,10 @@ export async function PUT(
       }).select("_id contractNumber").lean();
       for (const c of associatedContracts) {
         clearPdfCache(c._id.toString());
+        clearConsentPdfCache(c._id.toString());
         if (c.contractNumber) {
           clearPdfCache(String(c.contractNumber));
+          clearConsentPdfCache(String(c.contractNumber));
         }
       }
     } catch (touchErr) {

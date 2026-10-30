@@ -34,6 +34,7 @@ import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { useToast } from "@/components/providers/ToastProvider";
+import { calculateRentalDays } from "@/lib/date-utils";
 
 // 4 steps for Admin Shop Handover (Car -> Inspection Photos -> Rental Data -> Sign & Review)
 const STEPS = [
@@ -845,13 +846,7 @@ function ConfirmHandoverPageContent() {
   const vehicleImage = contract.vehicleImage || contract.unitId?.images?.[0] || "";
   const pickupLoc = contract.pickupLocation || rentalData.pickupLocation || "Main Office";
 
-  const totalDays = Math.max(
-    1,
-    Math.ceil(
-      (new Date(rentalData.endDate).getTime() - new Date(rentalData.startDate).getTime()) /
-        (1000 * 3600 * 24)
-    )
-  );
+  const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
   const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
   const rawCollectionTotal = Number(rentalData.collectionAmount || 0) + extraFees;
   const advancePaid = Number(contract?.advancePayment || rentalData.advancePayment || 0);
@@ -1175,9 +1170,7 @@ function ConfirmHandoverPageContent() {
                 onChange={(e) => {
                   const newStart = e.target.value;
                   if (!newStart) return;
-                  const s = new Date(newStart);
-                  const end = new Date(rentalData.endDate);
-                  const days = Math.max(1, Math.ceil((end.getTime() - s.getTime()) / (1000 * 3600 * 24)));
+                  const days = calculateRentalDays(newStart, rentalData.endDate);
                   const rate = Number(rentalData.dailyRate) || 0;
                   setRentalData(prev => ({
                     ...prev,
@@ -1199,9 +1192,7 @@ function ConfirmHandoverPageContent() {
                 onChange={(e) => {
                   const newEnd = e.target.value;
                   if (!newEnd) return;
-                  const start = new Date(rentalData.startDate);
-                  const eDate = new Date(newEnd);
-                  const days = Math.max(1, Math.ceil((eDate.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+                  const days = calculateRentalDays(rentalData.startDate, newEnd);
                   const rate = Number(rentalData.dailyRate) || 0;
                   setRentalData(prev => ({
                     ...prev,

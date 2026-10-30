@@ -19,11 +19,15 @@ export async function checkContractDateOverlap({
   startDate,
   endDate,
   excludeContractId,
+  checkoutTime,
+  checkinTime,
 }: {
   unitId: string | mongoose.Types.ObjectId;
   startDate: string | Date;
   endDate: string | Date;
   excludeContractId?: string | mongoose.Types.ObjectId;
+  checkoutTime?: string;
+  checkinTime?: string;
 }) {
   const start = new Date(startDate);
   start.setHours(0, 0, 0, 0);
@@ -57,7 +61,21 @@ export async function checkContractDateOverlap({
     .lean();
 
   for (const candidate of candidateContracts) {
-    if (areDatesOverlapping(candidate.startDate, candidate.endDate, startDate, endDate)) {
+    const candidateReturnTime = (candidate as any).checkinTime || (candidate as any).returnedAt || (candidate as any).checkoutTime || "10:00 AM";
+    const candidateStartTime = (candidate as any).checkoutTime || "10:00 AM";
+
+    if (areDatesOverlapping(
+      candidate.startDate, 
+      candidate.endDate, 
+      startDate, 
+      endDate,
+      {
+        timeStartA: candidateStartTime,
+        timeEndA: candidateReturnTime,
+        timeStartB: checkoutTime || "10:00 AM",
+        timeEndB: checkinTime || checkoutTime || "10:00 AM",
+      }
+    )) {
       return candidate;
     }
   }

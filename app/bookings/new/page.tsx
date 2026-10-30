@@ -47,6 +47,7 @@ import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import { areDatesOverlapping } from "@/lib/date-overlap";
+import { calculateRentalDays } from "@/lib/date-utils";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys, compressImage } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
@@ -618,9 +619,7 @@ export function NewRentalAdminPageContent() {
       // 3. Rental Data & Timing
       const editStart = c.startDate ? formatDateToInput(c.startDate) : new Date().toISOString().split("T")[0];
       const editEnd = c.endDate ? formatDateToInput(c.endDate) : new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
-      const startD = new Date(editStart);
-      const endD = new Date(editEnd);
-      const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)));
+      const days = calculateRentalDays(editStart, editEnd);
       const editDailyRate = c.dailyRate || 85;
       const extraFees = (c.babySeatFees || 0) + (c.deliveryCharges || 0) + (c.salikFees || c.salikCharge || 0) + (c.tintingFees || 0) + (c.cleaningFees || 0);
       const editCollectionAmount = c.collectionAmount !== undefined 
@@ -722,7 +721,7 @@ export function NewRentalAdminPageContent() {
     });
   }, [contractId]);
 
-  const getUnitConflict = (unit: any, startDateStr?: string, endDateStr?: string) => {
+  const getUnitConflict = (unit: any, startDateStr?: string, endDateStr?: string, reqCheckoutTime?: string, reqCheckinTime?: string) => {
     if (!unit) return null;
     if (unit.status === "Maintenance" || unit.status === "Out of Service") {
       return { reason: unit.status };
@@ -731,10 +730,8 @@ export function NewRentalAdminPageContent() {
     const endStr = endDateStr || rentalData.endDate;
     if (!startStr || !endStr) return null;
 
-    const start = new Date(startStr);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endStr);
-    end.setHours(23, 59, 59, 999);
+    const checkoutT = reqCheckoutTime !== undefined ? reqCheckoutTime : rentalData.checkoutTime;
+    const checkinT = reqCheckinTime !== undefined ? reqCheckinTime : rentalData.checkinTime;
 
     if (Array.isArray(unit.activeBookings) && unit.activeBookings.length > 0) {
       for (const booking of unit.activeBookings) {
@@ -748,12 +745,28 @@ export function NewRentalAdminPageContent() {
           continue;
         }
 
-        if (areDatesOverlapping(booking.startDate, booking.endDate, startStr, endStr)) {
+        const bReturnTime = booking.checkinTime || booking.returnedAt || booking.checkoutTime || "10:00 AM";
+        const bStartTime = booking.checkoutTime || "10:00 AM";
+
+        if (areDatesOverlapping(
+          booking.startDate, 
+          booking.endDate, 
+          startStr, 
+          endStr,
+          {
+            timeStartA: bStartTime,
+            timeEndA: bReturnTime,
+            timeStartB: checkoutT || "10:00 AM",
+            timeEndB: checkinT || checkoutT || "10:00 AM",
+          }
+        )) {
           return {
             reason: "Booked",
             startDate: booking.startDate,
             endDate: booking.endDate,
             contractNumber: booking.contractNumber || (booking.contractId ? booking.contractId.substring(0, 8).toUpperCase() : ""),
+            returnTime: bReturnTime,
+            startTime: bStartTime,
           };
         }
       }
@@ -761,10 +774,10 @@ export function NewRentalAdminPageContent() {
     return null;
   };
 
-  const isUnitBookable = (unit: any, startDateStr?: string, endDateStr?: string) => {
+  const isUnitBookable = (unit: any, startDateStr?: string, endDateStr?: string, reqCheckoutTime?: string, reqCheckinTime?: string) => {
     if (!unit) return false;
     if (unit.status === "Maintenance" || unit.status === "Out of Service") return false;
-    return !getUnitConflict(unit, startDateStr, endDateStr);
+    return !getUnitConflict(unit, startDateStr, endDateStr, reqCheckoutTime, reqCheckinTime);
   };
 
   const handleRemoveMoneyPhoto = (index: number) => {
@@ -996,11 +1009,7 @@ export function NewRentalAdminPageContent() {
         return;
       }
 
-      const start = new Date(rentalData.startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(rentalData.endDate);
-      end.setHours(0, 0, 0, 0);
-      const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+      const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
       const collectionPrice = Number(rentalData.collectionAmount || 0);
       const calculatedDailyRate = totalDays > 0 ? Math.round((collectionPrice / totalDays) * 100) / 100 : collectionPrice;
       const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
@@ -1316,9 +1325,7 @@ export function NewRentalAdminPageContent() {
                       return;
                     }
                     setSelectedVehicle(unit._id);
-                    const start = new Date(rentalData.startDate);
-                    const end = new Date(rentalData.endDate);
-                    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+                    const days = calculateRentalDays(rentalData.startDate, rentalData.endDate);
                     const defaultRate = unit.dailyRate || 85;
                     setRentalData(prev => ({
                       ...prev,
@@ -1578,11 +1585,7 @@ export function NewRentalAdminPageContent() {
   };
 
   const renderRentalData = () => {
-    const start = new Date(rentalData.startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(rentalData.endDate);
-    end.setHours(0, 0, 0, 0);
-    const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+    const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
 
     const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
     const totalCharges = Number(rentalData.collectionAmount || 0) + extraFees;
@@ -1699,10 +1702,12 @@ export function NewRentalAdminPageContent() {
               <Calendar size={16} className="text-brand" /> Dates &amp; Logistics (المواعيد واللوجستيات)
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
+              {/* Start Date */}
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Start Date
+                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between gap-1 mb-1 whitespace-nowrap">
+                  <span className="truncate">Start Date</span>
+                  <span className="text-[11px] text-text-muted font-normal shrink-0">(تاريخ البدء)</span>
                 </label>
                 <input 
                   type="date" 
@@ -1713,24 +1718,18 @@ export function NewRentalAdminPageContent() {
                     const s = new Date(newStart);
                     s.setHours(0, 0, 0, 0);
 
-                    const prevS = new Date(rentalData.startDate);
-                    prevS.setHours(0, 0, 0, 0);
-                    const prevE = new Date(rentalData.endDate);
-                    prevE.setHours(0, 0, 0, 0);
-                    const prevDuration = Math.max(1, Math.round((prevE.getTime() - prevS.getTime()) / 86400000));
+                    const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate);
 
                     let resolvedEnd = rentalData.endDate;
                     if (newStart > rentalData.endDate) {
-                      const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
+                      const updatedEnd = new Date(s.getTime() + (prevDuration - 1) * 86400000);
                       const y = updatedEnd.getFullYear();
                       const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
                       const d = String(updatedEnd.getDate()).padStart(2, "0");
                       resolvedEnd = `${y}-${m}-${d}`;
                     }
 
-                    const end = new Date(resolvedEnd);
-                    end.setHours(0, 0, 0, 0);
-                    const days = Math.max(1, Math.round((end.getTime() - s.getTime()) / 86400000));
+                    const days = calculateRentalDays(newStart, resolvedEnd);
                     const rate = Number(rentalData.dailyRate) || 0;
                     setRentalData(prev => ({
                       ...prev,
@@ -1739,12 +1738,50 @@ export function NewRentalAdminPageContent() {
                       collectionAmount: rate * days
                     }));
                   }} 
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium" 
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium" 
                 />
               </div>
+
+              {/* Checkout Time * (وقت الاستلام) */}
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Expected End Date
+                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between gap-1 mb-1 whitespace-nowrap">
+                  <span className="flex items-center gap-1 min-w-0">
+                    <Clock size={13} className="text-brand shrink-0" />
+                    <span className="truncate">Checkout Time</span>
+                    <span className="text-red-500 shrink-0">*</span>
+                  </span>
+                  <span className="text-[11px] text-text-muted font-normal shrink-0">
+                    (وقت الاستلام)
+                  </span>
+                </label>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="relative flex-1 min-w-0">
+                    <Clock size={14} className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input 
+                      type="text" 
+                      value={rentalData.checkoutTime} 
+                      onChange={e => setRentalData({...rentalData, checkoutTime: e.target.value})} 
+                      placeholder="e.g. 10:00 AM"
+                      className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary" 
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRentalData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
+                    className="px-2.5 sm:px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1 shadow-2xs"
+                    title="Set current time"
+                  >
+                    <Clock size={12} className="hidden sm:inline" />
+                    <span>Now</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Expected End Date */}
+              <div>
+                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between gap-1 mb-1 whitespace-nowrap">
+                  <span className="truncate">Expected End Date</span>
+                  <span className="text-[11px] text-text-muted font-normal shrink-0">(تاريخ الإرجاع المتوقع)</span>
                 </label>
                 <input 
                   type="date" 
@@ -1753,14 +1790,8 @@ export function NewRentalAdminPageContent() {
                   onChange={e => {
                     const newEnd = e.target.value;
                     if (!newEnd) return;
-                    const s = new Date(rentalData.startDate);
-                    s.setHours(0, 0, 0, 0);
-
                     const validEnd = newEnd < rentalData.startDate ? rentalData.startDate : newEnd;
-                    const eDate = new Date(validEnd);
-                    eDate.setHours(0, 0, 0, 0);
-
-                    const days = Math.max(1, Math.round((eDate.getTime() - s.getTime()) / 86400000));
+                    const days = calculateRentalDays(rentalData.startDate, validEnd);
                     const rate = Number(rentalData.dailyRate) || 0;
                     setRentalData(prev => ({
                       ...prev,
@@ -1768,8 +1799,41 @@ export function NewRentalAdminPageContent() {
                       collectionAmount: rate * days
                     }));
                   }} 
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium" 
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium" 
                 />
+              </div>
+
+              {/* Expected Return Time (وقت الإرجاع المتوقع) */}
+              <div>
+                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between gap-1 mb-1 whitespace-nowrap">
+                  <span className="flex items-center gap-1 min-w-0">
+                    <Clock size={13} className="text-brand shrink-0" />
+                    <span className="truncate">Return Time</span>
+                  </span>
+                  <span className="text-[11px] text-text-muted font-normal shrink-0">
+                    (وقت الإرجاع المتوقع)
+                  </span>
+                </label>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="relative flex-1 min-w-0">
+                    <Clock size={14} className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input 
+                      type="text" 
+                      value={rentalData.checkinTime} 
+                      onChange={e => setRentalData({...rentalData, checkinTime: e.target.value})} 
+                      placeholder={rentalData.checkoutTime || "e.g. 10:00 AM"}
+                      className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary" 
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRentalData(prev => ({ ...prev, checkinTime: prev.checkoutTime || getCurrentFormattedTime() }))}
+                    className="px-2.5 sm:px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-primary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-border flex items-center gap-1 shadow-2xs"
+                    title="Same as checkout time"
+                  >
+                    <span>Same</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1789,64 +1853,48 @@ export function NewRentalAdminPageContent() {
               )}
             </div>
 
-            {/* Conflict Alert Banner if selected vehicle is booked for these dates */}
+            {/* Conflict Alert Banner if selected vehicle is booked for these dates & times */}
             {(() => {
               const selectedUnit = units.find(u => u._id === selectedVehicle);
-              const conflict = selectedUnit ? getUnitConflict(selectedUnit, rentalData.startDate, rentalData.endDate) : null;
+              const conflict = selectedUnit ? getUnitConflict(selectedUnit, rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime) : null;
               if (!conflict || conflict.reason !== "Booked") return null;
               const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
               const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+              const returnHour = conflict.returnTime || "10:00 AM";
+
+              const sDate = new Date(rentalData.startDate);
+              const cEnd = new Date(conflict.endDate);
+              const isTurnoverConflict = sDate.getFullYear() === cEnd.getFullYear() && 
+                                         sDate.getMonth() === cEnd.getMonth() && 
+                                         sDate.getDate() === cEnd.getDate();
+
               return (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in shadow-2xs">
                   <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-600" />
-                  <div className="space-y-1 min-w-0 flex-1">
+                  <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 font-bold text-red-800 text-xs">
-                      <span>Date Conflict Detected</span>
+                      <span>Date &amp; Time Conflict Detected</span>
                       <span className="text-[11px] font-normal text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
-                        تعارض في التواريخ
+                        تعارض في المواعيد
                       </span>
                     </div>
                     <p className="text-[11px] sm:text-xs text-red-700 leading-relaxed">
-                      This car (<strong className="font-semibold">{selectedUnit.make} {selectedUnit.model} - {selectedUnit.plate}</strong>) is already booked from <span className="font-semibold underline">{conflictStart}</span> to <span className="font-semibold underline">{conflictEnd}</span>. Please choose different dates or select another car.
+                      This car (<strong className="font-semibold">{selectedUnit.make} {selectedUnit.model} - {selectedUnit.plate}</strong>) is already booked from <span className="font-semibold underline">{conflictStart}</span> until <span className="font-semibold underline">{conflictEnd}</span> at <span className="font-semibold underline">{returnHour}</span>.
+                      {isTurnoverConflict ? (
+                        <> Please select a <strong>Checkout Time (وقت الاستلام)</strong> after <strong>{returnHour}</strong> or choose another car.</>
+                      ) : (
+                        <> Please choose different dates or select another car.</>
+                      )}
                     </p>
+                    {isTurnoverConflict && (
+                      <p className="text-[11px] text-red-600 font-semibold bg-red-100/60 p-2 rounded-lg border border-red-200/60">
+                        🚗 السيارة ترجع يوم {conflictEnd} الساعة {returnHour}. يمكنك استلامها وإنشاء العقد بعد الساعة {returnHour}.
+                      </p>
+                    )}
                   </div>
                 </div>
               );
             })()}
-
-            <div>
-              <label className="text-xs font-semibold text-text-secondary flex items-center justify-between mb-1">
-                <span className="flex items-center gap-1">
-                  <Clock size={13} className="text-brand shrink-0" />
-                  <span>{contractType === "Delivery" ? "Delivery / Handover Time" : "Checkout Time"}</span>
-                  <span className="text-red-500">*</span>
-                </span>
-                <span className="text-[11px] text-text-muted font-normal">
-                  {contractType === "Delivery" ? "(تسليم للسائق)" : "(وقت الاستلام)"}
-                </span>
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                  <input 
-                    type="text" 
-                    value={rentalData.checkoutTime} 
-                    onChange={e => setRentalData({...rentalData, checkoutTime: e.target.value})} 
-                    placeholder="e.g. 10:00 AM"
-                    className="w-full p-2.5 pl-9 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary" 
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setRentalData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
-                  className="px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1.5 shadow-2xs"
-                  title="Set current time"
-                >
-                  <Clock size={13} />
-                  <span>Now</span>
-                </button>
-              </div>
-            </div>
 
             {/* Driver assignment — only for Delivery contracts */}
             {contractType === "Delivery" && (
@@ -2281,11 +2329,7 @@ export function NewRentalAdminPageContent() {
   };
 
   const renderReview = () => {
-    const start = new Date(rentalData.startDate || Date.now());
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(rentalData.endDate || Date.now() + 86400000);
-    end.setHours(0, 0, 0, 0);
-    const totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+    const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
 
     const clientObj = contractType === "Shop" ? clients.find(c => c._id === selectedClient) : null;
     const vehicleObj = units.find(u => u._id === selectedVehicle);
@@ -2680,10 +2724,12 @@ export function NewRentalAdminPageContent() {
               <span>Booking Dates (تواريخ الحجز)</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
+              {/* Start Date */}
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Start Date (من تاريخ)
+                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between gap-1 mb-1 whitespace-nowrap">
+                  <span className="truncate">Start Date</span>
+                  <span className="text-[11px] text-text-muted font-normal shrink-0">(من تاريخ)</span>
                 </label>
                 <input
                   type="date"
@@ -2693,14 +2739,10 @@ export function NewRentalAdminPageContent() {
                     if (!newStart) return;
                     const s = new Date(newStart);
                     s.setHours(0, 0, 0, 0);
-                    const prevS = new Date(rentalData.startDate);
-                    prevS.setHours(0, 0, 0, 0);
-                    const prevE = new Date(rentalData.endDate);
-                    prevE.setHours(0, 0, 0, 0);
-                    const prevDuration = Math.max(1, Math.round((prevE.getTime() - prevS.getTime()) / 86400000));
+                    const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate);
                     let resolvedEnd = rentalData.endDate;
                     if (newStart > rentalData.endDate) {
-                      const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
+                      const updatedEnd = new Date(s.getTime() + (prevDuration - 1) * 86400000);
                       const y = updatedEnd.getFullYear();
                       const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
                       const d = String(updatedEnd.getDate()).padStart(2, "0");
@@ -2708,13 +2750,48 @@ export function NewRentalAdminPageContent() {
                     }
                     setRentalData(prev => ({ ...prev, startDate: newStart, endDate: resolvedEnd }));
                   }}
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
                 />
               </div>
 
+              {/* Checkout Time * (وقت الاستلام) */}
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">
-                  Expected End Date (إلى تاريخ)
+                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between gap-1 mb-1 whitespace-nowrap">
+                  <span className="flex items-center gap-1 min-w-0">
+                    <Clock size={13} className="text-brand shrink-0" />
+                    <span className="truncate">Checkout Time</span>
+                    <span className="text-red-500 shrink-0">*</span>
+                  </span>
+                  <span className="text-[11px] text-text-muted font-normal shrink-0">(وقت الاستلام)</span>
+                </label>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="relative flex-1 min-w-0">
+                    <Clock size={14} className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="text"
+                      value={rentalData.checkoutTime}
+                      onChange={(e) => setRentalData({ ...rentalData, checkoutTime: e.target.value })}
+                      placeholder="e.g. 10:00 AM"
+                      className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRentalData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
+                    className="px-2.5 sm:px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1 shadow-2xs"
+                    title="Set current time"
+                  >
+                    <Clock size={12} className="hidden sm:inline" />
+                    <span>Now</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Expected End Date */}
+              <div>
+                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between gap-1 mb-1 whitespace-nowrap">
+                  <span className="truncate">Expected End Date</span>
+                  <span className="text-[11px] text-text-muted font-normal shrink-0">(إلى تاريخ)</span>
                 </label>
                 <input
                   type="date"
@@ -2726,18 +2803,45 @@ export function NewRentalAdminPageContent() {
                     const validEnd = newEnd < rentalData.startDate ? rentalData.startDate : newEnd;
                     setRentalData(prev => ({ ...prev, endDate: validEnd }));
                   }}
-                  className="w-full p-2.5 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
+                  className="w-full p-2.5 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
                 />
+              </div>
+
+              {/* Expected Return Time (وقت الإرجاع المتوقع) */}
+              <div>
+                <label className="text-xs font-semibold text-text-secondary flex items-center justify-between gap-1 mb-1 whitespace-nowrap">
+                  <span className="flex items-center gap-1 min-w-0">
+                    <Clock size={13} className="text-brand shrink-0" />
+                    <span className="truncate">Return Time</span>
+                  </span>
+                  <span className="text-[11px] text-text-muted font-normal shrink-0">(وقت الإرجاع المتوقع)</span>
+                </label>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="relative flex-1 min-w-0">
+                    <Clock size={14} className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="text"
+                      value={rentalData.checkinTime}
+                      onChange={(e) => setRentalData({ ...rentalData, checkinTime: e.target.value })}
+                      placeholder={rentalData.checkoutTime || "e.g. 10:00 AM"}
+                      className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRentalData(prev => ({ ...prev, checkinTime: prev.checkoutTime || getCurrentFormattedTime() }))}
+                    className="px-2.5 sm:px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-primary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-border flex items-center gap-1 shadow-2xs"
+                    title="Same as checkout time"
+                  >
+                    <span>Same</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Rental Duration indicator for Personalized */}
             {(() => {
-              const s = new Date(rentalData.startDate);
-              s.setHours(0, 0, 0, 0);
-              const e = new Date(rentalData.endDate);
-              e.setHours(0, 0, 0, 0);
-              const daysCount = Math.max(1, Math.round((e.getTime() - s.getTime()) / 86400000));
+              const daysCount = calculateRentalDays(rentalData.startDate, rentalData.endDate);
               return (
                 <div className="flex items-center justify-between text-xs px-1">
                   <span className="text-text-muted">
@@ -2758,60 +2862,45 @@ export function NewRentalAdminPageContent() {
 
             {/* Date Conflict Alert */}
             {(() => {
-              const conflict = selectedUnit ? getUnitConflict(selectedUnit, rentalData.startDate, rentalData.endDate) : null;
+              const conflict = selectedUnit ? getUnitConflict(selectedUnit, rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime) : null;
               if (!conflict || conflict.reason !== "Booked") return null;
-              const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-              const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+              const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+              const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+              const returnHour = conflict.returnTime || "10:00 AM";
+
+              const sDate = new Date(rentalData.startDate);
+              const cEnd = new Date(conflict.endDate);
+              const isTurnoverConflict = sDate.getFullYear() === cEnd.getFullYear() && 
+                                         sDate.getMonth() === cEnd.getMonth() && 
+                                         sDate.getDate() === cEnd.getDate();
+
               return (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in shadow-2xs">
                   <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-600" />
-                  <div className="space-y-1 min-w-0 flex-1">
+                  <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 font-bold text-red-800 text-xs">
-                      <span>Date Conflict Detected</span>
+                      <span>Date &amp; Time Conflict Detected</span>
                       <span className="text-[11px] font-normal text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
-                        تعارض في التواريخ
+                        تعارض في المواعيد
                       </span>
                     </div>
                     <p className="text-[11px] sm:text-xs text-red-700 leading-relaxed">
-                      This car is already booked from <span className="font-semibold underline">{conflictStart}</span> to <span className="font-semibold underline">{conflictEnd}</span>. Please choose different dates.
+                      This car is already booked from <span className="font-semibold underline">{conflictStart}</span> until <span className="font-semibold underline">{conflictEnd}</span> at <span className="font-semibold underline">{returnHour}</span>.
+                      {isTurnoverConflict ? (
+                        <> Please choose a <strong>Checkout Time (وقت الاستلام)</strong> after <strong>{returnHour}</strong>.</>
+                      ) : (
+                        <> Please choose different dates.</>
+                      )}
                     </p>
+                    {isTurnoverConflict && (
+                      <p className="text-[11px] text-red-600 font-semibold bg-red-100/60 p-2 rounded-lg border border-red-200/60">
+                        🚗 السيارة ترجع يوم {conflictEnd} الساعة {returnHour}. يمكنك استلامها وإنشاء العقد بعد الساعة {returnHour}.
+                      </p>
+                    )}
                   </div>
                 </div>
               );
             })()}
-
-            {/* Handover Time */}
-            <div>
-              <label className="text-xs font-semibold text-text-secondary flex items-center justify-between mb-1">
-                <span className="flex items-center gap-1">
-                  <Clock size={13} className="text-brand shrink-0" />
-                  <span>Handover Time (وقت الاستلام)</span>
-                  <span className="text-red-500">*</span>
-                </span>
-                <span className="text-[11px] text-text-muted font-normal">(وقت الاستلام)</span>
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                  <input
-                    type="text"
-                    value={rentalData.checkoutTime}
-                    onChange={(e) => setRentalData({ ...rentalData, checkoutTime: e.target.value })}
-                    placeholder="e.g. 10:00 AM"
-                    className="w-full p-2.5 pl-9 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setRentalData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
-                  className="px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1.5 shadow-2xs"
-                  title="Set current time"
-                >
-                  <Clock size={13} />
-                  <span>Now</span>
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Card 2: Location, Mileage & Notes */}
@@ -3244,9 +3333,7 @@ export function NewRentalAdminPageContent() {
           if (newUnit && (newUnit._id || newUnit.id)) {
             const newId = newUnit._id || newUnit.id;
             setSelectedVehicle(newId);
-            const start = new Date(rentalData.startDate);
-            const end = new Date(rentalData.endDate);
-            const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+            const days = calculateRentalDays(rentalData.startDate, rentalData.endDate);
             const defaultRate = newUnit.dailyRate || 85;
             setRentalData((prev) => ({
               ...prev,

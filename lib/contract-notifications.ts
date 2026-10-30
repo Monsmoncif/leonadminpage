@@ -14,6 +14,7 @@ import {
   getEmailLogoAttachment,
 } from "@/lib/email-templates";
 import { formatDateDMY } from "@/lib/date-utils";
+import { isResidentClient } from "@/lib/client-utils";
 
 function getTransporter() {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
@@ -102,34 +103,30 @@ export async function sendClientContractNotification(
     const shouldSendContractPdf = type === "initial" && isHandedOverOrDelivered;
     let pdfBuffer: Buffer | undefined;
     if (shouldSendContractPdf) {
-      const hasEmiratesId = Boolean(
-        clientDoc.idNumber && (
-          clientDoc.idNumber.startsWith("784-") ||
-          /^\d{3}-\d{4}-\d{7}-\d{1}$/.test(clientDoc.idNumber)
-        )
-      );
-      const isForeigner = Boolean(
-        clientDoc.clientType === "Tourist" ||
-        clientDoc.passportNumber ||
-        (clientDoc.licenseIssuedBy && !["uae", "dubai", "abu dhabi", "sharjah", "ajman", "fujairah", "rak", "uaq", "united arab emirates"].includes(clientDoc.licenseIssuedBy.toLowerCase().trim())) ||
-        (clientDoc.nationality && !["uae", "united arab emirates", "emirati", "إماراتي"].includes(clientDoc.nationality.toLowerCase().trim()) && !hasEmiratesId)
-      );
+      const isResident = isResidentClient(clientDoc, contract);
+      const isForeigner = !isResident;
 
       const contractPdfData = {
         contractNumber: contractNum,
         clientName,
         clientPhone: clientPhone || "",
         clientEmail: clientEmail || "",
-        clientIdNumber: clientDoc.idNumber || clientDoc.passportNumber || "",
+        clientIdNumber: !isForeigner 
+          ? (clientDoc.idNumber || contract.customerIdNumber || clientDoc.passportNumber || "")
+          : (clientDoc.passportNumber || contract.passportNumber || clientDoc.idNumber || ""),
         clientType: isForeigner ? "Tourist" : (clientDoc.clientType || "Resident"),
         clientLicense: clientDoc.licenseNumber || clientDoc.driverLicense || "",
         licenseIssuedBy: clientDoc.licenseIssuedBy || clientDoc.licenseIssuedAt || "",
         licenseIssuedDate: clientDoc.licenseIssuedDate ? formatDateDMY(clientDoc.licenseIssuedDate) : "",
         licenseExpiry: clientDoc.licenseExpiry ? formatDateDMY(clientDoc.licenseExpiry) : "",
         internationalLicenseNumber: clientDoc.internationalLicenseNumber || "",
-        passportNumber: clientDoc.passportNumber || (isForeigner ? clientDoc.idNumber : ""),
+        passportNumber: isForeigner
+          ? (clientDoc.passportNumber || contract.passportNumber || clientDoc.idNumber || "")
+          : (clientDoc.passportNumber || ""),
         passportIssuedBy: clientDoc.passportIssuedBy || (isForeigner ? clientDoc.nationality : ""),
         passportExpiry: clientDoc.passportExpiry ? formatDateDMY(clientDoc.passportExpiry) : (isForeigner && clientDoc.idExpiry ? formatDateDMY(clientDoc.idExpiry) : ""),
+        idNumber: clientDoc.idNumber || "",
+        idExpiry: clientDoc.idExpiry ? formatDateDMY(clientDoc.idExpiry) : "",
         nationality: clientDoc.nationality || "",
         documents: Array.isArray(clientDoc.documents) ? clientDoc.documents : [],
         vehicleName,

@@ -14,7 +14,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { sendClientContractNotification, sendDriverTaskNotification, sendHandoverReminderNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
-import { formatDateWords } from "@/lib/date-utils";
+import { formatDateWords, calculateRentalDays } from "@/lib/date-utils";
 
 const emptyResponse = {
   contracts: [],
@@ -94,6 +94,10 @@ export async function GET(req: Request) {
       customer: c.personalizedPersonName || c.clientId?.name || (c.contractType === "Personalized" ? (c.additionalDriverName || "Personal Use") : "Unknown"),
       personalizedPersonName: c.personalizedPersonName || "",
       customerPhone: c.clientId?.phone || c.additionalDriverPhone || "",
+      customerAddress: c.clientId?.address || c.pickupLocation || "",
+      customerEmail: c.clientId?.email || "",
+      customerIdNumber: c.clientId?.idNumber || c.clientId?.passportNumber || "",
+      customerNationality: c.clientId?.nationality || "",
       customerLicense: c.clientId?.licenseNumber || c.additionalDriverLicense || "",
       customerLicenseExpiry: c.clientId?.licenseExpiry || c.additionalDriverExpiry || "",
       customerLicenseIssuedDate: c.clientId?.licenseIssuedDate || c.additionalDriverIssuedAt || "",
@@ -172,7 +176,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+    const days = calculateRentalDays(start, end);
     
     const isPersonalized = body.contractType === "Personalized";
 
@@ -212,13 +216,16 @@ export async function POST(req: Request) {
       unitId: body.unitId,
       startDate: body.startDate,
       endDate: body.endDate,
+      checkoutTime: body.checkoutTime,
+      checkinTime: body.checkinTime,
     });
 
     if (conflictingContract) {
       const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
       const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      const returnHour = conflictingContract.checkinTime || conflictingContract.checkoutTime || "10:00 AM";
       return NextResponse.json(
-        { error: `Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates or choose another car.` },
+        { error: `Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is booked until ${conflictEnd} (${returnHour}). Please select a checkout time after ${returnHour} or choose another car.` },
         { status: 400 }
       );
     }

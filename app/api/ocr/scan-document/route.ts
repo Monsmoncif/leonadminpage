@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { hasEmiratesIdNumber, isUaeLicenseAuthority } from "@/lib/client-utils";
 
 // Date normalization helper to guarantee standard YYYY-MM-DD output for HTML date inputs
 function normalizeDateToISO(rawDate: any): string {
@@ -211,7 +212,7 @@ Extraction Guidelines:
    - idExpiry: Look for Expiry Date / تاريخ الانتهاء / Valid Until (often on back or front) converted to YYYY-MM-DD.
 5. For UAE Driving Licence (رخصة القيادة الإماراتية):
    - licenseNumber: Licence number / رقم الرخصة (e.g., 5031657).
-   - licenseIssuedBy: Issuing authority / جهة الإصدار (e.g., Dubai, Abu Dhabi, Sharjah, RTA).
+   - licenseIssuedBy: Issuing authority / جهة الإصدار (e.g., Dubai, Abu Dhabi, Sharjah, Ras Al Khaima, Ras Al Khaimah, Ajman, Fujairah, Umm Al Quwain, RTA, MITR).
    - licenseIssuedDate: Issue date in YYYY-MM-DD.
    - licenseExpiry: Expiry date in YYYY-MM-DD.
 6. Return ONLY valid JSON. Do not include markdown code block backticks.`;
@@ -317,7 +318,9 @@ Extraction Guidelines:
         }
       }
 
-      if (extracted && extracted.passportNumber && extracted.licenseNumber) {
+      const hasUaeId = hasEmiratesIdNumber(extracted?.idNumber);
+      const isUaeLic = isUaeLicenseAuthority(extracted?.licenseIssuedBy);
+      if (extracted && extracted.passportNumber && extracted.licenseNumber && !hasUaeId && !isUaeLic) {
         extracted.documentType = "tourist_bundle";
       }
     }
@@ -347,11 +350,14 @@ Extraction Guidelines:
 
     // Determine normalized document type
     let docType = (extracted.documentType || "unknown").toLowerCase();
-    if (resolvedIdNumber.startsWith("784") || docType.includes("emirates") || docType.includes("id_card")) {
+    const hasUaeEmiratesId = hasEmiratesIdNumber(resolvedIdNumber);
+    const hasUaeLic = isUaeLicenseAuthority(extracted.licenseIssuedBy);
+
+    if (hasUaeEmiratesId || docType.includes("emirates") || docType.includes("id_card")) {
       docType = "emirates_id";
-    } else if (docType.includes("tourist")) {
+    } else if (docType.includes("tourist") && !hasUaeLic) {
       docType = "tourist_bundle";
-    } else if (docType.includes("passport")) {
+    } else if (docType.includes("passport") && !hasUaeEmiratesId && !hasUaeLic) {
       docType = "passport";
       if (!resolvedIdNumber && resolvedPassportNumber) {
         resolvedIdNumber = resolvedPassportNumber;
@@ -361,9 +367,13 @@ Extraction Guidelines:
     }
 
     // Safety: Emirates ID should NEVER be set as passportNumber
-    if (resolvedPassportNumber.startsWith("784") || (resolvedPassportNumber === resolvedIdNumber && docType === "emirates_id")) {
+    if (hasEmiratesIdNumber(resolvedPassportNumber) || (resolvedPassportNumber === resolvedIdNumber && (docType === "emirates_id" || hasUaeEmiratesId))) {
       resolvedPassportNumber = "";
     }
+
+    const suggestedClientType: "Resident" | "Tourist" = (docType === "emirates_id" || hasUaeEmiratesId || hasUaeLic)
+      ? "Resident"
+      : (docType === "passport" || docType === "tourist_bundle" ? "Tourist" : "Resident");
 
     const allImageUrls = parsedImages.map((p) => p.resolvedUrl);
 
@@ -410,6 +420,7 @@ Extraction Guidelines:
         phone: extracted.phone || "",
         email: extracted.email || "",
         documentType: docType,
+        suggestedClientType,
       },
       imageUrl: allImageUrls[0] || null,
       imageUrls: allImageUrls,

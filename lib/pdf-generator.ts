@@ -7,6 +7,7 @@ import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
 import { User } from "@/models/User";
 import { CONTRACT_TERMS } from "@/lib/contractTerms";
+import { isResidentClient } from "@/lib/client-utils";
 
 export interface ContractPdfData {
   contractNumber: string | number;
@@ -114,18 +115,8 @@ export function buildRealContractHtml(contract: any): string {
   const isPersonalized = Boolean(contract.contractType === "Personalized" || contract.personalizedPersonName);
   const isReturned = contract.status === "Completed" || contract.deliveryStatus === "Returned" || Boolean(contract.returnedAt);
 
-  const hasEmiratesId = Boolean(
-    client.idNumber && (
-      client.idNumber.startsWith("784-") ||
-      /^\d{3}-\d{4}-\d{7}-\d{1}$/.test(client.idNumber)
-    )
-  );
-  const isForeigner = Boolean(
-    client.clientType === "Tourist" ||
-    client.passportNumber ||
-    (client.licenseIssuedBy && !["uae", "dubai", "abu dhabi", "sharjah", "ajman", "fujairah", "rak", "uaq", "united arab emirates"].includes(client.licenseIssuedBy.toLowerCase().trim())) ||
-    (client.nationality && !["uae", "united arab emirates", "emirati", "إماراتي"].includes(client.nationality.toLowerCase().trim()) && !hasEmiratesId)
-  );
+  const isResident = isResidentClient(client, contract);
+  const isForeigner = !isResident;
 
   let logoBase64 = "";
   try {
@@ -270,11 +261,11 @@ export function buildRealContractHtml(contract: any): string {
         <div class="grid-2 border-b-black" style="font-size: 6.5px;">
           <div class="border-r-black" style="padding: 2px 4px;">
             <div style="font-size: 6px; color: #6b7280;">${isForeigner ? "PASSPORT NO / جواز السفر" : "EMIRATES ID NO / رقم الهوية"}</div>
-            <div style="font-weight: bold;">${client.passportNumber || client.idNumber || "N/A"}</div>
+            <div style="font-weight: bold;">${!isForeigner ? (client.idNumber || contract.customerIdNumber || client.passportNumber || "N/A") : (client.passportNumber || contract.passportNumber || client.idNumber || "N/A")}</div>
           </div>
           <div style="padding: 2px 4px;">
             <div style="font-size: 6px; color: #6b7280;">${isForeigner ? "PASSPORT EXPIRY / انتهاء الجواز" : "ID EXPIRY / انتهاء الهوية"}</div>
-            <div style="font-weight: bold;">${formatDateDisplay(client.passportExpiry || client.idExpiry) || "N/A"}</div>
+            <div style="font-weight: bold;">${!isForeigner ? (formatDateDisplay(client.idExpiry || contract.customerIdExpiry || client.passportExpiry) || "N/A") : (formatDateDisplay(client.passportExpiry || contract.passportExpiry || client.idExpiry) || "N/A")}</div>
           </div>
         </div>
         <div class="grid-2 border-b-black" style="font-size: 6.5px;">
@@ -626,6 +617,22 @@ export async function generateContractPdfFromPrintUrl(
         .populate({ path: "clientId" })
         .populate({ path: "unitId" })
         .lean();
+    }
+    if (contractObj) {
+      if (contractObj.clientId) {
+        const cId = typeof contractObj.clientId === "object" ? (contractObj.clientId._id || contractObj.clientId.id) : contractObj.clientId;
+        if (cId && mongoose.Types.ObjectId.isValid(cId)) {
+          const freshClient = await Client.findById(cId).lean();
+          if (freshClient) contractObj.clientId = freshClient;
+        }
+      }
+      if (contractObj.unitId) {
+        const uId = typeof contractObj.unitId === "object" ? (contractObj.unitId._id || contractObj.unitId.id) : contractObj.unitId;
+        if (uId && mongoose.Types.ObjectId.isValid(uId)) {
+          const freshUnit = await Unit.findById(uId).lean();
+          if (freshUnit) contractObj.unitId = freshUnit;
+        }
+      }
     }
   } catch (dbErr) {
     console.warn(`[PdfGenerator] Failed loading contract from DB for ${contractId}:`, dbErr);

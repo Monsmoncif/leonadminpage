@@ -92,3 +92,58 @@ export function formatDateTimeDMY(dateInput: any): string {
   const minutes = String(d.getMinutes()).padStart(2, "0");
   return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
+
+/**
+ * Normalizes any date input (ISO string, DD/MM/YYYY, Date instance) to midnight (00:00:00.000)
+ */
+function parseDateToMidnight(input: any): Date | null {
+  if (!input) return null;
+  if (input instanceof Date) {
+    if (isNaN(input.getTime())) return null;
+    const d = new Date(input.getTime());
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    // Match DD/MM/YYYY
+    const dmy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (dmy) {
+      return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10), 0, 0, 0, 0);
+    }
+    // Match YYYY-MM-DD or YYYY/MM/DD
+    const ymd = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (ymd) {
+      return new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10), 0, 0, 0, 0);
+    }
+    const parsed = new Date(trimmed);
+    if (isNaN(parsed.getTime())) return null;
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  }
+  const parsed = new Date(input);
+  if (isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+}
+
+/**
+ * Calculates rental duration in days inclusively.
+ * In car rentals, both the start day and the expected return day are billable rental days.
+ * E.g. Start 01/11/2026 to Return 06/11/2026 = 6 days (1st, 2nd, 3rd, 4th, 5th, 6th).
+ * E.g. Same-day rental 01/11/2026 to 01/11/2026 = 1 day.
+ */
+export function calculateRentalDays(startDateInput: any, endDateInput: any): number {
+  if (!startDateInput || !endDateInput) return 1;
+
+  const s = parseDateToMidnight(startDateInput);
+  const e = parseDateToMidnight(endDateInput);
+
+  if (!s || !e) return 1;
+  if (e.getTime() < s.getTime()) return 1;
+
+  const diffDays = Math.round((e.getTime() - s.getTime()) / 86400000);
+  // Inclusive counting (+1 day)
+  return Math.max(1, diffDays + 1);
+}
+

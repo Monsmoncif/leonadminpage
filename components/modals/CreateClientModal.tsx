@@ -24,6 +24,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
+import { hasEmiratesIdNumber, isUaeLicenseAuthority } from "@/lib/client-utils";
 
 interface CreateClientModalProps {
   isOpen: boolean;
@@ -619,12 +620,18 @@ export default function CreateClientModal({
       const { data, imageUrls, imageUrl } = resData;
 
       // Smart resident vs tourist classification without forcing tourist for non-emirati residents
-      if (data.documentType === "emirates_id" || (data.idNumber && data.idNumber.startsWith("784"))) {
+      const isResidentDetected = 
+        data.suggestedClientType === "Resident" ||
+        data.documentType === "emirates_id" ||
+        hasEmiratesIdNumber(data.idNumber) ||
+        isUaeLicenseAuthority(data.licenseIssuedBy);
+
+      if (isResidentDetected) {
         setClientType("Resident");
       } else if (
         (data.documentType === "passport" || data.documentType === "tourist_bundle" || data.passportNumber) &&
-        !data.idNumber?.startsWith("784") &&
-        data.documentType !== "emirates_id"
+        !hasEmiratesIdNumber(data.idNumber) &&
+        !isUaeLicenseAuthority(data.licenseIssuedBy)
       ) {
         setClientType("Tourist");
       }
@@ -683,7 +690,8 @@ export default function CreateClientModal({
             .join(" ");
         }
 
-        if (clientType === "Tourist" && updated.passportNumber) {
+        const effectiveType = isResidentDetected ? "Resident" : clientType;
+        if (effectiveType === "Tourist" && updated.passportNumber && !hasEmiratesIdNumber(updated.idNumber)) {
           updated.idNumber = updated.passportNumber;
         }
 
@@ -739,12 +747,18 @@ export default function CreateClientModal({
 
       const { data, imageUrls, imageUrl } = resData;
 
-      if (data.documentType === "emirates_id" || (data.idNumber && data.idNumber.startsWith("784"))) {
+      const isResidentDetected = 
+        data.suggestedClientType === "Resident" ||
+        data.documentType === "emirates_id" ||
+        hasEmiratesIdNumber(data.idNumber) ||
+        isUaeLicenseAuthority(data.licenseIssuedBy);
+
+      if (isResidentDetected) {
         setClientType("Resident");
       } else if (
         (data.documentType === "passport" || data.documentType === "tourist_bundle" || data.passportNumber) &&
-        !data.idNumber?.startsWith("784") &&
-        data.documentType !== "emirates_id"
+        !hasEmiratesIdNumber(data.idNumber) &&
+        !isUaeLicenseAuthority(data.licenseIssuedBy)
       ) {
         setClientType("Tourist");
       }
@@ -802,7 +816,8 @@ export default function CreateClientModal({
             .join(" ");
         }
 
-        if (clientType === "Tourist" && updated.passportNumber) {
+        const effectiveType = isResidentDetected ? "Resident" : clientType;
+        if (effectiveType === "Tourist" && updated.passportNumber && !hasEmiratesIdNumber(updated.idNumber)) {
           updated.idNumber = updated.passportNumber;
         }
 
@@ -916,8 +931,11 @@ export default function CreateClientModal({
 
       const allDocuments = [...existingUrls, ...uploadedUrls];
 
+      const isResidentDetected = hasEmiratesIdNumber(formData.idNumber) || isUaeLicenseAuthority(formData.licenseIssuedBy);
+      const effectiveClientType = isResidentDetected ? "Resident" : clientType;
+
       const existingId = clientToEdit?.idNumber || clientToEdit?.passportNumber;
-      const resolvedIdNumber = clientType === "Tourist"
+      const resolvedIdNumber = effectiveClientType === "Tourist"
         ? (formData.passportNumber.trim() || formData.idNumber.trim() || existingId || `T-${Date.now().toString().slice(-6)}`)
         : (formData.idNumber.trim() || existingId || `R-${Date.now().toString().slice(-6)}`);
 
@@ -933,7 +951,7 @@ export default function CreateClientModal({
         idIssuedBy: formData.idIssuedBy || undefined,
         idIssuedDate: formData.idIssuedDate || undefined,
         idExpiry: formData.idExpiry || undefined,
-        passportNumber: clientType === "Tourist" ? resolvedIdNumber : (formData.passportNumber || clientToEdit?.passportNumber || undefined),
+        passportNumber: effectiveClientType === "Tourist" ? resolvedIdNumber : (formData.passportNumber || clientToEdit?.passportNumber || undefined),
         passportIssuedBy: formData.passportIssuedBy || undefined,
         passportIssuedDate: formData.passportIssuedDate || undefined,
         passportExpiry: formData.passportExpiry || undefined,
@@ -947,9 +965,9 @@ export default function CreateClientModal({
         internationalLicenseExpiry: formData.internationalLicenseExpiry || undefined,
         visaNumber: formData.visaNumber || undefined,
         visaExpiry: formData.visaExpiry || undefined,
-        nationality: formData.nationality.trim() || (clientType === "Tourist" ? "International" : "Emirati"),
-        address: formData.address.trim() || (clientType === "Tourist" ? "Hotel / Tourist stay" : "Local residence"),
-        clientType,
+        nationality: formData.nationality.trim() || (effectiveClientType === "Tourist" ? "International" : "Emirati"),
+        address: formData.address.trim() || (effectiveClientType === "Tourist" ? "Hotel / Tourist stay" : "Local residence"),
+        clientType: effectiveClientType,
         documents: allDocuments,
       };
 

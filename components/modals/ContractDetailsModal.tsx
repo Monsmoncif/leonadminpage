@@ -31,11 +31,17 @@ import {
   Download,
   Building2,
   XCircle,
-  ShieldCheck
+  ShieldCheck,
+  Printer,
+  Upload,
+  Trash2,
+  Eye,
+  FileCheck,
+  Loader2
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import ExtendRentalModal from "@/components/modals/ExtendRentalModal";
-import { formatDateWords, formatDateTimeDMY } from "@/lib/date-utils";
+import { formatDateWords, formatDateTimeDMY, calculateRentalDays } from "@/lib/date-utils";
 
 const VEHICLE_ANGLES = [
   "Front View",
@@ -220,6 +226,7 @@ export default function ContractDetailsModal({
   const [contractData, setContractData] = useState<any>(contract);
   const [damages, setDamages] = useState<any[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [showConsentPreview, setShowConsentPreview] = useState(false);
   const [isExtendOpen, setIsExtendOpen] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const lastFetchedIdRef = useRef<string | null>(null);
@@ -252,6 +259,8 @@ export default function ContractDetailsModal({
               customer: fresh.personalizedPersonName || fresh.clientId?.name || prev?.customer,
               customerPhone: fresh.clientId?.phone || fresh.additionalDriverPhone || prev?.customerPhone,
               customerEmail: fresh.clientId?.email || prev?.customerEmail,
+              customerAddress: fresh.clientId?.address || fresh.pickupLocation || prev?.customerAddress,
+              customerNationality: fresh.clientId?.nationality || prev?.customerNationality,
               customerLicense: fresh.clientId?.licenseNumber || fresh.clientId?.driverLicense || fresh.clientId?.idNumber || fresh.additionalDriverLicense || prev?.customerLicense,
               customerLicenseIssuedDate: fresh.clientId?.licenseIssuedDate || fresh.additionalDriverIssuedAt || prev?.customerLicenseIssuedDate,
               customerLicenseExpiry: fresh.clientId?.licenseExpiry || fresh.additionalDriverExpiry || prev?.customerLicenseExpiry,
@@ -314,7 +323,7 @@ export default function ContractDetailsModal({
 
   // Pre-handover rental terms & financial calculations
   const totalDays = contractData.totalDays || (contractData.startDate && contractData.endDate 
-    ? Math.max(1, Math.ceil((new Date(contractData.endDate).getTime() - new Date(contractData.startDate).getTime()) / (1000 * 3600 * 24)))
+    ? calculateRentalDays(contractData.startDate, contractData.endDate)
     : 1);
   const dailyRate = Number(contractData.dailyRate) || 0;
   const totalAmount = Number(contractData.totalAmount || contractData.collectionAmount || (dailyRate * totalDays)) || 0;
@@ -918,6 +927,15 @@ export default function ContractDetailsModal({
                               </strong>
                             </div>
                           )}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-text-muted text-[11px]">Address:</span>
+                            <strong 
+                              className="font-semibold text-text-secondary truncate text-right max-w-[150px] sm:max-w-[190px]"
+                              title={contractData.customerAddress || contractData.clientId?.address || contractData.clientObj?.address || "—"}
+                            >
+                              {contractData.customerAddress || contractData.clientId?.address || contractData.clientObj?.address || "—"}
+                            </strong>
+                          </div>
                         </>
                       )}
 
@@ -1353,6 +1371,68 @@ export default function ContractDetailsModal({
                       <span>{isDelivered ? "No digital signature recorded for this contract." : "Awaiting customer signature on handover."}</span>
                     </div>
                   )}
+                </div>
+
+                {/* Cardoo Privacy Notice and Consent PDF Card */}
+                <div className="pt-1.5">
+                  <div className="bg-white p-3 sm:p-4 rounded-xl border border-border/80 shadow-2xs space-y-2.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-200/60 flex items-center justify-center shrink-0 text-red-600 shadow-2xs">
+                          <FileText size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-text-primary truncate">
+                              Privacy Notice and Consent
+                            </span>
+                            <span className="text-[9px] font-extrabold text-gray-700 uppercase tracking-tight bg-gray-100 border border-gray-200/70 px-1.5 py-0.5 rounded">
+                              Cardoo
+                            </span>
+                          </div>
+                          <p className="text-[10px] sm:text-[11px] text-text-muted truncate">
+                            Official client data privacy notice &amp; GDPR consent agreement (PDF)
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {contractData.customerSignature ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                            <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
+                            <span>Client Signed</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                            <Clock size={11} className="text-amber-600 shrink-0" />
+                            <span>Ready to Print / Sign</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons Row */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowConsentPreview(true)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200/80 text-text-primary rounded-lg text-xs font-bold border border-border/80 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                      >
+                        <Eye size={13} className="text-text-secondary shrink-0" />
+                        <span>Preview &amp; Print (عرض وطباعة)</span>
+                      </button>
+
+                      <a
+                        href={`/api/contracts/${contractData._id || contractData.id}/consent-pdf?download=1&t=${Date.now()}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-brand hover:bg-brand/90 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                      >
+                        <Download size={13} className="shrink-0" />
+                        <span>Download PDF (تحميل الملف)</span>
+                      </a>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Handover Cash & Payment Proof Photos */}
@@ -1925,6 +2005,66 @@ export default function ContractDetailsModal({
               alt="Preview" 
               className="max-h-[85vh] max-w-full rounded-xl sm:rounded-2xl object-contain shadow-2xl border border-white/20" 
             />
+          </div>
+        </div>
+      )}
+      {/* Privacy Notice and Consent Preview Modal - Displays Pure PDF */}
+      {showConsentPreview && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowConsentPreview(false)}
+        >
+          <div 
+            className="bg-neutral-900 w-full max-w-4xl h-[92vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-white/10 animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Preview Header */}
+            <div className="px-4 py-3 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between shrink-0 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={18} className="text-red-500 shrink-0" />
+                <h3 className="text-sm font-bold text-white truncate">
+                  Privacy Notice and Consent (Cardoo) - PDF
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={`/api/contracts/${contractData._id || contractData.id}/consent-pdf?t=${Date.now()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-all cursor-pointer active:scale-95"
+                  title="Open in new window"
+                >
+                  <Printer size={13} />
+                  <span>Open / Print</span>
+                </a>
+                <a
+                  href={`/api/contracts/${contractData._id || contractData.id}/consent-pdf?download=1&t=${Date.now()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand/90 text-white rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer active:scale-95"
+                >
+                  <Download size={13} />
+                  <span>Download PDF</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowConsentPreview(false)}
+                  className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* IFrame embedding the pure PDF document */}
+            <div className="flex-1 bg-neutral-900 overflow-hidden relative">
+              <iframe
+                src={`/api/contracts/${contractData._id || contractData.id}/consent-pdf?t=${Date.now()}`}
+                className="w-full h-full border-0 bg-neutral-900"
+                title="Privacy Notice and Consent PDF"
+              />
+            </div>
           </div>
         </div>
       )}
