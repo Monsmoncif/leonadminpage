@@ -1520,11 +1520,6 @@ export default function CreateContractModal({
                                   <> Please choose different dates or pick another vehicle.</>
                                 )}
                               </p>
-                              {isTurnoverConflict && (
-                                <p className="text-[11px] text-red-600 font-semibold bg-red-100/60 p-2 rounded-lg border border-red-200/60">
-                                  🚗 السيارة ترجع يوم {conflictEnd} الساعة {returnHour}. يمكنك استلامها وإنشاء العقد بعد الساعة {returnHour}.
-                                </p>
-                              )}
                             </div>
                           </div>
                         );
