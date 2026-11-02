@@ -35,18 +35,25 @@ const getInitials = (name: string) => {
     .toUpperCase();
 };
 
-const getAvatarColor = (name: string) => {
+const getAvatarColor = (name: string, seed?: string | number) => {
   const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-emerald-100 text-emerald-700",
-    "bg-amber-100 text-amber-700",
-    "bg-purple-100 text-purple-700",
-    "bg-rose-100 text-rose-700",
-    "bg-cyan-100 text-cyan-700",
+    "bg-rose-100 text-rose-700 border border-rose-200/60",
+    "bg-emerald-100 text-emerald-700 border border-emerald-200/60",
+    "bg-amber-100 text-amber-700 border border-amber-200/60",
+    "bg-purple-100 text-purple-700 border border-purple-200/60",
+    "bg-teal-100 text-teal-700 border border-teal-200/60",
+    "bg-orange-100 text-orange-700 border border-orange-200/60",
+    "bg-pink-100 text-pink-700 border border-pink-200/60",
+    "bg-indigo-100 text-indigo-700 border border-indigo-200/60",
+    "bg-lime-100 text-lime-700 border border-lime-200/60",
+    "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200/60",
   ];
-  if (!name) return colors[0];
-  const charCode = name.charCodeAt(0) || 0;
-  return colors[charCode % colors.length];
+  const str = `${name || ""}-${seed ?? ""}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return colors[hash % colors.length];
 };
 
 export default function DriverDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -201,7 +208,7 @@ export default function DriverDetailsPage({ params }: { params: Promise<{ id: st
         <div className="p-4 sm:p-6 border-b border-border bg-gray-50/30">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
             <div
-              className={`w-14 h-14 sm:w-20 sm:h-20 shrink-0 rounded-full flex items-center justify-center text-xl sm:text-3xl font-bold shadow-sm ${getAvatarColor(driver.name)}`}
+              className={`w-14 h-14 sm:w-20 sm:h-20 shrink-0 rounded-full flex items-center justify-center text-xl sm:text-3xl font-bold shadow-sm ${getAvatarColor(driver.name, driver._id || driver.driverId)}`}
             >
               {getInitials(driver.name)}
             </div>

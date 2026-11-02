@@ -26,13 +26,15 @@ import {
   Gauge,
   ShieldCheck,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Building2
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useSession } from "next-auth/react";
 import CreateClientModal from "@/components/modals/CreateClientModal";
+import CreateCompanyModal from "@/components/modals/CreateCompanyModal";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
@@ -76,6 +78,7 @@ export default function CreateContractModal({
   const [fleetFilter, setFleetFilter] = useState<"all" | "available">("all");
   const [showAllCars, setShowAllCars] = useState(false);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [isSelectSecondDriverModalOpen, setIsSelectSecondDriverModalOpen] = useState(false);
   const [secondDriverClient, setSecondDriverClient] = useState<any>(null);
   const [isAddingForSecondDriver, setIsAddingForSecondDriver] = useState(false);
@@ -207,6 +210,18 @@ export default function CreateContractModal({
       }
     }
     setIsClientModalOpen(false);
+  };
+
+  const handleCompanyModalSuccess = (newCompany?: any) => {
+    fetchData();
+    if (newCompany) {
+      setFormData((prev) => ({
+        ...prev,
+        customerType: "B2B",
+        clientId: newCompany._id || newCompany.id,
+      }));
+    }
+    setIsCompanyModalOpen(false);
   };
 
   const formatDateToInput = (dateStr: string) => {
@@ -762,15 +777,22 @@ export default function CreateContractModal({
     );
   });
 
-  // Filter Clients (show latest 6 by default, or all matching search, and always include selected)
+  // Filter Clients by B2C vs B2B (show latest 6 by default, or all matching search, and always include selected)
+  const isB2BMode = formData.customerType === "B2B";
+  const typeFilteredClients = clients.filter(c => {
+    const isCorp = c.customerType === "B2B" || c.clientType === "Corporate" || Boolean(c.companyName);
+    return isB2BMode ? isCorp : !isCorp;
+  });
+
   const filteredClients = clientSearchQuery
-    ? clients.filter(c =>
+    ? typeFilteredClients.filter(c =>
         c.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        c.companyName?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.phone?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.idNumber?.toLowerCase().includes(clientSearchQuery.toLowerCase())
       )
     : (() => {
-        const top6 = clients.slice(0, 6);
+        const top6 = typeFilteredClients.slice(0, 6);
         if (formData.clientId && !top6.some(c => c._id === formData.clientId)) {
           const selected = clients.find(c => c._id === formData.clientId);
           if (selected) return [selected, ...top6];
@@ -792,7 +814,7 @@ export default function CreateContractModal({
 
   return (
     <div ref={modalOverlayRef} className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-      <div className="bg-white w-full max-w-5xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-border flex flex-col max-h-[94dvh] sm:max-h-[90vh]">
+      <div className="bg-white w-full max-w-6xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-border flex flex-col max-h-[94dvh] sm:max-h-[90vh]">
         
         {/* ================= MODAL HEADER ================= */}
         <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex justify-between items-center bg-white shrink-0">
@@ -1098,10 +1120,58 @@ export default function CreateContractModal({
               {/* ==================== STEP 2: CLIENT ==================== */}
               {currentStep === 2 && (
                 <div className="space-y-5 animate-fade-in-up">
+                  {/* Step 2.1: Select B2C vs B2B FIRST before choosing client/company */}
+                  <div className="bg-gray-50/80 p-3 sm:p-3.5 rounded-2xl border border-gray-200/80">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+                      <span className="text-xs font-bold text-text-primary flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        {isB2BMode ? <Building2 size={15} className="text-brand shrink-0" /> : <User size={15} className="text-brand shrink-0" />}
+                        <span>Customer Type (نوع العميل)</span>
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-white rounded-xl border border-gray-200 shadow-2xs w-full md:w-auto md:min-w-[420px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, customerType: "B2C", clientId: "" }));
+                            setClientSearchQuery("");
+                          }}
+                          className={`py-2 px-3 sm:px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                            !isB2BMode
+                              ? "bg-brand text-white shadow-xs"
+                              : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
+                          }`}
+                        >
+                          <User size={14} className="shrink-0" />
+                          <span className="whitespace-nowrap">B2C (Individual / فردي)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, customerType: "B2B", clientId: "" }));
+                            setClientSearchQuery("");
+                          }}
+                          className={`py-2 px-3 sm:px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                            isB2BMode
+                              ? "bg-brand text-white shadow-xs"
+                              : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
+                          }`}
+                        >
+                          <Building2 size={14} className="shrink-0" />
+                          <span className="whitespace-nowrap">B2B (Corporate / شركات)</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                      <h2 className="text-lg font-bold text-text-primary">Step 2: Select Customer (اختيار العميل)</h2>
-                      <p className="text-xs text-text-muted mt-0.5">Click a customer card to select, or register a new one</p>
+                      <h2 className="text-lg font-bold text-text-primary">
+                        {isB2BMode ? "Step 2: Select Company (اختيار الشركة - B2B)" : "Step 2: Select Customer (اختيار العميل)"}
+                      </h2>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        {isB2BMode
+                          ? "Select an existing company or add a new company name directly (no ID or license scan required)"
+                          : "Click a customer card to select, or register a new one"}
+                      </p>
                     </div>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1109,23 +1179,34 @@ export default function CreateContractModal({
                         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
                         <input
                           type="text"
-                          placeholder="Search by name, phone, national ID..."
+                          placeholder={isB2BMode ? "Search by company name, phone, TRN..." : "Search by name, phone, national ID..."}
                           value={clientSearchQuery}
                           onChange={(e) => setClientSearchQuery(e.target.value)}
                           className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsAddingForSecondDriver(false);
-                          setIsClientModalOpen(true);
-                        }}
-                        className="px-3.5 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
-                      >
-                        <UserCheck size={14} />
-                        <span>+ New Client</span>
-                      </button>
+                      {isB2BMode ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsCompanyModalOpen(true)}
+                          className="px-3.5 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
+                        >
+                          <Building2 size={14} />
+                          <span>+ New Company</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingForSecondDriver(false);
+                            setIsClientModalOpen(true);
+                          }}
+                          className="px-3.5 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
+                        >
+                          <UserCheck size={14} />
+                          <span>+ New Client</span>
+                        </button>
+                      )}
                       {/* Compact 2nd Driver Icon Button */}
                       <button
                         type="button"
@@ -1152,8 +1233,12 @@ export default function CreateContractModal({
                     <div className="flex flex-wrap items-center gap-2">
                       {selectedClientObj && (
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/8 border border-brand/20">
-                          <span className="w-5 h-5 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center">1</span>
-                          <span className="text-xs font-semibold text-text-primary truncate max-w-[140px]">{selectedClientObj.name}</span>
+                          <span className="w-5 h-5 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center">
+                            {isB2BMode ? <Building2 size={10} /> : "1"}
+                          </span>
+                          <span className="text-xs font-semibold text-text-primary truncate max-w-[140px]">
+                            {selectedClientObj.companyName || selectedClientObj.name}
+                          </span>
                           <CheckCircle2 size={13} className="text-brand shrink-0" />
                           <button
                             type="button"
@@ -1187,22 +1272,34 @@ export default function CreateContractModal({
                     </div>
                   )}
 
-                  {!clientSearchQuery && clients.length > 6 && (
+                  {!clientSearchQuery && typeFilteredClients.length > 6 && (
                     <p className="text-[11px] text-text-muted">
-                      Showing latest 6 customers. Use the search bar above to quickly find any other customer.
+                      Showing latest 6 {isB2BMode ? "companies" : "customers"}. Use the search bar above to quickly find any other {isB2BMode ? "company" : "customer"}.
                     </p>
                   )}
 
                   {filteredClients.length === 0 ? (
                     <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl bg-gray-50/50">
-                      <User size={40} className="text-gray-300 mx-auto mb-3" />
-                      <p className="text-sm font-semibold text-text-primary">No customers found</p>
-                      <p className="text-xs text-text-muted mt-1">Click "+ New Client" to register the customer right away.</p>
+                      {isB2BMode ? (
+                        <Building2 size={40} className="text-gray-300 mx-auto mb-3" />
+                      ) : (
+                        <User size={40} className="text-gray-300 mx-auto mb-3" />
+                      )}
+                      <p className="text-sm font-semibold text-text-primary">
+                        {isB2BMode ? "No B2B companies found" : "No customers found"}
+                      </p>
+                      <p className="text-xs text-text-muted mt-1">
+                        {isB2BMode
+                          ? 'Click "+ New Company" to add the company name directly.'
+                          : 'Click "+ New Client" to register the customer right away.'}
+                      </p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredClients.map((client) => {
                         const isSelected = formData.clientId === client._id;
+                        const isClientCorp = client.customerType === "B2B" || client.clientType === "Corporate" || Boolean(client.companyName);
+                        const displayName = client.companyName || client.name;
                         return (
                           <div
                             key={client._id}
@@ -1215,11 +1312,18 @@ export default function CreateContractModal({
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm shrink-0">
-                                {client.name?.charAt(0)?.toUpperCase() || "C"}
+                                {isClientCorp ? <Building2 size={18} /> : (displayName?.charAt(0)?.toUpperCase() || "C")}
                               </div>
                               <div className="min-w-0">
-                                <h3 className="text-sm font-bold text-text-primary leading-snug truncate">{client.name}</h3>
-                                <p className="text-xs text-text-muted truncate">{client.phone || "No phone"}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <h3 className="text-sm font-bold text-text-primary leading-snug truncate">{displayName}</h3>
+                                  {isClientCorp && (
+                                    <span className="text-[9px] font-bold uppercase tracking-wider bg-brand/10 text-brand px-1.5 py-0.5 rounded shrink-0">
+                                      B2B
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-text-muted truncate">{client.phone || (isClientCorp ? "Corporate Account" : "No phone")}</p>
                               </div>
                             </div>
                             {isSelected ? (
@@ -2157,6 +2261,13 @@ export default function CreateContractModal({
           setIsAddingForSecondDriver(false);
         }}
         onSuccess={handleClientModalSuccess}
+      />
+
+      {/* Embedded Create Company Modal (B2B — only company name required) */}
+      <CreateCompanyModal
+        isOpen={isCompanyModalOpen}
+        onClose={() => setIsCompanyModalOpen(false)}
+        onSuccess={handleCompanyModalSuccess}
       />
 
       {/* Embedded Select Second Driver Modal */}

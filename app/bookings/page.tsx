@@ -53,18 +53,26 @@ const isShopContract = (c: any): boolean => {
   return !hasDriver;
 };
 
-// Pastel avatar colors matching clients page
-const getAvatarColor = (name: string) => {
+// Vibrant avatar colors with full string + seed hash so every circle gets a distinct color
+const getAvatarColor = (name: string, seed?: string | number) => {
   const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-emerald-100 text-emerald-700",
-    "bg-amber-100 text-amber-700",
-    "bg-purple-100 text-purple-700",
-    "bg-rose-100 text-rose-700",
-    "bg-cyan-100 text-cyan-700",
+    "bg-rose-100 text-rose-700 border border-rose-200/60",
+    "bg-emerald-100 text-emerald-700 border border-emerald-200/60",
+    "bg-amber-100 text-amber-700 border border-amber-200/60",
+    "bg-purple-100 text-purple-700 border border-purple-200/60",
+    "bg-teal-100 text-teal-700 border border-teal-200/60",
+    "bg-orange-100 text-orange-700 border border-orange-200/60",
+    "bg-pink-100 text-pink-700 border border-pink-200/60",
+    "bg-indigo-100 text-indigo-700 border border-indigo-200/60",
+    "bg-lime-100 text-lime-700 border border-lime-200/60",
+    "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200/60",
   ];
-  const charCode = name?.charCodeAt(0) || 0;
-  return colors[charCode % colors.length];
+  const str = `${name || ""}-${seed ?? ""}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return colors[hash % colors.length];
 };
 
 // Status badge styling with vibrant, professional colors
@@ -607,12 +615,12 @@ export default function ContractsPage() {
                                   <Link
                                     href={`/clients/${clientId}`}
                                     title={`View client details: ${contract.customer}`}
-                                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs hover:ring-2 hover:ring-red-500/70 transition-all cursor-pointer ${getAvatarColor(contract.customer)}`}
+                                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs hover:ring-2 hover:ring-red-500/70 transition-all cursor-pointer ${getAvatarColor(contract.customer, contract._id || idx)}`}
                                   >
                                     {getInitials(contract.customer)}
                                   </Link>
                                 ) : (
-                                  <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(contract.customer)}`}>
+                                  <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(contract.customer, contract._id || idx)}`}>
                                     {getInitials(contract.customer)}
                                   </div>
                                 )}

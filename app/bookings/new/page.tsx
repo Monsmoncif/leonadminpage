@@ -35,12 +35,14 @@ import {
   Image as ImageIcon,
   Trash2,
   Edit,
-  Edit2
+  Edit2,
+  Building2
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/providers/ToastProvider";
 import CreateClientModal from "@/components/modals/CreateClientModal";
+import CreateCompanyModal from "@/components/modals/CreateCompanyModal";
 import CreateUnitModal from "@/components/modals/CreateUnitModal";
 import AdditionalDriverModal from "@/components/modals/AdditionalDriverModal";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
@@ -149,15 +151,17 @@ export function NewRentalAdminPageContent() {
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState("");
   const [fleetFilter, setFleetFilter] = useState<"available" | "all">("all");
-  const [visibleCarsCount, setVisibleCarsCount] = useState(3);
+  const [visibleCarsCount, setVisibleCarsCount] = useState(4);
 
   useEffect(() => {
-    setVisibleCarsCount(3);
+    setVisibleCarsCount(4);
   }, [vehicleSearchQuery, fleetFilter]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<any>(null);
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
+  const [companyToEdit, setCompanyToEdit] = useState<any>(null);
   const [isCreateUnitModalOpen, setIsCreateUnitModalOpen] = useState(false);
   const [isSelectSecondDriverModalOpen, setIsSelectSecondDriverModalOpen] = useState(false);
   const [secondDriverClient, setSecondDriverClient] = useState<any | null>(null);
@@ -215,6 +219,19 @@ export function NewRentalAdminPageContent() {
     }
     setIsClientModalOpen(false);
     setClientToEdit(null);
+  };
+
+  const handleCompanyModalSuccess = (newCompany?: any) => {
+    fetchClients();
+    if (newCompany) {
+      setSelectedClient(newCompany._id || newCompany.id);
+      setRentalData(prev => ({ ...prev, customerType: "B2B" }));
+      if (contractType === "Personalized") {
+        setPersonName(newCompany.companyName || newCompany.name);
+      }
+    }
+    setIsCompanyModalOpen(false);
+    setCompanyToEdit(null);
   };
 
   const getCurrentFormattedTime = () => {
@@ -1171,25 +1188,33 @@ export function NewRentalAdminPageContent() {
     );
   });
 
-  // Filter Clients
+  // Filter Clients based on Customer Type (B2C vs B2B)
+  const isB2B = rentalData.customerType === "B2B";
+  const typeFilteredClients = clients.filter((c: any) => {
+    const isClientCorporate = c.customerType === "B2B" || c.clientType === "Corporate" || Boolean(c.companyName);
+    return isB2B ? isClientCorporate : !isClientCorporate;
+  });
+
   const filteredClients = clientSearchQuery
-    ? clients.filter(c =>
+    ? typeFilteredClients.filter(c =>
         c.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        c.companyName?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.phone?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-        c.idNumber?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+        c.idNumber?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        c.trn?.toLowerCase().includes(clientSearchQuery.toLowerCase())
       )
     : (() => {
-        const top6 = clients.slice(0, 6);
-        if (selectedClient && !top6.some(c => c._id === selectedClient)) {
-          const selected = clients.find(c => c._id === selectedClient);
-          if (selected) return [selected, ...top6];
+        const top8 = typeFilteredClients.slice(0, 8);
+        if (selectedClient && !top8.some(c => c._id === selectedClient)) {
+          const selected = typeFilteredClients.find(c => c._id === selectedClient);
+          if (selected) return [selected, ...top8];
         }
-        return top6;
+        return top8;
       })();
 
   if (isPageLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-6 pb-20 animate-pulse">
+      <div className="w-full max-w-7xl mx-auto space-y-6 pb-20 animate-pulse">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <div className="h-8 w-64 bg-gray-200 rounded-lg"></div>
@@ -1221,21 +1246,21 @@ export function NewRentalAdminPageContent() {
   // ===================== RENDER HELPERS =====================
 
   const renderVehicleSelector = () => (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-4 animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Select Car</h2>
-          <p className="text-xs text-text-muted mt-0.5">Select an available car to assign to this contract</p>
+          <h2 className="text-sm sm:text-base font-bold text-text-primary">Select Car</h2>
+          <p className="text-[11px] text-text-muted">Select an available car to assign to this contract</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
-          <div className="flex items-center bg-gray-100 p-1 rounded-xl shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center bg-gray-100 p-0.5 rounded-lg shrink-0">
             <button
               type="button"
               onClick={() => setFleetFilter("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                 fleetFilter === "all"
-                  ? "bg-white text-brand shadow-xs"
+                  ? "bg-white text-brand shadow-2xs"
                   : "text-text-muted hover:text-text-primary"
               }`}
             >
@@ -1244,9 +1269,9 @@ export function NewRentalAdminPageContent() {
             <button
               type="button"
               onClick={() => setFleetFilter("available")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                 fleetFilter === "available"
-                  ? "bg-white text-brand shadow-xs"
+                  ? "bg-white text-brand shadow-2xs"
                   : "text-text-muted hover:text-text-primary"
               }`}
             >
@@ -1254,55 +1279,55 @@ export function NewRentalAdminPageContent() {
             </button>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+          <div className="relative w-full sm:w-56">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               type="text"
               placeholder="Search by make, model, plate..."
               value={vehicleSearchQuery}
               onChange={(e) => setVehicleSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
             />
           </div>
 
           <button
             type="button"
             onClick={() => setIsCreateUnitModalOpen(true)}
-            className="px-3.5 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
+            className="px-3 py-1.5 bg-brand text-white rounded-lg text-[11px] font-semibold hover:bg-brand-dark transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
           >
-            <ExecutiveCarIcon size={14} />
+            <ExecutiveCarIcon size={13} />
             <span>+ New Car (إضافة سيارة)</span>
           </button>
         </div>
       </div>
 
       {filteredUnits.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl bg-gray-50/50">
-          <div className="w-14 h-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-3 border border-red-100">
-            <AlertCircle size={28} />
+        <div className="text-center py-8 border-2 border-dashed border-border rounded-xl bg-gray-50/50">
+          <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-2.5 border border-red-100">
+            <AlertCircle size={22} />
           </div>
-          <p className="text-sm font-bold text-text-primary">
+          <p className="text-xs font-bold text-text-primary">
             {fleetFilter === "available" ? "No Available Cars" : "No matching cars found"}
           </p>
-          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+          <p className="text-[11px] text-text-muted mt-0.5 max-w-sm mx-auto">
             {fleetFilter === "available" 
               ? "All cars are currently booked or under maintenance. Switch to All Cars to view fleet."
               : "No cars match your search keywords. Try searching by make, model, or license plate."}
           </p>
-          <div className="mt-4 flex justify-center">
+          <div className="mt-3 flex justify-center">
             <button
               type="button"
               onClick={() => setIsCreateUnitModalOpen(true)}
-              className="px-4 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              className="px-3.5 py-2 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
             >
-              <ExecutiveCarIcon size={14} />
+              <ExecutiveCarIcon size={13} />
               <span>+ Add Vehicle to Fleet (إضافة سيارة جديدة)</span>
             </button>
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {(() => {
               const currentLimit = Math.min(visibleCarsCount, filteredUnits.length);
               const topCars = filteredUnits.slice(0, currentLimit);
@@ -1344,27 +1369,27 @@ export function NewRentalAdminPageContent() {
                       toast.success(`Selected ${unit.make} ${unit.model} (${unit.plate})`);
                     }
                   }}
-                  className={`bg-card rounded-2xl border p-5 flex flex-col transition-all group cursor-pointer card-hover ${
+                  className={`bg-card rounded-xl border p-3.5 flex flex-col transition-all group cursor-pointer card-hover ${
                     isSelected 
-                      ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md" 
-                      : "border-border shadow-sm hover:border-gray-300"
+                      ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-sm" 
+                      : "border-border shadow-2xs hover:border-gray-300"
                   }`}
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wider text-text-muted font-bold mb-0.5">
+                  <div className="flex justify-between items-start gap-1.5 mb-1.5">
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold truncate">
                         {unit.make} • {unit.year || new Date().getFullYear()}
                       </p>
-                      <h3 className="text-base font-bold text-text-primary leading-tight">{unit.model}</h3>
+                      <h3 className="text-xs sm:text-sm font-bold text-text-primary leading-tight truncate">{unit.model}</h3>
                     </div>
                     {isSelected ? (
-                      <span className="bg-brand text-white p-1 rounded-full"><CheckCircle2 size={16} /></span>
+                      <span className="bg-brand text-white p-0.5 rounded-full shrink-0"><CheckCircle2 size={14} /></span>
                     ) : conflict?.reason === "Booked" ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                         Booked ({new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - {new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})
                       </span>
                     ) : unit.status === "Maintenance" || unit.status === "Out of Service" ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-700 border border-red-200 shrink-0">
                         {unit.status}
                       </span>
                     ) : (
@@ -1372,19 +1397,19 @@ export function NewRentalAdminPageContent() {
                     )}
                   </div>
                   
-                  <div className="flex-1 flex items-center justify-center min-h-[130px] my-3 relative bg-gray-50/70 rounded-xl border border-gray-100 group-hover:bg-gray-100/60 transition-colors">
+                  <div className="flex-1 flex items-center justify-center min-h-[85px] my-1.5 relative bg-gray-50/70 rounded-lg border border-gray-100 group-hover:bg-gray-100/60 transition-colors">
                     {unit.images && unit.images.length > 0 ? (
-                      <img src={unit.images[0]} alt={unit.model} className="max-w-full max-h-28 object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-300" />
+                      <img src={unit.images[0]} alt={unit.model} className="max-w-full max-h-20 object-contain drop-shadow-2xs group-hover:scale-105 transition-transform duration-300" />
                     ) : (
-                      <ExecutiveCarIcon size={44} className="text-gray-300" />
+                      <ExecutiveCarIcon size={32} className="text-gray-300" />
                     )}
                   </div>
 
-                  <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
-                    <span className="font-mono text-text-muted bg-gray-100 px-2 py-0.5 rounded">{unit.plate}</span>
+                  <div className="pt-2 border-t border-border flex items-center justify-between text-[11px]">
+                    <span className="font-mono text-text-muted bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">{unit.plate}</span>
                     <div>
-                      <span className="text-base font-bold text-text-primary">AED {unit.dailyRate || 85}</span>
-                      <span className="text-text-muted text-[11px]">/day</span>
+                      <span className="text-xs sm:text-sm font-bold text-text-primary">AED {unit.dailyRate || 85}</span>
+                      <span className="text-text-muted text-[10px]">/day</span>
                     </div>
                   </div>
                 </div>
@@ -1393,14 +1418,14 @@ export function NewRentalAdminPageContent() {
           </div>
 
           {filteredUnits.length > visibleCarsCount && (
-            <div className="flex justify-center pt-2">
+            <div className="flex justify-center pt-1">
               <button
                 type="button"
-                onClick={() => setVisibleCarsCount((prev) => prev + 3)}
-                className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow cursor-pointer w-full sm:w-auto"
+                onClick={() => setVisibleCarsCount((prev) => prev + 4)}
+                className="px-4 py-1.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs hover:shadow cursor-pointer w-full sm:w-auto"
               >
                 <span>More</span>
-                <ChevronDown size={16} />
+                <ChevronDown size={14} />
               </button>
             </div>
           )}
@@ -1414,51 +1439,141 @@ export function NewRentalAdminPageContent() {
     const secondDriverName = secondDriverClient?.name || additionalDriver.name;
     const secondDriverLicense = secondDriverClient?.licenseNumber || additionalDriver.license;
     const secondDriverPhone = secondDriverClient?.phone || additionalDriver.phone;
+    const isB2BMode = rentalData.customerType === "B2B";
 
     return (
-      <div className="space-y-5 animate-fade-in-up">
+      <div className="space-y-4 animate-fade-in-up">
+        {/* Customer Type Selection FIRST: B2C (Individual) vs B2B (Corporate) */}
+        <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-border shadow-2xs">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
+              {isB2BMode ? (
+                <Building2 size={14} className="text-brand shrink-0" />
+              ) : (
+                <User size={14} className="text-brand shrink-0" />
+              )}
+              <span className="text-xs font-bold text-text-primary whitespace-nowrap">
+                Customer Type (نوع العميل)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-gray-100 rounded-lg w-full md:w-auto md:min-w-[380px]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (rentalData.customerType !== "B2C") {
+                    setRentalData(prev => ({ ...prev, customerType: "B2C" }));
+                    if (selectedClientObj && (selectedClientObj.customerType === "B2B" || selectedClientObj.clientType === "Corporate" || selectedClientObj.companyName)) {
+                      setSelectedClient(null);
+                    }
+                  }
+                }}
+                className={`py-1.5 px-3 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                  !isB2BMode
+                    ? "bg-brand text-white shadow-2xs"
+                    : "text-text-secondary hover:text-text-primary hover:bg-white/60"
+                }`}
+              >
+                <User size={12} className="shrink-0" />
+                <span className="whitespace-nowrap">B2C (Individual / فردي)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (rentalData.customerType !== "B2B") {
+                    setRentalData(prev => ({ ...prev, customerType: "B2B" }));
+                    if (selectedClientObj && selectedClientObj.customerType !== "B2B" && selectedClientObj.clientType !== "Corporate" && !selectedClientObj.companyName) {
+                      setSelectedClient(null);
+                    }
+                  }
+                }}
+                className={`py-1.5 px-3 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                  isB2BMode
+                    ? "bg-brand text-white shadow-2xs"
+                    : "text-text-secondary hover:text-text-primary hover:bg-white/60"
+                }`}
+              >
+                <Building2 size={12} className="shrink-0" />
+                <span className="whitespace-nowrap">B2B (Corporate / شركات)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Step Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h2 className="text-lg font-bold text-text-primary">Select Customer (اختيار العميل)</h2>
-            <p className="text-xs text-text-muted mt-0.5">Click a customer card to select, or register a new one</p>
+            <h2 className="text-sm sm:text-base font-bold text-text-primary flex items-center gap-1.5">
+              {isB2BMode ? (
+                <>
+                  <Building2 size={15} className="text-brand" />
+                  <span>Select Company (اختيار الشركة)</span>
+                </>
+              ) : (
+                <>
+                  <User size={15} className="text-brand" />
+                  <span>Select Customer (اختيار العميل)</span>
+                </>
+              )}
+            </h2>
+            <p className="text-[11px] text-text-muted">
+              {isB2BMode
+                ? "Click a company card to select, or click \"+ New Company\" to add company name"
+                : "Click a customer card to select, or register a new one"}
+            </p>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+            <div className="relative flex-1 sm:w-56">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 type="text"
-                placeholder="Search by name, phone, license..."
+                placeholder={isB2BMode ? "Search company name, phone, TRN..." : "Search by name, phone, license..."}
                 value={clientSearchQuery}
                 onChange={(e) => setClientSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
+                className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddingForSecondDriver(false);
-                setIsClientModalOpen(true);
-              }}
-              className="px-3.5 py-2 bg-brand text-white rounded-xl text-xs font-semibold hover:bg-brand-dark transition-colors flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
-            >
-              <UserCheck size={14} />
-              <span>+ New Client</span>
-            </button>
+            {isB2BMode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setCompanyToEdit(null);
+                  setIsCompanyModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-brand text-white rounded-lg text-[11px] font-semibold hover:bg-brand-dark transition-colors flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
+              >
+                <Building2 size={13} />
+                <span>+ New Company</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingForSecondDriver(false);
+                  setClientToEdit(null);
+                  setIsClientModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-brand text-white rounded-lg text-[11px] font-semibold hover:bg-brand-dark transition-colors flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
+              >
+                <UserCheck size={13} />
+                <span>+ New Client</span>
+              </button>
+            )}
             {/* Compact 2nd Driver Icon Button */}
             <button
               type="button"
               onClick={() => setIsSelectSecondDriverModalOpen(true)}
-              className={`relative p-2 rounded-xl border transition-all cursor-pointer shrink-0 group ${
+              className={`relative p-1.5 rounded-lg border transition-all cursor-pointer shrink-0 group ${
                 secondDriverName
                   ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
                   : "bg-gray-50 border-border text-text-muted hover:border-red-400 hover:text-red-600 hover:bg-red-50/50"
               }`}
               title={secondDriverName ? `2nd Driver: ${secondDriverName}` : "Add 2nd Driver (إضافة سائق ثاني)"}
             >
-              <User size={16} />
-              <span className={`absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-xs ${
+              <User size={15} />
+              <span className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full text-white text-[8px] font-black flex items-center justify-center shadow-2xs ${
                 secondDriverName ? "bg-red-600" : "bg-gray-400 group-hover:bg-red-600"
               }`}>
                 2
@@ -1471,39 +1586,46 @@ export function NewRentalAdminPageContent() {
         {(selectedClientObj || secondDriverName) && (
           <div className="flex flex-wrap items-center gap-2">
             {selectedClientObj && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/8 border border-brand/20">
-                <span className="w-5 h-5 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center">1</span>
-                <span className="text-xs font-semibold text-text-primary truncate max-w-[140px]">{selectedClientObj.name}</span>
-                <CheckCircle2 size={13} className="text-brand shrink-0" />
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand/8 border border-brand/20">
+                <span className="w-4 h-4 rounded-full text-white text-[8px] font-black flex items-center justify-center bg-brand">1</span>
+                <span className="text-[11px] font-semibold text-text-primary truncate max-w-[150px]">
+                  {selectedClientObj.companyName || selectedClientObj.name}
+                </span>
+                <CheckCircle2 size={12} className="text-brand shrink-0" />
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setClientToEdit(selectedClientObj);
-                    setIsAddingForSecondDriver(false);
-                    setIsClientModalOpen(true);
+                    if (selectedClientObj.customerType === "B2B" || selectedClientObj.clientType === "Corporate" || selectedClientObj.companyName) {
+                      setCompanyToEdit(selectedClientObj);
+                      setIsCompanyModalOpen(true);
+                    } else {
+                      setClientToEdit(selectedClientObj);
+                      setIsAddingForSecondDriver(false);
+                      setIsClientModalOpen(true);
+                    }
                   }}
                   className="p-0.5 text-gray-400 hover:text-brand transition-colors cursor-pointer"
-                  title="Edit customer details (تعديل بيانات العميل)"
+                  title="Edit details"
                 >
-                  <Edit2 size={12} />
+                  <Edit2 size={11} />
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedClient(null)}
                   className="text-gray-400 hover:text-red-600 transition-colors cursor-pointer ml-0.5"
-                  title="Remove selected customer"
+                  title="Remove selection"
                 >
-                  <X size={13} />
+                  <X size={12} />
                 </button>
               </div>
             )}
             {secondDriverName && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-200">
-                <span className="w-5 h-5 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center">2</span>
-                <span className="text-xs font-semibold text-text-primary truncate max-w-[140px]">{secondDriverName}</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200">
+                <span className="w-4 h-4 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">2</span>
+                <span className="text-[11px] font-semibold text-text-primary truncate max-w-[140px]">{secondDriverName}</span>
                 {secondDriverLicense && (
-                  <span className="text-[9px] font-mono text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
+                  <span className="text-[9px] font-mono text-red-700 bg-red-100 px-1 py-0.5 rounded">
                     {secondDriverLicense}
                   </span>
                 )}
@@ -1513,66 +1635,106 @@ export function NewRentalAdminPageContent() {
                   className="text-red-400 hover:text-red-600 transition-colors cursor-pointer ml-0.5"
                   title="Remove second driver"
                 >
-                  <X size={13} />
+                  <X size={12} />
                 </button>
               </div>
             )}
           </div>
         )}
 
-      {!clientSearchQuery && clients.length > 6 && (
+      {!clientSearchQuery && typeFilteredClients.length > 8 && (
         <p className="text-[11px] text-text-muted">
-          Showing latest 6 customers. Use the search bar above to quickly find any other customer.
+          Showing latest 8 {isB2BMode ? "companies" : "customers"}. Use the search bar above to quickly find any other {isB2BMode ? "company" : "customer"}.
         </p>
       )}
 
       {filteredClients.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl bg-gray-50/50">
-          <User size={40} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-text-primary">No customers found</p>
-          <p className="text-xs text-text-muted mt-1">Click &quot;+ New Client&quot; to register the customer right away.</p>
+        <div className="text-center py-8 border-2 border-dashed border-border rounded-xl bg-gray-50/50">
+          {isB2BMode ? (
+            <Building2 size={32} className="text-gray-300 mx-auto mb-2" />
+          ) : (
+            <User size={32} className="text-gray-300 mx-auto mb-2" />
+          )}
+          <p className="text-xs font-semibold text-text-primary">
+            {isB2BMode ? "No companies found (لا توجد شركات مسجلة)" : "No customers found"}
+          </p>
+          <p className="text-[11px] text-text-muted mt-0.5">
+            {isB2BMode
+              ? 'Click "+ New Company" to add a company with just the company name.'
+              : 'Click "+ New Client" to register the customer right away.'}
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredClients.map((client) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+          {filteredClients.map((client, idx) => {
             const isSelected = selectedClient === client._id;
+            const isCorpCard = client.customerType === "B2B" || client.clientType === "Corporate" || Boolean(client.companyName);
+            const avatarColors = [
+              "bg-rose-100 text-rose-700",
+              "bg-emerald-100 text-emerald-700",
+              "bg-amber-100 text-amber-700",
+              "bg-purple-100 text-purple-700",
+              "bg-teal-100 text-teal-700",
+              "bg-orange-100 text-orange-700",
+              "bg-pink-100 text-pink-700",
+              "bg-indigo-100 text-indigo-700",
+              "bg-lime-100 text-lime-700",
+              "bg-fuchsia-100 text-fuchsia-700",
+            ];
+            const seedStr = `${client.companyName || client.name || ""}-${client._id || idx}`;
+            let hash = 0;
+            for (let i = 0; i < seedStr.length; i++) hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0;
+            const circleColor = avatarColors[hash % avatarColors.length];
             return (
               <div
                 key={client._id}
                 onClick={() => setSelectedClient(isSelected ? null : client._id)}
-                className={`bg-card rounded-2xl border p-4 flex items-center justify-between transition-all cursor-pointer group card-hover ${
+                className={`bg-card rounded-xl border p-3 flex items-center justify-between transition-all cursor-pointer group card-hover ${
                   isSelected 
-                    ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-md" 
-                    : "border-border shadow-sm hover:border-gray-300"
+                    ? "border-brand bg-brand-light/20 ring-2 ring-brand/30 shadow-xs"
+                    : "border-border shadow-2xs hover:border-gray-300"
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm shrink-0">
-                    {client.name?.charAt(0)?.toUpperCase() || "C"}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${circleColor}`}>
+                    {isCorpCard ? (
+                      <Building2 size={14} />
+                    ) : (
+                      client.name?.charAt(0)?.toUpperCase() || "C"
+                    )}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-text-primary leading-snug truncate">{client.name}</h3>
-                    <p className="text-xs text-text-muted truncate">{client.phone || "No phone"}</p>
+                    <h3 className="text-xs font-bold text-text-primary leading-snug truncate">
+                      {client.companyName || client.name}
+                    </h3>
+                    <p className="text-[11px] text-text-muted truncate">
+                      {client.phone && client.phone !== "N/A" ? client.phone : (client.trn ? `TRN: ${client.trn}` : "Corporate Account")}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setClientToEdit(client);
-                      setIsAddingForSecondDriver(false);
-                      setIsClientModalOpen(true);
+                      if (isCorpCard) {
+                        setCompanyToEdit(client);
+                        setIsCompanyModalOpen(true);
+                      } else {
+                        setClientToEdit(client);
+                        setIsAddingForSecondDriver(false);
+                        setIsClientModalOpen(true);
+                      }
                     }}
-                    className="p-1 text-gray-400 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors cursor-pointer"
-                    title="Edit customer details (تعديل بيانات العميل)"
+                    className="p-1 text-gray-400 hover:text-brand hover:bg-brand/10 rounded-md transition-colors cursor-pointer"
+                    title="Edit details"
                   >
-                    <Edit2 size={13} />
+                    <Edit2 size={12} />
                   </button>
                   {isSelected ? (
-                    <span className="bg-brand text-white p-1 rounded-full shrink-0"><CheckCircle2 size={16} /></span>
+                    <span className="bg-brand text-white p-0.5 rounded-full shrink-0"><CheckCircle2 size={14} /></span>
                   ) : (
-                    <div className="w-5 h-5 rounded-full border border-gray-300 group-hover:border-brand shrink-0" />
+                    <div className="w-4 h-4 rounded-full border border-gray-300 group-hover:border-brand shrink-0" />
                   )}
                 </div>
               </div>
@@ -1595,14 +1757,14 @@ export function NewRentalAdminPageContent() {
     const grandTotal = remainingToCollect + depositTotal;
 
     return (
-      <div className="space-y-6 animate-fade-in-up">
+      <div className="space-y-4 animate-fade-in-up">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">
+          <h2 className="text-sm sm:text-base font-bold text-text-primary">
             {contractType === "Delivery" 
               ? "Driver, Rental Period & Financial Terms" 
               : "Rental Period & Financial Terms"}
           </h2>
-          <p className="text-xs text-text-muted mt-0.5">
+          <p className="text-[11px] text-text-muted">
             {contractType === "Delivery" 
               ? "Assign delivery driver, specify dates, locations, and pricing"
               : "Specify dates, locations, and pricing"}
@@ -1610,25 +1772,25 @@ export function NewRentalAdminPageContent() {
         </div>
 
         {/* Rental Plan & Customer Type Switchers */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/70 p-4 rounded-2xl border border-gray-200/80">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50/70 p-3 rounded-xl border border-gray-200/80">
           {/* Rental Type: Daily vs Monthly */}
           <div>
-            <label className="text-xs font-bold text-text-primary block mb-2 flex items-center justify-between">
+            <label className="text-xs font-bold text-text-primary block mb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Calendar size={14} className="text-brand" />
+                <Calendar size={13} className="text-brand" />
                 <span>Rental Type (نوع الإيجار)</span>
               </span>
               <span className="text-[11px] font-semibold text-brand">
                 {rentalData.rentalType === "Monthly" ? "Monthly Plan (30+ Days)" : "Daily Rate"}
               </span>
             </label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-white rounded-xl border border-gray-200 shadow-xs">
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-lg border border-gray-200 shadow-2xs">
               <button
                 type="button"
                 onClick={() => setRentalData(prev => ({ ...prev, rentalType: "Daily" }))}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`py-1.5 px-3 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                   rentalData.rentalType === "Daily"
-                    ? "bg-brand text-white shadow-xs"
+                    ? "bg-brand text-white shadow-2xs"
                     : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
                 }`}
               >
@@ -1646,9 +1808,9 @@ export function NewRentalAdminPageContent() {
                     collectionAmount: Math.round(prev.dailyRate * 30 * 100) / 100
                   }));
                 }}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`py-1.5 px-3 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                   rentalData.rentalType === "Monthly"
-                    ? "bg-brand text-white shadow-xs"
+                    ? "bg-brand text-white shadow-2xs"
                     : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
                 }`}
               >
@@ -1659,22 +1821,22 @@ export function NewRentalAdminPageContent() {
 
           {/* Customer Type: B2C vs B2B */}
           <div>
-            <label className="text-xs font-bold text-text-primary block mb-2 flex items-center justify-between">
+            <label className="text-xs font-bold text-text-primary block mb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <User size={14} className="text-brand" />
+                <User size={13} className="text-brand" />
                 <span>Customer Type (نوع العميل)</span>
               </span>
               <span className="text-[11px] font-semibold text-brand">
                 {rentalData.customerType === "B2B" ? "Corporate Account" : "Individual (B2C)"}
               </span>
             </label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-white rounded-xl border border-gray-200 shadow-xs">
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-lg border border-gray-200 shadow-2xs">
               <button
                 type="button"
                 onClick={() => setRentalData(prev => ({ ...prev, customerType: "B2C" }))}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`py-1.5 px-3 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   rentalData.customerType === "B2C"
-                    ? "bg-brand text-white shadow-xs"
+                    ? "bg-brand text-white shadow-2xs"
                     : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
                 }`}
               >
@@ -1683,9 +1845,9 @@ export function NewRentalAdminPageContent() {
               <button
                 type="button"
                 onClick={() => setRentalData(prev => ({ ...prev, customerType: "B2B" }))}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`py-1.5 px-3 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                   rentalData.customerType === "B2B"
-                    ? "bg-brand text-white shadow-xs"
+                    ? "bg-brand text-white shadow-2xs"
                     : "text-text-secondary hover:text-text-primary hover:bg-gray-100"
                 }`}
               >
@@ -1695,9 +1857,9 @@ export function NewRentalAdminPageContent() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* 1. Dates & Drivers */}
-          <div className="space-y-4 bg-gray-50/60 p-4 sm:p-5 rounded-2xl border border-gray-100">
+          <div className="space-y-3 bg-gray-50/60 p-3.5 sm:p-4 rounded-xl border border-gray-100">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
               <Calendar size={16} className="text-brand" /> Dates &amp; Logistics (المواعيد واللوجستيات)
             </h3>
@@ -2326,7 +2488,7 @@ export function NewRentalAdminPageContent() {
   const renderReview = () => {
     const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
 
-    const clientObj = contractType === "Shop" ? clients.find(c => c._id === selectedClient) : null;
+    const clientObj = contractType !== "Personalized" ? clients.find(c => c._id === selectedClient) : null;
     const vehicleObj = units.find(u => u._id === selectedVehicle);
     const deliveryDriverObj = contractType === "Delivery" 
       ? drivers.find(d => d._id === rentalData.deliveryDriverId || d.userId === rentalData.deliveryDriverId)
@@ -2355,11 +2517,15 @@ export function NewRentalAdminPageContent() {
 
         <div className="bg-gray-50/70 rounded-xl sm:rounded-2xl p-3 sm:p-5 md:p-6 border border-border space-y-3.5 sm:space-y-5">
           <div className={`grid grid-cols-1 sm:grid-cols-2 ${contractType === "Delivery" || contractType === "Personalized" ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-2.5 sm:gap-4`}>
-            {/* Customer — for Shop or whenever a client is selected */}
+            {/* Customer / Company — for Shop or whenever a client is selected */}
             {(contractType === "Shop" || (selectedClient && contractType !== "Personalized")) && (
               <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
-                <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Customer</span>
-                <strong className="text-text-primary text-sm font-bold block truncate">{clientObj?.name || (editingContract?.clientId?.name) || "N/A"}</strong>
+                <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">
+                  {rentalData.customerType === "B2B" ? "Company (الشركة)" : "Customer"}
+                </span>
+                <strong className="text-text-primary text-sm font-bold block truncate">
+                  {clientObj?.companyName || clientObj?.name || (editingContract?.clientId?.name) || "N/A"}
+                </strong>
                 <span className="text-xs text-text-muted block truncate">{clientObj?.phone || (editingContract?.clientId?.phone) || ""}</span>
               </div>
             )}
@@ -3057,24 +3223,24 @@ export function NewRentalAdminPageContent() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20">
+    <div className="w-full max-w-7xl mx-auto space-y-4 pb-16">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in-up">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 animate-fade-in-up">
         <div>
           <button
             onClick={() => router.push(isDriver ? "/driver" : "/bookings")}
-            className="text-xs text-text-muted hover:text-text-primary flex items-center gap-1 mb-2 transition-colors cursor-pointer"
+            className="text-[11px] text-text-muted hover:text-text-primary flex items-center gap-1 mb-1.5 transition-colors cursor-pointer"
           >
-            <ArrowLeft size={14} /> Back to {isDriver ? "Driver Operations" : "Bookings"}
+            <ArrowLeft size={13} /> Back to {isDriver ? "Driver Operations" : "Bookings"}
           </button>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-bold text-text-primary">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold text-text-primary">
               {isEditMode 
                 ? `Edit Rental Contract ${editingContract?.contractNumber ? `#${editingContract.contractNumber}` : ""}`
                 : "Create New Booking"}
             </h1>
             {isEditMode && editingContract?.status && (
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
                 editingContract.status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                 editingContract.status === "Completed" ? "bg-blue-50 text-blue-700 border-blue-200" :
                 editingContract.status === "Delivered" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
@@ -3084,7 +3250,7 @@ export function NewRentalAdminPageContent() {
               </span>
             )}
           </div>
-          <p className="text-sm text-text-secondary mt-1">
+          <p className="text-xs text-text-secondary mt-0.5">
             {isEditMode 
               ? "Update vehicle, customer, rental schedule, extra fees, inspection photos, and terms."
               : isDriver
@@ -3099,16 +3265,16 @@ export function NewRentalAdminPageContent() {
 
         {/* Contract Type Pill Switcher (Admins Only) */}
         {!isDriver && (
-          <div className="bg-gray-100 p-1 rounded-xl sm:rounded-2xl grid grid-cols-1 sm:flex sm:flex-wrap items-center border border-gray-200/80 shadow-2xs w-full md:w-auto shrink-0 gap-1">
+          <div className="bg-gray-100 p-1 rounded-xl grid grid-cols-1 sm:flex sm:flex-wrap items-center border border-gray-200/80 shadow-2xs w-full md:w-auto shrink-0 gap-1">
             <button
               type="button"
               onClick={() => {
                 setContractType("Shop");
                 if (currentStep > 4) setCurrentStep(4);
               }}
-              className={`px-3.5 sm:px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center justify-center ${
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center justify-center ${
                 contractType === "Shop"
-                  ? "bg-white text-brand shadow-xs"
+                  ? "bg-white text-brand shadow-2xs"
                   : "text-text-muted hover:text-text-primary"
               }`}
             >
@@ -3120,9 +3286,9 @@ export function NewRentalAdminPageContent() {
                 setContractType("Delivery");
                 if (currentStep > 4) setCurrentStep(4);
               }}
-              className={`px-3.5 sm:px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center justify-center ${
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center justify-center ${
                 contractType === "Delivery"
-                  ? "bg-white text-brand shadow-xs"
+                  ? "bg-white text-brand shadow-2xs"
                   : "text-text-muted hover:text-text-primary"
               }`}
             >
@@ -3134,9 +3300,9 @@ export function NewRentalAdminPageContent() {
                 setContractType("Personalized");
                 if (currentStep > 2) setCurrentStep(2);
               }}
-              className={`px-3.5 sm:px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center justify-center ${
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center justify-center ${
                 contractType === "Personalized"
-                  ? "bg-white text-brand shadow-xs"
+                  ? "bg-white text-brand shadow-2xs"
                   : "text-text-muted hover:text-text-primary"
               }`}
             >
@@ -3147,11 +3313,11 @@ export function NewRentalAdminPageContent() {
       </div>
 
       {/* Stepper Header */}
-      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3 sm:p-6 animate-fade-in-up stagger-1">
-        <div className="relative w-full max-w-4xl mx-auto px-1 sm:px-4">
+      <div className="bg-card rounded-xl border border-border shadow-2xs p-2.5 sm:p-4 animate-fade-in-up stagger-1">
+        <div className="relative w-full max-w-3xl mx-auto px-1 sm:px-3">
           {/* Background Track Line (connected precisely through centers of first and last circles) */}
           <div 
-            className="absolute top-[18px] -translate-y-1/2 h-[2px] bg-gray-200 z-0 hidden sm:block pointer-events-none" 
+            className="absolute top-[14px] -translate-y-1/2 h-[2px] bg-gray-200 z-0 hidden sm:block pointer-events-none" 
             style={{
               left: `${100 / (2 * totalSteps)}%`,
               right: `${100 / (2 * totalSteps)}%`,
@@ -3159,7 +3325,7 @@ export function NewRentalAdminPageContent() {
           />
           {/* Active Progress Line */}
           <div 
-            className="absolute top-[18px] -translate-y-1/2 h-[2px] bg-brand z-0 transition-all duration-300 hidden sm:block pointer-events-none" 
+            className="absolute top-[14px] -translate-y-1/2 h-[2px] bg-brand z-0 transition-all duration-300 hidden sm:block pointer-events-none" 
             style={{
               left: `${100 / (2 * totalSteps)}%`,
               width: totalSteps > 1 
@@ -3185,22 +3351,22 @@ export function NewRentalAdminPageContent() {
                     else if (step.id < currentStep) setCurrentStep(step.id);
                     else if (step.id === currentStep + 1) handleNext();
                   }}
-                  className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 cursor-pointer ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] transition-all duration-300 border-2 cursor-pointer ${
                     currentStep === step.id 
-                      ? "border-brand bg-brand text-white shadow-md shadow-brand/20 scale-105 ring-2 sm:ring-4 ring-white" 
+                      ? "border-brand bg-brand text-white shadow-sm shadow-brand/20 scale-105 ring-2 sm:ring-3 ring-white" 
                       : currentStep > step.id 
-                      ? "border-brand bg-white text-brand ring-2 sm:ring-4 ring-white" 
-                      : "border-gray-200 bg-white text-gray-400 ring-2 sm:ring-4 ring-white"
+                      ? "border-brand bg-white text-brand ring-2 sm:ring-3 ring-white" 
+                      : "border-gray-200 bg-white text-gray-400 ring-2 sm:ring-3 ring-white"
                   }`}
                 >
                   {currentStep > step.id ? (
-                    <CheckCircle size={15} className="text-brand shrink-0" />
+                    <CheckCircle size={13} className="text-brand shrink-0" />
                   ) : (
                     <span className="leading-none">{step.id}</span>
                   )}
                 </button>
                 <span 
-                  className={`text-xs font-semibold hidden sm:block text-center w-full px-1 mt-2.5 leading-snug transition-colors ${
+                  className={`text-[11px] font-semibold hidden sm:block text-center w-full px-1 mt-1.5 leading-snug transition-colors ${
                     currentStep === step.id 
                       ? "text-brand font-bold" 
                       : currentStep > step.id 
@@ -3216,27 +3382,27 @@ export function NewRentalAdminPageContent() {
           </div>
 
           {/* Mobile Current Step Indicator */}
-          <div className="sm:hidden text-center mt-2.5 pt-2 border-t border-border/50">
-            <span className="text-[11px] font-bold text-brand uppercase tracking-wider">Step {currentStep} of {totalSteps}:</span>{" "}
-            <span className="text-xs font-semibold text-text-primary">{STEPS.find(s => s.id === currentStep)?.title}</span>
+          <div className="sm:hidden text-center mt-2 pt-1.5 border-t border-border/50">
+            <span className="text-[10px] font-bold text-brand uppercase tracking-wider">Step {currentStep} of {totalSteps}:</span>{" "}
+            <span className="text-[11px] font-semibold text-text-primary">{STEPS.find(s => s.id === currentStep)?.title}</span>
           </div>
         </div>
       </div>
 
       {/* Wizard Step Content */}
-      <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm p-3.5 sm:p-6 md:p-8 animate-fade-in-up stagger-2">
+      <div className="bg-card rounded-xl border border-border shadow-2xs p-3.5 sm:p-5 animate-fade-in-up stagger-2">
         {renderStepContent()}
 
         {/* Step Navigation Buttons */}
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-border pt-4 sm:pt-6 mt-6 sm:mt-8">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-2.5 border-t border-border pt-3.5 sm:pt-4 mt-5 sm:mt-6">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={handleBack}
               disabled={isLoading}
-              className="px-5 py-3 sm:py-2.5 rounded-xl border border-border text-text-secondary hover:bg-gray-50 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer w-full sm:w-auto"
+              className="px-4 py-2 rounded-lg border border-border text-text-secondary hover:bg-gray-50 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer w-full sm:w-auto"
             >
-              <ArrowLeft size={16} />
+              <ArrowLeft size={14} />
               <span>Previous Step</span>
             </button>
           ) : (
@@ -3244,26 +3410,26 @@ export function NewRentalAdminPageContent() {
           )}
 
           {currentStep < totalSteps ? (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               {isEditMode && (
                 <button
                   type="button"
                   onClick={handleGenerate}
                   disabled={isLoading}
-                  className="px-5 py-3 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-xs disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                   title="Save all changes immediately"
                 >
-                  {isLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                  {isLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                   <span>Save Changes (حفظ)</span>
                 </button>
               )}
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-3 sm:py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
+                className="px-4 py-2 rounded-lg bg-brand hover:bg-brand-dark text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer w-full sm:w-auto"
               >
                 <span>Next Step</span>
-                <ArrowRight size={16} />
+                <ArrowRight size={14} />
               </button>
             </div>
           ) : (
@@ -3271,16 +3437,16 @@ export function NewRentalAdminPageContent() {
               type="button"
               onClick={handleGenerate}
               disabled={isLoading}
-              className="px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+              className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer w-full sm:w-auto"
             >
               {isLoading ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2 size={14} className="animate-spin" />
                   <span>{isEditMode ? "Saving Changes..." : "Creating Booking..."}</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle size={18} />
+                  <CheckCircle size={15} />
                   <span>
                     {isEditMode 
                       ? "Save Changes (حفظ التعديلات)" 
@@ -3309,6 +3475,17 @@ export function NewRentalAdminPageContent() {
           setClientToEdit(null);
         }}
         onSuccess={handleClientModalSuccess}
+      />
+
+      {/* Modal for creating or editing a B2B Company (Only Company Name required, no ID/License scan) */}
+      <CreateCompanyModal
+        isOpen={isCompanyModalOpen}
+        companyToEdit={companyToEdit}
+        onClose={() => {
+          setIsCompanyModalOpen(false);
+          setCompanyToEdit(null);
+        }}
+        onSuccess={handleCompanyModalSuccess}
       />
 
       {/* Modal for creating a new vehicle on the fly (no card scan required) */}

@@ -14,11 +14,13 @@ import {
   UserPlus,
   AlertCircle,
   Loader2,
+  Building2,
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import TablePagination from "@/components/ui/TablePagination";
 import { useToast } from "@/components/providers/ToastProvider";
 import CreateClientModal from "@/components/modals/CreateClientModal";
+import CreateCompanyModal from "@/components/modals/CreateCompanyModal";
 import { useRouter } from "next/navigation";
 
 const getInitials = (name: string) => {
@@ -31,18 +33,25 @@ const getInitials = (name: string) => {
     .toUpperCase();
 };
 
-const getAvatarColor = (name: string) => {
-  if (!name) return "bg-blue-100 text-blue-700";
+const getAvatarColor = (name: string, indexOrSeed?: number | string) => {
   const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-emerald-100 text-emerald-700",
-    "bg-amber-100 text-amber-700",
-    "bg-purple-100 text-purple-700",
-    "bg-rose-100 text-rose-700",
-    "bg-cyan-100 text-cyan-700",
+    "bg-rose-100 text-rose-700 border border-rose-200/60",
+    "bg-emerald-100 text-emerald-700 border border-emerald-200/60",
+    "bg-amber-100 text-amber-700 border border-amber-200/60",
+    "bg-purple-100 text-purple-700 border border-purple-200/60",
+    "bg-teal-100 text-teal-700 border border-teal-200/60",
+    "bg-orange-100 text-orange-700 border border-orange-200/60",
+    "bg-pink-100 text-pink-700 border border-pink-200/60",
+    "bg-indigo-100 text-indigo-700 border border-indigo-200/60",
+    "bg-lime-100 text-lime-700 border border-lime-200/60",
+    "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200/60",
   ];
-  const charCode = name.charCodeAt(0) || 0;
-  return colors[charCode % colors.length];
+  const str = `${name || ""}-${indexOrSeed ?? ""}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return colors[hash % colors.length];
 };
 
 // Status badge styling matching drivers page
@@ -61,6 +70,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
@@ -212,16 +222,26 @@ export default function ClientsPage() {
             Manage customer profiles, documents, and rental history.
           </p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          <button
+            onClick={() => {
+              setEditTarget(null);
+              setIsCompanyModalOpen(true);
+            }}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-brand border border-brand/30 px-4 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-2xs transition-all cursor-pointer"
+          >
+            <Building2 size={18} />
+            <span>Add Company (B2B)</span>
+          </button>
           <button
             onClick={() => {
               setEditTarget(null);
               setIsModalOpen(true);
             }}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
             <Plus size={18} />
-            <span>Add Customer</span>
+            <span>Add Customer (B2C)</span>
           </button>
         </div>
       </div>
@@ -392,16 +412,20 @@ export default function ClientsPage() {
                           <td className="py-2 sm:py-2.5 px-2.5 sm:px-4 min-w-[150px] sm:min-w-[220px]">
                             <div className="flex items-center gap-2 sm:gap-2.5">
                               <div
-                                className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(client.name)}`}
+                                className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs ${getAvatarColor(client.companyName || client.name, client._id || idx)}`}
                               >
-                                {getInitials(client.name)}
+                                {getInitials(client.companyName || client.name)}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
-                                  <span className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm break-words leading-tight" title={client.name}>
-                                    {client.name}
+                                  <span className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm break-words leading-tight" title={client.companyName || client.name}>
+                                    {client.companyName || client.name}
                                   </span>
-                                  {client.clientType && (
+                                  {(client.customerType === "B2B" || client.clientType === "Corporate" || Boolean(client.companyName)) ? (
+                                    <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap bg-brand/10 text-brand border border-brand/25">
+                                      B2B (شركة)
+                                    </span>
+                                  ) : client.clientType ? (
                                     <span className={`text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap ${
                                       client.clientType === "Tourist"
                                         ? "bg-purple-50 text-purple-700 border border-purple-200"
@@ -409,7 +433,7 @@ export default function ClientsPage() {
                                     }`}>
                                       {client.clientType === "Tourist" ? "Tourist (سائح)" : "Resident (مقيم)"}
                                     </span>
-                                  )}
+                                  ) : null}
                                 </div>
                                 <p className="text-[9.5px] sm:text-[11px] text-text-muted mt-0.5 break-words leading-tight">
                                   {client.nationality || (client.idNumber ? `ID: ${client.idNumber}` : "Customer")}
@@ -480,7 +504,12 @@ export default function ClientsPage() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditTarget(client);
-                                  setIsModalOpen(true);
+                                  const isCorp = client.customerType === "B2B" || client.clientType === "Corporate" || Boolean(client.companyName);
+                                  if (isCorp) {
+                                    setIsCompanyModalOpen(true);
+                                  } else {
+                                    setIsModalOpen(true);
+                                  }
                                 }}
                               >
                                 <Edit size={14} />
@@ -534,6 +563,21 @@ export default function ClientsPage() {
           toast.success(
             `Customer ${editTarget ? "updated" : "added"} successfully!`
           );
+          setEditTarget(null);
+          fetchClients();
+        }}
+      />
+
+      {/* Create/Edit B2B Company Modal */}
+      <CreateCompanyModal
+        isOpen={isCompanyModalOpen}
+        companyToEdit={editTarget}
+        onClose={() => {
+          setIsCompanyModalOpen(false);
+          setEditTarget(null);
+        }}
+        onSuccess={() => {
+          setIsCompanyModalOpen(false);
           setEditTarget(null);
           fetchClients();
         }}

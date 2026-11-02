@@ -62,6 +62,26 @@ export async function POST(req: NextRequest) {
       body.email = body.email.trim();
     }
 
+    // Handle B2B Corporate Clients (No personal ID or driving license required)
+    const isCorporate = body.customerType === "B2B" || body.clientType === "Corporate";
+    if (isCorporate) {
+      body.customerType = "B2B";
+      body.clientType = "Corporate";
+      const compName = (body.companyName || body.name || "").trim();
+      if (!compName) {
+        return NextResponse.json(
+          { error: "Company name is required. (يرجى إدخال اسم الشركة)" },
+          { status: 400 }
+        );
+      }
+      body.companyName = compName;
+      body.name = compName;
+      body.nationality = body.nationality || "UAE";
+      body.idNumber = body.idNumber || body.trn || body.tradeLicenseNumber || `B2B-${Date.now().toString().slice(-6)}`;
+      body.licenseNumber = body.licenseNumber || "B2B-CORP";
+      body.address = body.address || "Dubai";
+    }
+
     // Sanitize empty date strings to null so Mongoose does not throw CastError
     const dateFields = [
       "dateOfBirth",
@@ -81,8 +101,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate Driving License Expiry
-    if (body.licenseExpiry && typeof body.licenseExpiry === "string" && body.licenseExpiry.trim()) {
+    // Validate Driving License Expiry (only for individual B2C clients)
+    if (!isCorporate && body.licenseExpiry && typeof body.licenseExpiry === "string" && body.licenseExpiry.trim()) {
       const expDate = new Date(body.licenseExpiry);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -107,7 +127,7 @@ export async function POST(req: NextRequest) {
       const duplicateField = Object.keys(error.keyPattern || {})[0];
       if (duplicateField === "idNumber") {
         return NextResponse.json(
-          { error: "A client with this Emirates ID or Passport Number already exists." },
+          { error: "A client with this Emirates ID, Passport, or TRN already exists." },
           { status: 400 }
         );
       }
@@ -119,4 +139,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-

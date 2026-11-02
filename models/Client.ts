@@ -2,6 +2,10 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IClient extends Document {
   name: string;
+  companyName?: string;
+  trn?: string;
+  tradeLicenseNumber?: string;
+  customerType?: "B2C" | "B2B";
   firstName?: string;
   middleName?: string;
   lastName?: string;
@@ -10,8 +14,8 @@ export interface IClient extends Document {
 
   phone?: string;
   email: string;
-  nationality: string;
-  idNumber: string; // Passport or National ID
+  nationality?: string;
+  idNumber?: string; // Passport or National ID or Trade License
   idIssuedBy?: string; // Issuing authority for National ID / Emirates ID
   idIssuedDate?: Date | string; // Issue date of Emirates ID
   idExpiry?: Date | string; // Emirates ID Expiry Date
@@ -23,10 +27,10 @@ export interface IClient extends Document {
   passportExpiry?: Date | string;
 
   // Driving License Details
-  licenseNumber: string;
+  licenseNumber?: string;
   licenseIssuedBy?: string;
   licenseIssuedDate?: Date | string;
-  licenseExpiry: Date | string;
+  licenseExpiry?: Date | string;
 
   // International Driving License Details
   internationalLicenseNumber?: string;
@@ -38,8 +42,8 @@ export interface IClient extends Document {
   visaNumber?: string;
   visaExpiry?: Date | string;
 
-  address: string;
-  clientType?: "Resident" | "Tourist";
+  address?: string;
+  clientType?: "Resident" | "Tourist" | "Corporate";
   status: "Active" | "Blacklisted";
   documents: string[]; // Cloudinary URLs for uploaded docs
   createdAt: Date;
@@ -49,6 +53,10 @@ export interface IClient extends Document {
 const clientSchema = new Schema<IClient>(
   {
     name: { type: String, required: true },
+    companyName: { type: String, required: false },
+    trn: { type: String, required: false },
+    tradeLicenseNumber: { type: String, required: false },
+    customerType: { type: String, enum: ["B2C", "B2B"], default: "B2C" },
     firstName: { type: String, required: false },
     middleName: { type: String, required: false },
     lastName: { type: String, required: false },
@@ -57,8 +65,8 @@ const clientSchema = new Schema<IClient>(
 
     phone: { type: String, required: false, default: "N/A" },
     email: { type: String, required: false, default: "" },
-    nationality: { type: String, required: true },
-    idNumber: { type: String, required: true },
+    nationality: { type: String, required: false, default: "UAE" },
+    idNumber: { type: String, required: false, default: "N/A" },
     idIssuedBy: { type: String, required: false },
     idIssuedDate: { type: Date, required: false },
     idExpiry: { type: Date, required: false },
@@ -70,7 +78,7 @@ const clientSchema = new Schema<IClient>(
     passportExpiry: { type: Date, required: false },
 
     // Driving License Details
-    licenseNumber: { type: String, required: true },
+    licenseNumber: { type: String, required: false, default: "N/A" },
     licenseIssuedBy: { type: String, required: false },
     licenseIssuedDate: { type: Date, required: false },
     licenseExpiry: { type: Date, required: false },
@@ -85,8 +93,8 @@ const clientSchema = new Schema<IClient>(
     visaNumber: { type: String, required: false },
     visaExpiry: { type: Date, required: false },
 
-    address: { type: String, required: true },
-    clientType: { type: String, enum: ["Resident", "Tourist"], default: "Resident" },
+    address: { type: String, required: false, default: "Dubai" },
+    clientType: { type: String, enum: ["Resident", "Tourist", "Corporate"], default: "Resident" },
     status: { type: String, enum: ["Active", "Blacklisted"], default: "Active" },
     documents: [{ type: String }],
   },
@@ -98,5 +106,11 @@ clientSchema.index({ status: 1 });
 clientSchema.index({ name: 1 });
 clientSchema.index({ phone: 1 });
 clientSchema.index({ idNumber: 1 });
+clientSchema.index({ customerType: 1 });
+clientSchema.index({ companyName: 1 });
+
+if (mongoose.models.Client) {
+  mongoose.deleteModel("Client");
+}
 
 export const Client: Model<IClient> = mongoose.models.Client || mongoose.model<IClient>("Client", clientSchema);

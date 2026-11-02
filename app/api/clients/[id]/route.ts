@@ -60,6 +60,15 @@ export async function PUT(
       }
     }
 
+    // Handle B2B Corporate Updates
+    const isCorporate = body.customerType === "B2B" || body.clientType === "Corporate";
+    if (isCorporate) {
+      body.customerType = "B2B";
+      body.clientType = "Corporate";
+      if (body.companyName) body.name = body.companyName;
+      if (body.name && !body.companyName) body.companyName = body.name;
+    }
+
     // Sanitize empty date strings to null so Mongoose does not throw CastError
     const dateFields = [
       "dateOfBirth",
@@ -79,8 +88,8 @@ export async function PUT(
       }
     }
 
-    // Validate Driving License Expiry
-    if (body.licenseExpiry && typeof body.licenseExpiry === "string" && body.licenseExpiry.trim()) {
+    // Validate Driving License Expiry (only for individual B2C clients)
+    if (!isCorporate && body.licenseExpiry && typeof body.licenseExpiry === "string" && body.licenseExpiry.trim()) {
       const expDate = new Date(body.licenseExpiry);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
