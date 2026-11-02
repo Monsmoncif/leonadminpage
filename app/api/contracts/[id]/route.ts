@@ -343,6 +343,18 @@ export async function PUT(
       );
     }
 
+    // Sync Before Rental Inspection photos if inspectionPhotos were updated in Edit Rental Contract
+    if (Array.isArray(body.inspectionPhotos)) {
+      try {
+        await Inspection.updateMany(
+          { contractId: existingContract._id, type: "Before Rental" },
+          { $set: { photos: body.inspectionPhotos } }
+        );
+      } catch (inspSyncErr) {
+        console.warn("Could not sync Before Rental inspection photos:", inspSyncErr);
+      }
+    }
+
     // Invalidate cached PDF so fresh PDF with latest handover mileage, fuel, and signature is generated
     clearPdfCache(resolvedParams.id);
     clearConsentPdfCache(resolvedParams.id);

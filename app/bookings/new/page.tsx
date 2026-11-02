@@ -73,11 +73,27 @@ const DELIVERY_STEPS = [
   { id: 4, title: "Review & Dispatch", icon: CheckCircle },
 ];
 
+const DELIVERY_EDIT_HANDED_OVER_STEPS = [
+  { id: 1, title: "Car", icon: ExecutiveCarIcon },
+  { id: 2, title: "Client (Optional)", icon: User },
+  { id: 3, title: "Rental Data & Driver", icon: Truck },
+  { id: 4, title: "Inspection Photos", icon: Camera },
+  { id: 5, title: "Review & Save", icon: CheckCircle },
+];
+
 const SHOP_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
   { id: 2, title: "Client", icon: User },
   { id: 3, title: "Rental Data", icon: FileText },
   { id: 4, title: "Review & Create", icon: CheckCircle },
+];
+
+const SHOP_EDIT_HANDED_OVER_STEPS = [
+  { id: 1, title: "Car", icon: ExecutiveCarIcon },
+  { id: 2, title: "Client", icon: User },
+  { id: 3, title: "Rental Data", icon: FileText },
+  { id: 4, title: "Inspection Photos", icon: Camera },
+  { id: 5, title: "Review & Save", icon: CheckCircle },
 ];
 
 const DRIVER_STEPS = [
@@ -471,11 +487,29 @@ export function NewRentalAdminPageContent() {
     toast.success(`Admin signature applied (${adminName})`);
   };
 
+  // Show Inspection Photos step in Edit Rental Contract ONLY when contract is NOT pending (i.e. already handed over)
+  const isEditHandedOver = Boolean(
+    isEditMode &&
+    editingContract &&
+    contractType !== "Personalized" &&
+    editingContract.deliveryStatus !== "Pending" &&
+    editingContract.status !== "Draft" &&
+    (
+      editingContract.status === "Active" ||
+      editingContract.status === "Completed" ||
+      editingContract.deliveryStatus === "Delivered" ||
+      editingContract.deliveryStatus === "Returned" ||
+      Boolean(editingContract.contractNumber) ||
+      Boolean(editingContract.deliveredAt || editingContract.handoverCompletedAt) ||
+      (Array.isArray(editingContract.inspectionPhotos) && editingContract.inspectionPhotos.some(Boolean))
+    )
+  );
+
   // Canvas initialization when reaching Review Step or Personalized Step 3 or when window resizes
   useEffect(() => {
     const isReviewStep = 
-      (contractType === "Shop" && currentStep === (isDriver ? 5 : 4)) || 
-      (contractType === "Delivery" && currentStep === 4) ||
+      (contractType === "Shop" && currentStep === (isDriver || isEditHandedOver ? 5 : 4)) || 
+      (contractType === "Delivery" && currentStep === (isEditHandedOver ? 5 : 4)) ||
       (contractType === "Personalized" && currentStep === 3);
     if (!isReviewStep) return;
 
@@ -549,7 +583,7 @@ export function NewRentalAdminPageContent() {
       clearTimeout(t2);
       window.removeEventListener("resize", setupCanvases);
     };
-  }, [currentStep, contractType, isDriver, isEditMode]);
+  }, [currentStep, contractType, isDriver, isEditMode, isEditHandedOver]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -566,10 +600,10 @@ export function NewRentalAdminPageContent() {
   }, [currentStep]);
 
   const STEPS = contractType === "Shop" 
-    ? (isDriver ? DRIVER_STEPS : SHOP_STEPS)
+    ? (isDriver ? DRIVER_STEPS : (isEditHandedOver ? SHOP_EDIT_HANDED_OVER_STEPS : SHOP_STEPS))
     : contractType === "Personalized" 
       ? PERSONALIZED_STEPS 
-      : DELIVERY_STEPS;
+      : (isEditHandedOver ? DELIVERY_EDIT_HANDED_OVER_STEPS : DELIVERY_STEPS);
   const totalSteps = STEPS.length;
 
   const fetchUnits = async () => {
@@ -1064,12 +1098,10 @@ export function NewRentalAdminPageContent() {
         paymentStatus: determinedPaymentStatus,
         customerSignature: signatureData || editingContract?.customerSignature || null,
         adminSignature: finalAdminSignature,
-        inspectionPhotos: (isEditMode && Array.isArray(editingContract?.inspectionPhotos) && editingContract.inspectionPhotos.length > 0)
-          ? editingContract.inspectionPhotos
-          : [
-              ...VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
-              ...getExtraPhotoKeys(inspectionPhotos).map(k => inspectionPhotos[k]),
-            ],
+        inspectionPhotos: [
+          ...VEHICLE_ANGLES.map(angle => inspectionPhotos[angle] || ""),
+          ...getExtraPhotoKeys(inspectionPhotos).map(k => inspectionPhotos[k]),
+        ],
         moneyPhotos: moneyPhotos || [],
         totalAmount,
         additionalDriverName: additionalDriver.name.trim() || (contractType === "Personalized" ? personName.trim() : ""),
@@ -2817,25 +2849,37 @@ export function NewRentalAdminPageContent() {
   };
 
   const renderInspectionPhotos = () => (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-4 sm:space-y-5 animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-lg font-bold text-text-primary">Step {isDriver ? 2 : 4}: {isDriver ? "Handover Inspection Photos (صور فحص السيارة عند التسليم)" : "Pre-Handover Vehicle Inspection Photos"}</h2>
-          <p className="text-xs text-text-muted mt-0.5">
-            {isDriver
-              ? "Capture vehicle inspection photos to document condition before handover (optional)"
-              : "Take or upload vehicle inspection photos to document condition before client handover"}
+          <h2 className="text-sm sm:text-base font-bold text-text-primary flex items-center gap-2">
+            <Camera size={16} className="text-brand" />
+            <span>
+              Step {isDriver ? 2 : 4}:{" "}
+              {isEditMode
+                ? "Edit Handover Inspection Photos (تعديل صور فحص السيارة عند التسليم)"
+                : isDriver
+                  ? "Handover Inspection Photos (صور فحص السيارة عند التسليم)"
+                  : "Pre-Handover Vehicle Inspection Photos"}
+            </span>
+          </h2>
+          <p className="text-[11px] sm:text-xs text-text-muted mt-0.5">
+            {isEditMode
+              ? "View, replace, add, or remove any of the vehicle handover inspection photos recorded for this contract."
+              : isDriver
+                ? "Capture vehicle inspection photos to document condition before handover (optional)"
+                : "Take or upload vehicle inspection photos to document condition before client handover"}
           </p>
         </div>
       </div>
 
       {/* Fuel Level at Checkout (drivers set it in Rental Data) */}
       {!isDriver && (
-        <div className="bg-gray-50/60 p-5 rounded-2xl border border-gray-100">
+        <div className="bg-gray-50/60 p-4 rounded-xl border border-gray-100">
           <FuelLevelSelector
             value={rentalData.checkoutFuelLevel}
             onChange={(val) => setRentalData({ ...rentalData, checkoutFuelLevel: val })}
-            label="Fuel Level Percentage (مستوى الوقود عند الاستلام بالمحل)"
+            label="Fuel Level Percentage (مستوى الوقود عند التسليم)"
           />
         </div>
       )}
@@ -2843,7 +2887,7 @@ export function NewRentalAdminPageContent() {
       <VehicleInspectionPhotoCapture
         photos={inspectionPhotos}
         onChange={setInspectionPhotos}
-        allowExtra={isDriver}
+        allowExtra={isDriver || isEditMode}
       />
     </div>
   );
@@ -3196,11 +3240,16 @@ export function NewRentalAdminPageContent() {
     }
 
     if (contractType === "Delivery") {
-      // 4 Steps for Driver Delivery: Car (1) → Client (Optional) (2) → Rental Data & Driver (3) → Review & Dispatch (4)
+      // Driver Delivery: Car (1) → Client (Optional) (2) → Rental Data & Driver (3) → [Inspection Photos (4) if Edit & Handed Over] → Review & Dispatch
       if (currentStep === 1) return renderVehicleSelector();
       if (currentStep === 2) return renderClientSelector();
       if (currentStep === 3) return renderRentalData();
-      if (currentStep === 4) return renderReview();
+      if (isEditHandedOver) {
+        if (currentStep === 4) return renderInspectionPhotos();
+        if (currentStep === 5) return renderReview();
+      } else {
+        if (currentStep === 4) return renderReview();
+      }
       return null;
     }
 
@@ -3214,11 +3263,16 @@ export function NewRentalAdminPageContent() {
       return null;
     }
 
-    // 4 Clean Steps for Shop: Car (1) → Client (2) → Rental Data (3) → Review & Create (4)
+    // Shop: Car (1) → Client (2) → Rental Data (3) → [Inspection Photos (4) if Edit & Handed Over] → Review & Create
     if (currentStep === 1) return renderVehicleSelector();
     if (currentStep === 2) return renderClientSelector();
     if (currentStep === 3) return renderRentalData();
-    if (currentStep === 4) return renderReview();
+    if (isEditHandedOver) {
+      if (currentStep === 4) return renderInspectionPhotos();
+      if (currentStep === 5) return renderReview();
+    } else {
+      if (currentStep === 4) return renderReview();
+    }
     return null;
   };
 
