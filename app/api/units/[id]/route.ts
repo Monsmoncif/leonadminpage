@@ -79,6 +79,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    // Also include vidange history checkpoints in mileage progression
+    if (Array.isArray((unit as any).vidangeHistory)) {
+      for (const v of (unit as any).vidangeHistory) {
+        if (v && v.mileage != null && v.date) {
+          const vDate = new Date(v.date);
+          if (!isNaN(vDate.getTime())) {
+            mileageHistory.push({
+              name: vDate.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
+              km: Number(v.mileage),
+              date: vDate.toISOString(),
+            });
+          }
+        }
+      }
+    }
+
     // Sort ascending by date
     mileageHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
