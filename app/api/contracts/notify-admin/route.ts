@@ -18,6 +18,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "contractId and type are required" }, { status: 400 });
     }
 
+    // Return / Completed notifications are disabled
+    if (type === "vehicle_returned") {
+      return NextResponse.json({ success: true, skipped: true });
+    }
+
     // Fetch contract with populated fields
     const _c = Client;
     const _u = Unit;

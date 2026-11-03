@@ -387,24 +387,7 @@ export async function PUT(
       } catch (e) { console.error("Admin notify trigger failed:", e); }
     }
 
-    // Auto-send thank you notification to client when vehicle is returned and contract is completed
-    const isReturnCompletion = 
-      (body.status === "Completed" && existingContract.status !== "Completed") ||
-      (body.deliveryStatus === "Returned" && existingContract.deliveryStatus !== "Returned");
-
-    if (isReturnCompletion) {
-      sendClientContractNotification(resolvedParams.id, "final").catch(e => console.error("Client return completion send trigger failed (background):", e));
-
-      // Auto-notify admin that vehicle was returned
-      try {
-        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-        fetch(`${baseUrl}/api/contracts/notify-admin`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contractId: updatedContract._id.toString(), type: "vehicle_returned" }),
-        }).catch(err => console.error("Failed to notify admin on return:", err));
-      } catch (e) { console.error("Admin notify return trigger failed:", e); }
-    }
+    // Note: Return / Completed notifications (client thank-you & return alerts) are disabled as requested.
 
     // Send notifications to driver if newly assigned (delivery or return) in background
     // Delivery driver assigned
@@ -495,29 +478,6 @@ export async function PUT(
       });
 
       if (body.status === "Completed" && body.status !== existingContract.status) {
-        const clientNameForReturn = (updatedContract.clientId as any)?.name || (updatedContract as any).additionalDriverName || "Client";
-        const vehicleForReturn = (updatedContract.unitId as any)?.make ? `${(updatedContract.unitId as any).make} ${(updatedContract.unitId as any).model || ""}`.trim() : "Vehicle";
-        const returnAmountStr = body.returnAmountCollected !== undefined ? `${body.returnAmountCollected} AED` : "remaining balance";
-
-        await Notification.create({
-          title: "Vehicle Returned & Settled",
-          message: `Vehicle (${vehicleForReturn}) returned by ${clientNameForReturn}. Driver confirmed collecting ${returnAmountStr} to admin.`,
-          type: "alert"
-        });
-
-        // Auto-notify admin that vehicle was returned
-        try {
-          const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-          fetch(`${baseUrl}/api/contracts/notify-admin`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contractId: updatedContract._id.toString(), type: "vehicle_returned" }),
-          }).catch(err => console.error("Failed to notify admin on return:", err));
-        } catch (e) { console.error("Admin return notify failed:", e); }
-
-        // Note: Client thank-you notification on contract completion is disabled as requested
-
-
         // Automatically generate Before and After inspections for Comparison
         try {
           const returnOdo = Number(body.returnOdometer) || initialMileage;

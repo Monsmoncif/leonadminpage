@@ -46,6 +46,11 @@ export async function sendClientContractNotification(
 ): Promise<{ email: boolean; whatsapp: boolean }> {
   const results = { email: false, whatsapp: false };
 
+  // Return / Completed notifications are disabled
+  if (type === "final") {
+    return results;
+  }
+
   try {
     await connectDB();
 
@@ -243,16 +248,6 @@ export async function sendClientContractNotification(
             `\n📋 *Inspection & official signed contract will be completed upon vehicle handover.*\n` +
             `📄 *سيتم إتمام الفحص وتوقيع العقد الرسمي وتسليم المفاتيح عند استلام السيارة.*\n\n` +
             `Need any assistance? Reply directly to this chat.\n` +
-            `— *Leon Rent Car*`;
-        } else if (type === "final") {
-          whatsappMsg = `🌟 *LEON RENT CAR* | شكراً لاختياركم ليون لتأجير السيارات\n` +
-            `*Thank You for Choosing Leon Rent Car!*\n\n` +
-            `Hello *${clientName}*,\n` +
-            `Thank you for choosing Leon Rent Car. Your vehicle return inspection has been successfully completed, and your rental account is officially finalized! 🤝\n\n` +
-            `🚗 *Vehicle / السيارة:* ${vehicleName}\n` +
-            `📅 *Rental Period / الفترة:* ${startDate} ➔ ${endDate}\n\n` +
-            `✨ نتمنى أن تكون قد استمتعت برحلتك وبتجربة قيادة مريحة معنا، ونتطلع لخدمتك مجدداً في أقرب وقت!\n` +
-            `We truly hope you had a great driving experience and look forward to welcoming you behind the wheel again soon!\n\n` +
             `— *Leon Rent Car*`;
         } else {
           whatsappMsg = `🌟 *LEON RENT CAR* | عقد إيجار سيارة رسمي والتسليم\n` +
