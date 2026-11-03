@@ -276,7 +276,7 @@ export default function CreateContractModal({
         const editReturnDriverId = contractToEdit.returnDriverId?._id || contractToEdit.returnDriverId || "";
 
         const editDailyRate = contractToEdit.dailyRate || 85;
-        const editDays = calculateRentalDays(contractToEdit.startDate, contractToEdit.endDate);
+        const editDays = calculateRentalDays(contractToEdit.startDate, contractToEdit.endDate, contractToEdit.checkoutTime, contractToEdit.checkinTime);
         const editCollectionAmount = contractToEdit.totalAmount || (editDailyRate * editDays);
 
         setSignatureData(contractToEdit.customerSignature || null);
@@ -694,7 +694,7 @@ export default function CreateContractModal({
     setError(null);
 
     try {
-      const days = calculateRentalDays(formData.startDate, formData.endDate);
+      const days = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
       const collectionPrice = Number(formData.collectionAmount || (days * Number(formData.dailyRate)));
       const calculatedDailyRate = days > 0 ? Math.round((collectionPrice / days) * 100) / 100 : collectionPrice;
       const calculatedTotal = collectionPrice + 
@@ -804,7 +804,7 @@ export default function CreateContractModal({
   const selectedClientObj = clients.find((c) => c._id === formData.clientId);
   const selectedDeliveryDriverObj = drivers.find((d) => (d._id || d.userId) === formData.deliveryDriverId) || (isDriverRole ? currentDriver : undefined);
 
-  const durationDays = calculateRentalDays(formData.startDate, formData.endDate);
+  const durationDays = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
   const calculatedTotalRent = (durationDays * Number(formData.dailyRate)) + 
     (Number(formData.babySeatFees) || 0) + 
     (Number(formData.tintingFees) || 0) + 
@@ -1023,7 +1023,7 @@ export default function CreateContractModal({
                                   toast.error(`This car is currently in ${unit.status} and cannot be booked.`);
                                   return;
                                 }
-                                const days = calculateRentalDays(formData.startDate, formData.endDate);
+                                const days = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
                                 const rate = unit.dailyRate || 85;
                                 setFormData(prev => ({
                                   ...prev,
@@ -1452,18 +1452,18 @@ export default function CreateContractModal({
                               const s = new Date(newStart);
                               s.setHours(0, 0, 0, 0);
 
-                              const prevDuration = calculateRentalDays(formData.startDate, formData.endDate);
+                              const prevDuration = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
 
                               let resolvedEnd = formData.endDate;
                               if (newStart > formData.endDate) {
-                                const updatedEnd = new Date(s.getTime() + (prevDuration - 1) * 86400000);
+                                const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
                                 const y = updatedEnd.getFullYear();
                                 const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
                                 const d = String(updatedEnd.getDate()).padStart(2, "0");
                                 resolvedEnd = `${y}-${m}-${d}`;
                               }
 
-                              const days = calculateRentalDays(newStart, resolvedEnd);
+                              const days = calculateRentalDays(newStart, resolvedEnd, formData.checkoutTime, formData.checkinTime);
                               const rate = Number(formData.dailyRate) || 0;
                               setFormData(prev => ({
                                 ...prev,
@@ -1525,7 +1525,7 @@ export default function CreateContractModal({
                               const newEnd = e.target.value;
                               if (!newEnd) return;
                               const validEnd = newEnd < formData.startDate ? formData.startDate : newEnd;
-                              const days = calculateRentalDays(formData.startDate, validEnd);
+                              const days = calculateRentalDays(formData.startDate, validEnd, formData.checkoutTime, formData.checkinTime);
                               const rate = Number(formData.dailyRate) || 0;
                               setFormData(prev => ({
                                 ...prev,
@@ -1573,7 +1573,7 @@ export default function CreateContractModal({
 
                       {/* Rental Duration and Date Order Helper */}
                       {(() => {
-                        const calcDays = calculateRentalDays(formData.startDate, formData.endDate);
+                        const calcDays = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
                         return (
                           <div className="flex items-center justify-between text-xs px-1">
                             <span className="text-text-muted">
@@ -1752,7 +1752,7 @@ export default function CreateContractModal({
                               value={formData.dailyRate === 0 ? "" : formData.dailyRate} 
                               onChange={e => {
                                 const val = Number(e.target.value);
-                                const days = calculateRentalDays(formData.startDate, formData.endDate);
+                                const days = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
                                 setFormData(prev => ({
                                   ...prev, 
                                   dailyRate: val,
@@ -1778,7 +1778,7 @@ export default function CreateContractModal({
                               value={formData.collectionAmount === 0 ? "" : formData.collectionAmount} 
                               onChange={e => {
                                 const val = Number(e.target.value);
-                                const days = calculateRentalDays(formData.startDate, formData.endDate);
+                                const days = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
                                 setFormData(prev => ({
                                   ...prev, 
                                   collectionAmount: val,
@@ -1790,7 +1790,7 @@ export default function CreateContractModal({
                             />
                           </div>
                           <span className="text-[11px] text-text-muted mt-0.5 block truncate">
-                            Calculated: {formData.dailyRate || 0} × {calculateRentalDays(formData.startDate, formData.endDate)}d (editable)
+                            Calculated: {formData.dailyRate || 0} × {calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime)}d (editable)
                           </span>
                         </div>
 

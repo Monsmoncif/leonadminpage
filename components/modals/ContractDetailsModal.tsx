@@ -323,7 +323,7 @@ export default function ContractDetailsModal({
 
   // Pre-handover rental terms & financial calculations
   const totalDays = contractData.totalDays || (contractData.startDate && contractData.endDate 
-    ? calculateRentalDays(contractData.startDate, contractData.endDate)
+    ? calculateRentalDays(contractData.startDate, contractData.endDate, contractData.checkoutTime, contractData.checkinTime)
     : 1);
   const dailyRate = Number(contractData.dailyRate) || 0;
   const totalAmount = Number(contractData.totalAmount || contractData.collectionAmount || (dailyRate * totalDays)) || 0;

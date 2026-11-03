@@ -670,7 +670,7 @@ export function NewRentalAdminPageContent() {
       // 3. Rental Data & Timing
       const editStart = c.startDate ? formatDateToInput(c.startDate) : new Date().toISOString().split("T")[0];
       const editEnd = c.endDate ? formatDateToInput(c.endDate) : new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
-      const days = calculateRentalDays(editStart, editEnd);
+      const days = calculateRentalDays(editStart, editEnd, c.checkoutTime, c.checkinTime);
       const editDailyRate = c.dailyRate || 85;
       const extraFees = (c.babySeatFees || 0) + (c.deliveryCharges || 0) + (c.salikFees || c.salikCharge || 0) + (c.tintingFees || 0) + (c.cleaningFees || 0);
       const editCollectionAmount = c.collectionAmount !== undefined 
@@ -1060,7 +1060,7 @@ export function NewRentalAdminPageContent() {
         return;
       }
 
-      const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+      const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
       const collectionPrice = Number(rentalData.collectionAmount || 0);
       const calculatedDailyRate = totalDays > 0 ? Math.round((collectionPrice / totalDays) * 100) / 100 : collectionPrice;
       const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
@@ -1382,7 +1382,7 @@ export function NewRentalAdminPageContent() {
                       return;
                     }
                     setSelectedVehicle(unit._id);
-                    const days = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+                    const days = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
                     const defaultRate = unit.dailyRate || 85;
                     setRentalData(prev => ({
                       ...prev,
@@ -1778,8 +1778,19 @@ export function NewRentalAdminPageContent() {
   );
   };
 
+  // Updates checkout/return time and re-calculates the rental duration & collection amount (24h blocks)
+  const applyTimeChange = (prev: typeof rentalData, patch: Partial<typeof rentalData>) => {
+    const next = { ...prev, ...patch };
+    const days = calculateRentalDays(next.startDate, next.endDate, next.checkoutTime, next.checkinTime);
+    const rate = Number(next.dailyRate) || 0;
+    return {
+      ...next,
+      collectionAmount: rate > 0 ? Math.round(rate * days * 100) / 100 : next.collectionAmount,
+    };
+  };
+
   const renderRentalData = () => {
-    const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+    const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
 
     const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
     const totalCharges = Number(rentalData.collectionAmount || 0) + extraFees;
@@ -1912,18 +1923,18 @@ export function NewRentalAdminPageContent() {
                     const s = new Date(newStart);
                     s.setHours(0, 0, 0, 0);
 
-                    const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+                    const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
 
                     let resolvedEnd = rentalData.endDate;
                     if (newStart > rentalData.endDate) {
-                      const updatedEnd = new Date(s.getTime() + (prevDuration - 1) * 86400000);
+                      const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
                       const y = updatedEnd.getFullYear();
                       const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
                       const d = String(updatedEnd.getDate()).padStart(2, "0");
                       resolvedEnd = `${y}-${m}-${d}`;
                     }
 
-                    const days = calculateRentalDays(newStart, resolvedEnd);
+                    const days = calculateRentalDays(newStart, resolvedEnd, rentalData.checkoutTime, rentalData.checkinTime);
                     const rate = Number(rentalData.dailyRate) || 0;
                     setRentalData(prev => ({
                       ...prev,
@@ -1954,14 +1965,14 @@ export function NewRentalAdminPageContent() {
                     <input 
                       type="text" 
                       value={rentalData.checkoutTime} 
-                      onChange={e => setRentalData({...rentalData, checkoutTime: e.target.value})} 
+                      onChange={e => setRentalData(prev => applyTimeChange(prev, { checkoutTime: e.target.value }))} 
                       placeholder="e.g. 10:00 AM"
                       className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary" 
                     />
                   </div>
                   <button
                     type="button"
-                    onClick={() => setRentalData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
+                    onClick={() => setRentalData(prev => applyTimeChange(prev, { checkoutTime: getCurrentFormattedTime() }))}
                     className="px-2.5 sm:px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1 shadow-2xs"
                     title="Set current time"
                   >
@@ -1985,7 +1996,7 @@ export function NewRentalAdminPageContent() {
                     const newEnd = e.target.value;
                     if (!newEnd) return;
                     const validEnd = newEnd < rentalData.startDate ? rentalData.startDate : newEnd;
-                    const days = calculateRentalDays(rentalData.startDate, validEnd);
+                    const days = calculateRentalDays(rentalData.startDate, validEnd, rentalData.checkoutTime, rentalData.checkinTime);
                     const rate = Number(rentalData.dailyRate) || 0;
                     setRentalData(prev => ({
                       ...prev,
@@ -2014,14 +2025,14 @@ export function NewRentalAdminPageContent() {
                     <input 
                       type="text" 
                       value={rentalData.checkinTime} 
-                      onChange={e => setRentalData({...rentalData, checkinTime: e.target.value})} 
+                      onChange={e => setRentalData(prev => applyTimeChange(prev, { checkinTime: e.target.value }))} 
                       placeholder={rentalData.checkoutTime || "e.g. 10:00 AM"}
                       className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary" 
                     />
                   </div>
                   <button
                     type="button"
-                    onClick={() => setRentalData(prev => ({ ...prev, checkinTime: prev.checkoutTime || getCurrentFormattedTime() }))}
+                    onClick={() => setRentalData(prev => applyTimeChange(prev, { checkinTime: prev.checkoutTime || getCurrentFormattedTime() }))}
                     className="px-2.5 sm:px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-primary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-border flex items-center gap-1 shadow-2xs"
                     title="Same as checkout time"
                   >
@@ -2518,7 +2529,7 @@ export function NewRentalAdminPageContent() {
   };
 
   const renderReview = () => {
-    const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+    const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
 
     const clientObj = contractType !== "Personalized" ? clients.find(c => c._id === selectedClient) : null;
     const vehicleObj = units.find(u => u._id === selectedVehicle);
@@ -2944,10 +2955,10 @@ export function NewRentalAdminPageContent() {
                     if (!newStart) return;
                     const s = new Date(newStart);
                     s.setHours(0, 0, 0, 0);
-                    const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+                    const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
                     let resolvedEnd = rentalData.endDate;
                     if (newStart > rentalData.endDate) {
-                      const updatedEnd = new Date(s.getTime() + (prevDuration - 1) * 86400000);
+                      const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
                       const y = updatedEnd.getFullYear();
                       const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
                       const d = String(updatedEnd.getDate()).padStart(2, "0");
@@ -2982,7 +2993,7 @@ export function NewRentalAdminPageContent() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setRentalData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
+                    onClick={() => setRentalData(prev => applyTimeChange(prev, { checkoutTime: getCurrentFormattedTime() }))}
                     className="px-2.5 sm:px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1 shadow-2xs"
                     title="Set current time"
                   >
@@ -3034,7 +3045,7 @@ export function NewRentalAdminPageContent() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setRentalData(prev => ({ ...prev, checkinTime: prev.checkoutTime || getCurrentFormattedTime() }))}
+                    onClick={() => setRentalData(prev => applyTimeChange(prev, { checkinTime: prev.checkoutTime || getCurrentFormattedTime() }))}
                     className="px-2.5 sm:px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-primary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-border flex items-center gap-1 shadow-2xs"
                     title="Same as checkout time"
                   >
@@ -3046,7 +3057,7 @@ export function NewRentalAdminPageContent() {
 
             {/* Rental Duration indicator for Personalized */}
             {(() => {
-              const daysCount = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+              const daysCount = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
               return (
                 <div className="flex items-center justify-between text-xs px-1">
                   <span className="text-text-muted">
@@ -3554,7 +3565,7 @@ export function NewRentalAdminPageContent() {
           if (newUnit && (newUnit._id || newUnit.id)) {
             const newId = newUnit._id || newUnit.id;
             setSelectedVehicle(newId);
-            const days = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+            const days = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
             const defaultRate = newUnit.dailyRate || 85;
             setRentalData((prev) => ({
               ...prev,

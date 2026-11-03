@@ -141,7 +141,7 @@ export async function PUT(
     const fuelFees = body.fuelFees !== undefined ? Number(body.fuelFees) : (body.fuelCharge !== undefined ? Number(body.fuelCharge) : (existingContract.fuelFees || existingContract.fuelCharge || 0));
     const cleaningFees = isPersonalized ? 0 : (body.cleaningFees !== undefined ? Number(body.cleaningFees) : (existingContract.cleaningFees || 0));
 
-    const totalDays = calculateRentalDays(startDateVal, endDateVal);
+    const totalDays = calculateRentalDays(startDateVal, endDateVal, body.checkoutTime || existingContract.checkoutTime, body.checkinTime !== undefined ? body.checkinTime : existingContract.checkinTime);
     
     const extraKmCharge = isPersonalized ? 0 : (body.extraKmCharge !== undefined ? Number(body.extraKmCharge) : (existingContract.extraKmCharge || 0));
     const damageCharge = body.damageCharge !== undefined ? Number(body.damageCharge) : (existingContract.damageCharge || 0);

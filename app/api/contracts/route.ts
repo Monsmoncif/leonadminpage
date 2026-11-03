@@ -275,7 +275,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const days = calculateRentalDays(start, end);
+    const days = calculateRentalDays(start, end, body.checkoutTime, body.checkinTime);
     
     const isPersonalized = body.contractType === "Personalized";
 
