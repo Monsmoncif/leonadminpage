@@ -53,6 +53,14 @@ const isShopContract = (c: any): boolean => {
   return !hasDriver;
 };
 
+const isPersonalizedContract = (c: any): boolean => {
+  return Boolean(
+    c?.contractType === "Personalized" ||
+    c?.personalizedPersonName ||
+    c?.deliveryDriver === "Personal Use"
+  );
+};
+
 // Vibrant avatar colors with full string + seed hash so every circle gets a distinct color
 const getAvatarColor = (name: string, seed?: string | number) => {
   const colors = [
@@ -870,7 +878,7 @@ export default function ContractsPage() {
                                 >
                                   <Edit size={14} />
                                 </Link>
-                                {contract.status === "Active" && contract.deliveryStatus === "Delivered" && (
+                                {contract.status === "Active" && contract.deliveryStatus === "Delivered" && !isPersonalizedContract(contract) && (
                                   <Link 
                                     href={`/bookings/return?contractId=${contract._id}`}
                                     className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
@@ -879,6 +887,33 @@ export default function ContractsPage() {
                                   >
                                     <ArrowLeftRight size={14} />
                                   </Link>
+                                )}
+                                {contract.status === "Active" && isPersonalizedContract(contract) && (
+                                  <button
+                                    type="button"
+                                    className="p-1 sm:p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
+                                    title="Complete Contract (إنهاء العقد الشخصي)"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        const res = await fetch(`/api/contracts/${contract._id}`, {
+                                          method: "PUT",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ status: "Completed", deliveryStatus: "Returned" }),
+                                        });
+                                        if (!res.ok) {
+                                          const errJson = await res.json().catch(() => null);
+                                          throw new Error(errJson?.error || "Failed to complete contract");
+                                        }
+                                        toast.success("Personalized contract completed and finished!");
+                                        fetchContracts();
+                                      } catch (err: any) {
+                                        toast.error(err.message || "Failed to complete contract");
+                                      }
+                                    }}
+                                  >
+                                    <CheckCircle2 size={14} />
+                                  </button>
                                 )}
                                 {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
                                   <button 

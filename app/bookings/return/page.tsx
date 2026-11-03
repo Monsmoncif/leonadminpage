@@ -212,7 +212,9 @@ function ReturnPageContent() {
       fetch(`/api/drivers?t=${Date.now()}`, { cache: "no-store" }).then(res => res.json())
     ])
       .then(([contractsData, driversData]) => {
-        const list = contractsData.contracts || [];
+        const rawList = contractsData.contracts || [];
+        // Exclude Personalized contracts as they finish directly when status changes to Completed without return workflow
+        const list = rawList.filter((c: any) => !(c.contractType === "Personalized" || c.personalizedPersonName || c.deliveryDriver === "Personal Use"));
         const activeList = list.filter((c: any) => c.status === "Active" || c.deliveryStatus === "Delivered");
 
         // Keep all contracts in list so user can search or edit completed ones too

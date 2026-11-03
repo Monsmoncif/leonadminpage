@@ -438,6 +438,7 @@ export async function PUT(
         }
 
         await Unit.findByIdAndUpdate(existingContract.unitId, updateData);
+        await syncUnitStatuses(existingContract.unitId);
       } else if (body.status === "Active") {
         await syncUnitStatuses(existingContract.unitId);
       }
@@ -477,7 +478,13 @@ export async function PUT(
         ip: "127.0.0.1"
       });
 
-      if (body.status === "Completed" && body.status !== existingContract.status) {
+      const isPersonalizedContract = Boolean(
+        existingContract.contractType === "Personalized" ||
+        existingContract.personalizedPersonName ||
+        (existingContract as any).deliveryDriver === "Personal Use"
+      );
+
+      if (body.status === "Completed" && body.status !== existingContract.status && !isPersonalizedContract) {
         // Automatically generate Before and After inspections for Comparison
         try {
           const returnOdo = Number(body.returnOdometer) || initialMileage;
