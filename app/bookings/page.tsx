@@ -746,10 +746,24 @@ export default function ContractsPage() {
                                       }
                                     }
                                     try {
+                                      const now = new Date();
+                                      const currentFormattedTime = now.toLocaleTimeString("en-US", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                      });
+                                      const payload: any = { status: newStatus };
+                                      if (newStatus === "Completed") {
+                                        payload.deliveryStatus = "Returned";
+                                        payload.returnedAt = now.toISOString();
+                                        if (isPersonalizedContract(contract)) {
+                                          payload.checkinTime = currentFormattedTime;
+                                        }
+                                      }
                                       const res = await fetch(`/api/contracts/${contract._id}`, {
                                         method: "PUT",
                                         headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ status: newStatus })
+                                        body: JSON.stringify(payload)
                                       });
                                       if (!res.ok) {
                                         const errJson = await res.json().catch(() => null);
@@ -896,10 +910,21 @@ export default function ContractsPage() {
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
+                                        const now = new Date();
+                                        const currentFormattedTime = now.toLocaleTimeString("en-US", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                          hour12: true,
+                                        });
                                         const res = await fetch(`/api/contracts/${contract._id}`, {
                                           method: "PUT",
                                           headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ status: "Completed", deliveryStatus: "Returned" }),
+                                          body: JSON.stringify({
+                                            status: "Completed",
+                                            deliveryStatus: "Returned",
+                                            returnedAt: now.toISOString(),
+                                            checkinTime: currentFormattedTime,
+                                          }),
                                         });
                                         if (!res.ok) {
                                           const errJson = await res.json().catch(() => null);

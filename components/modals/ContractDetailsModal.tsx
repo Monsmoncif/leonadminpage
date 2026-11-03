@@ -1928,10 +1928,21 @@ export default function ContractDetailsModal({
                     onClick={async () => {
                       try {
                         const targetId = contractData._id || contractData.id;
+                        const now = new Date();
+                        const currentFormattedTime = now.toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        });
                         const res = await fetch(`/api/contracts/${targetId}`, {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ status: "Completed", deliveryStatus: "Returned" }),
+                          body: JSON.stringify({
+                            status: "Completed",
+                            deliveryStatus: "Returned",
+                            returnedAt: now.toISOString(),
+                            checkinTime: currentFormattedTime,
+                          }),
                         });
                         if (res.ok) {
                           refreshContractData(String(targetId));

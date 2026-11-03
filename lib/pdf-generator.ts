@@ -144,8 +144,11 @@ export function buildRealContractHtml(contract: any): string {
   ];
 
   const handoverDisplay = `${formatDateDisplay(contract.deliveredAt || contract.startDate)} - ${contract.checkoutTime || "08:00 AM"}`;
+  const returnTimeStr = isPersonalized && contract.returnedAt
+    ? new Date(contract.returnedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+    : (contract.checkinTime || (contract.returnedAt ? new Date(contract.returnedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "N/A"));
   const returnDisplay = isReturned
-    ? `${formatDateDisplay(contract.returnedAt || contract.endDate)} - ${contract.checkinTime || "N/A"}`
+    ? `${formatDateDisplay(contract.returnedAt || contract.endDate)} - ${returnTimeStr}`
     : (contract.endDate ? formatDateDisplay(contract.endDate) : "N/A");
   const returnMileageDisplay = isReturned
     ? (contract.returnOdometer || contract.returnMileage || unit.mileage || "N/A")

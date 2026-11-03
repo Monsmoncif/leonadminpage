@@ -185,6 +185,17 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
 
   const getReturnTimeDisplay = () => {
     if (!isReturned) return "";
+    if (isPersonalized && contract.returnedAt) {
+      try {
+        return new Date(contract.returnedAt).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      } catch {
+        // fallback below
+      }
+    }
     if (contract.checkinTime && contract.checkinTime !== "Pending Return" && contract.checkinTime !== "Pending Handover") {
       return contract.checkinTime;
     }

@@ -235,11 +235,19 @@ export async function PUT(
       delete updatedData.deliveryStatus;
     }
 
-    // Auto-sync deliveryStatus and returnedAt when completed
+    // Auto-sync deliveryStatus, returnedAt, and checkinTime when completed
     if (body.status === "Completed") {
       updatedData.deliveryStatus = "Returned";
-      if (!body.returnedAt && !existingContract.returnedAt) {
-        updatedData.returnedAt = new Date();
+      const completedMoment = body.returnedAt ? new Date(body.returnedAt) : new Date();
+      if (isPersonalized) {
+        updatedData.returnedAt = completedMoment;
+        updatedData.checkinTime = body.checkinTime || completedMoment.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      } else if (!body.returnedAt && !existingContract.returnedAt) {
+        updatedData.returnedAt = completedMoment;
       }
     } else if (body.status && body.status !== "Completed" && existingContract.status === "Completed") {
       if (!body.returnedAt) {
@@ -478,13 +486,7 @@ export async function PUT(
         ip: "127.0.0.1"
       });
 
-      const isPersonalizedContract = Boolean(
-        existingContract.contractType === "Personalized" ||
-        existingContract.personalizedPersonName ||
-        (existingContract as any).deliveryDriver === "Personal Use"
-      );
-
-      if (body.status === "Completed" && body.status !== existingContract.status && !isPersonalizedContract) {
+      if (body.status === "Completed" && body.status !== existingContract.status && !isPersonalized) {
         // Automatically generate Before and After inspections for Comparison
         try {
           const returnOdo = Number(body.returnOdometer) || initialMileage;
