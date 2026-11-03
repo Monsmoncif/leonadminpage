@@ -40,7 +40,7 @@ import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { areDatesOverlapping } from "@/lib/date-overlap";
-import { calculateRentalDays } from "@/lib/date-utils";
+import { calculateRentalDays, formatRentalDuration } from "@/lib/date-utils";
 import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
 const STEPS = [
@@ -1494,14 +1494,24 @@ export default function CreateContractModal({
                               <input 
                                 type="text" 
                                 value={formData.checkoutTime} 
-                                onChange={e => setFormData({...formData, checkoutTime: e.target.value})} 
+                                onChange={e => {
+                                  const nextCheckout = e.target.value;
+                                  const days = calculateRentalDays(formData.startDate, formData.endDate, nextCheckout, formData.checkinTime);
+                                  const rate = Number(formData.dailyRate) || 0;
+                                  setFormData(prev => ({ ...prev, checkoutTime: nextCheckout, collectionAmount: rate * days }));
+                                }} 
                                 placeholder="e.g. 10:00 AM"
                                 className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary" 
                               />
                             </div>
                             <button
                               type="button"
-                              onClick={() => setFormData(prev => ({ ...prev, checkoutTime: getCurrentFormattedTime() }))}
+                              onClick={() => {
+                                const nextCheckout = getCurrentFormattedTime();
+                                const days = calculateRentalDays(formData.startDate, formData.endDate, nextCheckout, formData.checkinTime);
+                                const rate = Number(formData.dailyRate) || 0;
+                                setFormData(prev => ({ ...prev, checkoutTime: nextCheckout, collectionAmount: rate * days }));
+                              }}
                               className="px-2.5 sm:px-3.5 py-2.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-brand/20 flex items-center gap-1 shadow-2xs"
                               title="Set current time"
                             >
@@ -1554,14 +1564,24 @@ export default function CreateContractModal({
                               <input 
                                 type="text" 
                                 value={formData.checkinTime} 
-                                onChange={e => setFormData({...formData, checkinTime: e.target.value})} 
+                                onChange={e => {
+                                  const nextCheckin = e.target.value;
+                                  const days = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, nextCheckin);
+                                  const rate = Number(formData.dailyRate) || 0;
+                                  setFormData(prev => ({ ...prev, checkinTime: nextCheckin, collectionAmount: rate * days }));
+                                }} 
                                 placeholder={formData.checkoutTime || "e.g. 10:00 AM"}
                                 className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary" 
                               />
                             </div>
                             <button
                               type="button"
-                              onClick={() => setFormData(prev => ({ ...prev, checkinTime: prev.checkoutTime || getCurrentFormattedTime() }))}
+                              onClick={() => {
+                                const nextCheckin = formData.checkoutTime || getCurrentFormattedTime();
+                                const days = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, nextCheckin);
+                                const rate = Number(formData.dailyRate) || 0;
+                                setFormData(prev => ({ ...prev, checkinTime: nextCheckin, collectionAmount: rate * days }));
+                              }}
                               className="px-2.5 sm:px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-text-primary text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 border border-border flex items-center gap-1 shadow-2xs"
                               title="Same as checkout time"
                             >
@@ -1572,25 +1592,20 @@ export default function CreateContractModal({
                       </div>
 
                       {/* Rental Duration and Date Order Helper */}
-                      {(() => {
-                        const calcDays = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
-                        return (
-                          <div className="flex items-center justify-between text-xs px-1">
-                            <span className="text-text-muted">
-                              Rental Duration:{" "}
-                              <strong className="text-brand font-bold">
-                                {calcDays} {calcDays === 1 ? "day" : "days"} (يوم)
-                              </strong>
-                            </span>
-                            {formData.startDate > formData.endDate && (
-                              <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
-                                <AlertCircle size={13} />
-                                <span>Expected End Date cannot be before Start Date</span>
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()}
+                      <div className="flex items-center justify-between text-xs px-1">
+                        <span className="text-text-muted">
+                          Rental Duration (مدة الإيجار):{" "}
+                          <strong className="text-brand font-bold">
+                            {formatRentalDuration(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime)}
+                          </strong>
+                        </span>
+                        {formData.startDate > formData.endDate && (
+                          <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
+                            <AlertCircle size={13} />
+                            <span>Expected End Date cannot be before Start Date</span>
+                          </span>
+                        )}
+                      </div>
 
                       {/* Conflict Alert Banner if selected vehicle is booked for these dates & times */}
                       {(() => {
@@ -2035,7 +2050,7 @@ export default function CreateContractModal({
                       <div className="space-y-1 sm:space-y-2 text-xs">
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
                           <span className="text-text-muted font-medium">Rental Period:</span>
-                          <span className="font-semibold text-text-primary text-xs sm:text-right break-words">{formData.startDate} to {formData.endDate} (Expected, {durationDays} days)</span>
+                          <span className="font-semibold text-text-primary text-xs sm:text-right break-words">{formData.startDate} to {formData.endDate} (Expected, {formatRentalDuration(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime)})</span>
                         </div>
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1 border-b border-gray-100">
                           <span className="text-text-muted font-medium">Scheduled Delivery Time:</span>

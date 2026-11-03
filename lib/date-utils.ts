@@ -163,25 +163,37 @@ export function parseTimeToMinutes(input: any): number | null {
  * pick-up time, so the result is simply the number of calendar days between the dates.
  * Minimum duration is always 1 day.
  */
-export function calculateRentalDays(
+export function calculateRentalDuration(
   startDateInput: any,
   endDateInput: any,
   startTimeInput?: any,
   endTimeInput?: any
-): number {
-  if (!startDateInput || !endDateInput) return 1;
+): { days: number; hours: number; minutes: number; billableDays: number } {
+  const fallback = { days: 1, hours: 0, minutes: 0, billableDays: 1 };
+  if (!startDateInput || !endDateInput) return fallback;
 
   const s = parseDateToMidnight(startDateInput);
   const e = parseDateToMidnight(endDateInput);
 
-  if (!s || !e) return 1;
+  if (!s || !e) return fallback;
 
   // Whole calendar days between the two dates (UTC math avoids any DST shift)
   const dayDiff = Math.round(
     (Date.UTC(e.getFullYear(), e.getMonth(), e.getDate()) -
       Date.UTC(s.getFullYear(), s.getMonth(), s.getDate())) / 86400000
   );
-  if (dayDiff <= 0) return 1;
+  if (dayDiff <= 0) {
+    // Same-day rental: show the real hours when both times are valid, billed as 1 day
+    const sm = parseTimeToMinutes(startTimeInput);
+    const em = sm === null ? null : parseTimeToMinutes(endTimeInput);
+    const sameDayMinutes = sm !== null && em !== null && em > sm ? em - sm : 0;
+    return {
+      days: 0,
+      hours: Math.floor(sameDayMinutes / 60),
+      minutes: sameDayMinutes % 60,
+      billableDays: 1,
+    };
+  }
 
   const startMin = parseTimeToMinutes(startTimeInput);
   // Without a valid pick-up time, ignore the return time as well (whole days only)
@@ -191,8 +203,57 @@ export function calculateRentalDays(
   const endOffset = endMin ?? startOffset;
 
   const totalMinutes = dayDiff * 1440 + (endOffset - startOffset);
-  if (totalMinutes <= 0) return 1;
+  if (totalMinutes <= 0) return fallback;
 
-  return Math.max(1, Math.ceil(totalMinutes / 1440));
+  return {
+    days: Math.floor(totalMinutes / 1440),
+    hours: Math.floor((totalMinutes % 1440) / 60),
+    minutes: totalMinutes % 60,
+    billableDays: Math.max(1, Math.ceil(totalMinutes / 1440)),
+  };
+}
+
+export function calculateRentalDays(
+  startDateInput: any,
+  endDateInput: any,
+  startTimeInput?: any,
+  endTimeInput?: any
+): number {
+  return calculateRentalDuration(startDateInput, endDateInput, startTimeInput, endTimeInput).billableDays;
+}
+
+/**
+ * Human readable duration, e.g. "1 day 4 hours (يوم و 4 ساعات)".
+ * Extra hours beyond full 24h days are shown separately; billing rounds them up to a full day.
+ */
+export function formatRentalDuration(
+  startDateInput: any,
+  endDateInput: any,
+  startTimeInput?: any,
+  endTimeInput?: any
+): string {
+  const { days, hours, minutes } = calculateRentalDuration(startDateInput, endDateInput, startTimeInput, endTimeInput);
+  const parts: string[] = [];
+  const partsAr: string[] = [];
+  if (days > 0) {
+    parts.push(`${days} ${days === 1 ? "day" : "days"}`);
+    partsAr.push(days === 1 ? "يوم" : days === 2 ? "يومان" : `${days} أيام`);
+  }
+  if (hours > 0 || minutes > 0) {
+    if (hours > 0 && minutes > 0) {
+      parts.push(`${hours} ${hours === 1 ? "hour" : "hours"} ${minutes}m`);
+      partsAr.push(`${hours === 1 ? "ساعة" : hours === 2 ? "ساعتان" : `${hours} ساعات`} و ${minutes} د`);
+    } else if (hours > 0) {
+      parts.push(`${hours} ${hours === 1 ? "hour" : "hours"}`);
+      partsAr.push(hours === 1 ? "ساعة" : hours === 2 ? "ساعتان" : `${hours} ساعات`);
+    } else {
+      parts.push(`${minutes} min`);
+      partsAr.push(`${minutes} دقيقة`);
+    }
+  }
+  if (parts.length === 0) {
+    return "1 day (يوم)";
+  }
+  return `${parts.join(" - ")} (${partsAr.join(" و ")})`;
 }
 

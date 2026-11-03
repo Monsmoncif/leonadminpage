@@ -49,7 +49,7 @@ import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import { areDatesOverlapping } from "@/lib/date-overlap";
-import { calculateRentalDays } from "@/lib/date-utils";
+import { calculateRentalDays, formatRentalDuration } from "@/lib/date-utils";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys, compressImage } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
@@ -2047,7 +2047,7 @@ export function NewRentalAdminPageContent() {
               <span className="text-text-muted">
                 Rental Duration (مدة الإيجار):{" "}
                 <strong className="text-brand font-bold">
-                  {totalDays} {totalDays === 1 ? "day" : "days"} (يوم)
+                  {formatRentalDuration(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime)}
                 </strong>
               </span>
               {rentalData.startDate > rentalData.endDate && (
@@ -2654,7 +2654,7 @@ export function NewRentalAdminPageContent() {
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
                 <span className="text-text-muted font-medium">Rental Period:</span>
                 <span className="font-semibold text-text-primary text-xs sm:text-right break-words">
-                  {rentalData.startDate} to {rentalData.endDate} <span className="text-text-muted font-normal">(Expected, {totalDays} days)</span>
+                  {rentalData.startDate} to {rentalData.endDate} <span className="text-text-muted font-normal">(Expected, {formatRentalDuration(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime)})</span>
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5 sm:gap-2 py-2 sm:py-1.5 border-b border-gray-100">
@@ -2986,7 +2986,7 @@ export function NewRentalAdminPageContent() {
                     <input
                       type="text"
                       value={rentalData.checkoutTime}
-                      onChange={(e) => setRentalData({ ...rentalData, checkoutTime: e.target.value })}
+                      onChange={(e) => setRentalData(prev => applyTimeChange(prev, { checkoutTime: e.target.value }))}
                       placeholder="e.g. 10:00 AM"
                       className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary"
                     />
@@ -3038,7 +3038,7 @@ export function NewRentalAdminPageContent() {
                     <input
                       type="text"
                       value={rentalData.checkinTime}
-                      onChange={(e) => setRentalData({ ...rentalData, checkinTime: e.target.value })}
+                      onChange={(e) => setRentalData(prev => applyTimeChange(prev, { checkinTime: e.target.value }))}
                       placeholder={rentalData.checkoutTime || "e.g. 10:00 AM"}
                       className="w-full p-2.5 pl-8 sm:pl-9 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary"
                     />
@@ -3056,25 +3056,20 @@ export function NewRentalAdminPageContent() {
             </div>
 
             {/* Rental Duration indicator for Personalized */}
-            {(() => {
-              const daysCount = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
-              return (
-                <div className="flex items-center justify-between text-xs px-1">
-                  <span className="text-text-muted">
-                    Rental Duration (مدة الإيجار):{" "}
-                    <strong className="text-brand font-bold">
-                      {daysCount} {daysCount === 1 ? "day" : "days"} (يوم)
-                    </strong>
-                  </span>
-                  {rentalData.startDate > rentalData.endDate && (
-                    <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
-                      <AlertCircle size={13} />
-                      <span>Expected End Date cannot be before Start Date</span>
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
+            <div className="flex items-center justify-between text-xs px-1">
+              <span className="text-text-muted">
+                Rental Duration (مدة الإيجار):{" "}
+                <strong className="text-brand font-bold">
+                  {formatRentalDuration(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime)}
+                </strong>
+              </span>
+              {rentalData.startDate > rentalData.endDate && (
+                <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
+                  <AlertCircle size={13} />
+                  <span>Expected End Date cannot be before Start Date</span>
+                </span>
+              )}
+            </div>
 
             {/* Date Conflict Alert */}
             {(() => {
