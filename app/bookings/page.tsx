@@ -892,11 +892,11 @@ export default function ContractsPage() {
                                 >
                                   <Edit size={14} />
                                 </Link>
-                                {contract.status === "Active" && contract.deliveryStatus === "Delivered" && !isPersonalizedContract(contract) && (
+                                {contract.status === "Active" && contract.deliveryStatus === "Delivered" && (
                                   <Link 
                                     href={`/bookings/return?contractId=${contract._id}`}
                                     className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
-                                    title="Return Vehicle" 
+                                    title="Return Vehicle (إرجاع السيارة)" 
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <ArrowLeftRight size={14} />

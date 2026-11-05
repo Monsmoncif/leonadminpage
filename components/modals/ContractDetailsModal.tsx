@@ -310,7 +310,7 @@ export default function ContractDetailsModal({
     contractData?.newDamages ||
     damages.length > 0
   );
-  const showReturnTab = !isPersonalized && hasReturnData;
+  const showReturnTab = hasReturnData;
 
   useEffect(() => {
     if (!showReturnTab && activeTab === "return") {
@@ -1921,46 +1921,8 @@ export default function ContractDetailsModal({
                   </button>
                 )}
 
-                {/* Personalized Contract Direct Completion (No Return Required) */}
-                {!isDriver && isPersonalized && !isCompletedOrReturned && !isCancelled && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const targetId = contractData._id || contractData.id;
-                        const now = new Date();
-                        const currentFormattedTime = now.toLocaleTimeString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        });
-                        const res = await fetch(`/api/contracts/${targetId}`, {
-                          method: "PUT",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            status: "Completed",
-                            deliveryStatus: "Returned",
-                            returnedAt: now.toISOString(),
-                            checkinTime: currentFormattedTime,
-                          }),
-                        });
-                        if (res.ok) {
-                          refreshContractData(String(targetId));
-                          window.location.reload();
-                        }
-                      } catch (err) {
-                        console.error("Failed to complete personalized contract:", err);
-                      }
-                    }}
-                    className="flex-1 sm:flex-none px-4 py-2.5 min-h-[40px] sm:min-h-[38px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <CheckCircle2 size={15} className="shrink-0" />
-                    <span className="truncate">Complete Contract (إنهاء العقد)</span>
-                  </button>
-                )}
-
-                {/* Process Return: Admin only when vehicle is delivered, not personalized, and not yet returned */}
-                {!isDriver && isDelivered && !isCompletedOrReturned && !isPersonalized && (
+                {/* Process Return: Admin only when vehicle is delivered and not yet returned */}
+                {!isDriver && isDelivered && !isCompletedOrReturned && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1970,12 +1932,12 @@ export default function ContractDetailsModal({
                     className="flex-1 sm:flex-none px-4 py-2.5 min-h-[40px] sm:min-h-[38px] bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <ArrowLeftRight size={15} className="shrink-0" />
-                    <span className="truncate">Process Return</span>
+                    <span className="truncate">Process Return (إرجاع السيارة)</span>
                   </button>
                 )}
 
-                {/* Edit Return: Admin can edit return details & settlement for completed/returned non-personalized contracts */}
-                {!isDriver && isCompletedOrReturned && !isPersonalized && (
+                {/* Edit Return: Admin can edit return details & settlement for completed/returned contracts */}
+                {!isDriver && isCompletedOrReturned && (
                   <button
                     type="button"
                     onClick={() => {

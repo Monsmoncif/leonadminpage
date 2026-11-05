@@ -59,9 +59,7 @@ const SHOP_STEPS = [
 ];
 
 const PERSONALIZED_SHOP_STEPS = [
-  { id: 1, title: "Vehicle & Mileage", icon: ExecutiveCarIcon },
-  { id: 2, title: "Damage Check", icon: AlertTriangle },
-  { id: 3, title: "Check-in", icon: CheckCircle2 },
+  { id: 1, title: "Kilometrage & Return Time", icon: Gauge },
 ];
 
 const DISPATCH_STEPS = [
@@ -212,9 +210,7 @@ function ReturnPageContent() {
       fetch(`/api/drivers?t=${Date.now()}`, { cache: "no-store" }).then(res => res.json())
     ])
       .then(([contractsData, driversData]) => {
-        const rawList = contractsData.contracts || [];
-        // Exclude Personalized contracts as they finish directly when status changes to Completed without return workflow
-        const list = rawList.filter((c: any) => !(c.contractType === "Personalized" || c.personalizedPersonName || c.deliveryDriver === "Personal Use"));
+        const list = contractsData.contracts || [];
         const activeList = list.filter((c: any) => c.status === "Active" || c.deliveryStatus === "Delivered");
 
         // Keep all contracts in list so user can search or edit completed ones too
@@ -588,8 +584,8 @@ function ReturnPageContent() {
       }
     }
 
-    // Step: Damage Check (Shop mode: Step 2 for personalized, Step 3 for regular)
-    if (returnMode === "shop" && ((isPersonalized && currentStep === 2) || (!isPersonalized && currentStep === 3))) {
+    // Step: Damage Check (Shop mode: Step 3 for regular contracts)
+    if (returnMode === "shop" && !isPersonalized && currentStep === 3) {
       if (hasDamages && !damageDescription.trim()) {
         toast.error("Please enter a description for the reported damage.");
         return;
@@ -620,20 +616,22 @@ function ReturnPageContent() {
       return;
     }
 
-    if (hasDamages && !damageDescription.trim()) {
-      toast.error("Please describe the reported damages.");
-      setCurrentStep(isPersonalized ? 2 : 3);
-      return;
-    }
+    if (!isPersonalized) {
+      if (hasDamages && !damageDescription.trim()) {
+        toast.error("Please describe the reported damages.");
+        setCurrentStep(3);
+        return;
+      }
 
-    if (!isPersonalized && !isAllMoneyConfirmed) {
-      toast.error("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before completing return.");
-      return;
-    }
+      if (!isAllMoneyConfirmed) {
+        toast.error("Please check 'Confirm Get All Money (تأكيد استلام كامل المبلغ)' before completing return.");
+        return;
+      }
 
-    if (!isConfirmed) {
-      toast.error("Please confirm return completion checkbox.");
-      return;
+      if (!isConfirmed) {
+        toast.error("Please confirm return completion checkbox.");
+        return;
+      }
     }
 
     try {
@@ -650,36 +648,39 @@ function ReturnPageContent() {
         cleanedNotes = cleanedNotes ? `${cleanedNotes}\n[Return Remarks: ${instructions.trim()}]` : `[Return Remarks: ${instructions.trim()}]`;
       }
 
+      const nowTimeStr = getCurrentFormattedTime();
+      const returnTime = shopReturnTime.trim() || scheduledTime || nowTimeStr;
+
       const payload = {
         status: "Completed",
         deliveryStatus: "Returned",
-        checkinTime: shopReturnTime.trim() || scheduledTime || "10:00 AM",
+        checkinTime: returnTime,
         returnOdometer: odoNum,
-        returnFuelLevel: Number(returnFuelLevel),
-        extraKmCharge: extraKmCharge,
-        damageCharge: damageChargeNum,
-        salikFees: salikChargeNum,
-        salikCharge: salikChargeNum,
-        parkingFees: parkingChargeNum,
-        parkingCharge: parkingChargeNum,
-        finesFees: finesChargeNum,
-        finesCharge: finesChargeNum,
-        fuelFees: fuelChargeNum,
-        fuelCharge: fuelChargeNum,
-        damages: hasDamages && damageDescription.trim() ? [{
+        returnFuelLevel: Number(returnFuelLevel || 100),
+        extraKmCharge: isPersonalized ? 0 : extraKmCharge,
+        damageCharge: isPersonalized ? 0 : damageChargeNum,
+        salikFees: isPersonalized ? 0 : salikChargeNum,
+        salikCharge: isPersonalized ? 0 : salikChargeNum,
+        parkingFees: isPersonalized ? 0 : parkingChargeNum,
+        parkingCharge: isPersonalized ? 0 : parkingChargeNum,
+        finesFees: isPersonalized ? 0 : finesChargeNum,
+        finesCharge: isPersonalized ? 0 : finesChargeNum,
+        fuelFees: isPersonalized ? 0 : fuelChargeNum,
+        fuelCharge: isPersonalized ? 0 : fuelChargeNum,
+        damages: !isPersonalized && hasDamages && damageDescription.trim() ? [{
           description: damageDescription.trim(),
           cost: damageChargeNum,
           date: new Date()
         }] : [],
-        newDamages: hasDamages && damageDescription.trim() ? damageDescription.trim() : "None",
-        damagePhotos: hasDamages ? damagePhotos : [],
+        newDamages: !isPersonalized && hasDamages && damageDescription.trim() ? damageDescription.trim() : "None",
+        damagePhotos: !isPersonalized && hasDamages ? damagePhotos : [],
         moneyPhotos: selectedContract.moneyPhotos || [],
-        returnMoneyPhotos: moneyPhotos,
-        paymentMethod: returnPaymentMethod,
+        returnMoneyPhotos: !isPersonalized ? moneyPhotos : [],
+        paymentMethod: isPersonalized ? "Free / Personalized" : returnPaymentMethod,
         paymentStatus: "Paid",
-        returnAmountCollected: totalReturnCharges,
+        returnAmountCollected: isPersonalized ? 0 : totalReturnCharges,
         returnPaymentMethod: returnPaymentMethod,
-        returnPhotos: orderedReturnPhotos,
+        returnPhotos: !isPersonalized ? orderedReturnPhotos : [],
         returnNotes: instructions.trim(),
         notes: cleanedNotes,
         returnedAt: selectedContract.returnedAt || new Date().toISOString(),
@@ -808,9 +809,13 @@ function ReturnPageContent() {
       <div className="space-y-6 animate-fade-in-up">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-text-primary">Step 1: Vehicle &amp; Return Details</h2>
+            <h2 className="text-lg font-bold text-text-primary">
+              {isPersonalized ? "Vehicle Return Details (بيانات إرجاع واستلام السيارة)" : "Step 1: Vehicle & Return Details"}
+            </h2>
             <p className="text-xs text-text-muted mt-0.5">
-              Verify vehicle identity, record current return odometer reading, and select return fuel level
+              {isPersonalized
+                ? "Enter return kilometrage and time of return to complete vehicle return."
+                : "Verify vehicle identity, record current return odometer reading, and select return fuel level"}
             </p>
           </div>
         </div>
@@ -1120,27 +1125,29 @@ function ReturnPageContent() {
                 </div>
 
                 {/* Return Fuel Level */}
-                <div className="bg-white rounded-2xl border border-border p-5 space-y-3 shadow-2xs">
-                  <FuelLevelSelector
-                    value={returnFuelLevel}
-                    onChange={(lvl) => setReturnFuelLevel(lvl)}
-                    label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
-                    sublabel={`Handover Baseline: ${checkoutFuelLevel}%`}
-                    required
-                    className="p-0 border-0 bg-transparent"
-                  />
-                  {returnFuelLevel < checkoutFuelLevel && (
-                    <div className="flex items-center justify-between text-xs p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Fuel size={14} className="text-amber-700 shrink-0" />
-                        Fuel is lower than checkout baseline ({checkoutFuelLevel}% → {returnFuelLevel}%).
-                      </span>
-                      <span className="font-bold text-amber-800 shrink-0">
-                        -{checkoutFuelLevel - returnFuelLevel}%
-                      </span>
-                    </div>
-                  )}
-                </div>
+                {!isPersonalized && (
+                  <div className="bg-white rounded-2xl border border-border p-5 space-y-3 shadow-2xs">
+                    <FuelLevelSelector
+                      value={returnFuelLevel}
+                      onChange={(lvl) => setReturnFuelLevel(lvl)}
+                      label="Return Fuel Level (مستوى الوقود عند الاسترجاع)"
+                      sublabel={`Handover Baseline: ${checkoutFuelLevel}%`}
+                      required
+                      className="p-0 border-0 bg-transparent"
+                    />
+                    {returnFuelLevel < checkoutFuelLevel && (
+                      <div className="flex items-center justify-between text-xs p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <Fuel size={14} className="text-amber-700 shrink-0" />
+                          Fuel is lower than checkout baseline ({checkoutFuelLevel}% → {returnFuelLevel}%).
+                        </span>
+                        <span className="font-bold text-amber-800 shrink-0">
+                          -{checkoutFuelLevel - returnFuelLevel}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               /* Dispatch Mode: Pickup Logistics Card */
@@ -2062,9 +2069,7 @@ function ReturnPageContent() {
   const renderStepContent = () => {
     if (returnMode === "shop") {
       if (isPersonalized) {
-        if (currentStep === 1) return renderVehicleStep();
-        if (currentStep === 2) return renderDamageStep();
-        if (currentStep === 3) return renderSettlementStep();
+        return renderVehicleStep();
       } else {
         if (currentStep === 1) return renderVehicleStep();
         if (currentStep === 2) return renderPhotosStep();
@@ -2111,39 +2116,41 @@ function ReturnPageContent() {
         </div>
 
         {/* Return Mode Pill Switcher (Matches /bookings/new) */}
-        <div className="bg-gray-100 p-1 rounded-xl sm:rounded-2xl grid grid-cols-1 sm:flex sm:flex-wrap items-center border border-gray-200/80 shadow-2xs w-full md:w-auto shrink-0 gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setReturnMode("shop");
-              const maxSteps = isPersonalized ? 3 : 4;
-              if (currentStep > maxSteps) setCurrentStep(maxSteps);
-            }}
-            className={`px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              returnMode === "shop"
-                ? "bg-white text-brand shadow-xs"
-                : "text-text-muted hover:text-text-primary"
-            }`}
-          >
-            <Building2 size={14} />
-            <span>In-Store Return (بالمحل)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setReturnMode("dispatch");
-              if (currentStep > 3) setCurrentStep(3);
-            }}
-            className={`px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              returnMode === "dispatch"
-                ? "bg-white text-brand shadow-xs"
-                : "text-text-muted hover:text-text-primary"
-            }`}
-          >
-            <UserCog size={14} />
-            <span>Dispatch Driver (مع سائق)</span>
-          </button>
-        </div>
+        {!isPersonalized && (
+          <div className="bg-gray-100 p-1 rounded-xl sm:rounded-2xl grid grid-cols-1 sm:flex sm:flex-wrap items-center border border-gray-200/80 shadow-2xs w-full md:w-auto shrink-0 gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setReturnMode("shop");
+                const maxSteps = 4;
+                if (currentStep > maxSteps) setCurrentStep(maxSteps);
+              }}
+              className={`px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                returnMode === "shop"
+                  ? "bg-white text-brand shadow-xs"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              <Building2 size={14} />
+              <span>In-Store Return (بالمحل)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setReturnMode("dispatch");
+                if (currentStep > 3) setCurrentStep(3);
+              }}
+              className={`px-4 py-2 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                returnMode === "dispatch"
+                  ? "bg-white text-brand shadow-xs"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              <UserCog size={14} />
+              <span>Dispatch Driver (مع سائق)</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ===== STEPPER HEADER (100% Identical to /bookings/new) ===== */}
@@ -2275,7 +2282,9 @@ function ReturnPageContent() {
                   <span>
                     {isCompleted
                       ? "Save Return Changes (حفظ تعديلات الإرجاع)"
-                      : (returnMode === "shop" ? "Complete Return & Check-in" : "Dispatch Return Driver")}
+                      : (returnMode === "shop" 
+                          ? (isPersonalized ? "Complete Return (إتمام الإرجاع وإغلاق العقد)" : "Complete Return & Check-in")
+                          : "Dispatch Return Driver")}
                   </span>
                 </>
               )}
