@@ -225,7 +225,7 @@ export function buildRealContractHtml(contract: any): string {
       </div>
       <div style="padding: 2px 4px;">
         <div style="font-size: 6px; color: #6b7280; font-weight: bold;">HIRE MODE / نوع الاستئجار</div>
-        <div style="font-weight: bold; font-size: 8px;">${isPersonalized ? "Personal Use / شخصي" : (contract.driverId ? "Chauffeur Driven" : "Self-Drive")}</div>
+        <div style="font-weight: bold; font-size: 8px;">${isPersonalized ? "No Revenue / بدون إيراد" : (contract.driverId ? "Chauffeur Driven" : "Self-Drive")}</div>
       </div>
     </div>
 
@@ -354,8 +354,8 @@ export function buildRealContractHtml(contract: any): string {
 
         <!-- HIRE RATES -->
         <div class="bg-gray-100 border-b-black" style="padding: 2px 4px; display: flex; justify-content: space-between; font-weight: bold; font-size: 7.5px;">
-          <span>${isPersonalized ? "HIRE INFORMATION (PERSONAL USE)" : "HIRE INFORMATION"}</span>
-          <span style="direction: rtl;">${isPersonalized ? "معلومات الاستخدام (شخصي ومخصص)" : "معلومات الاستئجار"}</span>
+          <span>${isPersonalized ? "HIRE INFORMATION (NO REVENUE)" : "HIRE INFORMATION"}</span>
+          <span style="direction: rtl;">${isPersonalized ? "معلومات الاستخدام (بدون إيراد)" : "معلومات الاستئجار"}</span>
         </div>
         <div class="grid-3 border-b-black" style="font-size: 6.5px;">
           <div class="border-r-black" style="padding: 2px 4px;">
@@ -378,7 +378,7 @@ export function buildRealContractHtml(contract: any): string {
           </div>
           <div class="col-span-2" style="padding: 2px 4px; background: #fef3c7;">
             <div style="font-size: 6px; color: #92400e; font-weight: bold;">BALANCE DUE / المستحق</div>
-            <div style="font-weight: 900; font-size: 8.5px; color: #b45309;">AED ${Math.max(0, (Number(contract.totalAmount) || 0) - (Number(contract.advancePayment) || 0)).toFixed(2)}</div>
+            <div style="font-weight: 900; font-size: 8.5px; color: #b45309;">AED ${isPersonalized ? "0.00 (No Revenue / بدون إيراد)" : Math.max(0, (Number(contract.totalAmount) || 0) - (Number(contract.advancePayment) || 0)).toFixed(2)}</div>
           </div>
         </div>
 

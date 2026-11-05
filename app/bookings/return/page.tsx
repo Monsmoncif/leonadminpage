@@ -2261,11 +2261,7 @@ function ReturnPageContent() {
               type="button"
               onClick={returnMode === "shop" ? () => handleShopReturn() : () => handleDispatch()}
               disabled={isSubmitting || (returnMode === "shop" ? (!returnOdometer.trim() || isNaN(Number(returnOdometer))) : (!returnDriverId || !pickupLocation.trim()))}
-              className={`w-full sm:w-auto px-7 py-3 rounded-xl text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer ${
-                isCompleted 
-                  ? "bg-amber-600 hover:bg-amber-700" 
-                  : "bg-emerald-600 hover:bg-emerald-700"
-              }`}
+              className="w-full sm:w-auto px-7 py-3 rounded-xl text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-md disabled:opacity-50 cursor-pointer bg-emerald-600 hover:bg-emerald-700 active:scale-95"
             >
               {isSubmitting ? (
                 <>

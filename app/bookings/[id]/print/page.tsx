@@ -493,7 +493,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
           <div className="px-1 py-0.5 flex flex-col justify-between">
             <span className="text-[6px] text-gray-500 font-bold uppercase">Hire Mode / نوع الاستئجار</span>
             <span className="font-bold text-[8px] truncate">
-              {isPersonalized ? "Personal Use / شخصي" : contract.driverId ? "Chauffeur Driven" : "Self-Drive"}
+              {isPersonalized ? "No Revenue / بدون إيراد" : contract.driverId ? "Chauffeur Driven" : "Self-Drive"}
             </span>
           </div>
         </div>
@@ -714,10 +714,10 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
             {/* HIRE INFORMATION */}
             <div className="bg-gray-100 py-0.5 px-1 border-b border-black border-t border-black flex justify-between items-center">
               <span className="font-bold text-[7.5px] uppercase">
-                {isPersonalized ? "HIRE INFORMATION (PERSONAL USE)" : "HIRE INFORMATION"}
+                {isPersonalized ? "HIRE INFORMATION (NO REVENUE)" : "HIRE INFORMATION"}
               </span>
               <span className="font-bold text-[7.5px]">
-                {isPersonalized ? "معلومات الاستخدام (شخصي ومخصص)" : "معلومات الاستئجار"}
+                {isPersonalized ? "معلومات الاستخدام (بدون إيراد)" : "معلومات الاستئجار"}
               </span>
             </div>
 
@@ -725,11 +725,11 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
               <div className="grid grid-cols-3 border-b border-black text-[6.5px] bg-purple-50/25">
                 <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
                   <span className="text-[6px] text-gray-500 font-bold uppercase">Rental Mode / نوع الاستخدام</span>
-                  <span className="font-bold text-[8px] text-purple-900 truncate">Personal Use / استخدام شخصي</span>
+                  <span className="font-bold text-[8px] text-purple-900 truncate">No Revenue / بدون إيراد</span>
                 </div>
                 <div className="px-1 py-[1.5px] border-r border-black flex flex-col">
                   <span className="text-[6px] text-gray-500 font-bold uppercase">Hire Rate 24H / الإيجار اليومي</span>
-                  <span className="font-bold text-[8px] text-gray-600 truncate">AED 0.00 (Complimentary)</span>
+                  <span className="font-bold text-[8px] text-gray-600 truncate">AED 0.00 (No Revenue)</span>
                 </div>
                 <div className="px-1 py-[1.5px] flex flex-col">
                   <span className="text-[6px] text-gray-500 font-bold uppercase">Deposit / التأمين</span>
@@ -745,7 +745,7 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
                 <div className="col-span-2 px-1 py-[1.5px] border-t border-black flex flex-col bg-emerald-50/40">
                   <span className="text-[6px] text-emerald-800 font-extrabold uppercase">Balance Due / المستحق</span>
                   <span className="font-black text-[8.5px] text-emerald-800 truncate">
-                    AED 0.00 (Free / استخدام شخصي)
+                    AED 0.00 (No Revenue / بدون إيراد)
                   </span>
                 </div>
               </div>
