@@ -68,16 +68,33 @@ export default function SettingsPage() {
     setPairError("");
     setPairCode(null);
     try {
-      const res = await fetch("/api/whatsapp/gateway", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "pair", phone: pairPhone }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      // 1. Direct port 3005 first
+      let data: any = null;
+      try {
+        const directRes = await fetch("http://localhost:3005/pair", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: pairPhone }),
+        });
+        if (directRes.ok) {
+          data = await directRes.json();
+        }
+      } catch {}
+
+      // 2. Fallback to API route
+      if (!data || !data.success) {
+        const res = await fetch("/api/whatsapp/gateway", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "pair", phone: pairPhone }),
+        });
+        data = await res.json();
+      }
+
+      if (data && data.success) {
         setPairCode(data.code);
       } else {
-        setPairError(data.error || "تعذر إنشاء الرمز");
+        setPairError(data?.error || "تعذر إنشاء الرمز");
       }
     } catch (err: any) {
       setPairError(err.message || "حدث خطأ");
@@ -111,25 +128,46 @@ export default function SettingsPage() {
     }
   };
 
-  // WhatsApp Status Fetcher
+  // WhatsApp Status Fetcher (Dual check: direct 3005 + proxy fallback)
   const checkWhatsAppStatus = async (isManual = false) => {
     if (isManual) setIsRefreshingWa(true);
     try {
-      const res = await fetch("/api/whatsapp/gateway", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.online) {
-          setWaStatus(data.status || "DISCONNECTED");
-          setWaPhone(data.phone || null);
-          setWaQr(data.qr || null);
-          setWaConnectedAt(data.connectedAt || null);
-        } else {
-          setWaStatus("OFFLINE");
-          setWaPhone(null);
-          setWaQr(null);
+      let data: any = null;
+
+      // 1. Try direct port 3005 (zero-latency, bypasses any proxy)
+      try {
+        const directRes = await fetch("http://localhost:3005/status", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(2000),
+        });
+        if (directRes.ok) {
+          data = await directRes.json();
+          data.online = true;
         }
+      } catch {
+        // Direct local call failed, try proxy
+      }
+
+      // 2. Try proxy route /api/whatsapp/gateway
+      if (!data) {
+        const res = await fetch("/api/whatsapp/gateway", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) {
+          data = await res.json();
+        }
+      }
+
+      if (data && (data.online || data.status === "SCAN_QR" || data.status === "CONNECTED" || data.status === "STARTING")) {
+        setWaStatus(data.status || "DISCONNECTED");
+        setWaPhone(data.phone || null);
+        setWaQr(data.qr || null);
+        setWaConnectedAt(data.connectedAt || null);
       } else {
         setWaStatus("OFFLINE");
+        setWaPhone(null);
+        setWaQr(null);
       }
     } catch {
       setWaStatus("OFFLINE");
