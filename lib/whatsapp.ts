@@ -17,7 +17,7 @@ export interface SendWhatsAppOptions {
 
 export interface WhatsAppSendResult {
   success: boolean;
-  provider: "meta" | "ultramsg" | "none";
+  provider: "local" | "meta" | "ultramsg" | "none";
   messageId?: string;
   error?: string;
 }
@@ -133,6 +133,55 @@ export async function sendWhatsApp({
 
   if (!recipient) {
     return { success: false, provider: "none", error: "Invalid or empty phone number" };
+  }
+
+  const localGatewayUrl = process.env.LOCAL_WHATSAPP_URL || "http://127.0.0.1:3005";
+
+  // 0. Primary Priority: Free Local Self-Hosted Baileys Gateway (0$ Cost / Instant / No templates)
+  try {
+    const statusRes = await fetch(`${localGatewayUrl}/status`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(2000),
+    }).catch(() => null);
+
+    if (statusRes && statusRes.ok) {
+      const statusData = await statusRes.json().catch(() => null);
+      if (statusData && statusData.status === "CONNECTED") {
+        console.log(`[WhatsApp] Free Local Gateway active (Connected as ${statusData.phone}). Sending message to ${recipient}...`);
+
+        const payload: any = {
+          to: recipient,
+          message,
+          pdfFilename: pdfFilename || "Rental-Contract.pdf",
+        };
+
+        if (pdfBuffer && pdfBuffer.length > 0) {
+          payload.pdfBase64 = pdfBuffer.toString("base64");
+        } else if (pdfUrl) {
+          payload.pdfUrl = pdfUrl;
+        }
+
+        const sendRes = await fetch(`${localGatewayUrl}/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const sendData = await sendRes.json().catch(() => ({}));
+        if (sendRes.ok && sendData.success) {
+          console.log(`[WhatsApp] ✓ Message successfully sent via Free Local Gateway! Msg ID: ${sendData.messageId}`);
+          return {
+            success: true,
+            provider: "local",
+            messageId: sendData.messageId,
+          };
+        } else {
+          console.warn("[WhatsApp] Free Local Gateway send error:", sendData.error || sendRes.status);
+        }
+      }
+    }
+  } catch (localErr: any) {
+    // If local gateway offline, seamlessly fallback
   }
 
   const metaToken = process.env.WHATSAPP_CLOUD_API_TOKEN || process.env.META_WHATSAPP_TOKEN;

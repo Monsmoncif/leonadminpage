@@ -38,6 +38,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# WhatsApp local session auth
+whatsapp-server/auth_info_baileys/
+auth_info_baileys/
+
 # vercel
 .vercel
 

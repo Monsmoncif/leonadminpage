@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:all": "concurrently -n \"BACKEND,FRONTEND\" -c \"magenta,cyan\" \"npm run backend:dev\" \"npm run dev\"",
+    "dev:all": "concurrently -n \"BACKEND,FRONTEND,WHATSAPP\" -c \"magenta,cyan,green\" \"npm run backend:dev\" \"npm run dev\" \"npm run whatsapp\"",
     "build": "next build",
     "start": "next start",
+    "whatsapp": "node whatsapp-server/index.js",
     "backend:dev": "npm --prefix backend run start:dev",
     "backend:build": "npm --prefix backend run build",
     "backend:start": "npm --prefix backend run start:prod"
