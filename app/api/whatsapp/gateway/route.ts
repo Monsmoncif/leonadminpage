@@ -47,6 +47,19 @@ export async function POST(req: Request) {
       return NextResponse.json(data);
     }
 
+    if (action === "pair") {
+      const res = await fetch(`${GATEWAY_URL}/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: body.phone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        return NextResponse.json({ error: data.error || "Failed to generate pairing code" }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, code: data.code });
+    }
+
     if (action === "test") {
       const phone = body.phone;
       if (!phone) {

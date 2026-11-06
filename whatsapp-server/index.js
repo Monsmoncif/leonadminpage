@@ -325,6 +325,34 @@ app.post("/send", async (req, res) => {
   }
 });
 
+// 2B. POST /pair: Link using phone number + 8-digit pairing code (no QR scan needed)
+app.post("/pair", async (req, res) => {
+  try {
+    if (!sock) {
+      return res.status(503).json({ success: false, error: "Server is still starting, try again in a few seconds." });
+    }
+    if (connectionStatus === "CONNECTED" || sock.authState?.creds?.registered) {
+      return res.status(400).json({ success: false, error: "Already linked. Disconnect first to link a new number." });
+    }
+
+    const digits = String(req.body?.phone || "").replace(/[^0-9]/g, "");
+    if (digits.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: "Enter the full number with country code, e.g. 971501234567",
+      });
+    }
+
+    const code = await sock.requestPairingCode(digits);
+    const formatted = code && code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+    console.log(`[WhatsApp-Server] Pairing code for ${digits}: ${formatted}`);
+    return res.json({ success: true, code: formatted });
+  } catch (err) {
+    console.error("[WhatsApp-Server] Pairing code error:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to generate pairing code" });
+  }
+});
+
 // 3. POST /disconnect: Logout and reset session
 app.post("/disconnect", async (req, res) => {
   try {

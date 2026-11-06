@@ -57,6 +57,35 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
+  // WhatsApp Pairing Code State (link by phone number instead of QR)
+  const [pairPhone, setPairPhone] = useState("");
+  const [pairCode, setPairCode] = useState<string | null>(null);
+  const [pairError, setPairError] = useState("");
+  const [isPairing, setIsPairing] = useState(false);
+
+  const handleRequestPairCode = async () => {
+    setIsPairing(true);
+    setPairError("");
+    setPairCode(null);
+    try {
+      const res = await fetch("/api/whatsapp/gateway", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pair", phone: pairPhone }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPairCode(data.code);
+      } else {
+        setPairError(data.error || "تعذر إنشاء الرمز");
+      }
+    } catch (err: any) {
+      setPairError(err.message || "حدث خطأ");
+    } finally {
+      setIsPairing(false);
+    }
+  };
+
   // Fetch Profile
   useEffect(() => {
     if (session?.user?.id) {
@@ -566,6 +595,39 @@ export default function SettingsPage() {
                   <RefreshCw size={13} className="animate-spin text-emerald-600" />
                   يتم تجديد الرمز تلقائياً كل 20 ثانية لضمان أمان الاتصال.
                 </div>
+              </div>
+
+              {/* Link with phone number (pairing code) */}
+              <div className="max-w-md mx-auto bg-gray-50 dark:bg-zinc-900/50 border border-border rounded-2xl p-5 space-y-3">
+                <h4 className="text-sm font-bold text-text-primary">أو اربط برقم الهاتف (بدون مسح QR)</h4>
+                <p className="text-xs text-text-secondary">
+                  أدخل رقم واتساب مع رمز الدولة، ثم في الهاتف: الأجهزة المرتبطة ← ربط جهاز ← <b>الربط برقم الهاتف بدلاً من ذلك</b>، واكتب الرمز الذي سيظهر.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="971501234567"
+                    value={pairPhone}
+                    onChange={(e) => setPairPhone(e.target.value)}
+                    className="flex-1 border border-border rounded-xl px-3 py-2 text-sm bg-white text-text-secondary font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRequestPairCode}
+                    disabled={isPairing || !pairPhone.trim()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                  >
+                    {isPairing && <Loader2 size={14} className="animate-spin" />}
+                    احصل على الرمز
+                  </button>
+                </div>
+                {pairCode && (
+                  <div className="text-center bg-white border-2 border-emerald-500 rounded-xl py-3">
+                    <div className="text-[11px] text-text-muted mb-1">اكتب هذا الرمز في واتساب على هاتفك</div>
+                    <div className="text-3xl font-bold font-mono tracking-widest text-emerald-700">{pairCode}</div>
+                  </div>
+                )}
+                {pairError && <div className="text-xs text-red-600">{pairError}</div>}
               </div>
 
               {/* Step By Step Guide */}
