@@ -176,22 +176,12 @@ export default function ContractsPage() {
   };
 
   const lastFetchRef = useRef(0);
-  const isFirstRender = useRef(true);
 
   const fetchContracts = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
     if (!silent) setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(currentPage),
-        limit: String(itemsPerPage),
-        status: statusFilter,
-        t: String(Date.now()),
-      });
-      if (searchQuery.trim()) {
-        params.set("search", searchQuery.trim());
-      }
-      const res = await fetch(`/api/contracts?${params.toString()}`, { cache: 'no-store' });
+      const res = await fetch(`/api/contracts?full=false&t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`Failed to fetch contracts data (${res.status})`);
       const json = await res.json();
       setData(json);
@@ -211,21 +201,8 @@ export default function ContractsPage() {
   };
 
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      fetchContracts();
-      return;
-    }
     fetchContracts();
-  }, [currentPage, itemsPerPage, statusFilter]);
-
-  useEffect(() => {
-    if (isFirstRender.current) return;
-    const timer = setTimeout(() => {
-      fetchContracts();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, []);
 
   useEffect(() => {
     try {
@@ -240,7 +217,7 @@ export default function ContractsPage() {
     return () => {
       window.removeEventListener("focus", onFocus);
     };
-  }, [router, currentPage, itemsPerPage, statusFilter, searchQuery]);
+  }, [router]);
 
   const handleDeleteConfirm = async () => {
     if (!contractToDelete) return;
@@ -301,32 +278,38 @@ export default function ContractsPage() {
     cancelled: 0,
   };
 
-  const isServerPaginated = data?.totalCount !== undefined;
+  // Pure instant in-memory filtering (matches Clients / Customers page)
+  const filteredContracts = contracts.filter((c: any) => {
+    if (!searchQuery && statusFilter === "All") return true;
 
-  // Fallback client-side filtering if server pagination wasn't returned
-  const filteredContracts = isServerPaginated ? contracts : contracts.filter((c: any) => {
-    const query = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      !searchQuery ||
-      (c.id && c.id.toLowerCase().includes(query)) ||
-      (c.customer && c.customer.toLowerCase().includes(query)) ||
-      (c.vehicle && c.vehicle.toLowerCase().includes(query)) ||
-      (c.driver && c.driver.toLowerCase().includes(query)) ||
-      (c.deliveryDriver && c.deliveryDriver.toLowerCase().includes(query)) ||
-      (c.returnDriver && c.returnDriver.toLowerCase().includes(query));
+      !q ||
+      (c.id && String(c.id).toLowerCase().includes(q)) ||
+      (c.contractNumber && String(c.contractNumber).toLowerCase().includes(q)) ||
+      (c.customer && c.customer.toLowerCase().includes(q)) ||
+      (c.personalizedPersonName && c.personalizedPersonName.toLowerCase().includes(q)) ||
+      (c.additionalDriverName && c.additionalDriverName.toLowerCase().includes(q)) ||
+      (c.customerPhone && c.customerPhone.includes(q)) ||
+      (c.customerEmail && c.customerEmail.toLowerCase().includes(q)) ||
+      (c.customerIdNumber && c.customerIdNumber.toLowerCase().includes(q)) ||
+      (c.customerLicense && c.customerLicense.toLowerCase().includes(q)) ||
+      (c.vehicle && c.vehicle.toLowerCase().includes(q)) ||
+      (c.vehiclePlate && c.vehiclePlate.toLowerCase().includes(q)) ||
+      (c.driver && c.driver.toLowerCase().includes(q)) ||
+      (c.deliveryDriver && c.deliveryDriver.toLowerCase().includes(q)) ||
+      (c.returnDriver && c.returnDriver.toLowerCase().includes(q));
 
     const matchesStatus = statusFilter === "All" || c.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const totalItems = isServerPaginated ? (data?.totalCount ?? 0) : filteredContracts.length;
+  const totalItems = filteredContracts.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-  const paginatedContracts = isServerPaginated
-    ? contracts
-    : filteredContracts.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-      );
+  const paginatedContracts = filteredContracts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const hasAnyContractsTotal =
     (stats.activeContracts + stats.pendingSignatures + stats.completedThisMonth + stats.cancelled) > 0 ||
