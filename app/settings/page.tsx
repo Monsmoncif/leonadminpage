@@ -68,27 +68,31 @@ export default function SettingsPage() {
     setPairError("");
     setPairCode(null);
     try {
-      // 1. Direct port 3005 first
+      // 1. Try API route first (safe, same-origin, no CORS or private-network issues)
       let data: any = null;
       try {
-        const directRes = await fetch("http://localhost:3005/pair", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: pairPhone }),
-        });
-        if (directRes.ok) {
-          data = await directRes.json();
-        }
-      } catch {}
-
-      // 2. Fallback to API route
-      if (!data || !data.success) {
         const res = await fetch("/api/whatsapp/gateway", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "pair", phone: pairPhone }),
         });
-        data = await res.json();
+        if (res.ok) {
+          data = await res.json();
+        }
+      } catch {}
+
+      // 2. Direct port 3005 fallback
+      if (!data || !data.success) {
+        try {
+          const directRes = await fetch("http://localhost:3005/pair", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: pairPhone }),
+          });
+          if (directRes.ok) {
+            data = await directRes.json();
+          }
+        } catch {}
       }
 
       if (data && data.success) {
@@ -128,34 +132,40 @@ export default function SettingsPage() {
     }
   };
 
-  // WhatsApp Status Fetcher (Dual check: direct 3005 + proxy fallback)
+  // WhatsApp Status Fetcher (Dual check: Next.js API gateway proxy first + direct 3005 fallback)
   const checkWhatsAppStatus = async (isManual = false) => {
     if (isManual) setIsRefreshingWa(true);
     try {
       let data: any = null;
 
-      // 1. Try direct port 3005 (zero-latency, bypasses any proxy)
+      // 1. Try proxy route /api/whatsapp/gateway FIRST (always reliable, same origin, no CORS or private-network policy issues)
       try {
-        const directRes = await fetch("http://localhost:3005/status", {
-          cache: "no-store",
-          signal: AbortSignal.timeout(2000),
-        });
-        if (directRes.ok) {
-          data = await directRes.json();
-          data.online = true;
-        }
-      } catch {
-        // Direct local call failed, try proxy
-      }
-
-      // 2. Try proxy route /api/whatsapp/gateway
-      if (!data) {
         const res = await fetch("/api/whatsapp/gateway", {
           cache: "no-store",
           signal: AbortSignal.timeout(3000),
         });
         if (res.ok) {
           data = await res.json();
+        }
+      } catch {
+        // Proxy route failed, try direct port 3005
+      }
+
+      // 2. Direct port 3005 fallback
+      if (!data || !data.online) {
+        try {
+          const directRes = await fetch("http://localhost:3005/status", {
+            cache: "no-store",
+            signal: AbortSignal.timeout(2000),
+          });
+          if (directRes.ok) {
+            const directData = await directRes.json();
+            if (directData && (directData.status === "SCAN_QR" || directData.status === "CONNECTED" || directData.status === "STARTING")) {
+              data = { online: true, ...directData };
+            }
+          }
+        } catch {
+          // Direct local call failed
         }
       }
 
@@ -176,6 +186,13 @@ export default function SettingsPage() {
     }
   };
 
+  // Immediate check when switching to WhatsApp tab
+  useEffect(() => {
+    if (activeTab === "whatsapp") {
+      checkWhatsAppStatus(true);
+    }
+  }, [activeTab]);
+
   // Poll WhatsApp Status
   useEffect(() => {
     checkWhatsAppStatus();
@@ -185,10 +202,10 @@ export default function SettingsPage() {
       if (waStatus === "SCAN_QR" || waStatus === "STARTING" || waStatus === "LOADING") {
         checkWhatsAppStatus();
       } else if (waStatus === "CONNECTED" || waStatus === "OFFLINE") {
-        // Poll every 6 seconds when connected or offline
+        // Poll every 5 seconds when connected or offline
         checkWhatsAppStatus();
       }
-    }, waStatus === "SCAN_QR" ? 2500 : 6000);
+    }, waStatus === "SCAN_QR" ? 2000 : 5000);
 
     return () => clearInterval(interval);
   }, [waStatus]);
@@ -352,7 +369,10 @@ export default function SettingsPage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("whatsapp")}
+            onClick={() => {
+              setActiveTab("whatsapp");
+              checkWhatsAppStatus(true);
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
               activeTab === "whatsapp"
                 ? "bg-emerald-600 text-white shadow-sm"
@@ -584,7 +604,15 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                <a
+                  href="http://localhost:3005"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold text-brand hover:underline inline-flex items-center gap-1.5"
+                >
+                  🔗 أو فتح لوحة واتساب المباشرة: http://localhost:3005
+                </a>
                 <button
                   type="button"
                   onClick={() => checkWhatsAppStatus(true)}

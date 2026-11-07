@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import {
   X,
@@ -232,6 +233,11 @@ export default function ContractDetailsModal({
   const lastFetchedIdRef = useRef<string | null>(null);
   const contentContainerRef = useRef<HTMLDivElement>(null);
   const overlayContainerRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Automatically scroll to the top of the modal when activeTab changes or modal opens
   useEffect(() => {
@@ -471,10 +477,10 @@ export default function ContractDetailsModal({
     ...damages.flatMap((d: any) => Array.isArray(d.photos) ? d.photos : [])
   ])).filter((p) => typeof p === "string" && p.trim().length > 0 && p.trim() !== "null" && p.trim() !== "undefined");
 
-  return (
+  const modalContent = (
     <div 
       ref={overlayContainerRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+      className="fixed inset-0 z-[120] flex items-center justify-center p-1 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
     >
       <div className="bg-card w-full max-w-2xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[96dvh] sm:max-h-[90vh] my-auto border border-border/60">
         
@@ -1988,7 +1994,7 @@ export default function ContractDetailsModal({
       {/* Full-size Image Preview Modal */}
       {previewImage && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in"
           onClick={() => setPreviewImage(null)}
         >
           <div className="relative max-w-4xl max-h-[92vh] flex flex-col items-center">
@@ -2011,7 +2017,7 @@ export default function ContractDetailsModal({
       {/* Privacy Notice and Consent Preview Modal - Displays Pure PDF */}
       {showConsentPreview && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[150] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm animate-fade-in"
           onClick={() => setShowConsentPreview(false)}
         >
           <div 
@@ -2070,4 +2076,9 @@ export default function ContractDetailsModal({
       )}
     </div>
   );
+
+  if (mounted && typeof document !== "undefined") {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 }
