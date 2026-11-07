@@ -14,7 +14,6 @@ import {
   Clock,
   X,
   User,
-  Car,
   Phone,
   MapPin,
   FileText,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
+import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -686,29 +686,8 @@ export default function CalendarPage() {
                       <span>{b.formattedHour}</span>
                     </span>
 
-                    {/* Type Pill */}
-                    <span
-                      className={`text-xs font-bold px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${
-                        b.type === "pickup"
-                          ? "bg-blue-50 text-blue-700 border-blue-200"
-                          : b.isReturned
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : b.isOverdue
-                          ? "bg-rose-50 text-rose-700 border-rose-200"
-                          : "bg-purple-50 text-purple-700 border-purple-200"
-                      }`}
-                    >
-                      {b.type === "pickup"
-                        ? "🚗 Start / Handover Delivery"
-                        : b.isReturned
-                        ? "✅ Returned to Fleet"
-                        : b.isOverdue
-                        ? "⚠️ Overdue Return"
-                        : "🔄 Expected Return"}
-                    </span>
-
-                    {/* Contract Pill */}
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-gray-100 text-text-primary border border-gray-200">
+                    {/* Contract Identifier */}
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-100 text-text-primary border border-gray-200 tabular-nums">
                       {b.displayNum}
                     </span>
                   </div>
@@ -736,7 +715,7 @@ export default function CalendarPage() {
                       {b.clientPhone && (
                         <a
                           href={`tel:${b.clientPhone}`}
-                          className="text-[11px] text-text-secondary hover:text-brand font-mono flex items-center gap-1 mt-0.5 truncate transition-colors"
+                          className="text-[11px] text-text-secondary hover:text-brand font-medium tabular-nums flex items-center gap-1 mt-0.5 truncate transition-colors"
                         >
                           <Phone size={11} className="text-text-muted shrink-0" />
                           <span>{b.clientPhone}</span>
@@ -748,7 +727,7 @@ export default function CalendarPage() {
                   {/* Vehicle Box */}
                   <div className="bg-gray-50/70 p-3 rounded-xl border border-gray-200/70 flex items-start gap-3">
                     <div className="w-9 h-9 rounded-xl bg-gray-200/70 text-text-muted flex items-center justify-center shrink-0">
-                      <Car size={18} />
+                      <ExecutiveCarIcon size={14} className="text-text-muted" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">
@@ -758,8 +737,8 @@ export default function CalendarPage() {
                         {b.car}
                       </span>
                       {b.carPlate && (
-                        <span className="text-[11px] font-mono font-semibold text-text-muted block mt-0.5">
-                          Plate: <strong className="text-text-primary">{b.carPlate}</strong> {b.carColor ? `• ${b.carColor}` : ""}
+                        <span className="text-[11px] font-medium text-text-muted block mt-0.5">
+                          Plate: <strong className="text-text-primary font-bold">{b.carPlate}</strong>{b.carColor ? ` • ${b.carColor}` : ""}
                         </span>
                       )}
                     </div>
