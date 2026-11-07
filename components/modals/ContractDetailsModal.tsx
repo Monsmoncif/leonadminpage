@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   X,
@@ -219,6 +220,7 @@ export default function ContractDetailsModal({
   contract,
   onEdit,
 }: ContractDetailsModalProps) {
+  const router = useRouter();
   const { data: session } = useSession();
   const currentUserId = (session?.user as any)?.id;
   const isDriver = (session?.user as any)?.role === "driver";
@@ -249,7 +251,7 @@ export default function ContractDetailsModal({
     }
   }, [activeTab, isOpen]);
 
-  const refreshContractData = (explicitId?: string) => {
+  const refreshContractData = (explicitId?: string, isUserEdit = false) => {
     const contractId = explicitId || contractData?._id || contractData?.id || contract?._id || contract?.id;
     if (contractId) {
       setIsLoadingDetails(true);
@@ -278,7 +280,9 @@ export default function ContractDetailsModal({
               vehicleYear: fresh.unitId?.year || prev?.vehicleYear,
               vehicleFuel: fresh.unitId?.fuelType || prev?.vehicleFuel,
             }));
-            onEdit?.(fresh);
+            if (isUserEdit) {
+              onEdit?.(fresh);
+            }
           }
           if (Array.isArray(damagesData)) {
             setDamages(damagesData);
@@ -578,7 +582,7 @@ export default function ContractDetailsModal({
                       type="button"
                       onClick={() => {
                         onClose();
-                        window.location.href = `/bookings/handover?contractId=${contractData._id || contractData.id}`;
+                        router.push(`/bookings/handover?contractId=${contractData._id || contractData.id}`);
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-full text-[11px] sm:text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                       title="Edit Handover Data, Photos & Odometer (تعديل بيانات وفحص التسليم)"
@@ -645,7 +649,7 @@ export default function ContractDetailsModal({
                       type="button"
                       onClick={() => {
                         onClose();
-                        window.location.href = `/bookings/handover?contractId=${contractData._id || contractData.id}`;
+                        router.push(`/bookings/handover?contractId=${contractData._id || contractData.id}`);
                       }}
                       className="w-full sm:w-auto px-3.5 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
                     >
@@ -1497,7 +1501,7 @@ export default function ContractDetailsModal({
                       type="button"
                       onClick={() => {
                         onClose();
-                        window.location.href = `/bookings/return?contractId=${contractData._id || contractData.id}`;
+                        router.push(`/bookings/return?contractId=${contractData._id || contractData.id}`);
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 hover:bg-red-100 text-red-800 border border-red-300 rounded-full text-[11px] sm:text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                       title="Edit Return Data, Photos, Charges & Odometer (تعديل بيانات وفحص الإرجاع)"
@@ -1905,7 +1909,7 @@ export default function ContractDetailsModal({
                     type="button"
                     onClick={() => {
                       onClose();
-                      window.location.href = `/bookings/handover?contractId=${contractData._id || contractData.id}`;
+                      router.push(`/bookings/handover?contractId=${contractData._id || contractData.id}`);
                     }}
                     className="flex-1 sm:flex-none px-3.5 py-2.5 min-h-[40px] sm:min-h-[38px] bg-amber-50 hover:bg-amber-100 active:scale-[0.98] text-amber-800 border border-amber-300 text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Edit handover data, odometer, fuel, photos, or signature (تعديل بيانات التسليم)"
@@ -1933,7 +1937,7 @@ export default function ContractDetailsModal({
                     type="button"
                     onClick={() => {
                       onClose();
-                      window.location.href = `/bookings/return?contractId=${contractData._id || contractData.id}`;
+                      router.push(`/bookings/return?contractId=${contractData._id || contractData.id}`);
                     }}
                     className="flex-1 sm:flex-none px-4 py-2.5 min-h-[40px] sm:min-h-[38px] bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                   >
@@ -1948,7 +1952,7 @@ export default function ContractDetailsModal({
                     type="button"
                     onClick={() => {
                       onClose();
-                      window.location.href = `/bookings/return?contractId=${contractData._id || contractData.id}`;
+                      router.push(`/bookings/return?contractId=${contractData._id || contractData.id}`);
                     }}
                     className="flex-1 sm:flex-none px-3.5 py-2.5 min-h-[40px] sm:min-h-[38px] bg-red-50 hover:bg-red-100 active:scale-[0.98] text-red-800 border border-red-300 text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Edit vehicle return details, odometer, fuel, damages, or charges (تعديل بيانات وفحص الإرجاع)"
@@ -1964,7 +1968,7 @@ export default function ContractDetailsModal({
                     type="button"
                     onClick={() => {
                       onClose();
-                      window.location.href = `/bookings/handover?contractId=${contractData._id || contractData.id}`;
+                      router.push(`/bookings/handover?contractId=${contractData._id || contractData.id}`);
                     }}
                     className="w-full sm:w-auto px-4 py-2.5 min-h-[40px] sm:min-h-[38px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                   >
@@ -1985,7 +1989,7 @@ export default function ContractDetailsModal({
           isOpen={isExtendOpen}
           onClose={() => setIsExtendOpen(false)}
           onSuccess={() => {
-            refreshContractData();
+            refreshContractData(undefined, true);
           }}
           contract={contractData}
         />

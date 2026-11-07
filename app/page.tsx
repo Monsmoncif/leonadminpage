@@ -36,6 +36,7 @@ import {
 import CreateContractModal from "@/components/modals/CreateContractModal";
 import CreateUnitModal from "@/components/modals/CreateUnitModal";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
+import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -97,26 +98,31 @@ const emptyStats = {
 };
 
 export default function Dashboard() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const currentYear = new Date().getFullYear();
+  const [rentalsYear, setRentalsYear] = useState(currentYear);
+  const cachedData = typeof window !== "undefined" ? getClientCache<any>(`dashboard_${currentYear}`) : null;
+  const [data, setData] = useState<any>(cachedData);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState<string | null>(null);
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
-  
-  const currentYear = new Date().getFullYear();
-  const [rentalsYear, setRentalsYear] = useState(currentYear);
   const [isChartUpdating, setIsChartUpdating] = useState(false);
 
   const fetchDashboardData = async (year: number, isInitial = false, retryCount = 0) => {
     const MAX_RETRIES = 3;
-    if (isInitial) setLoading(true);
-    else setIsChartUpdating(true);
+    const hasCache = Boolean(getClientCache(`dashboard_${year}`));
+    if (isInitial) {
+      if (!hasCache && !data) setLoading(true);
+    } else {
+      setIsChartUpdating(true);
+    }
 
     try {
       const res = await fetch(`/api/dashboard?year=${year}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`Failed to fetch dashboard data (${res.status})`);
       const json = await res.json();
       setData(json);
+      setClientCache(`dashboard_${year}`, json);
       setError(null);
     } catch (err: any) {
       console.error(`Dashboard fetch error (attempt ${retryCount + 1}):`, err);
@@ -125,7 +131,7 @@ export default function Dashboard() {
         await new Promise(res => setTimeout(res, delay));
         return fetchDashboardData(year, isInitial, retryCount + 1);
       }
-      setError(err.message);
+      if (!data) setError(err.message);
     } finally {
       setLoading(false);
       setIsChartUpdating(false);
@@ -437,7 +443,8 @@ export default function Dashboard() {
         onClose={() => setIsContractModalOpen(false)} 
         onSuccess={() => {
           setIsContractModalOpen(false);
-          window.location.reload();
+          invalidateClientCache();
+          fetchDashboardData(rentalsYear, false);
         }}
       />
 
@@ -446,7 +453,8 @@ export default function Dashboard() {
         onClose={() => setIsUnitModalOpen(false)}
         onSuccess={() => {
           setIsUnitModalOpen(false);
-          window.location.reload();
+          invalidateClientCache();
+          fetchDashboardData(rentalsYear, false);
         }}
       />
     </div>

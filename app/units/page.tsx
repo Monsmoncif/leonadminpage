@@ -24,6 +24,7 @@ import CreateUnitModal from "@/components/modals/CreateUnitModal";
 import StatCard from "@/components/ui/StatCard";
 import TablePagination from "@/components/ui/TablePagination";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
+import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 // Status badge styling with vibrant, professional colors matching bookings page
 const getStatusClasses = (status: string) => {
@@ -41,8 +42,9 @@ const getStatusClasses = (status: string) => {
 
 export default function UnitsPage() {
   const router = useRouter();
-  const [data, setData] = useState<{ units: any[], stats: any } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedData = typeof window !== "undefined" ? getClientCache<{ units: any[], stats: any }>("units") : null;
+  const [data, setData] = useState<{ units: any[], stats: any } | null>(cachedData);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState<string | null>(null);
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
@@ -55,27 +57,26 @@ export default function UnitsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const toast = useToast();
 
-  const fetchUnits = async (retryCount = 0) => {
+  const fetchUnits = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
-    setLoading(true);
+    const shouldShowSpinner = !silent && !data && !getClientCache("units");
+    if (shouldShowSpinner) setLoading(true);
     try {
       const res = await fetch("/api/units", { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to fetch units data (${res.status})`);
       const json = await res.json();
-      if (Array.isArray(json)) {
-        setData({ units: json, stats: {} });
-      } else {
-        setData(json);
-      }
+      const formatted = Array.isArray(json) ? { units: json, stats: {} } : json;
+      setData(formatted);
+      setClientCache("units", formatted);
       setError(null);
     } catch (err: any) {
       console.error(`Units fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise(res => setTimeout(res, delay));
-        return fetchUnits(retryCount + 1);
+        return fetchUnits(retryCount + 1, silent);
       }
-      setError(err.message);
+      if (!silent && !data) setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -94,6 +95,7 @@ export default function UnitsPage() {
         const newUnits = data.units.filter((u: any) => u._id !== deleteTarget._id);
         setData({ ...data, units: newUnits });
       }
+      invalidateClientCache("units");
       toast.success(`${deleteTarget.make} ${deleteTarget.model} deleted successfully.`);
       setDeleteTarget(null);
     } catch (err: any) {
@@ -598,6 +600,7 @@ export default function UnitsPage() {
           setIsUnitModalOpen(false);
           toast.success(`Vehicle ${editTarget ? 'updated' : 'added'} successfully!`);
           setEditTarget(null);
+          invalidateClientCache("units");
           fetchUnits();
         }}
       />

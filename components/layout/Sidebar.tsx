@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard,
@@ -62,11 +62,22 @@ const sections = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const { collapsed, setCollapsed } = useSidebar();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   /* Unread badge – shared single poller (count-only, 30s, pauses when tab hidden) */
   const unreadCount = useUnreadNotifications(true);
+
+  // Background pre-fetch core pages for instant navigation
+  useEffect(() => {
+    const coreRoutes = ["/", "/bookings", "/units", "/calendar", "/clients", "/drivers", "/settings"];
+    coreRoutes.forEach((route) => {
+      try {
+        router.prefetch(route);
+      } catch {}
+    });
+  }, [router]);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -159,6 +170,7 @@ export default function Sidebar() {
                   <li key={item.name} className="relative">
                     <Link
                       href={item.href}
+                      prefetch={true}
                       onMouseEnter={() => setHoveredItem(item.name)}
                       onMouseLeave={() => setHoveredItem(null)}
                       onClick={() => {

@@ -22,6 +22,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import CreateClientModal from "@/components/modals/CreateClientModal";
 import CreateCompanyModal from "@/components/modals/CreateCompanyModal";
 import { useRouter } from "next/navigation";
+import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 const getInitials = (name: string) => {
   if (!name) return "";
@@ -66,8 +67,9 @@ const getClientStatusClasses = (status: string) => {
 };
 
 export default function ClientsPage() {
-  const [data, setData] = useState<{ clients: any[]; stats: any } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedData = typeof window !== "undefined" ? getClientCache<{ clients: any[]; stats: any }>("clients") : null;
+  const [data, setData] = useState<{ clients: any[]; stats: any } | null>(cachedData);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -80,27 +82,26 @@ export default function ClientsPage() {
   const toast = useToast();
   const router = useRouter();
 
-  const fetchClients = async (retryCount = 0) => {
+  const fetchClients = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
-    setLoading(true);
+    const shouldShowSpinner = !silent && !data && !getClientCache("clients");
+    if (shouldShowSpinner) setLoading(true);
     try {
       const res = await fetch("/api/clients?full=true", { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to fetch clients data (${res.status})`);
       const json = await res.json();
-      if (Array.isArray(json)) {
-        setData({ clients: json, stats: {} });
-      } else {
-        setData(json);
-      }
+      const formatted = Array.isArray(json) ? { clients: json, stats: {} } : json;
+      setData(formatted);
+      setClientCache("clients", formatted);
       setError(null);
     } catch (err: any) {
       console.error(`Clients fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise(res => setTimeout(res, delay));
-        return fetchClients(retryCount + 1);
+        return fetchClients(retryCount + 1, silent);
       }
-      setError(err.message);
+      if (!silent && !data) setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -128,6 +129,7 @@ export default function ClientsPage() {
         );
         setData({ ...data, clients: newClients });
       }
+      invalidateClientCache("clients");
       toast.success(`${deleteTarget.name} deleted successfully.`);
       setDeleteTarget(null);
     } catch (err: any) {
@@ -564,6 +566,7 @@ export default function ClientsPage() {
             `Customer ${editTarget ? "updated" : "added"} successfully!`
           );
           setEditTarget(null);
+          invalidateClientCache("clients");
           fetchClients();
         }}
       />
@@ -579,6 +582,7 @@ export default function ClientsPage() {
         onSuccess={() => {
           setIsCompanyModalOpen(false);
           setEditTarget(null);
+          invalidateClientCache("clients");
           fetchClients();
         }}
       />

@@ -29,6 +29,7 @@ import {
 import StatCard from "@/components/ui/StatCard";
 import TablePagination from "@/components/ui/TablePagination";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
+import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -110,8 +111,9 @@ const getCarStatusBadge = (status: string) => {
 };
 
 export default function ContractsPage() {
-  const [data, setData] = useState<{ contracts: any[], stats: any, totalCount?: number } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedData = typeof window !== "undefined" ? getClientCache<{ contracts: any[], stats: any, totalCount?: number }>("contracts") : null;
+  const [data, setData] = useState<{ contracts: any[], stats: any, totalCount?: number } | null>(cachedData);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -179,12 +181,14 @@ export default function ContractsPage() {
 
   const fetchContracts = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
-    if (!silent) setLoading(true);
+    const shouldShowSpinner = !silent && !data && !getClientCache("contracts");
+    if (shouldShowSpinner) setLoading(true);
     try {
       const res = await fetch(`/api/contracts?full=false&t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`Failed to fetch contracts data (${res.status})`);
       const json = await res.json();
       setData(json);
+      setClientCache("contracts", json);
       setError(null);
       lastFetchRef.current = Date.now();
     } catch (err: any) {
@@ -194,9 +198,9 @@ export default function ContractsPage() {
         await new Promise(res => setTimeout(res, delay));
         return fetchContracts(retryCount + 1, silent);
       }
-      if (!silent) setError(err.message);
+      if (!silent && !data) setError(err.message);
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -209,13 +213,15 @@ export default function ContractsPage() {
       router.prefetch("/bookings/handover");
     } catch {}
 
-    const onFocus = () => {
-      // Silent background refresh, throttled so tab switching doesn't reload the page
-      if (Date.now() - lastFetchRef.current > 20000) fetchContracts(0, true);
+    const onVisibilityChange = () => {
+      // Silent background refresh only when returning to this browser tab after 60s
+      if (document.visibilityState === "visible" && Date.now() - lastFetchRef.current > 60000) {
+        fetchContracts(0, true);
+      }
     };
-    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [router]);
 
@@ -241,6 +247,7 @@ export default function ContractsPage() {
       toast.success("Contract deleted successfully.");
       setIsDeleteDialogOpen(false);
       setContractToDelete(null);
+      invalidateClientCache("contracts");
       fetchContracts(0, true);
     } catch (err: any) {
       toast.error(err.message || "Failed to delete contract");
@@ -579,8 +586,7 @@ export default function ContractsPage() {
                         return (
                           <tr 
                             key={contract._id} 
-                            className="bg-white hover:bg-gray-50/75 transition-colors animate-fade-in-up"
-                            style={{ animationDelay: `${idx * 0.04 + 0.08}s` }}
+                            className="bg-white hover:bg-gray-50/75 transition-colors"
                           >
                             {/* Contract Column */}
                             <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
@@ -1030,7 +1036,7 @@ export default function ContractsPage() {
           isOpen={Boolean(selectedContractForDetails)}
           onClose={() => setSelectedContractForDetails(null)}
           contract={selectedContractForDetails}
-          onEdit={() => fetchContracts()}
+          onEdit={() => fetchContracts(0, true)}
         />
       )}
 

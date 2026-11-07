@@ -5,7 +5,7 @@ import ToastProvider from "@/components/providers/ToastProvider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchOnWindowFocus={false}>
       <ToastProvider>{children}</ToastProvider>
     </SessionProvider>
   );

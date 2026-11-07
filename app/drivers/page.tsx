@@ -28,6 +28,7 @@ import {
 import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/StatusBadge";
 import TablePagination from "@/components/ui/TablePagination";
+import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 import { useToast } from "@/components/providers/ToastProvider";
 import CreateDriverModal from "@/components/modals/CreateDriverModal";
 import { useRouter } from "next/navigation";
@@ -75,8 +76,9 @@ const getDriverStatusClasses = (status: string) => {
 };
 
 export default function DriversPage() {
-  const [data, setData] = useState<{ drivers: any[]; stats: any } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedData = typeof window !== "undefined" ? getClientCache<{ drivers: any[]; stats: any }>("drivers") : null;
+  const [data, setData] = useState<{ drivers: any[]; stats: any } | null>(cachedData);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
@@ -88,27 +90,26 @@ export default function DriversPage() {
   const toast = useToast();
   const router = useRouter();
 
-  const fetchDrivers = async (retryCount = 0) => {
+  const fetchDrivers = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
-    setLoading(true);
+    const shouldShowSpinner = !silent && !data && !getClientCache("drivers");
+    if (shouldShowSpinner) setLoading(true);
     try {
       const res = await fetch("/api/drivers", { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to fetch drivers data (${res.status})`);
       const json = await res.json();
-      if (Array.isArray(json)) {
-        setData({ drivers: json, stats: {} });
-      } else {
-        setData(json);
-      }
+      const formatted = Array.isArray(json) ? { drivers: json, stats: {} } : json;
+      setData(formatted);
+      setClientCache("drivers", formatted);
       setError(null);
     } catch (err: any) {
       console.error(`Drivers fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise(res => setTimeout(res, delay));
-        return fetchDrivers(retryCount + 1);
+        return fetchDrivers(retryCount + 1, silent);
       }
-      setError(err.message);
+      if (!silent && !data) setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -145,6 +146,7 @@ export default function DriversPage() {
           },
         });
       }
+      invalidateClientCache("drivers");
       toast.success(`${deleteTarget.name} deleted successfully.`);
       setDeleteTarget(null);
       await fetchDrivers();
@@ -544,6 +546,7 @@ export default function DriversPage() {
             `Driver ${editTarget ? "updated" : "added"} successfully!`
           );
           setEditTarget(null);
+          invalidateClientCache("drivers");
           fetchDrivers();
         }}
       />
