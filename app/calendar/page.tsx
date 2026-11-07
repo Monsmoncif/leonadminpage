@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -337,16 +338,22 @@ function mapContractsToEvents(contracts: any[]): BookingEvent[] {
 }
 
 export default function CalendarPage() {
+  const [mounted, setMounted] = useState(false);
   const [filter, setFilter] = useState<"all" | "pickup" | "return" | "precontract" | "contract">("all");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(new Date());
   const [dayModalDate, setDayModalDate] = useState<Date | null>(null);
   const [dayModalFilter, setDayModalFilter] = useState<"all" | "pickup" | "return">("all");
+  const [dayModalSearch, setDayModalSearch] = useState("");
   const [rawContracts, setRawContracts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContractForDetails, setSelectedContractForDetails] = useState<any | null>(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Month calculation
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -419,17 +426,42 @@ export default function CalendarPage() {
     return filteredBookings.filter((b) => b.date.toDateString() === selectedDay.toDateString());
   }, [filteredBookings, selectedDay]);
 
-  // Day Modal Bookings (Shows all events on clicked day, with modal sub-filter)
-  const modalDayBookings = useMemo(() => {
+  // All events on the date selected for the modal
+  const allDayBookings = useMemo(() => {
     if (!dayModalDate) return [];
     const dateStr = dayModalDate.toDateString();
-    return allBookings.filter((b) => {
-      if (b.date.toDateString() !== dateStr) return false;
-      if (dayModalFilter === "pickup") return b.type === "pickup";
-      if (dayModalFilter === "return") return b.type === "return";
+    return allBookings.filter((b) => b.date.toDateString() === dateStr);
+  }, [allBookings, dayModalDate]);
+
+  // Filtered events inside the Day Modal
+  const modalDayBookings = useMemo(() => {
+    return allDayBookings.filter((b) => {
+      if (dayModalFilter === "pickup" && b.type !== "pickup") return false;
+      if (dayModalFilter === "return" && b.type !== "return") return false;
+
+      if (dayModalSearch.trim()) {
+        const q = dayModalSearch.toLowerCase().trim();
+        const matches =
+          (b.client && b.client.toLowerCase().includes(q)) ||
+          (b.car && b.car.toLowerCase().includes(q)) ||
+          (b.carPlate && b.carPlate.toLowerCase().includes(q)) ||
+          (b.driver && b.driver.toLowerCase().includes(q)) ||
+          (b.displayNum && b.displayNum.toLowerCase().includes(q)) ||
+          (b.contractNumber && String(b.contractNumber).toLowerCase().includes(q)) ||
+          (b.location && b.location.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
       return true;
     });
-  }, [allBookings, dayModalDate, dayModalFilter]);
+  }, [allDayBookings, dayModalFilter, dayModalSearch]);
+
+  const pickupCount = useMemo(() => {
+    return allDayBookings.filter((b) => b.type === "pickup").length;
+  }, [allDayBookings]);
+
+  const returnCount = useMemo(() => {
+    return allDayBookings.filter((b) => b.type === "return").length;
+  }, [allDayBookings]);
 
   // Navigation handlers — ZERO page reload, instant month switch
   const prevMonth = () => {
@@ -485,6 +517,322 @@ export default function CalendarPage() {
       </div>
     );
   }
+
+  // ========================================================
+  // DAY EVENTS MODAL CONTENT (Inspired by CreateClientModal)
+  // ========================================================
+  const dayModalContent = dayModalDate ? (
+    <div
+      className="fixed inset-0 z-[100] w-screen h-screen min-h-screen flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto"
+      onClick={() => {
+        setDayModalDate(null);
+        setDayModalSearch("");
+      }}
+    >
+      {/* Widescreen Modal (max-w-4xl) - Height maximized cleanly on mobile */}
+      <div
+        className="bg-card w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] sm:max-h-[90vh] my-auto border border-border bg-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header - Identical styling to CreateClientModal */}
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
+          <div>
+            <h2 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-1.5 sm:gap-2">
+              <CalendarIcon className="text-brand shrink-0" size={20} />
+              <span>
+                {dayModalDate.toLocaleDateString("en-GB", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+            </h2>
+            <p className="text-[10px] sm:text-xs text-text-secondary mt-0.5 line-clamp-1 sm:line-clamp-none">
+              Daily fleet schedule • Review all handover deliveries and returns for this date.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setDayModalDate(null);
+              setDayModalSearch("");
+            }}
+            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer shrink-0"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-2.5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-3 sm:space-y-4">
+          {/* Top Controls: Filter Tabs + Search (Matches CreateClientModal Profile Type Box) */}
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Segmented Filter Control */}
+            <div className="grid grid-cols-3 gap-1 p-0.5 sm:p-1 bg-gray-100 rounded-lg sm:rounded-xl border border-gray-200 w-full sm:max-w-md">
+              <button
+                type="button"
+                onClick={() => setDayModalFilter("all")}
+                className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-md sm:rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 min-w-0 ${
+                  dayModalFilter === "all"
+                    ? "bg-white text-brand shadow-xs font-bold"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <span>All Events</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    dayModalFilter === "all" ? "bg-brand/10 text-brand" : "bg-gray-200 text-text-secondary"
+                  }`}
+                >
+                  {allDayBookings.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDayModalFilter("pickup")}
+                className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-md sm:rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 min-w-0 ${
+                  dayModalFilter === "pickup"
+                    ? "bg-white text-brand shadow-xs font-bold"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <span>Pickups</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    dayModalFilter === "pickup" ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-text-secondary"
+                  }`}
+                >
+                  {pickupCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDayModalFilter("return")}
+                className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-md sm:rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 min-w-0 ${
+                  dayModalFilter === "return"
+                    ? "bg-white text-brand shadow-xs font-bold"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <span>Returns</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    dayModalFilter === "return" ? "bg-purple-100 text-purple-700" : "bg-gray-200 text-text-secondary"
+                  }`}
+                >
+                  {returnCount}
+                </span>
+              </button>
+            </div>
+
+            {/* In-Modal Search Input */}
+            <div className="relative w-full sm:w-64 shrink-0">
+              <input
+                type="text"
+                placeholder="Search within this day..."
+                value={dayModalSearch}
+                onChange={(e) => setDayModalSearch(e.target.value)}
+                className="w-full text-xs border border-border rounded-xl pl-8 pr-8 py-2 bg-white text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all shadow-xs"
+              />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+              {dayModalSearch && (
+                <button
+                  type="button"
+                  onClick={() => setDayModalSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Cards List */}
+          {modalDayBookings.length === 0 ? (
+            <div className="bg-white rounded-xl border border-border p-8 sm:p-12 text-center space-y-3 shadow-xs">
+              <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto text-gray-400">
+                <CalendarIcon size={24} />
+              </div>
+              <h4 className="text-sm font-bold text-text-primary">No events found for this selection</h4>
+              <p className="text-xs text-text-secondary max-w-sm mx-auto">
+                {dayModalSearch
+                  ? `No events matching "${dayModalSearch}". Try clearing your search.`
+                  : "There are no contracts or handovers scheduled under this filter."}
+              </p>
+              {dayModalSearch && (
+                <button
+                  type="button"
+                  onClick={() => setDayModalSearch("")}
+                  className="text-xs font-semibold text-brand hover:underline"
+                >
+                  Clear Search
+                </button>
+              )}
+            </div>
+          ) : (
+            modalDayBookings.map((b) => (
+              <div
+                key={b.id}
+                className="bg-white p-3.5 sm:p-5 rounded-xl border border-border shadow-xs hover:border-gray-300 hover:shadow-sm transition-all flex flex-col gap-3.5"
+              >
+                {/* Card Header Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Time Badge */}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 text-text-primary text-xs font-extrabold tabular-nums border border-gray-200">
+                      <Clock size={13} className="text-brand shrink-0" />
+                      <span>{b.formattedHour}</span>
+                    </span>
+
+                    {/* Type Pill */}
+                    <span
+                      className={`text-xs font-bold px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${
+                        b.type === "pickup"
+                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                          : b.isReturned
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : b.isOverdue
+                          ? "bg-rose-50 text-rose-700 border-rose-200"
+                          : "bg-purple-50 text-purple-700 border-purple-200"
+                      }`}
+                    >
+                      {b.type === "pickup"
+                        ? "🚗 Start / Handover Delivery"
+                        : b.isReturned
+                        ? "✅ Returned to Fleet"
+                        : b.isOverdue
+                        ? "⚠️ Overdue Return"
+                        : "🔄 Expected Return"}
+                    </span>
+
+                    {/* Contract Pill */}
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-gray-100 text-text-primary border border-gray-200">
+                      {b.displayNum}
+                    </span>
+                  </div>
+
+                  {/* Status Badge */}
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border self-start sm:self-auto ${b.badgeClass}`}>
+                    {b.statusLabel}
+                  </span>
+                </div>
+
+                {/* Card Details Grid (Customer & Vehicle in 2 neat boxes) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Customer Box */}
+                  <div className="bg-gray-50/70 p-3 rounded-xl border border-gray-200/70 flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                      {getInitials(b.client)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">
+                        Customer / Client
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold text-text-primary block truncate mt-0.5">
+                        {b.client}
+                      </span>
+                      {b.clientPhone && (
+                        <a
+                          href={`tel:${b.clientPhone}`}
+                          className="text-[11px] text-text-secondary hover:text-brand font-mono flex items-center gap-1 mt-0.5 truncate transition-colors"
+                        >
+                          <Phone size={11} className="text-text-muted shrink-0" />
+                          <span>{b.clientPhone}</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vehicle Box */}
+                  <div className="bg-gray-50/70 p-3 rounded-xl border border-gray-200/70 flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gray-200/70 text-text-muted flex items-center justify-center shrink-0">
+                      <Car size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">
+                        Vehicle
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold text-text-primary block truncate mt-0.5">
+                        {b.car}
+                      </span>
+                      {b.carPlate && (
+                        <span className="text-[11px] font-mono font-semibold text-text-muted block mt-0.5">
+                          Plate: <strong className="text-text-primary">{b.carPlate}</strong> {b.carColor ? `• ${b.carColor}` : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Driver, Location & Notes Row + Action Button */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs text-text-secondary">
+                  <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <User size={13} className="text-text-muted shrink-0" />
+                      <span>
+                        Driver: <strong className="text-text-primary">{b.driver || "Showroom Handover"}</strong>
+                      </span>
+                    </div>
+
+                    {b.location && (
+                      <div className="flex items-center gap-1.5 font-medium truncate max-w-[240px]">
+                        <MapPin size={13} className="text-text-muted shrink-0" />
+                        <span className="truncate">{b.location}</span>
+                      </div>
+                    )}
+
+                    {b.notes && (
+                      <div className="text-[11px] text-text-muted italic truncate max-w-[200px]" title={b.notes}>
+                        "{b.notes}"
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedContractForDetails(b.rawContract)}
+                    className="px-4 py-2 bg-brand text-white hover:bg-brand-dark rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs shrink-0 active:scale-95"
+                  >
+                    <Eye size={13} />
+                    <span>View Contract Details</span>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Modal Footer - Identical styling to CreateClientModal */}
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-3.5 border-t border-border bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          <div className="text-[11px] sm:text-xs text-text-secondary text-center sm:text-left">
+            Showing <b>{modalDayBookings.length}</b> of <b>{allDayBookings.length}</b> events for this day
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setDayModalDate(null);
+                setDayModalSearch("");
+              }}
+              className="flex-1 sm:flex-initial px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-gray-100 transition-colors cursor-pointer text-center"
+            >
+              Close
+            </button>
+            <Link
+              href="/bookings/new"
+              className="flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-colors font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-sm text-center"
+            >
+              <Plus size={16} />
+              <span>New Contract</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -740,6 +1088,7 @@ export default function CalendarPage() {
                       setSelectedDay(date);
                       setDayModalDate(date);
                       setDayModalFilter("all");
+                      setDayModalSearch("");
                     }}
                     className={`p-1 sm:p-1.5 border-b border-border [&:not(:nth-child(7n+1))]:border-l border-l-border transition-colors cursor-pointer group/cell ${
                       !isCurrentMonth ? "bg-gray-50/40" : "bg-card"
@@ -809,6 +1158,7 @@ export default function CalendarPage() {
                             setSelectedDay(date);
                             setDayModalDate(date);
                             setDayModalFilter("all");
+                            setDayModalSearch("");
                           }}
                           className="w-full text-left text-[9px] sm:text-[10px] font-bold text-brand hover:text-brand-dark bg-brand/5 hover:bg-brand/10 border border-brand/20 px-1.5 py-0.5 rounded-md flex items-center justify-between transition-all cursor-pointer shadow-2xs hover:shadow-xs"
                           title={`Click to view all ${dayBookings.length} events for ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
@@ -840,6 +1190,7 @@ export default function CalendarPage() {
                 onClick={() => {
                   setDayModalDate(selectedDay);
                   setDayModalFilter("all");
+                  setDayModalSearch("");
                 }}
                 className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand text-white shadow-2xs cursor-pointer flex items-center gap-1"
               >
@@ -884,6 +1235,7 @@ export default function CalendarPage() {
                     onClick={() => {
                       setDayModalDate(selectedDay);
                       setDayModalFilter("all");
+                      setDayModalSearch("");
                     }}
                     className="w-full text-center py-1.5 text-xs font-bold text-brand bg-white rounded-xl border border-brand/20 shadow-2xs"
                   >
@@ -929,259 +1281,10 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ======================================================== */}
-      {/* DAY EVENTS MODAL: Shows ALL events for clicked day       */}
-      {/* Solves "+10 more events" visibility completely!          */}
-      {/* ======================================================== */}
-      {dayModalDate && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-fade-in"
-          onClick={() => setDayModalDate(null)}
-        >
-          <div
-            className="bg-card w-full max-w-2xl max-h-[88vh] rounded-2xl sm:rounded-3xl border border-border shadow-2xl flex flex-col overflow-hidden bg-white animate-scale-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="p-4 sm:p-6 border-b border-border bg-gray-50/70 flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-brand/10 text-brand flex items-center justify-center shrink-0 shadow-2xs">
-                  <CalendarIcon size={22} />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-text-primary flex items-center gap-2 flex-wrap">
-                    <span>
-                      {dayModalDate.toLocaleDateString("en-GB", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </span>
-                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-brand text-white shadow-2xs">
-                      {allBookings.filter((b) => b.date.toDateString() === dayModalDate.toDateString()).length} events
-                    </span>
-                  </h3>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    All fleet pickups, returns, and delivery schedules for this date
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setDayModalDate(null)}
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-gray-200/70 transition-colors cursor-pointer shrink-0"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Filter Pills inside Modal (All / Pickups / Returns) */}
-            <div className="px-4 sm:px-6 py-2.5 border-b border-border bg-white flex items-center justify-between gap-3 overflow-x-auto no-scrollbar">
-              <div className="flex items-center gap-1.5">
-                {[
-                  {
-                    key: "all" as const,
-                    label: "All Events",
-                    count: allBookings.filter((b) => b.date.toDateString() === dayModalDate.toDateString()).length,
-                  },
-                  {
-                    key: "pickup" as const,
-                    label: "Pickups (Start)",
-                    count: allBookings.filter(
-                      (b) => b.date.toDateString() === dayModalDate.toDateString() && b.type === "pickup"
-                    ).length,
-                  },
-                  {
-                    key: "return" as const,
-                    label: "Returns (End)",
-                    count: allBookings.filter(
-                      (b) => b.date.toDateString() === dayModalDate.toDateString() && b.type === "return"
-                    ).length,
-                  },
-                ].map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setDayModalFilter(item.key)}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                      dayModalFilter === item.key
-                        ? "bg-brand text-white shadow-xs"
-                        : "bg-gray-100 text-text-secondary hover:bg-gray-200 hover:text-text-primary"
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                        dayModalFilter === item.key ? "bg-white/25 text-white" : "bg-gray-200 text-text-primary"
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <Link
-                href="/bookings/new"
-                className="text-xs font-semibold text-brand hover:underline flex items-center gap-1 whitespace-nowrap shrink-0"
-              >
-                <Plus size={13} />
-                <span>New Booking</span>
-              </Link>
-            </div>
-
-            {/* Modal Body: Scrollable list of full event cards */}
-            <div className="p-4 sm:p-6 overflow-y-auto space-y-3.5 flex-1">
-              {modalDayBookings.length === 0 ? (
-                <div className="text-center py-12 px-4 space-y-3">
-                  <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto text-gray-400">
-                    <CalendarIcon size={26} />
-                  </div>
-                  <h4 className="text-sm font-bold text-text-primary">No events found for this selection</h4>
-                  <p className="text-xs text-text-secondary max-w-sm mx-auto">
-                    There are no contracts or handovers matching the selected filter for this day.
-                  </p>
-                </div>
-              ) : (
-                modalDayBookings.map((b) => (
-                  <div
-                    key={b.id}
-                    className={`rounded-2xl border p-4 sm:p-4.5 transition-all shadow-2xs hover:shadow-sm bg-white flex flex-col gap-3 ${
-                      b.type === "pickup"
-                        ? "border-blue-200 hover:border-blue-400"
-                        : b.isReturned
-                        ? "border-emerald-200 hover:border-emerald-400"
-                        : b.isOverdue
-                        ? "border-rose-300 hover:border-rose-400 bg-rose-50/20"
-                        : "border-purple-200 hover:border-purple-400"
-                    }`}
-                  >
-                    {/* Top Row: Type Pill, Time, Contract Number, Status Badge */}
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Time Badge */}
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 text-text-primary text-xs font-extrabold tabular-nums border border-border">
-                          <Clock size={12} className="text-brand" />
-                          <span>{b.formattedHour}</span>
-                        </span>
-
-                        {/* Event Type Pill */}
-                        <span
-                          className={`text-xs font-bold px-2.5 py-0.5 rounded-lg border ${
-                            b.type === "pickup"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : b.isReturned
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : b.isOverdue
-                              ? "bg-rose-50 text-rose-700 border-rose-200"
-                              : "bg-purple-50 text-purple-700 border-purple-200"
-                          }`}
-                        >
-                          {b.type === "pickup" ? "🚗 Start / Handover" : b.isReturned ? "✅ Returned to Fleet" : b.isOverdue ? "⚠️ Overdue Return" : "🔄 Expected Return"}
-                        </span>
-
-                        {/* Contract Identifier */}
-                        <span className="text-xs font-bold font-mono text-text-primary">
-                          {b.displayNum}
-                        </span>
-                      </div>
-
-                      {/* Status Badge */}
-                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${b.badgeClass}`}>
-                        {b.statusLabel}
-                      </span>
-                    </div>
-
-                    {/* Middle Row: Vehicle & Customer Info */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-gray-100">
-                      {/* Vehicle Column */}
-                      <div className="flex items-start gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 text-text-muted mt-0.5">
-                          <Car size={16} />
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-xs font-bold text-text-primary block truncate">
-                            {b.car}
-                          </span>
-                          {b.carPlate && (
-                            <span className="text-[11px] font-semibold text-text-muted block font-mono">
-                              Plate: {b.carPlate} {b.carColor ? `• ${b.carColor}` : ""}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Client Column */}
-                      <div className="flex items-start gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-brand/10 flex items-center justify-center shrink-0 text-brand font-bold text-xs mt-0.5">
-                          {getInitials(b.client)}
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-xs font-bold text-text-primary block truncate">
-                            {b.client}
-                          </span>
-                          {b.clientPhone && (
-                            <span className="text-[11px] text-text-secondary block font-mono flex items-center gap-1">
-                              <Phone size={10} className="text-text-muted" />
-                              {b.clientPhone}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom Row: Driver, Location, and Details Button */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-gray-100 text-xs">
-                      <div className="flex items-center gap-4 text-text-secondary flex-wrap">
-                        {b.driver ? (
-                          <span className="flex items-center gap-1 font-medium">
-                            <User size={13} className="text-text-muted" />
-                            <span>Driver: <strong className="text-text-primary">{b.driver}</strong></span>
-                          </span>
-                        ) : (
-                          <span className="text-text-muted italic text-[11px]">Showroom Handover</span>
-                        )}
-
-                        {b.location && (
-                          <span className="flex items-center gap-1 font-medium truncate max-w-[220px]">
-                            <MapPin size={13} className="text-text-muted shrink-0" />
-                            <span className="truncate">{b.location}</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedContractForDetails(b.rawContract)}
-                        className="px-3 py-1.5 rounded-xl bg-brand/10 hover:bg-brand/20 text-brand font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                      >
-                        <Eye size={13} />
-                        <span>View Contract Details</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-3.5 sm:p-4 border-t border-border bg-gray-50/70 flex items-center justify-between gap-3 text-xs">
-              <span className="text-text-muted font-medium">
-                Showing {modalDayBookings.length} scheduled event(s)
-              </span>
-              <button
-                type="button"
-                onClick={() => setDayModalDate(null)}
-                className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-text-primary font-bold transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Render Day Events Modal into Portal (Identical to CreateClientModal Portal) */}
+      {mounted && typeof document !== "undefined" && dayModalContent
+        ? createPortal(dayModalContent, document.body)
+        : null}
 
       {/* Contract Details Modal */}
       {selectedContractForDetails && (
