@@ -10,17 +10,10 @@ import {
   X,
   Send,
   Sparkles,
-  ExternalLink,
-  Car,
-  User,
-  FileText,
-  Calendar,
-  Layers,
   Phone,
   ArrowRight,
   Maximize2,
   Minimize2,
-  CheckCircle2,
 } from "lucide-react";
 
 interface SearchClientItem {
@@ -135,7 +128,7 @@ export default function SiriAssistant() {
     }
   }, [lang]);
 
-  // When speech transcript stops and has text, automatically submit after a brief pause
+  // When speech transcript stops and has text, automatically submit
   useEffect(() => {
     if (!isListening && transcript.trim().length > 0) {
       const textToSubmit = transcript.trim();
@@ -157,7 +150,7 @@ export default function SiriAssistant() {
       if (isMuted || !synthRef.current || typeof window === "undefined") return;
 
       try {
-        synthRef.current.cancel(); // Stop any previous speech
+        synthRef.current.cancel();
         const cleanText = text
           .replace(/[#*_~`]/g, "")
           .replace(/\[.*?\]/g, "")
@@ -168,7 +161,6 @@ export default function SiriAssistant() {
         utterance.rate = 1.0;
         utterance.pitch = 1.05;
 
-        // Try to pick natural Arabic or English voice
         const voices = synthRef.current.getVoices();
         const preferredVoice = voices.find((v) =>
           lang === "ar" ? v.lang.startsWith("ar") : v.lang.startsWith("en")
@@ -196,7 +188,6 @@ export default function SiriAssistant() {
       } catch {}
       setIsListening(false);
     } else {
-      // Cancel any ongoing speaking before listening
       if (synthRef.current) synthRef.current.cancel();
       setIsSpeaking(false);
 
@@ -252,7 +243,6 @@ export default function SiriAssistant() {
       setMessages((prev) => [...prev, assistantMsg]);
       speakText(replyText);
 
-      // If action is navigate or create contract, execute navigation after a brief speaking pause
       if (data.navigateUrl) {
         setTimeout(() => {
           router.push(data.navigateUrl);
@@ -275,46 +265,39 @@ export default function SiriAssistant() {
   return (
     <>
       {/* ============================================================ */}
-      {/* 🔮 FLOATING SIRI ORB BUTTON (Bottom-Right)                    */}
+      {/* 🔴 FLOATING BUTTON (Bottom-Right, Leon Red & White)          */}
       {/* ============================================================ */}
       {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-[90] flex items-center gap-3">
-          {/* Subtle pulsating callout bubble */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 text-white text-xs font-semibold backdrop-blur-md border border-white/10 shadow-lg animate-fade-in pointer-events-none select-none">
-            <Sparkles size={13} className="text-cyan-400 animate-spin-slow" />
-            <span>Leon Siri Voice</span>
+        <div className="fixed bottom-6 right-6 z-[90] flex items-center gap-2.5">
+          {/* Subtle callout label */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-gray-800 text-xs font-bold border border-gray-200 shadow-md animate-fade-in pointer-events-none select-none">
+            <span className="w-2 h-2 rounded-full bg-brand animate-ping" />
+            <span>Leon Voice AI</span>
           </div>
 
           <button
             type="button"
             onClick={() => {
               setIsOpen(true);
-              // Start listening automatically on open for true Siri experience
               setTimeout(() => {
                 toggleListening();
               }, 400);
             }}
             title="Leon Voice Assistant (اضغط للتحدث مع المساعد الصوتي)"
-            className="group relative w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center p-0.5 cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95 shadow-[0_0_25px_rgba(99,102,241,0.5)] hover:shadow-[0_0_35px_rgba(6,182,212,0.7)]"
+            className="group relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-brand text-white shadow-[0_8px_25px_rgba(229,57,53,0.38)] hover:shadow-[0_12px_32px_rgba(229,57,53,0.55)] border-2 border-white flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
           >
-            {/* Multi-layered Siri animated glowing ring */}
-            <span className="absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-400 via-indigo-500 to-fuchsia-500 animate-spin-slow opacity-85 group-hover:opacity-100 blur-[2px]" />
-            <span className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 opacity-40 blur-md group-hover:opacity-75 transition-opacity animate-pulse" />
+            {/* Ambient red breathing wave */}
+            <span className="absolute -inset-1 rounded-full bg-brand opacity-25 animate-ping pointer-events-none" />
 
-            {/* Siri Orb Inner Core */}
-            <span className="relative w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden border border-white/20">
-              {/* Internal iridescent light mesh */}
-              <span className="absolute inset-0 bg-radial from-cyan-400/30 via-indigo-600/30 to-transparent animate-pulse" />
-              <div className="relative flex items-center justify-center">
-                <Mic size={22} className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-              </div>
-            </span>
+            <div className="relative flex items-center justify-center">
+              <Mic size={24} className="text-white drop-shadow-sm" />
+            </div>
           </button>
         </div>
       )}
 
       {/* ============================================================ */}
-      {/* 🌌 SIRI APPLE-STYLE VOICE OVERLAY MODAL                     */}
+      {/* ⚪ RED & WHITE ASSISTANT MODAL                              */}
       {/* ============================================================ */}
       {isOpen && (
         <div
@@ -322,28 +305,25 @@ export default function SiriAssistant() {
             isExpanded
               ? "inset-4 sm:inset-10 max-w-4xl mx-auto rounded-3xl"
               : "bottom-5 right-5 sm:bottom-6 sm:right-6 w-[390px] sm:w-[430px] max-w-[calc(100vw-2.5rem)] h-[620px] max-h-[calc(100vh-3rem)] rounded-3xl"
-          } bg-slate-950/92 backdrop-blur-2xl border border-white/15 shadow-[0_25px_70px_rgba(0,0,0,0.75)] overflow-hidden text-white font-sans`}
+          } bg-white border border-gray-200 shadow-[0_20px_60px_rgba(0,0,0,0.18)] overflow-hidden text-gray-900 font-sans`}
         >
-          {/* Glowing Atmospheric Aura */}
-          <div className="absolute -top-32 -right-32 w-80 h-80 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-fuchsia-500/15 rounded-full blur-3xl pointer-events-none" />
+          {/* Subtle Red Top Gradient Accent Line */}
+          <div className="h-1.5 w-full bg-gradient-to-r from-brand-dark via-brand to-red-400" />
 
-          {/* ===== HEADER ===== */}
-          <div className="relative z-10 px-5 py-4 border-b border-white/10 flex items-center justify-between bg-white/[0.03]">
+          {/* ===== HEADER (Clean White & Red) ===== */}
+          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-white">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-400 via-indigo-500 to-fuchsia-500 p-0.5 flex items-center justify-center shadow-[0_0_12px_rgba(99,102,241,0.5)]">
-                <div className="w-full h-full bg-slate-950 rounded-full flex items-center justify-center">
-                  <Sparkles size={14} className="text-cyan-300" />
-                </div>
+              <div className="w-8 h-8 rounded-full bg-red-50 text-brand border border-red-200 flex items-center justify-center shadow-2xs">
+                <Sparkles size={16} className="text-brand" />
               </div>
               <div>
-                <h3 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
-                  <span>Leon Siri AI</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                  <span>Leon Assistant</span>
+                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-red-50 text-brand border border-red-200 font-bold">
                     Voice
                   </span>
                 </h3>
-                <p className="text-[10px] text-white/50">
+                <p className="text-[10px] text-gray-500 font-medium">
                   {isListening ? "Listening..." : isSpeaking ? "Speaking..." : "Ready"}
                 </p>
               </div>
@@ -354,7 +334,7 @@ export default function SiriAssistant() {
               <button
                 type="button"
                 onClick={() => setLang((l) => (l === "ar" ? "en" : "ar"))}
-                className="px-2 py-1 text-[11px] font-bold rounded-lg bg-white/5 hover:bg-white/10 text-white/80 transition-colors border border-white/10 cursor-pointer"
+                className="px-2.5 py-1 text-xs font-bold rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 transition-colors border border-gray-200 cursor-pointer"
                 title="Change language (تغيير اللغة)"
               >
                 {lang === "ar" ? "عربي" : "EN"}
@@ -368,8 +348,10 @@ export default function SiriAssistant() {
                   if (synthRef.current) synthRef.current.cancel();
                   setIsSpeaking(false);
                 }}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  isMuted ? "bg-red-500/20 text-red-400" : "bg-white/5 hover:bg-white/10 text-white/70"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer border ${
+                  isMuted
+                    ? "bg-red-50 text-brand border-red-200"
+                    : "bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200"
                 }`}
                 title={isMuted ? "Unmute voice" : "Mute voice"}
               >
@@ -380,7 +362,7 @@ export default function SiriAssistant() {
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="hidden sm:inline-flex p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 transition-colors cursor-pointer"
+                className="hidden sm:inline-flex p-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 transition-colors cursor-pointer"
                 title={isExpanded ? "Minimize" : "Expand"}
               >
                 {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -398,87 +380,77 @@ export default function SiriAssistant() {
                   setIsSpeaking(false);
                   setIsOpen(false);
                 }}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 hover:text-white transition-colors cursor-pointer"
-                title="Close Siri"
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
+                title="Close"
               >
                 <X size={16} />
               </button>
             </div>
           </div>
 
-          {/* ===== SIRI ANIMATED ORB (Center Highlight) ===== */}
-          <div className="relative z-10 py-6 flex flex-col items-center justify-center border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
-            {/* Siri Orb Graphic */}
+          {/* ===== RED ORB CENTER (Iconic Brand Voice Visual) ===== */}
+          <div className="py-5 flex flex-col items-center justify-center border-b border-gray-100 bg-gradient-to-b from-red-50/40 to-white">
             <button
               type="button"
               onClick={toggleListening}
               className="group relative cursor-pointer focus:outline-none transition-transform duration-300 hover:scale-105 active:scale-95"
-              title={isListening ? "Listening... Tap to stop" : "Tap to speak with Siri"}
+              title={isListening ? "Listening... Tap to stop" : "Tap to speak with Leon"}
             >
-              {/* Outer Ripple Waves when active */}
+              {/* Outer Ripple Wave Rings when active */}
               {(isListening || isSpeaking) && (
                 <>
-                  <span className="absolute -inset-4 rounded-full bg-cyan-500/25 animate-ping opacity-60" />
-                  <span className="absolute -inset-8 rounded-full bg-indigo-500/20 animate-pulse blur-md" />
+                  <span className="absolute -inset-3 rounded-full bg-red-500/20 animate-ping opacity-60" />
+                  <span className="absolute -inset-6 rounded-full bg-red-500/10 animate-pulse border border-red-200" />
                 </>
               )}
 
-              {/* Siri Multi-Colored Swirling Orb */}
+              {/* Leon Red Core Orb */}
               <div
-                className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full p-1 flex items-center justify-center shadow-[0_0_40px_rgba(99,102,241,0.6)] ${
+                className={`relative w-20 h-20 sm:w-22 sm:h-22 rounded-full p-1 flex items-center justify-center shadow-[0_8px_30px_rgba(229,57,53,0.35)] transition-all duration-300 ${
                   isListening
-                    ? "shadow-[0_0_50px_rgba(6,182,212,0.8)] scale-105"
+                    ? "shadow-[0_10px_35px_rgba(229,57,53,0.55)] scale-105"
                     : isSpeaking
-                    ? "shadow-[0_0_50px_rgba(236,72,153,0.8)]"
+                    ? "shadow-[0_10px_35px_rgba(198,40,40,0.55)]"
                     : ""
                 }`}
               >
-                {/* Dynamic rotating gradient mesh */}
-                <div
-                  className={`absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-400 via-indigo-600 via-purple-500 to-pink-500 transition-all duration-700 ${
-                    isListening || isSpeaking ? "animate-spin-slow opacity-100" : "opacity-80"
-                  }`}
-                />
+                {/* Red Brand Gradient Background */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-brand-dark via-brand to-red-500" />
 
-                {/* Inner glowing sphere */}
-                <div className="relative w-full h-full rounded-full bg-slate-950/80 backdrop-blur-md flex items-center justify-center overflow-hidden border border-white/20">
-                  <div
-                    className={`absolute inset-0 bg-radial from-cyan-400/40 via-purple-600/30 to-transparent transition-all ${
-                      isListening ? "animate-pulse" : ""
-                    }`}
-                  />
+                {/* Inner Circle Sheen */}
+                <div className="relative w-full h-full rounded-full bg-brand flex items-center justify-center border-2 border-white/30 shadow-inner">
                   <Mic
                     size={28}
-                    className={`relative z-10 transition-colors drop-shadow-[0_0_10px_rgba(255,255,255,0.9)] ${
-                      isListening ? "text-cyan-300 animate-pulse" : "text-white"
+                    className={`text-white transition-all drop-shadow-sm ${
+                      isListening ? "scale-110 animate-pulse" : ""
                     }`}
                   />
                 </div>
               </div>
             </button>
 
-            {/* Transcript & Status Label */}
+            {/* Transcript & Status Text */}
             <div className="mt-3 text-center px-6 max-w-sm">
               {isListening ? (
-                <p className="text-xs text-cyan-300 font-semibold flex items-center justify-center gap-1.5 animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <p className="text-xs text-brand font-bold flex items-center justify-center gap-1.5 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-brand animate-ping" />
                   <span>{transcript || "Listening... Speak now (تحدث الآن)"}</span>
                 </p>
               ) : isSpeaking ? (
-                <p className="text-xs text-pink-300 font-semibold flex items-center justify-center gap-1.5 animate-pulse">
-                  <Volume2 size={14} />
+                <p className="text-xs text-brand font-bold flex items-center justify-center gap-1.5 animate-pulse">
+                  <Volume2 size={14} className="text-brand" />
                   <span>Leon is speaking...</span>
                 </p>
               ) : (
-                <p className="text-xs text-white/50 font-medium">
-                  اضغط على الدائرة للتحدث • أو اكتب استفسارك بالأسفل
+                <p className="text-xs text-gray-500 font-medium">
+                  اضغط على الدائرة الحمراء للتحدث • أو اكتب استفسارك بالأسفل
                 </p>
               )}
             </div>
           </div>
 
-          {/* ===== CONVERSATION FEED ===== */}
-          <div className="relative z-10 flex-1 overflow-y-auto px-4 py-3 space-y-3.5 scrollbar-thin scrollbar-thumb-white/10">
+          {/* ===== CONVERSATION FEED (Pure White & Red) ===== */}
+          <div className="flex-1 overflow-y-auto px-4 py-3.5 space-y-3.5 bg-white scrollbar-thin scrollbar-thumb-gray-200">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -487,8 +459,8 @@ export default function SiriAssistant() {
                 <div
                   className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                     msg.sender === "user"
-                      ? "bg-gradient-to-r from-brand to-indigo-600 text-white rounded-br-xs shadow-md font-medium"
-                      : "bg-white/[0.08] text-white/95 border border-white/10 rounded-bl-xs shadow-sm"
+                      ? "bg-brand text-white rounded-br-xs shadow-xs font-semibold"
+                      : "bg-gray-50 text-gray-900 border border-gray-200 rounded-bl-xs shadow-2xs font-normal"
                   }`}
                   dir={msg.text.match(/[\u0600-\u06FF]/) ? "rtl" : "ltr"}
                 >
@@ -496,11 +468,11 @@ export default function SiriAssistant() {
 
                   {/* Navigation Action Button */}
                   {msg.navigateUrl && (
-                    <div className="mt-2.5 pt-2 border-t border-white/10">
+                    <div className="mt-2.5 pt-2 border-t border-gray-200/80">
                       <button
                         type="button"
                         onClick={() => router.push(msg.navigateUrl!)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
                       >
                         <span>انتقل إلى الصفحة الآن</span>
                         <ArrowRight size={13} />
@@ -508,25 +480,25 @@ export default function SiriAssistant() {
                     </div>
                   )}
 
-                  {/* ===== RICH SEARCH RESULT CARDS ===== */}
+                  {/* ===== CLIENTS SEARCH RESULTS ===== */}
                   {msg.data?.type === "clients" && msg.data.items && (
-                    <div className="mt-2.5 space-y-2 pt-2 border-t border-white/10">
+                    <div className="mt-2.5 space-y-2 pt-2 border-t border-gray-200">
                       {msg.data.items.map((client: SearchClientItem) => (
                         <div
                           key={client.id}
                           onClick={() => router.push(`/clients`)}
-                          className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-between gap-2 transition-all cursor-pointer"
+                          className="p-2.5 rounded-xl bg-white hover:bg-red-50/50 border border-gray-200 hover:border-red-300 flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs"
                         >
                           <div className="min-w-0">
-                            <strong className="text-xs font-bold text-cyan-300 block truncate">
+                            <strong className="text-xs font-bold text-gray-900 block truncate">
                               {client.name}
                             </strong>
-                            <p className="text-[11px] text-white/60 flex items-center gap-1 mt-0.5">
-                              <Phone size={10} />
+                            <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                              <Phone size={10} className="text-brand" />
                               <span>{client.phone}</span>
                             </p>
                           </div>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold shrink-0">
                             {client.status || "Active"}
                           </span>
                         </div>
@@ -534,27 +506,28 @@ export default function SiriAssistant() {
                     </div>
                   )}
 
+                  {/* ===== VEHICLES SEARCH RESULTS ===== */}
                   {msg.data?.type === "vehicles" && msg.data.items && (
-                    <div className="mt-2.5 space-y-2 pt-2 border-t border-white/10">
+                    <div className="mt-2.5 space-y-2 pt-2 border-t border-gray-200">
                       {msg.data.items.map((veh: SearchVehicleItem) => (
                         <div
                           key={veh.id}
                           onClick={() => router.push(`/units/${veh.id}`)}
-                          className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-between gap-2 transition-all cursor-pointer"
+                          className="p-2.5 rounded-xl bg-white hover:bg-red-50/50 border border-gray-200 hover:border-red-300 flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs"
                         >
                           <div className="min-w-0">
-                            <strong className="text-xs font-bold text-white block truncate">
+                            <strong className="text-xs font-bold text-gray-900 block truncate">
                               {veh.title}
                             </strong>
-                            <p className="text-[11px] text-amber-300 font-mono mt-0.5">
+                            <p className="text-[11px] text-brand font-mono font-bold mt-0.5">
                               Plate: {veh.plate}
                             </p>
                           </div>
                           <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 ${
+                            className={`text-[10px] px-2 py-0.5 rounded-full border font-bold shrink-0 ${
                               veh.status === "Available"
-                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                                : "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-blue-50 text-blue-700 border-blue-200"
                             }`}
                           >
                             {veh.status}
@@ -564,21 +537,22 @@ export default function SiriAssistant() {
                     </div>
                   )}
 
+                  {/* ===== CONTRACTS SEARCH RESULTS ===== */}
                   {msg.data?.type === "contracts" && msg.data.items && (
-                    <div className="mt-2.5 space-y-2 pt-2 border-t border-white/10">
+                    <div className="mt-2.5 space-y-2 pt-2 border-t border-gray-200">
                       {msg.data.items.map((cnt: SearchContractItem) => (
                         <div
                           key={cnt.id}
                           onClick={() => router.push(`/bookings`)}
-                          className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-between gap-2 transition-all cursor-pointer"
+                          className="p-2.5 rounded-xl bg-white hover:bg-red-50/50 border border-gray-200 hover:border-red-300 flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs"
                         >
                           <div className="min-w-0">
-                            <strong className="text-xs font-bold text-cyan-300 block truncate">
+                            <strong className="text-xs font-bold text-gray-900 block truncate">
                               Contract #{cnt.contractNumber} • {cnt.customer}
                             </strong>
-                            <p className="text-[11px] text-white/60 truncate mt-0.5">{cnt.vehicle}</p>
+                            <p className="text-[11px] text-gray-500 truncate mt-0.5">{cnt.vehicle}</p>
                           </div>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-brand border border-red-200 font-bold shrink-0">
                             {cnt.status}
                           </span>
                         </div>
@@ -586,44 +560,45 @@ export default function SiriAssistant() {
                     </div>
                   )}
 
+                  {/* ===== OVERVIEW STATS CARDS ===== */}
                   {msg.data?.type === "overview" && msg.data.stats && (
-                    <div className="mt-2.5 grid grid-cols-2 gap-2 pt-2 border-t border-white/10">
-                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-center">
-                        <span className="text-[10px] text-white/50 block">السيارات المتوفرة</span>
-                        <strong className="text-sm font-bold text-emerald-400">
+                    <div className="mt-2.5 grid grid-cols-2 gap-2 pt-2 border-t border-gray-200">
+                      <div className="p-2.5 rounded-xl bg-white border border-gray-200 text-center shadow-2xs">
+                        <span className="text-[10px] text-gray-500 font-medium block">السيارات المتوفرة</span>
+                        <strong className="text-sm font-bold text-emerald-600">
                           {msg.data.stats.availableUnits}
                         </strong>
                       </div>
-                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-center">
-                        <span className="text-[10px] text-white/50 block">العقود النشطة</span>
-                        <strong className="text-sm font-bold text-cyan-400">
+                      <div className="p-2.5 rounded-xl bg-white border border-gray-200 text-center shadow-2xs">
+                        <span className="text-[10px] text-gray-500 font-medium block">العقود النشطة</span>
+                        <strong className="text-sm font-bold text-brand">
                           {msg.data.stats.activeContracts}
                         </strong>
                       </div>
-                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-center">
-                        <span className="text-[10px] text-white/50 block">السيارات المؤجرة</span>
-                        <strong className="text-sm font-bold text-blue-400">
+                      <div className="p-2.5 rounded-xl bg-white border border-gray-200 text-center shadow-2xs">
+                        <span className="text-[10px] text-gray-500 font-medium block">السيارات المؤجرة</span>
+                        <strong className="text-sm font-bold text-blue-600">
                           {msg.data.stats.rentedUnits}
                         </strong>
                       </div>
-                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-center">
-                        <span className="text-[10px] text-white/50 block">إجمالي الأسطول</span>
-                        <strong className="text-sm font-bold text-white">
+                      <div className="p-2.5 rounded-xl bg-white border border-gray-200 text-center shadow-2xs">
+                        <span className="text-[10px] text-gray-500 font-medium block">إجمالي الأسطول</span>
+                        <strong className="text-sm font-bold text-gray-900">
                           {msg.data.stats.totalUnits}
                         </strong>
                       </div>
                     </div>
                   )}
                 </div>
-                <span className="text-[9px] text-white/40 mt-1 px-1">
+                <span className="text-[9px] text-gray-400 mt-1 px-1">
                   {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
             ))}
 
             {isProcessing && (
-              <div className="flex items-center gap-2 text-white/60 text-xs px-2 animate-pulse">
-                <Sparkles size={13} className="text-cyan-400 animate-spin" />
+              <div className="flex items-center gap-2 text-gray-500 text-xs px-2 animate-pulse">
+                <Sparkles size={13} className="text-brand animate-spin" />
                 <span>جاري المعالجة والبحث...</span>
               </div>
             )}
@@ -631,40 +606,40 @@ export default function SiriAssistant() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ===== SUGGESTION PILLS ===== */}
-          <div className="relative z-10 px-4 py-2 border-t border-white/5 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          {/* ===== SUGGESTION PILLS (Clean White & Red) ===== */}
+          <div className="px-4 py-2 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto scrollbar-none bg-white">
             <button
               type="button"
               onClick={() => handleSendMessage("أنشئ عقد جديد")}
-              className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-medium border border-white/10 shrink-0 cursor-pointer transition-colors"
+              className="px-2.5 py-1 rounded-full bg-white hover:bg-red-50 text-gray-700 hover:text-brand text-[11px] font-bold border border-gray-200 hover:border-red-200 shrink-0 cursor-pointer transition-colors shadow-2xs"
             >
               📝 إنشاء عقد
             </button>
             <button
               type="button"
               onClick={() => handleSendMessage("كم سيارة متوفرة اليوم؟")}
-              className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-medium border border-white/10 shrink-0 cursor-pointer transition-colors"
+              className="px-2.5 py-1 rounded-full bg-white hover:bg-red-50 text-gray-700 hover:text-brand text-[11px] font-bold border border-gray-200 hover:border-red-200 shrink-0 cursor-pointer transition-colors shadow-2xs"
             >
               🚗 السيارات المتوفرة
             </button>
             <button
               type="button"
               onClick={() => handleSendMessage("ابحث عن عميل")}
-              className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-medium border border-white/10 shrink-0 cursor-pointer transition-colors"
+              className="px-2.5 py-1 rounded-full bg-white hover:bg-red-50 text-gray-700 hover:text-brand text-[11px] font-bold border border-gray-200 hover:border-red-200 shrink-0 cursor-pointer transition-colors shadow-2xs"
             >
               🔍 بحث عن عميل
             </button>
             <button
               type="button"
               onClick={() => handleSendMessage("افتح التقويم")}
-              className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-medium border border-white/10 shrink-0 cursor-pointer transition-colors"
+              className="px-2.5 py-1 rounded-full bg-white hover:bg-red-50 text-gray-700 hover:text-brand text-[11px] font-bold border border-gray-200 hover:border-red-200 shrink-0 cursor-pointer transition-colors shadow-2xs"
             >
               📅 التقويم
             </button>
           </div>
 
-          {/* ===== INPUT BAR ===== */}
-          <div className="relative z-10 p-3.5 border-t border-white/10 bg-slate-900/60">
+          {/* ===== INPUT BAR (Clean White & Red) ===== */}
+          <div className="p-3.5 border-t border-gray-200 bg-gray-50/80">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -672,14 +647,14 @@ export default function SiriAssistant() {
               }}
               className="flex items-center gap-2"
             >
-              {/* Mic Button */}
+              {/* Mic Toggle Button */}
               <button
                 type="button"
                 onClick={toggleListening}
-                className={`p-2.5 rounded-xl transition-all cursor-pointer shrink-0 ${
+                className={`p-2.5 rounded-xl transition-all cursor-pointer shrink-0 border ${
                   isListening
-                    ? "bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.6)] animate-pulse"
-                    : "bg-white/10 hover:bg-white/15 text-white"
+                    ? "bg-brand text-white border-brand shadow-[0_0_12px_rgba(229,57,53,0.5)] animate-pulse"
+                    : "bg-white hover:bg-red-50 text-gray-700 hover:text-brand border-gray-200 shadow-2xs"
                 }`}
                 title={isListening ? "Stop listening" : "Start voice recognition"}
               >
@@ -692,14 +667,14 @@ export default function SiriAssistant() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder={lang === "ar" ? "تحدث أو اكتب أمرك هنا..." : "Speak or type a command..."}
-                className="flex-1 bg-white/[0.06] border border-white/15 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white placeholder-white/40 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/40"
+                className="flex-1 bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30 shadow-2xs font-medium"
                 dir={inputValue.match(/[\u0600-\u06FF]/) ? "rtl" : "ltr"}
               />
 
               <button
                 type="submit"
                 disabled={!inputValue.trim() || isProcessing}
-                className="p-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 disabled:opacity-30 disabled:hover:bg-cyan-500 text-slate-950 font-bold transition-all cursor-pointer shrink-0"
+                className="p-2.5 rounded-xl bg-brand hover:bg-brand-dark active:scale-95 disabled:opacity-40 disabled:hover:bg-brand text-white font-bold transition-all cursor-pointer shrink-0 shadow-xs"
               >
                 <Send size={15} />
               </button>
@@ -710,4 +685,3 @@ export default function SiriAssistant() {
     </>
   );
 }
-
