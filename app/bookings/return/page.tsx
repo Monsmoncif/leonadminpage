@@ -144,6 +144,7 @@ function ReturnPageContent() {
 
   // In-Store Return form states
   const [returnOdometer, setReturnOdometer] = useState<string>("");
+  const [returnDate, setReturnDate] = useState<string>("");
   const [shopReturnTime, setShopReturnTime] = useState<string>("");
   const [hasDamages, setHasDamages] = useState<boolean>(false);
   const [damageDescription, setDamageDescription] = useState<string>("");
@@ -307,10 +308,18 @@ function ReturnPageContent() {
       
       setReturnDriverId(selectedContract.returnDriverId || "");
 
+      const contractReturnedDate = selectedContract.returnedAt
+        ? new Date(selectedContract.returnedAt).toISOString().split("T")[0]
+        : (selectedContract.endDate ? new Date(selectedContract.endDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]);
+      setReturnDate(contractReturnedDate);
+
       const nowTimeStr = getCurrentFormattedTime();
       if (selectedContract.checkinTime && selectedContract.checkinTime !== "Pending Handover" && selectedContract.checkinTime !== "Pending Return") {
         setScheduledTime(selectedContract.checkinTime);
         setShopReturnTime(selectedContract.checkinTime);
+      } else if (isPersonalized) {
+        setScheduledTime("");
+        setShopReturnTime("");
       } else {
         setScheduledTime(nowTimeStr);
         setShopReturnTime(nowTimeStr);
@@ -616,7 +625,12 @@ function ReturnPageContent() {
       return;
     }
 
-    if (!isPersonalized) {
+    if (isPersonalized) {
+      if (!shopReturnTime.trim()) {
+        toast.error("Please enter the return time (يرجى إدخال وقت الاسترجاع للعقد الشخصي).");
+        return;
+      }
+    } else {
       if (hasDamages && !damageDescription.trim()) {
         toast.error("Please describe the reported damages.");
         setCurrentStep(3);
@@ -651,6 +665,25 @@ function ReturnPageContent() {
       const nowTimeStr = getCurrentFormattedTime();
       const returnTime = shopReturnTime.trim() || scheduledTime || nowTimeStr;
 
+      let combinedReturnedAt = selectedContract.returnedAt || new Date().toISOString();
+      if (returnDate) {
+        try {
+          const d = new Date(returnDate);
+          if (returnTime) {
+            const match = returnTime.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+            if (match) {
+              let hours = parseInt(match[1], 10);
+              const minutes = parseInt(match[2], 10);
+              const ampm = match[3]?.toUpperCase();
+              if (ampm === "PM" && hours < 12) hours += 12;
+              if (ampm === "AM" && hours === 12) hours = 0;
+              d.setHours(hours, minutes, 0, 0);
+            }
+          }
+          combinedReturnedAt = d.toISOString();
+        } catch {}
+      }
+
       const payload = {
         status: "Completed",
         deliveryStatus: "Returned",
@@ -683,7 +716,7 @@ function ReturnPageContent() {
         returnPhotos: !isPersonalized ? orderedReturnPhotos : [],
         returnNotes: instructions.trim(),
         notes: cleanedNotes,
-        returnedAt: selectedContract.returnedAt || new Date().toISOString(),
+        returnedAt: combinedReturnedAt,
         returnedBy: selectedContract.returnedBy || (session?.user as any)?.name || "Admin",
       };
 
@@ -1019,6 +1052,24 @@ function ReturnPageContent() {
                   </h3>
 
                   <div className="space-y-3">
+                    {/* Return Date */}
+                    <div>
+                      <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
+                        <span>Return Date (تاريخ الاسترجاع)</span>
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={returnDate}
+                          onChange={(e) => setReturnDate(e.target.value)}
+                          className="w-full p-2.5 pl-8 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium text-text-primary"
+                          required
+                        />
+                        <Calendar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                      </div>
+                    </div>
+
                     {/* Check-in Return Time */}
                     <div>
                       <label className="text-xs font-semibold text-text-secondary block mb-1 flex items-center gap-1">
@@ -1031,7 +1082,7 @@ function ReturnPageContent() {
                             type="text"
                             value={shopReturnTime}
                             onChange={(e) => setShopReturnTime(e.target.value)}
-                            placeholder="e.g. 10:00 AM"
+                            placeholder="e.g. 10:00 AM or 05:30 PM"
                             className="w-full p-2.5 pl-8 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none font-medium"
                           />
                           <Clock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />

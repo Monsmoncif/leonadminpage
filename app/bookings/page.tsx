@@ -746,7 +746,7 @@ export default function ContractsPage() {
                                         payload.deliveryStatus = "Returned";
                                         payload.returnedAt = now.toISOString();
                                         if (isPersonalizedContract(contract)) {
-                                          payload.checkinTime = currentFormattedTime;
+                                          payload.checkinTime = contract.checkinTime || currentFormattedTime;
                                         }
                                       }
                                       const res = await fetch(`/api/contracts/${contract._id}`, {
@@ -785,7 +785,7 @@ export default function ContractsPage() {
                             {/* Actions Column (Matches Clients Page) */}
                             <td className="py-2 sm:py-2.5 px-2 sm:px-4">
                               <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
-                                {(contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
+                                {(!isPersonalizedContract(contract) && contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
                                   const isShop = isShopContract(contract);
                                   const nowStartOfDay = new Date();
                                   nowStartOfDay.setHours(0, 0, 0, 0);
@@ -881,7 +881,7 @@ export default function ContractsPage() {
                                 >
                                   <Edit size={14} />
                                 </Link>
-                                {contract.status === "Active" && contract.deliveryStatus === "Delivered" && (
+                                {contract.status === "Active" && (contract.deliveryStatus === "Delivered" || isPersonalizedContract(contract)) && (
                                   <Link 
                                     href={`/bookings/return?contractId=${contract._id}`}
                                     className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
@@ -890,44 +890,6 @@ export default function ContractsPage() {
                                   >
                                     <ArrowLeftRight size={14} />
                                   </Link>
-                                )}
-                                {contract.status === "Active" && isPersonalizedContract(contract) && (
-                                  <button
-                                    type="button"
-                                    className="p-1 sm:p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center"
-                                    title="Complete Contract (إنهاء العقد الشخصي)"
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        const now = new Date();
-                                        const currentFormattedTime = now.toLocaleTimeString("en-US", {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                          hour12: true,
-                                        });
-                                        const res = await fetch(`/api/contracts/${contract._id}`, {
-                                          method: "PUT",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({
-                                            status: "Completed",
-                                            deliveryStatus: "Returned",
-                                            returnedAt: now.toISOString(),
-                                            checkinTime: currentFormattedTime,
-                                          }),
-                                        });
-                                        if (!res.ok) {
-                                          const errJson = await res.json().catch(() => null);
-                                          throw new Error(errJson?.error || "Failed to complete contract");
-                                        }
-                                        toast.success("Personalized contract completed and finished!");
-                                        fetchContracts();
-                                      } catch (err: any) {
-                                        toast.error(err.message || "Failed to complete contract");
-                                      }
-                                    }}
-                                  >
-                                    <CheckCircle2 size={14} />
-                                  </button>
                                 )}
                                 {Boolean(contract.deliveryStatus === "Delivered" || contract.status === "Completed") && (
                                   <button 
