@@ -6,6 +6,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
 import { useSession } from "next-auth/react";
 import { SidebarProvider, useSidebar } from "@/components/layout/SidebarContext";
+import SiriAssistant from "@/components/ai/SiriAssistant";
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar();
@@ -18,6 +19,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <SiriAssistant />
     </div>
   );
 }
