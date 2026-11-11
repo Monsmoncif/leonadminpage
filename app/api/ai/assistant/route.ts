@@ -70,12 +70,14 @@ export async function POST(req: Request) {
 
     const lower = message.toLowerCase();
 
-    // 1. CREATE NEW CONTRACT
+    // 1. CREATE NEW CONTRACT / NEW BOOKING
     if (
       lower.includes("create contract") ||
       lower.includes("new contract") ||
       lower.includes("create booking") ||
       lower.includes("new booking") ||
+      lower.includes("make contract") ||
+      lower.includes("make a contract") ||
       message.includes("عقد جديد") ||
       message.includes("حجز جديد") ||
       message.includes("انشئ عقد") ||
@@ -93,73 +95,263 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. NAVIGATION COMMANDS
-    const navMap: { keywords: string[]; url: string; replyAr: string; replyEn: string }[] = [
-      {
-        keywords: ["calendar", "التقويم", "مواعيد", "جدول"],
-        url: "/calendar",
-        replyAr: "جاري فتح صفحة التقويم والمواعيد...",
-        replyEn: "Navigating to Calendar...",
-      },
-      {
-        keywords: ["booking", "contract", "الحجوزات", "العقود", "حجوزات"],
-        url: "/bookings",
-        replyAr: "جاري الانتقال إلى قائمة الحجوزات والعقود...",
-        replyEn: "Navigating to Bookings & Contracts...",
-      },
-      {
-        keywords: ["client", "customer", "العملاء", "الزبائن", "عميل"],
-        url: "/clients",
-        replyAr: "جاري فتح صفحة إدارة العملاء...",
-        replyEn: "Navigating to Clients directory...",
-      },
-      {
-        keywords: ["car", "cars", "unit", "units", "fleet", "السيارات", "الأسطول", "سيارات"],
-        url: "/units",
-        replyAr: "جاري فتح صفحة أسطول السيارات...",
-        replyEn: "Navigating to Vehicle Fleet...",
-      },
-      {
-        keywords: ["driver", "drivers", "السائقين", "سائق"],
-        url: "/drivers",
-        replyAr: "جاري الانتقال إلى إدارة السائقين...",
-        replyEn: "Navigating to Drivers management...",
-      },
-      {
-        keywords: ["setting", "settings", "whatsapp", "الإعدادات", "اعدادات", "واتساب"],
-        url: "/settings",
-        replyAr: "جاري فتح صفحة الإعدادات وبوابة الواتساب...",
-        replyEn: "Opening Settings & WhatsApp Gateway...",
-      },
-      {
-        keywords: ["dashboard", "home", "الرئيسية", "لوحة التحكم"],
-        url: "/",
-        replyAr: "جاري التوجه إلى لوحة التحكم الرئيسية...",
-        replyEn: "Going to Dashboard Overview...",
-      },
-    ];
+    // Common intent check for open / go to / show / details
+    const hasOpenOrDetails =
+      lower.includes("open") ||
+      lower.includes("go to") ||
+      lower.includes("show") ||
+      lower.includes("view") ||
+      lower.includes("navigate") ||
+      lower.includes("take me to") ||
+      lower.includes("details") ||
+      lower.includes("profile") ||
+      lower.includes("page") ||
+      message.includes("افتح") ||
+      message.includes("عرض") ||
+      message.includes("تفاصيل") ||
+      message.includes("صفحة") ||
+      message.includes("ملف") ||
+      message.includes("روح") ||
+      message.includes("انتقل") ||
+      message.includes("وديني") ||
+      message.includes("وريني") ||
+      message.includes("بيانات");
 
-    if (
-      lower.startsWith("go to") ||
-      lower.startsWith("open") ||
-      lower.startsWith("show") ||
-      message.startsWith("افتح") ||
-      message.startsWith("روح") ||
-      message.startsWith("انتقل") ||
-      message.startsWith("عرض")
-    ) {
-      for (const item of navMap) {
-        if (item.keywords.some((k) => lower.includes(k) || message.includes(k))) {
+    // 2. CLIENT PAGE / CLIENT DETAILS NAVIGATION
+    const isClientIntent =
+      lower.includes("client") ||
+      lower.includes("customer") ||
+      message.includes("عميل") ||
+      message.includes("العميل") ||
+      message.includes("العملاء") ||
+      message.includes("زبون") ||
+      message.includes("الزبائن");
+
+    if (isClientIntent && hasOpenOrDetails) {
+      const wantsDetails =
+        lower.includes("details") ||
+        lower.includes("profile") ||
+        lower.includes("page details") ||
+        message.includes("تفاصيل") ||
+        message.includes("ملف") ||
+        message.includes("بيانات");
+
+      // Extract client search query if any
+      const cleaned = message
+        .replace(/can you|please|i told you to|i told him to|i want to|open a client page details|open client page details|open a client page|open client page|open a client details|open client details|open client|show client|view client|client page details|client details|details of|details for|client|customer|page|details|profile/gi, "")
+        .replace(/افتح صفحة تفاصيل العميل|افتح تفاصيل العميل|افتح صفحة العميل|عرض تفاصيل العميل|تفاصيل العميل|صفحة العميل|بيانات العميل|ملف العميل|العملاء|العميل|عميل/gi, "")
+        .trim();
+
+      if (cleaned.length >= 2) {
+        const matchedClient = await Client.findOne({
+          $or: [
+            { name: { $regex: cleaned, $options: "i" } },
+            { phone: { $regex: cleaned, $options: "i" } },
+            { email: { $regex: cleaned, $options: "i" } },
+            { idNumber: { $regex: cleaned, $options: "i" } },
+          ],
+        }).lean();
+
+        if (matchedClient) {
           return NextResponse.json<AssistantResponse>({
-            reply: lang === "ar" ? item.replyAr : item.replyEn,
+            reply:
+              lang === "ar"
+                ? `جاري فتح صفحة تفاصيل العميل (${matchedClient.name})...`
+                : `Opening details page for client ${matchedClient.name}...`,
             action: "NAVIGATE",
-            navigateUrl: item.url,
+            navigateUrl: `/clients/${matchedClient._id}`,
+            data: {
+              type: "clients",
+              items: [matchedClient],
+            },
           });
         }
       }
+
+      // If user specifically asked for "client page details" or "client details" without a specific name, open the latest client profile
+      if (wantsDetails) {
+        const latestClient = await Client.findOne().sort({ updatedAt: -1 }).lean();
+        if (latestClient) {
+          return NextResponse.json<AssistantResponse>({
+            reply:
+              lang === "ar"
+                ? `جاري فتح صفحة تفاصيل العميل (${latestClient.name})...`
+                : `Opening client details page for ${latestClient.name}...`,
+            action: "NAVIGATE",
+            navigateUrl: `/clients/${latestClient._id}`,
+            data: {
+              type: "clients",
+              items: [latestClient],
+            },
+          });
+        }
+      }
+
+      // Standard /clients page
+      return NextResponse.json<AssistantResponse>({
+        reply:
+          lang === "ar"
+            ? "جاري فتح صفحة قائمة العملاء..."
+            : "Opening the Clients directory...",
+        action: "NAVIGATE",
+        navigateUrl: "/clients",
+      });
     }
 
-    // 3. OVERVIEW / FLEET STATS COMMANDS
+    // 3. VEHICLE / CAR DETAILS OR FLEET PAGE NAVIGATION
+    const isVehicleIntent =
+      lower.includes("car") ||
+      lower.includes("cars") ||
+      lower.includes("vehicle") ||
+      lower.includes("vehicles") ||
+      lower.includes("unit") ||
+      lower.includes("units") ||
+      lower.includes("fleet") ||
+      message.includes("سيارة") ||
+      message.includes("السيارات") ||
+      message.includes("الأسطول") ||
+      message.includes("مركبة") ||
+      message.includes("مركبات");
+
+    if (isVehicleIntent && hasOpenOrDetails) {
+      const wantsDetails =
+        lower.includes("details") ||
+        lower.includes("page details") ||
+        message.includes("تفاصيل") ||
+        message.includes("بيانات");
+
+      const cleaned = message
+        .replace(/can you|please|open car details|open vehicle details|open car page details|open car page|open car|show car|view car|car details|vehicle details|details of|details for|car|cars|vehicle|vehicles|fleet|unit|units|page|details/gi, "")
+        .replace(/افتح صفحة تفاصيل السيارة|افتح تفاصيل السيارة|افتح صفحة السيارات|عرض تفاصيل السيارة|تفاصيل السيارة|صفحة السيارة|بيانات السيارة|السيارات|السيارة|سيارة|أسطول/gi, "")
+        .trim();
+
+      if (cleaned.length >= 2) {
+        const matchedUnit = await Unit.findOne({
+          $or: [
+            { plate: { $regex: cleaned, $options: "i" } },
+            { make: { $regex: cleaned, $options: "i" } },
+            { model: { $regex: cleaned, $options: "i" } },
+          ],
+        }).lean();
+
+        if (matchedUnit) {
+          return NextResponse.json<AssistantResponse>({
+            reply:
+              lang === "ar"
+                ? `جاري فتح صفحة تفاصيل السيارة (${matchedUnit.make} ${matchedUnit.model})...`
+                : `Opening vehicle details for ${matchedUnit.make} ${matchedUnit.model}...`,
+            action: "NAVIGATE",
+            navigateUrl: `/units/${matchedUnit._id}`,
+            data: {
+              type: "vehicles",
+              items: [matchedUnit],
+            },
+          });
+        }
+      }
+
+      if (wantsDetails) {
+        const latestUnit = await Unit.findOne().sort({ updatedAt: -1 }).lean();
+        if (latestUnit) {
+          return NextResponse.json<AssistantResponse>({
+            reply:
+              lang === "ar"
+                ? `جاري فتح صفحة تفاصيل السيارة (${latestUnit.make} ${latestUnit.model})...`
+                : `Opening vehicle details for ${latestUnit.make} ${latestUnit.model}...`,
+            action: "NAVIGATE",
+            navigateUrl: `/units/${latestUnit._id}`,
+            data: {
+              type: "vehicles",
+              items: [latestUnit],
+            },
+          });
+        }
+      }
+
+      return NextResponse.json<AssistantResponse>({
+        reply:
+          lang === "ar"
+            ? "جاري فتح صفحة أسطول السيارات..."
+            : "Opening the Vehicles Fleet...",
+        action: "NAVIGATE",
+        navigateUrl: "/units",
+      });
+    }
+
+    // 4. OTHER NAVIGATION COMMANDS (Calendar, Bookings, Drivers, Settings, Dashboard)
+    if (hasOpenOrDetails) {
+      if (
+        lower.includes("calendar") ||
+        lower.includes("schedule") ||
+        message.includes("التقويم") ||
+        message.includes("تقويم") ||
+        message.includes("مواعيد") ||
+        message.includes("جدول")
+      ) {
+        return NextResponse.json<AssistantResponse>({
+          reply: lang === "ar" ? "جاري فتح صفحة التقويم والمواعيد..." : "Opening the Calendar...",
+          action: "NAVIGATE",
+          navigateUrl: "/calendar",
+        });
+      }
+
+      if (
+        lower.includes("booking") ||
+        lower.includes("contract") ||
+        message.includes("الحجوزات") ||
+        message.includes("العقود") ||
+        message.includes("حجز")
+      ) {
+        return NextResponse.json<AssistantResponse>({
+          reply: lang === "ar" ? "جاري فتح صفحة الحجوزات والعقود..." : "Opening Bookings & Contracts...",
+          action: "NAVIGATE",
+          navigateUrl: "/bookings",
+        });
+      }
+
+      if (
+        lower.includes("driver") ||
+        lower.includes("drivers") ||
+        message.includes("السائقين") ||
+        message.includes("سائق")
+      ) {
+        return NextResponse.json<AssistantResponse>({
+          reply: lang === "ar" ? "جاري الانتقال إلى إدارة السائقين..." : "Opening Drivers management...",
+          action: "NAVIGATE",
+          navigateUrl: "/drivers",
+        });
+      }
+
+      if (
+        lower.includes("setting") ||
+        lower.includes("settings") ||
+        lower.includes("whatsapp") ||
+        message.includes("الإعدادات") ||
+        message.includes("اعدادات") ||
+        message.includes("واتساب")
+      ) {
+        return NextResponse.json<AssistantResponse>({
+          reply: lang === "ar" ? "جاري فتح صفحة الإعدادات وبوابة الواتساب..." : "Opening Settings & WhatsApp Gateway...",
+          action: "NAVIGATE",
+          navigateUrl: "/settings",
+        });
+      }
+
+      if (
+        lower.includes("dashboard") ||
+        lower.includes("home") ||
+        message.includes("الرئيسية") ||
+        message.includes("لوحة التحكم")
+      ) {
+        return NextResponse.json<AssistantResponse>({
+          reply: lang === "ar" ? "جاري التوجه إلى لوحة التحكم الرئيسية..." : "Opening Dashboard Overview...",
+          action: "NAVIGATE",
+          navigateUrl: "/",
+        });
+      }
+    }
+
+    // 5. OVERVIEW / FLEET STATS COMMANDS
     if (
       lower.includes("how many") ||
       lower.includes("available cars") ||
@@ -202,7 +394,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 4. SEARCH FOR CLIENT / PERSON
+    // 6. SEARCH FOR CLIENT / PERSON
     const isClientSearch =
       lower.includes("search for") ||
       lower.includes("find client") ||
@@ -213,10 +405,8 @@ export async function POST(req: Request) {
       message.includes("بحث عن") ||
       message.includes("مين هو") ||
       message.includes("من هو") ||
-      message.includes("معلومات العميل") ||
-      message.includes("عميل");
+      message.includes("معلومات العميل");
 
-    // Clean search term
     let cleanQuery = message
       .replace(/search for|find client|find customer|search client|who is/gi, "")
       .replace(/ابحث عن عميل|ابحث عن|بحث عن|مين هو|من هو|معلومات العميل|عميل/gi, "")
@@ -259,16 +449,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // 5. SEARCH FOR VEHICLE / PLATE
+    // 7. SEARCH FOR VEHICLE / PLATE
     const isVehicleSearch =
       lower.includes("plate") ||
-      lower.includes("car") ||
       lower.includes("find car") ||
       lower.includes("search car") ||
-      lower.includes("vehicle") ||
-      message.includes("لوحة") ||
-      message.includes("سيارة") ||
-      message.includes("مركبة");
+      message.includes("لوحة");
 
     if (isVehicleSearch && cleanQuery.length >= 2) {
       const vehicleQuery = cleanQuery
@@ -313,7 +499,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 6. SEARCH CONTRACTS BY NUMBER OR NAME
+    // 8. SEARCH CONTRACTS BY NUMBER OR NAME
     if (cleanQuery.length >= 2) {
       const contractNum = Number(cleanQuery.replace(/[^0-9]/g, ""));
       const queryConds: any[] = [];
@@ -356,8 +542,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // 7. INTELLIGENT AI CONVERSATION (Using Groq LLM)
-    const systemPrompt = `You are "Leon Siri", the high-tech, courteous and efficient Voice AI Assistant for Leon Rent A Car in Dubai/UAE.
+    // 9. INTELLIGENT AI CONVERSATION (Using Groq LLM)
+    const systemPrompt = `You are "Leon Assistant", the high-tech, courteous and efficient Voice AI Assistant for Leon Rent A Car in Dubai/UAE.
 You assist the rental agency admin with fleet management, bookings, clients, and vehicle inquiries.
 Answer concisely (1-3 sentences maximum) in friendly spoken ${lang === "ar" ? "Arabic (لهجة مهذبة مفهومة)" : "English"}.
 If asked what you can do, explain that you can create new contracts, search for clients, check car availability, search contracts, and navigate anywhere in the dashboard.`;
@@ -375,8 +561,8 @@ If asked what you can do, explain that you can create new contracts, search for 
     return NextResponse.json<AssistantResponse>({
       reply:
         lang === "ar"
-          ? "أنا مساعد ليون الصوتي الذكي. يمكنني إنشاء عقود جديدة، البحث عن عميل أو سيارة، عرض إحصائيات الأسطول، أو فتح أي صفحة ترغب بها!"
-          : "I am Leon Voice Assistant. I can help you create new contracts, search clients or cars, view fleet statistics, and navigate through the system!",
+          ? "أنا مساعد ليون الذكي. يمكنني إنشاء عقود جديدة، فتح صفحات العملاء والسيارات، عرض إحصائيات الأسطول، أو فتح أي صفحة ترغب بها!"
+          : "I am Leon Assistant. I can help you create new contracts, open client details, search cars, view fleet statistics, and navigate through the system!",
       action: "NONE",
     });
   } catch (error: any) {
@@ -390,4 +576,3 @@ If asked what you can do, explain that you can create new contracts, search for 
     );
   }
 }
-
