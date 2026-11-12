@@ -156,7 +156,9 @@ export default function SiriAssistant() {
           body: JSON.stringify({
             message: trimmed,
             lang: detectedLang,
-            history: messages.slice(-6).map((m) => ({ sender: m.sender, text: m.text })),
+            history: messages.slice(-6).map((m) => ({ sender: m.sender, text: m.text, action: m.action })),
+            pathname: typeof window !== "undefined" ? window.location.pathname : "",
+            currentSearch: typeof window !== "undefined" ? window.location.search : "",
           }),
         });
 

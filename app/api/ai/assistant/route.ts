@@ -52,7 +52,7 @@ async function callGroqBrain(
           model,
           messages: messagesPayload,
           temperature: 0.2,
-          max_tokens: 500,
+          max_tokens: 1200,
         }),
       });
 
@@ -68,11 +68,97 @@ async function callGroqBrain(
   return null;
 }
 
+interface ContractDetails {
+  clientName?: string | null;
+  carName?: string | null;
+  contractType?: string | null;
+  days?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  totalPrice?: number | null;
+  dailyRate?: number | null;
+  deposit?: number | null;
+  advancePayment?: number | null;
+  paymentMethod?: string | null;
+  pickupLocation?: string | null;
+  checkoutTime?: string | null;
+}
+
+// Extracts every contract detail (client, car, dates, price, payment...) from a free-form sentence
+async function extractContractDetails(message: string, previousUserMessages: string[] = []): Promise<ContractDetails | null> {
+  const today = new Date().toISOString().split("T")[0];
+  const conversation = previousUserMessages.length
+    ? `Earlier messages from the user (context, same contract request):\n${previousUserMessages.map((m) => `- ${m}`).join("\n")}\n\nLatest message: ${message}`
+    : message;
+  const raw = await callGroqBrain([
+    {
+      role: "system",
+      content: `You extract car-rental contract details from a user's sentence (English, Arabic or mixed, typos allowed).
+The user may give the details across several messages: combine earlier messages with the latest one.
+Today is ${today}. Return ONE raw JSON object only (no markdown), with these keys (use null when not mentioned, NEVER invent values):
+{
+  "clientName": string|null,        // existing/named customer, exactly as the user said (e.g. "khalil")
+  "carName": string|null,           // make/model and/or plate, e.g. "Nissan Patrol" or "A 12345"
+  "contractType": "Shop"|"Delivery"|"Personalized"|null,  // delivery = car delivered to customer by driver; personalized/personal/شخصي/بيرسونالايزد = personal use free contract
+  "days": number|null,
+  "startDate": "YYYY-MM-DD"|null,   // resolve words like today/tomorrow/Monday using today's date
+  "endDate": "YYYY-MM-DD"|null,
+  "totalPrice": number|null,        // total rental price if stated ("for 1500", "total 900")
+  "dailyRate": number|null,         // per-day price if stated ("200 per day")
+  "deposit": number|null,
+  "advancePayment": number|null,    // prepaid / advance / عربون
+  "paymentMethod": "Cash"|"Card"|"Crypto"|null,
+  "pickupLocation": string|null,
+  "checkoutTime": string|null       // like "10:00 AM"
+}
+Words like "new client"/"عميل جديد" mean the client does not exist yet: set clientName to null.`,
+    },
+    { role: "user", content: conversation },
+  ]);
+  if (!raw) return null;
+  try {
+    const m = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(m ? m[0] : raw);
+    const num = (v: any) => (v !== null && v !== undefined && !isNaN(Number(v)) && Number(v) > 0 ? Number(v) : null);
+    const str = (v: any) => (typeof v === "string" && v.trim() && v.toLowerCase() !== "null" ? v.trim() : null);
+    return {
+      clientName: str(parsed.clientName),
+      carName: str(parsed.carName),
+      contractType: str(parsed.contractType),
+      days: num(parsed.days),
+      startDate: str(parsed.startDate),
+      endDate: str(parsed.endDate),
+      totalPrice: num(parsed.totalPrice),
+      dailyRate: num(parsed.dailyRate),
+      deposit: num(parsed.deposit),
+      advancePayment: num(parsed.advancePayment),
+      paymentMethod: str(parsed.paymentMethod),
+      pickupLocation: str(parsed.pickupLocation),
+      checkoutTime: str(parsed.checkoutTime),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const message = (body.message || "").trim();
-    const history: { sender: string; text: string }[] = Array.isArray(body.history) ? body.history : [];
+    const lower = message.toLowerCase();
+    const history: { sender: string; text: string; action?: string }[] = Array.isArray(body.history) ? body.history : [];
+    const pathname: string = typeof body.pathname === "string" ? body.pathname : "";
+    const currentSearch: string = typeof body.currentSearch === "string" ? body.currentSearch : "";
+
+    // Are we in the middle of a contract conversation? (user is on the new-contract page, or the last assistant step was about a contract)
+    const lastAssistantMsg = [...history].reverse().find((h) => h.sender === "assistant");
+    const mentionsContractType = /\b(personalized|personal|delivery|shop)\b/i.test(lower) || message.includes("شخصي") || message.includes("توصيل");
+    const inContractFlow =
+      pathname.startsWith("/bookings/new") || lastAssistantMsg?.action === "CREATE_CONTRACT" || mentionsContractType;
+    const previousUserMessages = history
+      .filter((h) => h.sender === "user")
+      .slice(-3)
+      .map((h) => h.text);
     const isArabic = /[\u0600-\u06FF]/.test(message);
     const lang = isArabic ? "ar" : body.lang || "en";
 
@@ -102,7 +188,31 @@ export async function POST(req: Request) {
         Contract.countDocuments({ status: "Active" }),
       ]);
 
-    const lower = message.toLowerCase();
+    // =========================================================================
+    // 0. CONTRACT INTENT ALWAYS WINS (e.g. "create new contract for new client")
+    // =========================================================================
+    const mentionsContract =
+      /contract|contrac|booking|rental/i.test(lower) ||
+      message.includes("عقد") ||
+      message.includes("حجز");
+
+    const mentionsNewClient =
+      /new\s+(?:client|clint|customer|custmer)|(?:client|clint|customer|custmer)\s+new/i.test(lower) ||
+      message.includes("عميل جديد") ||
+      message.includes("زبون جديد") ||
+      message.includes("لعميل جديد") ||
+      message.includes("لزبون جديد");
+
+    if (mentionsContract && mentionsNewClient) {
+      return NextResponse.json<AssistantResponse>({
+        reply:
+          lang === "ar"
+            ? "حاضر! فتحت صفحة العقد الجديد وفتحت نافذة إضافة العميل الجديد، وبعد حفظه سيتم اختياره تلقائياً في العقد."
+            : "Sure! Opening the new contract and the Add New Customer form. Once saved, the client will be selected in the contract automatically.",
+        action: "CREATE_CONTRACT",
+        navigateUrl: "/bookings/new?openAddClient=true",
+      });
+    }
 
     // =========================================================================
     // 1. FAST MATCH: ADD / CREATE NEW CLIENT OR COMPANY
@@ -149,7 +259,7 @@ export async function POST(req: Request) {
       message.includes("اضف زبون") ||
       message.includes("زبون جديد");
 
-    if (isAddClientIntent) {
+    if (isAddClientIntent && !mentionsContract) {
       const phoneMatch = message.match(/(?:\+?\d[\d\s-]{6,14}\d)/);
       const extractedPhone = phoneMatch ? phoneMatch[0].replace(/\s+/g, "").trim() : "";
 
@@ -257,6 +367,7 @@ export async function POST(req: Request) {
       lower.includes("make a contract") ||
       lower.includes("auto contract") ||
       lower.includes("go to contract") ||
+      /(want|need|wanna|book|rent|عايز|ابغى|أبغى|اريد|أريد|ابي|أبي).*(contract|contrac|booking|عقد|حجز)/i.test(lower) ||
       message.includes("عقد جديد") ||
       message.includes("حجز جديد") ||
       message.includes("انشئ عقد") ||
@@ -265,6 +376,181 @@ export async function POST(req: Request) {
       message.includes("سوي عقد") ||
       message.includes("اعمل عقد") ||
       message.includes("فتح عقد");
+
+    if (isCreateContractIntent || inContractFlow) {
+      // ---- Smart path: user gave client / car / dates / price / payment details in the sentence ----
+      // (also handles follow-ups like "its personalized for khalil" right after "create new contract")
+      const details = await extractContractDetails(message, isCreateContractIntent ? [] : previousUserMessages);
+      if (details) {
+        const [fullClients, fullUnits] = await Promise.all([
+          Client.find().select("name phone status").limit(3000).lean(),
+          Unit.find().select("make model plate status dailyRate").limit(1000).lean(),
+        ]);
+
+        const tokensOf = (s: string) =>
+          s
+            .toLowerCase()
+            .split(/[\s,.-]+/)
+            .filter((t) => t.length >= 2);
+
+        const findClient = (q?: string | null) => {
+          if (!q || q.trim().length < 2) return null;
+          const qt = tokensOf(q);
+          return (
+            (fullClients as any[]).find((c) => c.name?.toLowerCase().trim() === q.toLowerCase().trim()) ||
+            (fullClients as any[]).find((c) => {
+              const n = (c.name || "").toLowerCase();
+              return qt.length > 0 && qt.every((t) => n.includes(t));
+            }) ||
+            (fullClients as any[]).find((c) => c.phone && q.replace(/\D/g, "").length >= 6 && c.phone.replace(/\D/g, "").includes(q.replace(/\D/g, ""))) ||
+            null
+          );
+        };
+
+        const findUnit = (q?: string | null) => {
+          if (!q || q.trim().length < 2) return null;
+          const qt = tokensOf(q);
+          const hay = (u: any) => `${u.make || ""} ${u.model || ""} ${u.plate || ""}`.toLowerCase();
+          const matches = (fullUnits as any[]).filter((u) => qt.length > 0 && qt.every((t) => hay(u).includes(t)));
+          return (
+            matches.find((u) => u.status === "Available") ||
+            matches[0] ||
+            (fullUnits as any[]).find((u) => (u.plate || "").toLowerCase().replace(/\s/g, "") === q.toLowerCase().replace(/\s/g, "")) ||
+            null
+          );
+        };
+
+        let dClient: any = findClient(details.clientName);
+        let dUnit: any = findUnit(details.carName);
+
+        // If user asked for "any car" / "first car" / "available car"
+        if (
+          !dUnit &&
+          (/\b(any\s+car|first\s+car|available\s+car|auto)\b/i.test(lower) ||
+            message.includes("اي سيارة") ||
+            message.includes("أي سيارة") ||
+            message.includes("اول سيارة"))
+        ) {
+          dUnit = (fullUnits as any[]).find((u) => u.status === "Available") || (fullUnits as any[])[0] || null;
+        }
+
+        // Preserve any parameters already set on /bookings/new from earlier messages in the conversation
+        const existingParams = pathname.startsWith("/bookings/new")
+          ? new URLSearchParams(currentSearch)
+          : new URLSearchParams();
+
+        if (!dClient && existingParams.get("clientId")) {
+          dClient = (fullClients as any[]).find((c) => String(c._id) === existingParams.get("clientId")) || {
+            _id: existingParams.get("clientId"),
+            name: existingParams.get("clientName") || "Customer",
+          };
+        }
+        if (!dUnit && existingParams.get("unitId")) {
+          dUnit = (fullUnits as any[]).find((u) => String(u._id) === existingParams.get("unitId")) || null;
+        }
+
+        const hasAnyDetail =
+          details.contractType ||
+          details.clientName ||
+          details.carName ||
+          details.totalPrice ||
+          details.dailyRate ||
+          details.days ||
+          details.startDate ||
+          details.endDate ||
+          details.paymentMethod ||
+          details.deposit ||
+          details.advancePayment ||
+          dUnit;
+
+        if (hasAnyDetail) {
+          // If the user gave a specific client name (e.g. "Khalil") that isn't in the DB yet, create that client automatically so it's selected immediately!
+          if (details.clientName && !dClient) {
+            const createdClient = await Client.create({
+              name: details.clientName.trim(),
+              phone: "N/A",
+              email: "",
+              nationality: "UAE",
+              idNumber: "N/A",
+              licenseNumber: "N/A",
+              address: "Dubai",
+              clientType: "Resident",
+              customerType: "B2C",
+              status: "Active",
+            });
+            dClient = createdClient.toObject ? createdClient.toObject() : createdClient;
+          }
+
+          const type =
+            details.contractType && ["Shop", "Delivery", "Personalized"].includes(details.contractType)
+              ? details.contractType
+              : (existingParams.get("contractType") as "Shop" | "Delivery" | "Personalized") || "Shop";
+
+          const params = new URLSearchParams(existingParams.toString());
+          params.set("contractType", type);
+          params.delete("openAddClient");
+          params.delete("autoPilot");
+          params.delete("autoSubmit");
+
+          if (dClient) {
+            params.set("clientId", String(dClient._id));
+            if (dClient.name) params.set("clientName", String(dClient.name));
+          }
+          if (dUnit) params.set("unitId", String(dUnit._id));
+          if (details.days) params.set("days", String(details.days));
+          if (details.startDate) params.set("startDate", details.startDate);
+          if (details.endDate) params.set("endDate", details.endDate);
+          if (details.totalPrice) params.set("price", String(details.totalPrice));
+          if (details.dailyRate) params.set("dailyRate", String(details.dailyRate));
+          if (details.deposit) params.set("deposit", String(details.deposit));
+          if (details.advancePayment) params.set("advance", String(details.advancePayment));
+          if (details.paymentMethod) params.set("paymentMethod", details.paymentMethod);
+          if (details.pickupLocation) params.set("pickupLocation", details.pickupLocation);
+          if (details.checkoutTime) params.set("checkoutTime", details.checkoutTime);
+
+          const missing: string[] = [];
+          const notFound: string[] = [];
+          if (details.carName && !dUnit) notFound.push(lang === "ar" ? `السيارة "${details.carName}"` : `car "${details.carName}"`);
+          if (!dClient) missing.push(lang === "ar" ? "العميل" : "client");
+          if (!dUnit) missing.push(lang === "ar" ? "السيارة" : "car");
+
+          // Only submit by himself when everything essential is known (Delivery needs a driver, so never auto-submit it)
+          const canAutoSubmit = !!dClient && !!dUnit && type !== "Delivery";
+          if (canAutoSubmit) {
+            params.set("autoPilot", "true");
+            params.set("autoSubmit", "true");
+          }
+
+          const summary: string[] = [];
+          if (type) summary.push(type);
+          if (dClient) summary.push(lang === "ar" ? `العميل ${dClient.name}` : `client ${dClient.name}`);
+          if (dUnit) summary.push(`${dUnit.make} ${dUnit.model}`);
+          if (details.days) summary.push(lang === "ar" ? `${details.days} أيام` : `${details.days} day(s)`);
+          if (details.totalPrice) summary.push(lang === "ar" ? `السعر ${details.totalPrice}` : `price ${details.totalPrice}`);
+          else if (details.dailyRate) summary.push(lang === "ar" ? `${details.dailyRate} يومياً` : `${details.dailyRate}/day`);
+          if (details.paymentMethod) summary.push(details.paymentMethod);
+
+          let reply: string;
+          if (canAutoSubmit) {
+            reply =
+              lang === "ar"
+                ? `حاضر! جاري إنشاء العقد تلقائياً (${summary.join("، ")}).`
+                : `On it! Creating the contract automatically (${summary.join(", ")}).`;
+          } else {
+            reply =
+              lang === "ar"
+                ? `تم ضبط العقد (${summary.join("، ")}).${notFound.length ? ` لم أجد ${notFound.join(" و")}.` : ""} ${type === "Delivery" ? "اختر السائق لإتمام العقد." : `ما هي ${missing.join(" و")} التي تريد اختيارها؟`}`
+                : `Set contract to ${summary.join(", ")}.${notFound.length ? ` Couldn't find ${notFound.join(" and ")}.` : ""} ${type === "Delivery" ? "Please pick a driver to finish." : `Which ${missing.join(" and ")} should I select?`}`;
+          }
+
+          return NextResponse.json<AssistantResponse>({
+            reply,
+            action: "CREATE_CONTRACT",
+            navigateUrl: `/bookings/new?${params.toString()}`,
+          });
+        }
+      }
+    }
 
     if (isCreateContractIntent) {
       const daysMatch = message.match(/(\d+)\s*(?:days?|day|ايام|أيام|يوم)/i);
@@ -278,14 +564,9 @@ export async function POST(req: Request) {
         lower.includes("direct") ||
         lower.includes("submit") ||
         lower.includes("confirm") ||
-        lower.includes("for ") ||
-        lower.includes("with ") ||
         message.includes("تلقائي") ||
         message.includes("بنفسه") ||
-        message.includes("الآن") ||
-        message.includes("فورا") ||
-        message.includes("للعميل") ||
-        message.includes("بسيارة");
+        message.includes("فورا");
 
       let matchedClient = allClients.find(
         (c: any) =>
@@ -330,7 +611,7 @@ export async function POST(req: Request) {
         );
       }
 
-      if (wantsAuto || matchedClient || matchedUnit) {
+      if (wantsAuto || (matchedClient && matchedUnit)) {
         const targetClient: any = matchedClient || allClients[0];
         const targetUnit: any =
           matchedUnit ||
@@ -356,6 +637,27 @@ export async function POST(req: Request) {
             navigateUrl: `/bookings/new?${params.toString()}`,
           });
         }
+      }
+
+      // Only part of the info was given: open the contract wizard and prefill what we know (no auto-submit)
+      if (matchedClient || matchedUnit) {
+        const params = new URLSearchParams({ contractType: "Shop", days: String(days) });
+        if (matchedClient) params.set("clientId", String((matchedClient as any)._id));
+        if (matchedUnit) params.set("unitId", String((matchedUnit as any)._id));
+
+        const picked =
+          lang === "ar"
+            ? `${matchedClient ? `العميل (${(matchedClient as any).name})` : ""}${matchedClient && matchedUnit ? " و" : ""}${matchedUnit ? `السيارة (${(matchedUnit as any).make} ${(matchedUnit as any).model})` : ""}`
+            : `${matchedClient ? `client ${(matchedClient as any).name}` : ""}${matchedClient && matchedUnit ? " and " : ""}${matchedUnit ? `${(matchedUnit as any).make} ${(matchedUnit as any).model}` : ""}`;
+
+        return NextResponse.json<AssistantResponse>({
+          reply:
+            lang === "ar"
+              ? `حاضر! فتحت العقد الجديد واخترت ${picked}. أكمل باقي البيانات.`
+              : `Opening a new contract with ${picked} selected. Complete the remaining details.`,
+          action: "CREATE_CONTRACT",
+          navigateUrl: `/bookings/new?${params.toString()}`,
+        });
       }
 
       return NextResponse.json<AssistantResponse>({
@@ -406,7 +708,7 @@ AVAILABLE INTENTS (Return valid JSON ONLY):
 You MUST respond with a single raw JSON object (no markdown fences) matching this schema:
 {
   "reply": "Your friendly natural response to the user",
-  "intent": "NONE" | "NAVIGATE" | "OPEN_CLIENT_DETAILS" | "OPEN_VEHICLE_DETAILS" | "AUTO_CREATE_CONTRACT" | "OPEN_NEW_CONTRACT" | "OPEN_ADD_CLIENT_MODAL" | "ADD_CLIENT_DIRECT" | "OPEN_ADD_UNIT_MODAL" | "CLICK_BUTTON" | "SEARCH_CLIENT" | "SEARCH_VEHICLE" | "FLEET_OVERVIEW",
+  "intent": "NONE" | "NAVIGATE" | "OPEN_CLIENT_DETAILS" | "OPEN_VEHICLE_DETAILS" | "AUTO_CREATE_CONTRACT" | "OPEN_NEW_CONTRACT" | "OPEN_NEW_CONTRACT_NEW_CLIENT" | "OPEN_ADD_CLIENT_MODAL" | "ADD_CLIENT_DIRECT" | "OPEN_ADD_UNIT_MODAL" | "CLICK_BUTTON" | "SEARCH_CLIENT" | "SEARCH_VEHICLE" | "FLEET_OVERVIEW",
   "targetUrl": "optional URL if intent is NAVIGATE: '/' | '/bookings' | '/bookings/new' | '/clients' | '/units' | '/drivers' | '/calendar' | '/settings'",
   "clientId": "optional client ID from context if user refers to a client or wants client details",
   "unitId": "optional unit ID from context if user refers to a car or wants car details",
@@ -422,7 +724,12 @@ RULES:
 3. If user asks to add/create a new client without giving a name, set intent="OPEN_ADD_CLIENT_MODAL". If they give a name, set intent="ADD_CLIENT_DIRECT" and fill clientName/clientPhone.
 4. If user asks to create/make a contract automatically or for a specific client/car, set intent="AUTO_CREATE_CONTRACT" and fill clientId/unitId if matched. If they just want the new contract page opened, set intent="OPEN_NEW_CONTRACT".
 5. If user asks about available cars, fleet count, or stats, set intent="FLEET_OVERVIEW" and answer using the Fleet Stats.
-6. If user is just chatting, greeting, or asking a general question (e.g. "hi", "how are you", "what can you do", "who rented the nissan"), set intent="NONE" and give a helpful, conversational reply using the live context.`;
+6. If user is just chatting, greeting, or asking a general question (e.g. "hi", "how are you", "what can you do", "who rented the nissan"), set intent="NONE" and give a helpful, conversational reply using the live context.
+7. CRITICAL: If the user mentions a contract/booking/rental together with a NEW client (e.g. "create a contract for a new client"), the goal is a CONTRACT, never just a client. Set intent="OPEN_NEW_CONTRACT_NEW_CLIENT". NEVER choose ADD_CLIENT_DIRECT or OPEN_ADD_CLIENT_MODAL when a contract is mentioned.
+8. Use ADD_CLIENT_DIRECT only when the user explicitly asks to add a client AND gives a real person name. Never invent names; if unsure, ask a short clarifying question with intent="NONE".
+9. Never pick a random client or car for a contract unless the user says "auto"/"automatically" or names them; otherwise use OPEN_NEW_CONTRACT and ask what's missing.
+10. NEVER claim you are opening/creating/adding something in "reply" unless the "intent" actually performs it. If you can't perform it, say so honestly or ask what you need, with intent="NONE".
+11. The user is currently on page: ${pathname || "unknown"}${inContractFlow ? " (they are in the middle of creating a contract; short follow-ups like names, car, price or dates belong to that contract)" : ""}.`;
 
     const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: systemPrompt },
@@ -440,7 +747,12 @@ RULES:
         const jsonMatch = rawBrainOutput.match(/\{[\s\S]*\}/);
         const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawBrainOutput);
         const aiReply = parsed.reply || (lang === "ar" ? "تم!" : "Done!");
-        const intent = parsed.intent || "NONE";
+        let intent = parsed.intent || "NONE";
+
+        // Safety net: a contract request must never be turned into a plain "add client"
+        if (mentionsContract && (intent === "ADD_CLIENT_DIRECT" || intent === "OPEN_ADD_CLIENT_MODAL")) {
+          intent = mentionsNewClient ? "OPEN_NEW_CONTRACT_NEW_CLIENT" : "OPEN_NEW_CONTRACT";
+        }
 
         if (intent === "OPEN_ADD_CLIENT_MODAL") {
           return NextResponse.json<AssistantResponse>({
@@ -540,6 +852,14 @@ RULES:
               navigateUrl: `/bookings/new?${params.toString()}`,
             });
           }
+        }
+
+        if (intent === "OPEN_NEW_CONTRACT_NEW_CLIENT") {
+          return NextResponse.json<AssistantResponse>({
+            reply: aiReply,
+            action: "CREATE_CONTRACT",
+            navigateUrl: "/bookings/new?openAddClient=true",
+          });
         }
 
         if (intent === "OPEN_NEW_CONTRACT") {

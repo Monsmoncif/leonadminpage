@@ -788,8 +788,22 @@ export function NewRentalAdminPageContent() {
     const isAutoSubmit = searchParams.get("autoSubmit") === "true";
     const openAddClient = searchParams.get("openAddClient") === "true";
 
-    const currentQueryKey = `${paramUnitId || ""}-${paramClientId || ""}-${paramType || ""}-${paramDays || ""}-${paramStep || ""}-${isAutoPilot}-${isAutoSubmit}-${openAddClient}`;
-    if (currentQueryKey === "-----false-false-false" || aiAutoPilotKeyRef.current === currentQueryKey) {
+    // Extra contract details spoken/typed to Leon Assistant
+    const paramStartDate = searchParams.get("startDate");
+    const paramEndDate = searchParams.get("endDate");
+    const paramPrice = searchParams.get("price");
+    const paramDailyRate = searchParams.get("dailyRate");
+    const paramDeposit = searchParams.get("deposit");
+    const paramAdvance = searchParams.get("advance");
+    const paramPayment = searchParams.get("paymentMethod");
+    const paramPickup = searchParams.get("pickupLocation");
+    const paramCheckout = searchParams.get("checkoutTime");
+
+    const currentQueryKey = searchParams.toString();
+    const hasAssistantParams =
+      paramUnitId || paramClientId || paramType || paramDays || paramStep || isAutoPilot || openAddClient ||
+      paramStartDate || paramEndDate || paramPrice || paramDailyRate;
+    if (!currentQueryKey || !hasAssistantParams || aiAutoPilotKeyRef.current === currentQueryKey) {
       return;
     }
     aiAutoPilotKeyRef.current = currentQueryKey;
@@ -811,23 +825,44 @@ export function NewRentalAdminPageContent() {
         units[0];
     }
 
+    const isValidDate = (s: string | null) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
+
     if (chosenUnit) {
       setSelectedVehicle(chosenUnit._id);
-      const daysCount = paramDays && !isNaN(Number(paramDays)) && Number(paramDays) > 0 ? Number(paramDays) : 3;
-      const startStr = new Date().toISOString().split("T")[0];
-      const endStr = new Date(Date.now() + daysCount * 86400000).toISOString().split("T")[0];
-      const unitRate = Number(chosenUnit.dailyRate) || 85;
+    }
+
+    if (chosenUnit || paramStartDate || paramEndDate || paramPrice || paramDays) {
+      const startStr = isValidDate(paramStartDate) ? (paramStartDate as string) : new Date().toISOString().split("T")[0];
+      let daysCount = paramDays && !isNaN(Number(paramDays)) && Number(paramDays) > 0 ? Number(paramDays) : 3;
+      let endStr: string;
+      if (isValidDate(paramEndDate)) {
+        endStr = paramEndDate as string;
+        daysCount = Math.max(1, Math.round((new Date(endStr).getTime() - new Date(startStr).getTime()) / 86400000));
+      } else {
+        endStr = new Date(new Date(startStr).getTime() + daysCount * 86400000).toISOString().split("T")[0];
+      }
+
+      const unitRate = Number(paramDailyRate) > 0 ? Number(paramDailyRate) : Number(chosenUnit?.dailyRate) || 85;
+      const totalPrice = Number(paramPrice) > 0 ? Number(paramPrice) : unitRate * daysCount;
+      const finalDailyRate = Number(paramPrice) > 0 ? Math.round((totalPrice / daysCount) * 100) / 100 : unitRate;
+
       setRentalData((prev) => ({
         ...prev,
         startDate: startStr,
         endDate: endStr,
-        dailyRate: unitRate,
-        collectionAmount: unitRate * daysCount,
-        checkoutMileage: Number(chosenUnit.mileage) || 0,
+        dailyRate: finalDailyRate,
+        collectionAmount: totalPrice,
+        checkoutMileage: chosenUnit ? Number(chosenUnit.mileage) || 0 : prev.checkoutMileage,
+        ...(paramDeposit && !isNaN(Number(paramDeposit)) ? { depositAmount: Number(paramDeposit) } : {}),
+        ...(paramAdvance && !isNaN(Number(paramAdvance)) ? { advancePayment: Number(paramAdvance) } : {}),
+        ...(paramPayment && ["Cash", "Card", "Crypto"].includes(paramPayment) ? { paymentMethod: paramPayment } : {}),
+        ...(paramPickup ? { pickupLocation: paramPickup } : {}),
+        ...(paramCheckout ? { checkoutTime: paramCheckout } : {}),
       }));
     }
 
     // 2. Select Client
+    const paramClientName = searchParams.get("clientName");
     let chosenClient = paramClientId ? clients.find((c) => String(c._id) === String(paramClientId)) : null;
     if (!chosenClient && isAutoPilot && clients.length > 0) {
       chosenClient = clients.find((c) => c.status === "Active") || clients[0];
@@ -836,32 +871,51 @@ export function NewRentalAdminPageContent() {
     if (chosenClient) {
       setSelectedClient(chosenClient._id);
       if (paramType === "Personalized" || contractType === "Personalized") {
-        setPersonName(chosenClient.name || "");
+        setPersonName(chosenClient.name || paramClientName || "");
+      }
+    } else if (paramClientId) {
+      // Newly created client by Leon Assistant — select ID immediately and refresh clients list
+      setSelectedClient(paramClientId);
+      if (paramClientName) {
+        setPersonName(paramClientName);
+      }
+      fetchClients();
+    }
+
+    if (paramType || chosenClient || paramClientName) {
+      const label = chosenClient?.name || paramClientName || "";
+      if (!isAutoPilot && (paramType || label)) {
+        toast.success(
+          `Leon Assistant set ${paramType ? `${paramType} contract` : "contract"}${label ? ` for ${label}` : ""}`
+        );
       }
     }
 
     // 3. Step Advancement & Auto-Submit
-    if (isAutoPilot && chosenUnit && chosenClient) {
-      toast.info(`Leon Assistant selected ${chosenUnit.make} ${chosenUnit.model} & ${chosenClient.name} automatically!`);
+    const hasClientSelected = Boolean(chosenClient || paramClientId);
+    const clientDisplayName = chosenClient?.name || paramClientName || "Customer";
+    if (isAutoPilot && chosenUnit && hasClientSelected) {
+      toast.info(`Leon Assistant selected ${chosenUnit.make} ${chosenUnit.model} & ${clientDisplayName} automatically!`);
+      const isPersonalizedFlow = paramType === "Personalized";
       const t1 = setTimeout(() => setCurrentStep(2), 250);
       const t2 = setTimeout(() => setCurrentStep(3), 550);
-      const t3 = setTimeout(() => setCurrentStep(4), 850);
+      const t3 = isPersonalizedFlow ? null : setTimeout(() => setCurrentStep(4), 850);
       const t4 = isAutoSubmit
         ? setTimeout(() => {
             setAiTriggerSubmit(true);
-          }, 1400)
+          }, isPersonalizedFlow ? 1100 : 1400)
         : null;
 
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);
-        clearTimeout(t3);
+        if (t3) clearTimeout(t3);
         if (t4) clearTimeout(t4);
       };
     } else if (paramStep && !isNaN(Number(paramStep))) {
       setCurrentStep(Math.min(4, Math.max(1, Number(paramStep))));
-    } else if (chosenUnit && chosenClient) {
-      setCurrentStep(4);
+    } else if (chosenUnit && hasClientSelected) {
+      setCurrentStep(paramType === "Delivery" || paramType === "Personalized" ? 3 : 4);
     } else if (chosenUnit) {
       setCurrentStep(2);
     }
