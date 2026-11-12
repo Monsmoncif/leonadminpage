@@ -193,7 +193,7 @@ async function callGroqBrain(
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
 
-  const models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+  const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
   for (const model of models) {
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -205,9 +205,10 @@ async function callGroqBrain(
         body: JSON.stringify({
           model,
           messages: messagesPayload,
-          temperature: 0.3,
-          max_tokens: 1000,
+          temperature: 0.2,
+          max_tokens: 800,
         }),
+        signal: AbortSignal.timeout(6000),
       });
 
       if (res.ok) {
@@ -220,6 +221,57 @@ async function callGroqBrain(
     }
   }
   return null;
+}
+
+// In-memory 30s server cache for fleet context to make assistant responses ultra fast (<0.4s)
+interface ServerFleetCache {
+  timestamp: number;
+  allClients: any[];
+  allUnits: any[];
+  recentContracts: any[];
+  totalUnits: number;
+  availableUnits: number;
+  rentedUnits: number;
+  activeContractsCount: number;
+}
+let serverFleetCache: ServerFleetCache | null = null;
+
+async function getLiveFleetContext() {
+  const now = Date.now();
+  if (serverFleetCache && now - serverFleetCache.timestamp < 30_000) {
+    return serverFleetCache;
+  }
+
+  await connectDB();
+  const [allClients, allUnits, recentContracts, totalUnits, availableUnits, rentedUnits, activeContractsCount] =
+    await Promise.all([
+      Client.find().select("name phone customerType status").sort({ updatedAt: -1 }).limit(50).lean(),
+      Unit.find().select("make model plate year color dailyRate status").sort({ updatedAt: -1 }).limit(50).lean(),
+      Contract.find()
+        .select("contractNumber status clientId unitId personalizedPersonName createdAt")
+        .sort({ createdAt: -1 })
+        .populate("clientId", "name phone")
+        .populate("unitId", "make model plate")
+        .limit(10)
+        .lean(),
+      Unit.countDocuments(),
+      Unit.countDocuments({ status: "Available" }),
+      Unit.countDocuments({ status: "Rented" }),
+      Contract.countDocuments({ status: "Active" }),
+    ]);
+
+  serverFleetCache = {
+    timestamp: now,
+    allClients,
+    allUnits,
+    recentContracts,
+    totalUnits,
+    availableUnits,
+    rentedUnits,
+    activeContractsCount,
+  };
+
+  return serverFleetCache;
 }
 
 export async function POST(req: Request) {
@@ -314,24 +366,16 @@ export async function POST(req: Request) {
       });
     }
 
-    await connectDB();
-
-    // Load live context from MongoDB so the AI knows every client, car, and contract
-    const [allClients, allUnits, recentContracts, totalUnits, availableUnits, rentedUnits, activeContractsCount] =
-      await Promise.all([
-        Client.find().sort({ updatedAt: -1 }).limit(100).lean(),
-        Unit.find().sort({ updatedAt: -1 }).limit(100).lean(),
-        Contract.find()
-          .sort({ createdAt: -1 })
-          .populate("clientId", "name phone")
-          .populate("unitId", "make model plate")
-          .limit(15)
-          .lean(),
-        Unit.countDocuments(),
-        Unit.countDocuments({ status: "Available" }),
-        Unit.countDocuments({ status: "Rented" }),
-        Contract.countDocuments({ status: "Active" }),
-      ]);
+    // Load live context from MongoDB or 30s cache for maximum responsiveness
+    const {
+      allClients,
+      allUnits,
+      recentContracts,
+      totalUnits,
+      availableUnits,
+      rentedUnits,
+      activeContractsCount,
+    } = await getLiveFleetContext();
 
     // Helpers to find Client and Unit
     const tokensOf = (s: string) =>
@@ -459,11 +503,16 @@ When the user wants to create, book, or set up a contract (or says "create contr
    Extract all of them immediately, DO NOT ask for what they already gave you!
 5. If the user asks for suggestions or what cars are available:
    Suggest real available models from the fleet list!
-6. CRITICAL - VEHICLE RECOGNITION & ACCEPTANCE:
-   - When the user specifies ANY car name, model, plate, color, or year (e.g., "Chevrolet Corvette (C8) Black • 2024 Plate: GG10273", "Nissan Patrol", "Mercedes G63", "BMW M4"):
-     YOU MUST ALWAYS ACCEPT IT and put the vehicle description in "contractData.carName"!
-     NEVER say "Couldn't find car"! NEVER say "Which car should I select?" when the user already told you which car!
-     Leon Assistant registers and assigns the vehicle into the fleet automatically!
+6. VEHICLE FLEET MATCHING & INTEGRITY:
+   - Check if the requested vehicle is in our "Available Cars in Fleet" list above.
+   - IF THE REQUESTED CAR IS NOT IN OUR FLEET:
+     DO NOT invent, pretend, or auto-create a fictitious car!
+     Politely explain that this car is not currently in our fleet.
+     Present the actual available vehicles in our fleet (e.g., Mercedes-Benz C300).
+     Ask if they would like to select one of the available cars, or if they want you to open the "Add Car" form to register a new vehicle into the fleet.
+     Keep the customer name and duration in "contractData" so they don't have to repeat them!
+   - IF THE CAR IS IN OUR FLEET:
+     Assign it immediately in "contractData.carName"!
 7. DATES AND DURATION RECOGNITION:
    - When user provides dates like "from today now too 14/11/2026", parse:
      startDate = today's date (${todayDate}),
@@ -591,12 +640,14 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
 
           // Resolve vehicle: priority to newly extracted car, fallback to existing in URL
           let resolvedUnit: any = null;
-          if (cData.carName) {
-            resolvedUnit = findUnit(cData.carName);
+          let requestedCarNotFound = false;
+          const requestedCarName = cData.carName ? cData.carName.trim() : "";
 
-            // If not found by direct query, parse car details & match plate or auto-create in MongoDB!
+          if (requestedCarName) {
+            resolvedUnit = findUnit(requestedCarName);
+
             if (!resolvedUnit) {
-              const parsedCar = parseCarDetails(cData.carName);
+              const parsedCar = parseCarDetails(requestedCarName);
 
               // 1. Check by plate
               if (parsedCar.plate) {
@@ -614,34 +665,16 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
                     u.model?.toLowerCase().includes(parsedCar.model.toLowerCase())
                 );
               }
+            }
 
-              // 3. Auto-create in MongoDB so it is ready for contract selection!
-              if (!resolvedUnit && cData.carName.trim().length >= 3) {
-                try {
-                  const newUnit = await Unit.create({
-                    make: parsedCar.make,
-                    model: parsedCar.model,
-                    year: parsedCar.year,
-                    plate: parsedCar.plate,
-                    color: parsedCar.color,
-                    mileage: 1500,
-                    dailyRate: cData.dailyRate || 150,
-                    status: "Available",
-                    transmission: "Automatic",
-                    fuelType: "Petrol",
-                    capacity: 2,
-                    description: `Auto-registered by Leon Assistant for booking (${parsedCar.make} ${parsedCar.model})`,
-                  });
-                  resolvedUnit = newUnit.toObject ? newUnit.toObject() : newUnit;
-                  allUnits.unshift(resolvedUnit);
-                } catch (createErr: any) {
-                  resolvedUnit = await Unit.findOne({ plate: parsedCar.plate }).lean();
-                }
-              }
+            // If user explicitly asked for a car that does NOT exist in our fleet:
+            // DO NOT auto-create it! Real car rental fleet requires real existing vehicles.
+            if (!resolvedUnit && requestedCarName.length >= 2) {
+              requestedCarNotFound = true;
             }
           }
 
-          if (!resolvedUnit && existingParams.get("unitId")) {
+          if (!resolvedUnit && !requestedCarNotFound && existingParams.get("unitId")) {
             resolvedUnit = (allUnits as any[]).find((u) => String(u._id) === existingParams.get("unitId")) || null;
           }
 
@@ -654,6 +687,7 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
               message.includes("اول سيارة"))
           ) {
             resolvedUnit = (allUnits as any[]).find((u) => u.status === "Available") || (allUnits as any[])[0] || null;
+            requestedCarNotFound = false;
           }
 
           // Contract Type
@@ -673,11 +707,6 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
             newParams.set("clientId", String(resolvedClient._id));
             if (resolvedClient.name) newParams.set("clientName", String(resolvedClient.name));
           }
-          if (resolvedUnit) {
-            newParams.set("unitId", String(resolvedUnit._id));
-            newParams.set("unitName", `${resolvedUnit.make} ${resolvedUnit.model}`);
-            newParams.set("unitPlate", resolvedUnit.plate);
-          }
           if (cData.days) newParams.set("days", String(cData.days));
           if (cData.startDate) newParams.set("startDate", String(cData.startDate));
           if (cData.endDate) newParams.set("endDate", String(cData.endDate));
@@ -688,6 +717,64 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
           if (cData.advancePayment) newParams.set("advance", String(cData.advancePayment));
           if (cData.paymentMethod) newParams.set("paymentMethod", String(cData.paymentMethod));
           if (cData.pickupLocation) newParams.set("pickupLocation", String(cData.pickupLocation));
+
+          // ===================================================================
+          // SMART BEHAVIOR 1: Car does NOT exist in fleet (DO NOT auto-create!)
+          // ===================================================================
+          if (requestedCarNotFound) {
+            newParams.delete("unitId");
+            newParams.delete("autoPilot");
+
+            const availableCars = (allUnits as any[]).filter((u) => u.status === "Available");
+            const availableList = availableCars
+              .slice(0, 3)
+              .map((u) => `${u.make} ${u.model} (لوحة ${u.plate} - ${u.dailyRate || 85} درهم/يوم)`)
+              .join("، ");
+            const clientLabel = resolvedClient?.name || cData.clientName || "";
+
+            const smartMissingCarReply =
+              lang === "ar"
+                ? `سيارة "${requestedCarName}" غير مسجلة حالياً ضمن أسطولنا. السيارات المتوفرة لدينا الآن: ${availableList || "مرسيدس C300"}. هل تفضل اختيار واحدة منها${clientLabel ? ` للعميل ${clientLabel}` : ""}، أم ترغب في فتح نافذة إضافة سيارة جديدة للأسطول؟`
+                : `The car "${requestedCarName}" is not registered in our fleet. Available vehicles right now: ${availableList || "Mercedes-Benz C300"}. Would you like to select one of these${clientLabel ? ` for ${clientLabel}` : ""}, or should I open the Add Car form?`;
+
+            return NextResponse.json<AssistantResponse>({
+              reply: smartMissingCarReply,
+              action: "CREATE_CONTRACT",
+              navigateUrl: `/bookings/new?${newParams.toString()}`,
+            });
+          }
+
+          // ===================================================================
+          // SMART BEHAVIOR 2: Car exists in fleet but is NOT Available (Rented/Maintenance)
+          // ===================================================================
+          if (resolvedUnit && resolvedUnit.status !== "Available") {
+            newParams.delete("unitId");
+            const availableCars = (allUnits as any[]).filter((u) => u.status === "Available");
+            const availableList = availableCars
+              .slice(0, 3)
+              .map((u) => `${u.make} ${u.model}`)
+              .join("، ");
+
+            const unavailableReply =
+              lang === "ar"
+                ? `سيارة ${resolvedUnit.make} ${resolvedUnit.model} مسجلة لدينا ولكنها (${resolvedUnit.status === "Rented" ? "مؤجرة حالياً" : "في الصيانة"}). السيارات المتاحة الآن: ${availableList || "مرسيدس C300"}. هل تفضل اختيار واحدة منها؟`
+                : `${resolvedUnit.make} ${resolvedUnit.model} is in our fleet but currently ${resolvedUnit.status}. Available cars right now: ${availableList || "Mercedes-Benz C300"}. Would you like to select one of these instead?`;
+
+            return NextResponse.json<AssistantResponse>({
+              reply: unavailableReply,
+              action: "CREATE_CONTRACT",
+              navigateUrl: `/bookings/new?${newParams.toString()}`,
+            });
+          }
+
+          // ===================================================================
+          // SMART BEHAVIOR 3: Car exists and is Available -> Assign it cleanly!
+          // ===================================================================
+          if (resolvedUnit) {
+            newParams.set("unitId", String(resolvedUnit._id));
+            newParams.set("unitName", `${resolvedUnit.make} ${resolvedUnit.model}`);
+            newParams.set("unitPlate", resolvedUnit.plate);
+          }
 
           // If user explicitly asks for "new client" without a name, trigger Add Client modal on contract page
           if (/new\s+client|عميل\s+جديد/i.test(message) && !cData.clientName) {
@@ -713,24 +800,8 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
             newParams.set("autoSubmit", "true");
           }
 
-          // Sanitize reply if the LLM hallucinated "couldn't find car"
-          let finalReply = aiReply;
-          if (
-            resolvedUnit &&
-            (finalReply.toLowerCase().includes("couldn't find car") ||
-              finalReply.includes("لم أجد السيارة") ||
-              finalReply.toLowerCase().includes("which car should i select"))
-          ) {
-            const clientLabel = resolvedClient?.name || cData.clientName || (lang === "ar" ? "العميل" : "Customer");
-            const daysLabel = cData.days ? `${cData.days} ${lang === "ar" ? "يوم" : "day(s)"}` : (lang === "ar" ? "المدة المحددة" : "selected duration");
-            finalReply =
-              lang === "ar"
-                ? `تم تجهيز العقد وتعيين سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.color} • لوحة ${resolvedUnit.plate}) للعميل ${clientLabel} لمدة ${daysLabel}! جاري عرض خطوات الإنشاء أمامك الآن.`
-                : `Set contract with ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.color} • Plate: ${resolvedUnit.plate}) for client ${clientLabel} for ${daysLabel}! Presenting contract steps now.`;
-          }
-
           return NextResponse.json<AssistantResponse>({
-            reply: finalReply,
+            reply: aiReply,
             action: "CREATE_CONTRACT",
             navigateUrl: `/bookings/new?${newParams.toString()}`,
           });

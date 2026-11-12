@@ -842,25 +842,6 @@ export function NewRentalAdminPageContent() {
     // 1. Select Vehicle
     let chosenUnit = paramUnitId ? units.find((u) => String(u._id) === String(paramUnitId)) : null;
     if (!chosenUnit && paramUnitId) {
-      // If unit was just registered by Leon Assistant, build synthetic unit from URL params and fetch fresh units
-      const paramUnitName = searchParams.get("unitName");
-      const paramUnitPlate = searchParams.get("unitPlate");
-      if (paramUnitName) {
-        const parts = paramUnitName.split(" ");
-        const synUnit = {
-          _id: paramUnitId,
-          make: parts[0] || "Car",
-          model: parts.slice(1).join(" ") || "Model",
-          plate: paramUnitPlate || "DXB",
-          color: "Black",
-          year: 2024,
-          mileage: 1500,
-          status: "Available",
-          dailyRate: Number(paramDailyRate) || 150,
-        };
-        setUnits((prev) => [synUnit, ...prev]);
-        chosenUnit = synUnit;
-      }
       fetchUnits();
     }
     if (!chosenUnit && isAutoPilot && units.length > 0) {

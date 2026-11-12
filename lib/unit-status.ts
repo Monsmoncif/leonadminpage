@@ -98,8 +98,18 @@ export async function checkContractDateOverlap({
  *   the car is available for pickup / hand over / new contract.
  * - If a contract has deliveryStatus === "Pending", car is NOT yet with the client -> "Available".
  */
-export async function syncUnitStatuses(targetUnitId?: string | mongoose.Types.ObjectId) {
+let lastGlobalSyncTime = 0;
+
+export async function syncUnitStatuses(targetUnitId?: string | mongoose.Types.ObjectId, force = false) {
   try {
+    // Throttle global fleet status synchronizations to at most once per 60 seconds
+    if (!force && !targetUnitId && Date.now() - lastGlobalSyncTime < 60_000) {
+      return;
+    }
+    if (!targetUnitId) {
+      lastGlobalSyncTime = Date.now();
+    }
+
     const now = new Date();
     const nowEndOfDay = new Date(now);
     nowEndOfDay.setHours(23, 59, 59, 999);
