@@ -32,6 +32,160 @@ interface AssistantResponse {
   };
 }
 
+// Helper: parse vehicle details from raw text (e.g. "Chevrolet Corvette (C8) Black • 2024 Plate: GG10273")
+function parseCarDetails(raw: string) {
+  let text = (raw || "").trim();
+
+  // 1. Extract Plate
+  let plate = "";
+  const plateLabelMatch = text.match(/(?:plate|لوحة|رقم|plaque)[:\s]*([A-Za-z0-9\s-]+)/i);
+  if (plateLabelMatch) {
+    plate = plateLabelMatch[1].trim().replace(/\s+/g, " ");
+    text = text.replace(plateLabelMatch[0], "").trim();
+  } else {
+    const plateCodeMatch = text.match(/\b([A-Z]{1,3}\s*\d{3,6})\b/);
+    if (plateCodeMatch) {
+      plate = plateCodeMatch[1].trim();
+      text = text.replace(plateCodeMatch[0], "").trim();
+    }
+  }
+
+  // 2. Extract Year
+  let year = 2024;
+  const yearMatch = text.match(/\b(19\d{2}|20[2-3]\d)\b/);
+  if (yearMatch) {
+    year = parseInt(yearMatch[1], 10);
+    text = text.replace(yearMatch[0], "").trim();
+  }
+
+  // 3. Extract Color
+  let color = "Black";
+  const colorMatch = text.match(
+    /\b(Black|White|Silver|Grey|Gray|Red|Blue|Green|Yellow|Orange|Gold|Brown|أسود|أبيض|فضي|رمادي|أحمر|أزرق)\b/i
+  );
+  if (colorMatch) {
+    const rawColor = colorMatch[1];
+    text = text.replace(colorMatch[0], "").trim();
+    const cLower = rawColor.toLowerCase();
+    if (cLower === "أسود" || cLower === "black") color = "Black";
+    else if (cLower === "أبيض" || cLower === "white") color = "White";
+    else if (cLower === "فضي" || cLower === "silver") color = "Silver";
+    else if (cLower === "رمادي" || cLower === "grey" || cLower === "gray") color = "Grey";
+    else if (cLower === "أحمر" || cLower === "red") color = "Red";
+    else if (cLower === "أزرق" || cLower === "blue") color = "Blue";
+    else color = rawColor.charAt(0).toUpperCase() + rawColor.slice(1).toLowerCase();
+  }
+
+  // Clean symbols
+  text = text.replace(/[•|,:–—]/g, " ").replace(/\s+/g, " ").trim();
+
+  // 4. Known car brands
+  const knownBrands = [
+    "Chevrolet",
+    "Mercedes-Benz",
+    "Mercedes",
+    "BMW",
+    "Audi",
+    "Porsche",
+    "Lamborghini",
+    "Ferrari",
+    "Bentley",
+    "Rolls-Royce",
+    "Rolls Royce",
+    "Range Rover",
+    "Land Rover",
+    "Nissan",
+    "Toyota",
+    "Ford",
+    "Hyundai",
+    "Kia",
+    "Lexus",
+    "Cadillac",
+    "Dodge",
+    "Jeep",
+    "GMC",
+    "Tesla",
+    "Maserati",
+    "Aston Martin",
+    "McLaren",
+    "Volkswagen",
+    "Honda",
+    "شفروليه",
+    "مرسيدس",
+    "بي ام دبليو",
+    "نيسان",
+    "تويوتا",
+  ];
+
+  let make = "";
+  let model = "";
+
+  for (const b of knownBrands) {
+    const rx = new RegExp(`^${b}\\b`, "i");
+    if (rx.test(text)) {
+      make = b;
+      model = text.replace(rx, "").trim();
+      break;
+    }
+  }
+
+  if (!make) {
+    const parts = text.split(" ");
+    make = parts[0] || "Chevrolet";
+    model = parts.slice(1).join(" ") || "Sedan";
+  }
+
+  if (!model) {
+    model = "Sedan";
+  }
+
+  if (make.toLowerCase() === "mercedes" || make === "مرسيدس") make = "Mercedes-Benz";
+  if (make === "شفروليه") make = "Chevrolet";
+  if (make === "بي ام دبليو") make = "BMW";
+  if (make === "نيسان") make = "Nissan";
+  if (make === "تويوتا") make = "Toyota";
+
+  if (!plate) {
+    plate = `DXB-${Math.floor(10000 + Math.random() * 90000)}`;
+  }
+
+  return { make, model, year, color, plate };
+}
+
+// Helper: parse dates from user message (e.g. "from today now too 14/11/2026")
+function parseRentalDates(message: string, todayDate: string) {
+  let startDate = todayDate;
+  let endDate: string | null = null;
+  let days: number | null = null;
+
+  // Pattern DD/MM/YYYY or DD-MM-YYYY
+  const dateMatches = Array.from(message.matchAll(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g));
+  if (dateMatches.length === 1) {
+    const [, d, m, y] = dateMatches[0];
+    const parsedEnd = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    if (!isNaN(new Date(parsedEnd).getTime())) {
+      endDate = parsedEnd;
+      const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000);
+      days = Math.max(1, diff);
+    }
+  } else if (dateMatches.length >= 2) {
+    const [, d1, m1, y1] = dateMatches[0];
+    const [, d2, m2, y2] = dateMatches[1];
+    startDate = `${y1}-${m1.padStart(2, "0")}-${d1.padStart(2, "0")}`;
+    endDate = `${y2}-${m2.padStart(2, "0")}-${d2.padStart(2, "0")}`;
+    const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000);
+    days = Math.max(1, diff);
+  }
+
+  const daysMatch = message.match(/\b(\d+)\s*(?:days?|day|يوم|أيام|ايام)\b/i);
+  if (daysMatch && !days) {
+    days = parseInt(daysMatch[1], 10);
+    endDate = new Date(new Date(startDate).getTime() + days * 86400000).toISOString().split("T")[0];
+  }
+
+  return { startDate, endDate, days };
+}
+
 // Call Groq LLM (supports conversation history + JSON output)
 async function callGroqBrain(
   messagesPayload: { role: "system" | "user" | "assistant"; content: string }[]
@@ -305,6 +459,16 @@ When the user wants to create, book, or set up a contract (or says "create contr
    Extract all of them immediately, DO NOT ask for what they already gave you!
 5. If the user asks for suggestions or what cars are available:
    Suggest real available models from the fleet list!
+6. CRITICAL - VEHICLE RECOGNITION & ACCEPTANCE:
+   - When the user specifies ANY car name, model, plate, color, or year (e.g., "Chevrolet Corvette (C8) Black • 2024 Plate: GG10273", "Nissan Patrol", "Mercedes G63", "BMW M4"):
+     YOU MUST ALWAYS ACCEPT IT and put the vehicle description in "contractData.carName"!
+     NEVER say "Couldn't find car"! NEVER say "Which car should I select?" when the user already told you which car!
+     Leon Assistant registers and assigns the vehicle into the fleet automatically!
+7. DATES AND DURATION RECOGNITION:
+   - When user provides dates like "from today now too 14/11/2026", parse:
+     startDate = today's date (${todayDate}),
+     endDate = "2026-11-14",
+     days = difference in days between startDate and endDate (e.g. 2 days).
 
 OUTPUT FORMAT:
 You MUST return ONLY a single valid JSON object (no markdown, no backticks, no code fence). Schema:
@@ -355,6 +519,36 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
         // =====================================================================
         // 1. CONTRACT FLOW: SMART MULTI-TURN CONVERSATION & PREFILL
         // =====================================================================
+        // Fallback regex extractions in case the model missed any specific parameters
+        if (!cData.clientName) {
+          const clientRegex = /(?:forclien named|for client named|for client|client named|العميل|للعميل|لصالح)\s+([A-Za-z\u0600-\u06FF\s]+?)(?:\s+(?:with|car|بسيارة|سيارة|from|من|$))/i;
+          const clientMatch = message.match(clientRegex);
+          if (clientMatch) {
+            cData.clientName = clientMatch[1].trim();
+          }
+        }
+
+        if (!cData.carName) {
+          const carRegex = /(?:with car|with vehicle|car|سيارة|بسيارة|مركبة)\s+([^,.\n]+?(?:Plate[:\s]*[A-Za-z0-9-]+|[0-9]{4}|Black|White|Red|Blue|Grey|Silver|[\u0600-\u06FF]+))/i;
+          const carMatch = message.match(carRegex);
+          if (carMatch) {
+            cData.carName = carMatch[1].trim();
+          }
+        }
+
+        const parsedDates = parseRentalDates(message, todayDate);
+        if (!cData.endDate && parsedDates.endDate) {
+          cData.endDate = parsedDates.endDate;
+          cData.startDate = parsedDates.startDate || cData.startDate || todayDate;
+          cData.days = parsedDates.days || cData.days;
+        } else if (cData.endDate && !cData.startDate) {
+          cData.startDate = todayDate;
+        }
+        if (!cData.days && cData.startDate && cData.endDate) {
+          const dDiff = Math.round((new Date(cData.endDate).getTime() - new Date(cData.startDate).getTime()) / 86400000);
+          if (dDiff > 0) cData.days = dDiff;
+        }
+
         const isContractRelated =
           intent === "CONTRACT_FLOW" ||
           lower.includes("contract") ||
@@ -370,7 +564,7 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
           let resolvedClient: any = null;
           if (cData.clientName) {
             resolvedClient = findClient(cData.clientName);
-            // If the user specified a real person's name (e.g. "Khalil") that isn't in DB yet, auto-create it!
+            // If the user specified a real person's name (e.g. "Khalil" or "ourci ahmed") that isn't in DB yet, auto-create it!
             if (!resolvedClient && cData.clientName.trim().length >= 2 && !/new\s+client|عميل\s+جديد/i.test(cData.clientName)) {
               const newClient = await Client.create({
                 name: cData.clientName.trim(),
@@ -399,7 +593,54 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
           let resolvedUnit: any = null;
           if (cData.carName) {
             resolvedUnit = findUnit(cData.carName);
+
+            // If not found by direct query, parse car details & match plate or auto-create in MongoDB!
+            if (!resolvedUnit) {
+              const parsedCar = parseCarDetails(cData.carName);
+
+              // 1. Check by plate
+              if (parsedCar.plate) {
+                const cleanPlate = parsedCar.plate.replace(/\s+/g, "").toLowerCase();
+                resolvedUnit = (allUnits as any[]).find(
+                  (u) => (u.plate || "").replace(/\s+/g, "").toLowerCase() === cleanPlate
+                );
+              }
+
+              // 2. Check by make + model
+              if (!resolvedUnit && parsedCar.make && parsedCar.model) {
+                resolvedUnit = (allUnits as any[]).find(
+                  (u) =>
+                    u.make?.toLowerCase() === parsedCar.make.toLowerCase() &&
+                    u.model?.toLowerCase().includes(parsedCar.model.toLowerCase())
+                );
+              }
+
+              // 3. Auto-create in MongoDB so it is ready for contract selection!
+              if (!resolvedUnit && cData.carName.trim().length >= 3) {
+                try {
+                  const newUnit = await Unit.create({
+                    make: parsedCar.make,
+                    model: parsedCar.model,
+                    year: parsedCar.year,
+                    plate: parsedCar.plate,
+                    color: parsedCar.color,
+                    mileage: 1500,
+                    dailyRate: cData.dailyRate || 150,
+                    status: "Available",
+                    transmission: "Automatic",
+                    fuelType: "Petrol",
+                    capacity: 2,
+                    description: `Auto-registered by Leon Assistant for booking (${parsedCar.make} ${parsedCar.model})`,
+                  });
+                  resolvedUnit = newUnit.toObject ? newUnit.toObject() : newUnit;
+                  allUnits.unshift(resolvedUnit);
+                } catch (createErr: any) {
+                  resolvedUnit = await Unit.findOne({ plate: parsedCar.plate }).lean();
+                }
+              }
+            }
           }
+
           if (!resolvedUnit && existingParams.get("unitId")) {
             resolvedUnit = (allUnits as any[]).find((u) => String(u._id) === existingParams.get("unitId")) || null;
           }
@@ -432,7 +673,11 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
             newParams.set("clientId", String(resolvedClient._id));
             if (resolvedClient.name) newParams.set("clientName", String(resolvedClient.name));
           }
-          if (resolvedUnit) newParams.set("unitId", String(resolvedUnit._id));
+          if (resolvedUnit) {
+            newParams.set("unitId", String(resolvedUnit._id));
+            newParams.set("unitName", `${resolvedUnit.make} ${resolvedUnit.model}`);
+            newParams.set("unitPlate", resolvedUnit.plate);
+          }
           if (cData.days) newParams.set("days", String(cData.days));
           if (cData.startDate) newParams.set("startDate", String(cData.startDate));
           if (cData.endDate) newParams.set("endDate", String(cData.endDate));
@@ -449,7 +694,12 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
             newParams.set("openAddClient", "true");
           }
 
-          // Auto-submit condition: client + car known AND user said yes / confirm / auto / create it
+          // Auto-Pilot: if client and unit are known, let the user see the step-by-step creation progress!
+          if (resolvedClient && resolvedUnit) {
+            newParams.set("autoPilot", "true");
+          }
+
+          // Auto-submit condition: client + car known AND user explicitly asked to submit/create it now
           const isConfirmed =
             Boolean(cData.readyToSubmit) ||
             /\b(yes|confirm|create it|submit it|do it|finalize|now|go ahead)\b/i.test(lower) ||
@@ -463,8 +713,24 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
             newParams.set("autoSubmit", "true");
           }
 
+          // Sanitize reply if the LLM hallucinated "couldn't find car"
+          let finalReply = aiReply;
+          if (
+            resolvedUnit &&
+            (finalReply.toLowerCase().includes("couldn't find car") ||
+              finalReply.includes("لم أجد السيارة") ||
+              finalReply.toLowerCase().includes("which car should i select"))
+          ) {
+            const clientLabel = resolvedClient?.name || cData.clientName || (lang === "ar" ? "العميل" : "Customer");
+            const daysLabel = cData.days ? `${cData.days} ${lang === "ar" ? "يوم" : "day(s)"}` : (lang === "ar" ? "المدة المحددة" : "selected duration");
+            finalReply =
+              lang === "ar"
+                ? `تم تجهيز العقد وتعيين سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.color} • لوحة ${resolvedUnit.plate}) للعميل ${clientLabel} لمدة ${daysLabel}! جاري عرض خطوات الإنشاء أمامك الآن.`
+                : `Set contract with ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.color} • Plate: ${resolvedUnit.plate}) for client ${clientLabel} for ${daysLabel}! Presenting contract steps now.`;
+          }
+
           return NextResponse.json<AssistantResponse>({
-            reply: aiReply,
+            reply: finalReply,
             action: "CREATE_CONTRACT",
             navigateUrl: `/bookings/new?${newParams.toString()}`,
           });

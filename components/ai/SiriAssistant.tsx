@@ -180,8 +180,9 @@ export default function SiriAssistant() {
           speakText(replyText);
         }
 
-        if (data.action === "CLIENT_CREATED") {
+        if (data.action === "CLIENT_CREATED" || data.action === "CREATE_CONTRACT") {
           invalidateClientCache("clients");
+          invalidateClientCache("units");
         }
 
         if (data.uiAction === "OPEN_ADD_CLIENT_MODAL") {

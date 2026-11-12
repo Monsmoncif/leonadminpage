@@ -36,8 +36,10 @@ import {
   Trash2,
   Edit,
   Edit2,
-  Building2
+  Building2,
+  Sparkles
 } from "lucide-react";
+import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -125,17 +127,33 @@ export function NewRentalAdminPageContent() {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPageLoading, setIsPageLoading] = useState(true);
+
+  // Instant page transitions: Read from client cache (SWR pattern)
+  const cachedUnits = typeof window !== "undefined" ? getClientCache<any[]>("units_list") : null;
+  const cachedClients = typeof window !== "undefined" ? getClientCache<any[]>("clients_list") : null;
+  const cachedDrivers = typeof window !== "undefined" ? getClientCache<any[]>("drivers_list") : null;
+
+  const [units, setUnits] = useState<any[]>(cachedUnits || []);
+  const [clients, setClients] = useState<any[]>(cachedClients || []);
+  const [drivers, setDrivers] = useState<any[]>(cachedDrivers || []);
+  const [isPageLoading, setIsPageLoading] = useState(
+    !contractId && cachedUnits && cachedClients ? false : true
+  );
+
+  // Leon AI Auto-Pilot Step-by-Step HUD State
+  const [aiAutoPilotStepInfo, setAiAutoPilotStepInfo] = useState<{
+    active: boolean;
+    currentStep: number;
+    statusText: string;
+    carName?: string;
+    clientName?: string;
+    duration?: string;
+  } | null>(null);
 
   // Contract Type (defaults to Delivery for drivers, Shop for admins, or Personalized)
   const [contractType, setContractType] = useState<"Delivery" | "Shop" | "Personalized">("Shop");
   // Person name for Personalized bookings (who took the car)
   const [personName, setPersonName] = useState("");
-
-  // Data State
-  const [units, setUnits] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
-  const [drivers, setDrivers] = useState<any[]>([]);
 
   const currentDriver = drivers.find(d => 
     (d._id && String(d._id) === String(currentUserId)) || 
@@ -610,7 +628,9 @@ export function NewRentalAdminPageContent() {
     try {
       const res = await fetch("/api/units", { cache: "no-store" });
       const data = await res.json();
-      setUnits(data.units || []);
+      const list = data.units || [];
+      setUnits(list);
+      setClientCache("units_list", list);
     } catch (e) {
       console.error("Failed to load units", e);
     }
@@ -620,7 +640,9 @@ export function NewRentalAdminPageContent() {
     try {
       const res = await fetch("/api/clients", { cache: "no-store" });
       const data = await res.json();
-      setClients(data.clients || []);
+      const list = data.clients || [];
+      setClients(list);
+      setClientCache("clients_list", list);
     } catch (e) {
       console.error("Failed to load clients", e);
     }
@@ -632,6 +654,7 @@ export function NewRentalAdminPageContent() {
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.drivers || []);
       setDrivers(list);
+      setClientCache("drivers_list", list);
     } catch (e) {
       console.error("Failed to load drivers", e);
     }
@@ -818,6 +841,28 @@ export function NewRentalAdminPageContent() {
 
     // 1. Select Vehicle
     let chosenUnit = paramUnitId ? units.find((u) => String(u._id) === String(paramUnitId)) : null;
+    if (!chosenUnit && paramUnitId) {
+      // If unit was just registered by Leon Assistant, build synthetic unit from URL params and fetch fresh units
+      const paramUnitName = searchParams.get("unitName");
+      const paramUnitPlate = searchParams.get("unitPlate");
+      if (paramUnitName) {
+        const parts = paramUnitName.split(" ");
+        const synUnit = {
+          _id: paramUnitId,
+          make: parts[0] || "Car",
+          model: parts.slice(1).join(" ") || "Model",
+          plate: paramUnitPlate || "DXB",
+          color: "Black",
+          year: 2024,
+          mileage: 1500,
+          status: "Available",
+          dailyRate: Number(paramDailyRate) || 150,
+        };
+        setUnits((prev) => [synUnit, ...prev]);
+        chosenUnit = synUnit;
+      }
+      fetchUnits();
+    }
     if (!chosenUnit && isAutoPilot && units.length > 0) {
       chosenUnit =
         units.find((u) => u.status === "Available" && isUnitBookable(u)) ||
@@ -831,6 +876,10 @@ export function NewRentalAdminPageContent() {
       setSelectedVehicle(chosenUnit._id);
     }
 
+    let calculatedStartStr = new Date().toISOString().split("T")[0];
+    let calculatedEndStr = new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0];
+    let calculatedDaysCount = 3;
+
     if (chosenUnit || paramStartDate || paramEndDate || paramPrice || paramDays) {
       const startStr = isValidDate(paramStartDate) ? (paramStartDate as string) : new Date().toISOString().split("T")[0];
       let daysCount = paramDays && !isNaN(Number(paramDays)) && Number(paramDays) > 0 ? Number(paramDays) : 3;
@@ -841,6 +890,10 @@ export function NewRentalAdminPageContent() {
       } else {
         endStr = new Date(new Date(startStr).getTime() + daysCount * 86400000).toISOString().split("T")[0];
       }
+
+      calculatedStartStr = startStr;
+      calculatedEndStr = endStr;
+      calculatedDaysCount = daysCount;
 
       const unitRate = Number(paramDailyRate) > 0 ? Number(paramDailyRate) : Number(chosenUnit?.dailyRate) || 85;
       const totalPrice = Number(paramPrice) > 0 ? Number(paramPrice) : unitRate * daysCount;
@@ -864,6 +917,20 @@ export function NewRentalAdminPageContent() {
     // 2. Select Client
     const paramClientName = searchParams.get("clientName");
     let chosenClient = paramClientId ? clients.find((c) => String(c._id) === String(paramClientId)) : null;
+    if (!chosenClient && paramClientId) {
+      if (paramClientName) {
+        const synClient = {
+          _id: paramClientId,
+          name: paramClientName,
+          phone: "N/A",
+          status: "Active",
+          customerType: "B2C",
+        };
+        setClients((prev) => [synClient, ...prev]);
+        chosenClient = synClient;
+      }
+      fetchClients();
+    }
     if (!chosenClient && isAutoPilot && clients.length > 0) {
       chosenClient = clients.find((c) => c.status === "Active") || clients[0];
     }
@@ -891,31 +958,99 @@ export function NewRentalAdminPageContent() {
       }
     }
 
-    // 3. Step Advancement & Auto-Submit
+    // 3. Step Advancement & Auto-Submit (Visible Step-by-Step Experience)
     const hasClientSelected = Boolean(chosenClient || paramClientId);
     const clientDisplayName = chosenClient?.name || paramClientName || "Customer";
     if (isAutoPilot && chosenUnit && hasClientSelected) {
-      toast.info(`Leon Assistant selected ${chosenUnit.make} ${chosenUnit.model} & ${clientDisplayName} automatically!`);
       const isPersonalizedFlow = paramType === "Personalized";
-      const t1 = setTimeout(() => setCurrentStep(2), 250);
-      const t2 = setTimeout(() => setCurrentStep(3), 550);
-      const t3 = isPersonalizedFlow ? null : setTimeout(() => setCurrentStep(4), 850);
+      const carLabel = `${chosenUnit.make} ${chosenUnit.model}${chosenUnit.plate ? ` (${chosenUnit.plate})` : ""}`;
+
+      // Step 1: Start at Step 1 (Car)
+      setCurrentStep(1);
+      setAiAutoPilotStepInfo({
+        active: true,
+        currentStep: 1,
+        statusText: `Step 1/4: Selected vehicle ${carLabel} ✓`,
+        carName: `${chosenUnit.make} ${chosenUnit.model}`,
+        clientName: clientDisplayName,
+        duration: `${calculatedDaysCount} Days`,
+      });
+
+      // Step 2: Transition to Step 2 (Client) after 800ms
+      const t1 = setTimeout(() => {
+        setCurrentStep(2);
+        setAiAutoPilotStepInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentStep: 2,
+                statusText: `Step 2/4: Assigned customer ${clientDisplayName} ✓`,
+              }
+            : null
+        );
+      }, 800);
+
+      // Step 3: Transition to Step 3 (Dates & Pricing) after 1650ms
+      const t2 = setTimeout(() => {
+        setCurrentStep(3);
+        setAiAutoPilotStepInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentStep: 3,
+                statusText: `Step 3/4: Configured dates (${calculatedStartStr} → ${calculatedEndStr} • ${calculatedDaysCount} Days) ✓`,
+              }
+            : null
+        );
+      }, 1650);
+
+      // Step 4: Transition to Step 4 (Review) after 2500ms
+      const t3 = isPersonalizedFlow
+        ? null
+        : setTimeout(() => {
+            setCurrentStep(4);
+            setAiAutoPilotStepInfo((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    currentStep: 4,
+                    statusText: `Step 4/4: Reviewing contract & ready to finalize ✓`,
+                  }
+                : null
+            );
+          }, 2500);
+
+      // Trigger submission after full visual review if autoSubmit was requested
       const t4 = isAutoSubmit
         ? setTimeout(() => {
             setAiTriggerSubmit(true);
-          }, isPersonalizedFlow ? 1100 : 1400)
+          }, isPersonalizedFlow ? 2400 : 3600)
         : null;
+
+      const t5 = setTimeout(() => {
+        setAiAutoPilotStepInfo((prev) => (prev ? { ...prev, active: false } : null));
+      }, isAutoSubmit ? 4800 : 4200);
 
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);
         if (t3) clearTimeout(t3);
         if (t4) clearTimeout(t4);
+        clearTimeout(t5);
       };
     } else if (paramStep && !isNaN(Number(paramStep))) {
       setCurrentStep(Math.min(4, Math.max(1, Number(paramStep))));
     } else if (chosenUnit && hasClientSelected) {
-      setCurrentStep(paramType === "Delivery" || paramType === "Personalized" ? 3 : 4);
+      // Visually progress through steps so user sees each section
+      setCurrentStep(1);
+      const t1 = setTimeout(() => setCurrentStep(2), 600);
+      const t2 = setTimeout(() => setCurrentStep(3), 1200);
+      const t3 = setTimeout(() => setCurrentStep(paramType === "Delivery" || paramType === "Personalized" ? 3 : 4), 1800);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     } else if (chosenUnit) {
       setCurrentStep(2);
     }
@@ -3527,6 +3662,49 @@ export function NewRentalAdminPageContent() {
           </div>
         )}
       </div>
+
+      {/* Leon AI Auto-Pilot Step-by-Step HUD Banner */}
+      {aiAutoPilotStepInfo?.active && (
+        <div className="bg-gradient-to-r from-red-600 via-red-600 to-rose-700 text-white rounded-xl p-3 sm:p-4 shadow-md border border-red-500 animate-fade-in-up">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0 animate-pulse">
+                <Sparkles size={18} className="text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full text-white">
+                    Leon AI Auto-Pilot (الطيار الآلي)
+                  </span>
+                  <span className="text-[11px] text-white/90 font-bold">
+                    الخطوة {aiAutoPilotStepInfo.currentStep} من {totalSteps}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm font-bold text-white mt-0.5">
+                  {aiAutoPilotStepInfo.statusText}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {aiAutoPilotStepInfo.carName && (
+                <span className="text-[11px] bg-black/20 text-white px-2.5 py-1 rounded-md font-semibold border border-white/10">
+                  🚗 {aiAutoPilotStepInfo.carName}
+                </span>
+              )}
+              {aiAutoPilotStepInfo.clientName && (
+                <span className="text-[11px] bg-black/20 text-white px-2.5 py-1 rounded-md font-semibold border border-white/10">
+                  👤 {aiAutoPilotStepInfo.clientName}
+                </span>
+              )}
+              {aiAutoPilotStepInfo.duration && (
+                <span className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-md font-semibold border border-white/10">
+                  📅 {aiAutoPilotStepInfo.duration}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stepper Header */}
       <div className="bg-card rounded-xl border border-border shadow-2xs p-2.5 sm:p-4 animate-fade-in-up stagger-1">
