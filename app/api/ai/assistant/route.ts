@@ -32,8 +32,10 @@ interface AssistantResponse {
   };
 }
 
-// Fallback LLM caller using Groq
-async function callGroqLLM(prompt: string, systemPrompt: string): Promise<string | null> {
+// Call Groq LLM (supports conversation history + JSON output)
+async function callGroqBrain(
+  messagesPayload: { role: "system" | "user" | "assistant"; content: string }[]
+): Promise<string | null> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
 
@@ -48,12 +50,9 @@ async function callGroqLLM(prompt: string, systemPrompt: string): Promise<string
         },
         body: JSON.stringify({
           model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.3,
-          max_tokens: 300,
+          messages: messagesPayload,
+          temperature: 0.2,
+          max_tokens: 500,
         }),
       });
 
@@ -63,7 +62,7 @@ async function callGroqLLM(prompt: string, systemPrompt: string): Promise<string
         if (text) return text;
       }
     } catch {
-      // Try next model if any network or rate-limit issue
+      // Try fallback model
     }
   }
   return null;
@@ -73,21 +72,40 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const message = (body.message || "").trim();
-    const lang = body.lang || (message.match(/[\u0600-\u06FF]/) ? "ar" : "en");
+    const history: { sender: string; text: string }[] = Array.isArray(body.history) ? body.history : [];
+    const isArabic = /[\u0600-\u06FF]/.test(message);
+    const lang = isArabic ? "ar" : body.lang || "en";
 
     if (!message) {
       return NextResponse.json<AssistantResponse>({
-        reply: lang === "ar" ? "أهلاً بك! كيف يمكنني مساعدتك اليوم؟" : "Hello! How can I assist you today?",
+        reply: lang === "ar" ? "أهلاً بك! كيف أساعدك؟" : "Hey! How can I help you?",
         action: "NONE",
       });
     }
 
     await connectDB();
 
+    // Load live context from MongoDB so both fast-rules and the AI Brain know every client, car, and contract
+    const [allClients, allUnits, recentContracts, totalUnits, availableUnits, rentedUnits, activeContractsCount] =
+      await Promise.all([
+        Client.find().sort({ updatedAt: -1 }).limit(50).lean(),
+        Unit.find().sort({ updatedAt: -1 }).limit(50).lean(),
+        Contract.find()
+          .sort({ createdAt: -1 })
+          .populate("clientId", "name phone")
+          .populate("unitId", "make model plate")
+          .limit(15)
+          .lean(),
+        Unit.countDocuments(),
+        Unit.countDocuments({ status: "Available" }),
+        Unit.countDocuments({ status: "Rented" }),
+        Contract.countDocuments({ status: "Active" }),
+      ]);
+
     const lower = message.toLowerCase();
 
     // =========================================================================
-    // 1. ADD / CREATE NEW CLIENT OR COMPANY (Direct DB creation OR Modal Open)
+    // 1. FAST MATCH: ADD / CREATE NEW CLIENT OR COMPANY
     // =========================================================================
     const isAddCompanyIntent =
       lower.includes("add company") ||
@@ -103,8 +121,8 @@ export async function POST(req: Request) {
       return NextResponse.json<AssistantResponse>({
         reply:
           lang === "ar"
-            ? "حاضر! جاري فتح نافذة إضافة شركة جديدة (B2B) الآن..."
-            : "Opening the Add Company (B2B) form for you now...",
+            ? "حاضر! فتحت لك نافذة إضافة شركة جديدة."
+            : "Sure! Opening the Add Company form now.",
         action: "OPEN_ADD_COMPANY_MODAL",
         uiAction: "OPEN_ADD_COMPANY_MODAL",
       });
@@ -132,14 +150,13 @@ export async function POST(req: Request) {
       message.includes("زبون جديد");
 
     if (isAddClientIntent) {
-      // Extract phone or email if the user spoke/typed them
       const phoneMatch = message.match(/(?:\+?\d[\d\s-]{6,14}\d)/);
       const extractedPhone = phoneMatch ? phoneMatch[0].replace(/\s+/g, "").trim() : "";
 
       const emailMatch = message.match(/\S+@\S+\.\S+/);
       const extractedEmail = emailMatch ? emailMatch[0].trim() : "";
 
-      let nameCandidate = message
+      const nameCandidate = message
         .replace(/(?:\+?\d[\d\s-]{6,14}\d)/g, "")
         .replace(/\S+@\S+\.\S+/g, "")
         .replace(
@@ -171,8 +188,8 @@ export async function POST(req: Request) {
         return NextResponse.json<AssistantResponse>({
           reply:
             lang === "ar"
-              ? `تم إضافة العميل الجديد (${newClient.name}) بنجاح! جاري فتح صفحة تفاصيل العميل الآن...`
-              : `Successfully added new client "${newClient.name}"! Opening their profile page now...`,
+              ? `تم إضافة العميل (${newClient.name}) بنجاح وفتح ملفه!`
+              : `Added client "${newClient.name}" and opening their profile!`,
           action: "CLIENT_CREATED",
           navigateUrl: `/clients/${newClient._id}`,
           data: {
@@ -190,19 +207,18 @@ export async function POST(req: Request) {
         });
       }
 
-      // If no specific name was provided, immediately pop open the Add New Customer modal
       return NextResponse.json<AssistantResponse>({
         reply:
           lang === "ar"
-            ? "حاضر! جاري فتح نافذة إضافة عميل جديد (Add New Customer) الآن..."
-            : "Opening the Add New Customer modal for you right now...",
+            ? "حاضر! فتحت لك نافذة إضافة عميل جديد."
+            : "Sure! Opening the Add New Customer form for you.",
         action: "OPEN_ADD_CLIENT_MODAL",
         uiAction: "OPEN_ADD_CLIENT_MODAL",
       });
     }
 
     // =========================================================================
-    // 2. ADD / CREATE NEW VEHICLE / CAR (Modal Open)
+    // 2. FAST MATCH: ADD / CREATE NEW VEHICLE
     // =========================================================================
     const isAddVehicleIntent =
       /(?:add|create|creat|new|register)\s+(?:a\s+)?(?:new\s+)?(?:car|vehicle|unit)/i.test(lower) ||
@@ -220,15 +236,15 @@ export async function POST(req: Request) {
       return NextResponse.json<AssistantResponse>({
         reply:
           lang === "ar"
-            ? "حاضر! جاري فتح نافذة إضافة سيارة جديدة للأسطول الآن..."
-            : "Opening the Add New Vehicle modal for you right now...",
+            ? "حاضر! فتحت لك نافذة إضافة سيارة جديدة."
+            : "Opening the Add New Vehicle form now.",
         action: "OPEN_ADD_UNIT_MODAL",
         uiAction: "OPEN_ADD_UNIT_MODAL",
       });
     }
 
     // =========================================================================
-    // 3. CREATE NEW CONTRACT / AUTO-PILOT CONTRACT CREATION
+    // 3. FAST MATCH: CREATE CONTRACT / AUTO-PILOT CONTRACT
     // =========================================================================
     const isCreateContractIntent =
       /(?:create|creat|make|new|start|open|auto)\s+(?:a\s+)?(?:new\s+)?(?:contract|contrac|booking|rental)/i.test(lower) ||
@@ -271,12 +287,6 @@ export async function POST(req: Request) {
         message.includes("للعميل") ||
         message.includes("بسيارة");
 
-      // Search all clients & units to see if user mentioned a specific client or car in the sentence
-      const [allClients, allUnits] = await Promise.all([
-        Client.find({ status: "Active" }).sort({ updatedAt: -1 }).limit(100).lean(),
-        Unit.find().sort({ updatedAt: -1 }).limit(100).lean(),
-      ]);
-
       let matchedClient = allClients.find(
         (c: any) =>
           c.name &&
@@ -291,7 +301,6 @@ export async function POST(req: Request) {
           (u.plate && u.plate.trim().length >= 2 && lower.includes(u.plate.toLowerCase().trim()))
       );
 
-      // If not found by exact full-name substring, check leftover words
       const leftover = message
         .replace(/(\d+)\s*(?:days?|day|ايام|أيام|يوم)/gi, "")
         .replace(
@@ -341,8 +350,8 @@ export async function POST(req: Request) {
           return NextResponse.json<AssistantResponse>({
             reply:
               lang === "ar"
-                ? `حاضر! جاري الذهاب إلى صفحة العقود، واختيار السيارة (${targetUnit.make} ${targetUnit.model}) والعميل (${targetClient.name})، وإنشاء العقد تلقائياً الآن...`
-                : `Going to contracts, selecting ${targetUnit.make} ${targetUnit.model} and customer ${targetClient.name}, and creating the contract automatically now...`,
+                ? `حاضر! جاري فتح العقود، واختيار السيارة (${targetUnit.make} ${targetUnit.model}) والعميل (${targetClient.name})، وإنشاء العقد تلقائياً!`
+                : `On it! Selecting ${targetUnit.make} ${targetUnit.model} for ${targetClient.name} and creating the contract automatically.`,
             action: "CREATE_CONTRACT",
             navigateUrl: `/bookings/new?${params.toString()}`,
           });
@@ -352,545 +361,303 @@ export async function POST(req: Request) {
       return NextResponse.json<AssistantResponse>({
         reply:
           lang === "ar"
-            ? "حاضر! جاري فتح صفحة إنشاء عقد جديد الآن..."
-            : "Opening the new contract booking page for you now...",
+            ? "حاضر! فتحت لك صفحة إنشاء عقد جديد."
+            : "Opening the new contract page for you now.",
         action: "CREATE_CONTRACT",
         navigateUrl: "/bookings/new",
       });
     }
 
     // =========================================================================
-    // 4. UI BUTTON CLICK COMMANDS (Click Next, Back, Submit, etc.)
+    // 4. INTELLIGENT GROQ AI BRAIN (Understands ANY phrasing, slang, typos, Arabic/English)
     // =========================================================================
-    if (
-      lower.includes("click ") ||
-      lower.includes("press ") ||
-      lower === "next" ||
-      lower === "next step" ||
-      lower === "previous step" ||
-      lower === "go back" ||
-      lower === "submit" ||
-      lower === "confirm" ||
-      message.includes("اضغط") ||
-      message === "التالي" ||
-      message.includes("الخطوة التالية")
-    ) {
-      const targetBtn = message
-        .replace(/\b(can you|please|click|press|on|the|button|btn)\b/gi, "")
-        .replace(/(ممكن|لو سمحت|اضغط|على|زر)/g, "")
-        .trim();
+    const clientsSummary = allClients
+      .slice(0, 15)
+      .map((c: any) => `- ID:${c._id} | Name:"${c.name}" | Phone:${c.phone || "N/A"}`)
+      .join("\n");
 
-      return NextResponse.json<AssistantResponse>({
-        reply:
-          lang === "ar"
-            ? `حاضر! جاري الضغط على (${targetBtn || "الزر"}) الآن...`
-            : `Clicking "${targetBtn || "button"}" for you now...`,
-        action: "UI_CLICK",
-        uiAction: "CLICK_BUTTON",
-        uiTarget: targetBtn || "next",
-      });
-    }
+    const unitsSummary = allUnits
+      .slice(0, 15)
+      .map((u: any) => `- ID:${u._id} | ${u.make} ${u.model} (${u.year}) | Plate:${u.plate} | Status:${u.status} | Rate:${u.dailyRate}`)
+      .join("\n");
 
-    // =========================================================================
-    // 5. OPEN / NAVIGATE / DETAILS INTENTS
-    // =========================================================================
-    const hasOpenOrDetails =
-      lower.includes("open") ||
-      lower.includes("go to") ||
-      lower.includes("show") ||
-      lower.includes("view") ||
-      lower.includes("navigate") ||
-      lower.includes("take me to") ||
-      lower.includes("details") ||
-      lower.includes("profile") ||
-      lower.includes("page") ||
-      message.includes("افتح") ||
-      message.includes("عرض") ||
-      message.includes("تفاصيل") ||
-      message.includes("صفحة") ||
-      message.includes("ملف") ||
-      message.includes("روح") ||
-      message.includes("انتقل") ||
-      message.includes("وديني") ||
-      message.includes("وريني") ||
-      message.includes("بيانات");
+    const contractsSummary = recentContracts
+      .slice(0, 8)
+      .map(
+        (c: any) =>
+          `- Contract #${c.contractNumber || "Pending"} | Client:${(c.clientId as any)?.name || c.personalizedPersonName || "N/A"} | Car:${(c.unitId as any)?.make || ""} ${(c.unitId as any)?.model || ""} | Status:${c.status}`
+      )
+      .join("\n");
 
-    // CLIENT PAGE / CLIENT DETAILS NAVIGATION
-    const isClientIntent =
-      lower.includes("client") ||
-      lower.includes("clint") ||
-      lower.includes("customer") ||
-      lower.includes("custmer") ||
-      message.includes("عميل") ||
-      message.includes("العميل") ||
-      message.includes("العملاء") ||
-      message.includes("زبون") ||
-      message.includes("الزبائن");
+    const systemPrompt = `You are "Leon Assistant", a smart, conversational ChatGPT-style AI assistant built into Leon Rent A Car admin dashboard.
+You understand English, Arabic, Franco-Arabic, and typos/broken English effortlessly.
+Speak naturally, warmly, and concisely (1-2 short sentences) in the SAME language the user writes in.
 
-    if (isClientIntent && hasOpenOrDetails) {
-      const wantsDetails =
-        lower.includes("details") ||
-        lower.includes("profile") ||
-        lower.includes("page details") ||
-        message.includes("تفاصيل") ||
-        message.includes("ملف") ||
-        message.includes("بيانات");
+LIVE DATABASE CONTEXT:
+Fleet Stats: ${totalUnits} total cars, ${availableUnits} Available, ${rentedUnits} Rented, ${activeContractsCount} Active Contracts.
+Recent Clients:
+${clientsSummary || "None"}
+Vehicles:
+${unitsSummary || "None"}
+Recent Contracts:
+${contractsSummary || "None"}
 
-      const cleaned = message
-        .replace(
-          /can you|please|i told you to|i told him to|i want to|open a client page details|open client page details|open a client page|open client page|open a client details|open client details|open client|show client|view client|client page details|client details|details of|details for|client|clint|customer|custmer|page|details|profile/gi,
-          ""
-        )
-        .replace(
-          /افتح صفحة تفاصيل العميل|افتح تفاصيل العميل|افتح صفحة العميل|عرض تفاصيل العميل|تفاصيل العميل|صفحة العميل|بيانات العميل|ملف العميل|العملاء|العميل|عميل/gi,
-          ""
-        )
-        .trim();
+AVAILABLE INTENTS (Return valid JSON ONLY):
+You MUST respond with a single raw JSON object (no markdown fences) matching this schema:
+{
+  "reply": "Your friendly natural response to the user",
+  "intent": "NONE" | "NAVIGATE" | "OPEN_CLIENT_DETAILS" | "OPEN_VEHICLE_DETAILS" | "AUTO_CREATE_CONTRACT" | "OPEN_NEW_CONTRACT" | "OPEN_ADD_CLIENT_MODAL" | "ADD_CLIENT_DIRECT" | "OPEN_ADD_UNIT_MODAL" | "CLICK_BUTTON" | "SEARCH_CLIENT" | "SEARCH_VEHICLE" | "FLEET_OVERVIEW",
+  "targetUrl": "optional URL if intent is NAVIGATE: '/' | '/bookings' | '/bookings/new' | '/clients' | '/units' | '/drivers' | '/calendar' | '/settings'",
+  "clientId": "optional client ID from context if user refers to a client or wants client details",
+  "unitId": "optional unit ID from context if user refers to a car or wants car details",
+  "clientName": "optional new client name if intent is ADD_CLIENT_DIRECT",
+  "clientPhone": "optional new client phone if intent is ADD_CLIENT_DIRECT",
+  "searchQuery": "optional search term for SEARCH_CLIENT or SEARCH_VEHICLE",
+  "buttonText": "optional button label if intent is CLICK_BUTTON (e.g. 'next', 'back', 'submit')"
+}
 
-      if (cleaned.length >= 2) {
-        const matchedClient = await Client.findOne({
-          $or: [
-            { name: { $regex: cleaned, $options: "i" } },
-            { phone: { $regex: cleaned, $options: "i" } },
-            { email: { $regex: cleaned, $options: "i" } },
-            { idNumber: { $regex: cleaned, $options: "i" } },
-          ],
-        }).lean();
+RULES:
+1. If user asks to open/see a client profile or client details (e.g. "open client details", "show me client X", "go to client profile"), set intent="OPEN_CLIENT_DETAILS" and set clientId to the matching client's ID (or the first client's ID if none specified).
+2. If user asks to open the clients list page ("go to clients", "show all customers"), set intent="NAVIGATE", targetUrl="/clients".
+3. If user asks to add/create a new client without giving a name, set intent="OPEN_ADD_CLIENT_MODAL". If they give a name, set intent="ADD_CLIENT_DIRECT" and fill clientName/clientPhone.
+4. If user asks to create/make a contract automatically or for a specific client/car, set intent="AUTO_CREATE_CONTRACT" and fill clientId/unitId if matched. If they just want the new contract page opened, set intent="OPEN_NEW_CONTRACT".
+5. If user asks about available cars, fleet count, or stats, set intent="FLEET_OVERVIEW" and answer using the Fleet Stats.
+6. If user is just chatting, greeting, or asking a general question (e.g. "hi", "how are you", "what can you do", "who rented the nissan"), set intent="NONE" and give a helpful, conversational reply using the live context.`;
 
-        if (matchedClient) {
+    const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: systemPrompt },
+      ...history.slice(-6).map((h) => ({
+        role: (h.sender === "user" ? "user" : "assistant") as "user" | "assistant",
+        content: h.text,
+      })),
+      { role: "user", content: message },
+    ];
+
+    const rawBrainOutput = await callGroqBrain(chatMessages);
+
+    if (rawBrainOutput) {
+      try {
+        const jsonMatch = rawBrainOutput.match(/\{[\s\S]*\}/);
+        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawBrainOutput);
+        const aiReply = parsed.reply || (lang === "ar" ? "تم!" : "Done!");
+        const intent = parsed.intent || "NONE";
+
+        if (intent === "OPEN_ADD_CLIENT_MODAL") {
           return NextResponse.json<AssistantResponse>({
-            reply:
-              lang === "ar"
-                ? `جاري فتح صفحة تفاصيل العميل (${matchedClient.name})...`
-                : `Opening details page for client ${matchedClient.name}...`,
-            action: "NAVIGATE",
-            navigateUrl: `/clients/${matchedClient._id}`,
+            reply: aiReply,
+            action: "OPEN_ADD_CLIENT_MODAL",
+            uiAction: "OPEN_ADD_CLIENT_MODAL",
+          });
+        }
+
+        if (intent === "OPEN_ADD_UNIT_MODAL") {
+          return NextResponse.json<AssistantResponse>({
+            reply: aiReply,
+            action: "OPEN_ADD_UNIT_MODAL",
+            uiAction: "OPEN_ADD_UNIT_MODAL",
+          });
+        }
+
+        if (intent === "ADD_CLIENT_DIRECT" && parsed.clientName) {
+          const newClient = await Client.create({
+            name: parsed.clientName.trim(),
+            phone: parsed.clientPhone || "N/A",
+            email: "",
+            nationality: "UAE",
+            idNumber: "N/A",
+            licenseNumber: "N/A",
+            address: "Dubai",
+            clientType: "Resident",
+            customerType: "B2C",
+            status: "Active",
+          });
+          return NextResponse.json<AssistantResponse>({
+            reply: aiReply,
+            action: "CLIENT_CREATED",
+            navigateUrl: `/clients/${newClient._id}`,
             data: {
               type: "clients",
-              items: [matchedClient],
+              items: [{ id: newClient._id, name: newClient.name, phone: newClient.phone }],
             },
           });
         }
-      }
 
-      if (wantsDetails) {
-        const latestClient = await Client.findOne().sort({ updatedAt: -1 }).lean();
-        if (latestClient) {
+        if (intent === "OPEN_CLIENT_DETAILS") {
+          const targetClient: any =
+            (parsed.clientId && allClients.find((c: any) => String(c._id) === String(parsed.clientId))) ||
+            (parsed.searchQuery &&
+              allClients.find((c: any) =>
+                c.name?.toLowerCase().includes(String(parsed.searchQuery).toLowerCase())
+              )) ||
+            allClients[0];
+
+          if (targetClient) {
+            return NextResponse.json<AssistantResponse>({
+              reply: aiReply,
+              action: "NAVIGATE",
+              navigateUrl: `/clients/${targetClient._id}`,
+              data: { type: "clients", items: [targetClient] },
+            });
+          }
+        }
+
+        if (intent === "OPEN_VEHICLE_DETAILS") {
+          const targetUnit: any =
+            (parsed.unitId && allUnits.find((u: any) => String(u._id) === String(parsed.unitId))) ||
+            allUnits[0];
+
+          if (targetUnit) {
+            return NextResponse.json<AssistantResponse>({
+              reply: aiReply,
+              action: "NAVIGATE",
+              navigateUrl: `/units/${targetUnit._id}`,
+              data: { type: "vehicles", items: [targetUnit] },
+            });
+          }
+        }
+
+        if (intent === "AUTO_CREATE_CONTRACT") {
+          const targetClient: any =
+            (parsed.clientId && allClients.find((c: any) => String(c._id) === String(parsed.clientId))) ||
+            allClients[0];
+          const targetUnit: any =
+            (parsed.unitId && allUnits.find((u: any) => String(u._id) === String(parsed.unitId))) ||
+            allUnits.find((u: any) => u.status === "Available") ||
+            allUnits[0];
+
+          if (targetUnit && targetClient) {
+            const params = new URLSearchParams({
+              unitId: String(targetUnit._id),
+              clientId: String(targetClient._id),
+              contractType: "Shop",
+              days: "3",
+              autoPilot: "true",
+              autoSubmit: "true",
+            });
+            return NextResponse.json<AssistantResponse>({
+              reply: aiReply,
+              action: "CREATE_CONTRACT",
+              navigateUrl: `/bookings/new?${params.toString()}`,
+            });
+          }
+        }
+
+        if (intent === "OPEN_NEW_CONTRACT") {
           return NextResponse.json<AssistantResponse>({
-            reply:
-              lang === "ar"
-                ? `جاري فتح صفحة تفاصيل العميل (${latestClient.name})...`
-                : `Opening client details page for ${latestClient.name}...`,
+            reply: aiReply,
+            action: "CREATE_CONTRACT",
+            navigateUrl: "/bookings/new",
+          });
+        }
+
+        if (intent === "NAVIGATE" && parsed.targetUrl) {
+          return NextResponse.json<AssistantResponse>({
+            reply: aiReply,
             action: "NAVIGATE",
-            navigateUrl: `/clients/${latestClient._id}`,
+            navigateUrl: parsed.targetUrl,
+          });
+        }
+
+        if (intent === "CLICK_BUTTON") {
+          return NextResponse.json<AssistantResponse>({
+            reply: aiReply,
+            action: "UI_CLICK",
+            uiAction: "CLICK_BUTTON",
+            uiTarget: parsed.buttonText || "next",
+          });
+        }
+
+        if (intent === "FLEET_OVERVIEW") {
+          return NextResponse.json<AssistantResponse>({
+            reply: aiReply,
+            action: "OVERVIEW",
+            data: {
+              type: "overview",
+              stats: {
+                totalUnits,
+                availableUnits,
+                rentedUnits,
+                activeContracts: activeContractsCount,
+              },
+            },
+          });
+        }
+
+        if (intent === "SEARCH_CLIENT") {
+          const q = (parsed.searchQuery || "").toLowerCase();
+          const matched = allClients
+            .filter(
+              (c: any) =>
+                !q ||
+                c.name?.toLowerCase().includes(q) ||
+                c.phone?.toLowerCase().includes(q)
+            )
+            .slice(0, 4);
+          return NextResponse.json<AssistantResponse>({
+            reply: aiReply,
+            action: "SEARCH_RESULT",
             data: {
               type: "clients",
-              items: [latestClient],
+              items: matched.map((c: any) => ({
+                id: c._id,
+                name: c.name,
+                phone: c.phone || "N/A",
+              })),
             },
           });
         }
-      }
 
-      return NextResponse.json<AssistantResponse>({
-        reply:
-          lang === "ar"
-            ? "جاري فتح صفحة قائمة العملاء..."
-            : "Opening the Clients directory...",
-        action: "NAVIGATE",
-        navigateUrl: "/clients",
-      });
-    }
-
-    // VEHICLE / CAR DETAILS OR FLEET PAGE NAVIGATION
-    const isVehicleIntent =
-      lower.includes("car") ||
-      lower.includes("cars") ||
-      lower.includes("vehicle") ||
-      lower.includes("vehicles") ||
-      lower.includes("unit") ||
-      lower.includes("units") ||
-      lower.includes("fleet") ||
-      message.includes("سيارة") ||
-      message.includes("السيارات") ||
-      message.includes("الأسطول") ||
-      message.includes("مركبة") ||
-      message.includes("مركبات");
-
-    if (isVehicleIntent && hasOpenOrDetails) {
-      const wantsDetails =
-        lower.includes("details") ||
-        lower.includes("page details") ||
-        message.includes("تفاصيل") ||
-        message.includes("بيانات");
-
-      const cleaned = message
-        .replace(
-          /can you|please|open car details|open vehicle details|open car page details|open car page|open car|show car|view car|car details|vehicle details|details of|details for|car|cars|vehicle|vehicles|fleet|unit|units|page|details/gi,
-          ""
-        )
-        .replace(
-          /افتح صفحة تفاصيل السيارة|افتح تفاصيل السيارة|افتح صفحة السيارات|عرض تفاصيل السيارة|تفاصيل السيارة|صفحة السيارة|بيانات السيارة|السيارات|السيارة|سيارة|أسطول/gi,
-          ""
-        )
-        .trim();
-
-      if (cleaned.length >= 2) {
-        const matchedUnit = await Unit.findOne({
-          $or: [
-            { plate: { $regex: cleaned, $options: "i" } },
-            { make: { $regex: cleaned, $options: "i" } },
-            { model: { $regex: cleaned, $options: "i" } },
-          ],
-        }).lean();
-
-        if (matchedUnit) {
+        if (intent === "SEARCH_VEHICLE") {
+          const q = (parsed.searchQuery || "").toLowerCase();
+          const matched = allUnits
+            .filter(
+              (u: any) =>
+                !q ||
+                u.make?.toLowerCase().includes(q) ||
+                u.model?.toLowerCase().includes(q) ||
+                u.plate?.toLowerCase().includes(q)
+            )
+            .slice(0, 4);
           return NextResponse.json<AssistantResponse>({
-            reply:
-              lang === "ar"
-                ? `جاري فتح صفحة تفاصيل السيارة (${matchedUnit.make} ${matchedUnit.model})...`
-                : `Opening vehicle details for ${matchedUnit.make} ${matchedUnit.model}...`,
-            action: "NAVIGATE",
-            navigateUrl: `/units/${matchedUnit._id}`,
+            reply: aiReply,
+            action: "SEARCH_RESULT",
             data: {
               type: "vehicles",
-              items: [matchedUnit],
+              items: matched.map((u: any) => ({
+                id: u._id,
+                title: `${u.make} ${u.model}`,
+                plate: u.plate,
+                status: u.status,
+              })),
             },
           });
         }
-      }
-
-      if (wantsDetails) {
-        const latestUnit = await Unit.findOne().sort({ updatedAt: -1 }).lean();
-        if (latestUnit) {
-          return NextResponse.json<AssistantResponse>({
-            reply:
-              lang === "ar"
-                ? `جاري فتح صفحة تفاصيل السيارة (${latestUnit.make} ${latestUnit.model})...`
-                : `Opening vehicle details for ${latestUnit.make} ${latestUnit.model}...`,
-            action: "NAVIGATE",
-            navigateUrl: `/units/${latestUnit._id}`,
-            data: {
-              type: "vehicles",
-              items: [latestUnit],
-            },
-          });
-        }
-      }
-
-      return NextResponse.json<AssistantResponse>({
-        reply:
-          lang === "ar"
-            ? "جاري فتح صفحة أسطول السيارات..."
-            : "Opening the Vehicles Fleet...",
-        action: "NAVIGATE",
-        navigateUrl: "/units",
-      });
-    }
-
-    // OTHER NAVIGATION COMMANDS (Calendar, Bookings, Drivers, Settings, Dashboard)
-    if (hasOpenOrDetails) {
-      if (
-        lower.includes("calendar") ||
-        lower.includes("schedule") ||
-        message.includes("التقويم") ||
-        message.includes("تقويم") ||
-        message.includes("مواعيد") ||
-        message.includes("جدول")
-      ) {
-        return NextResponse.json<AssistantResponse>({
-          reply: lang === "ar" ? "جاري فتح صفحة التقويم والمواعيد..." : "Opening the Calendar...",
-          action: "NAVIGATE",
-          navigateUrl: "/calendar",
-        });
-      }
-
-      if (
-        lower.includes("booking") ||
-        lower.includes("contract") ||
-        lower.includes("contrac") ||
-        message.includes("الحجوزات") ||
-        message.includes("العقود") ||
-        message.includes("حجز")
-      ) {
-        return NextResponse.json<AssistantResponse>({
-          reply: lang === "ar" ? "جاري فتح صفحة الحجوزات والعقود..." : "Opening Bookings & Contracts...",
-          action: "NAVIGATE",
-          navigateUrl: "/bookings",
-        });
-      }
-
-      if (
-        lower.includes("driver") ||
-        lower.includes("drivers") ||
-        message.includes("السائقين") ||
-        message.includes("سائق")
-      ) {
-        return NextResponse.json<AssistantResponse>({
-          reply: lang === "ar" ? "جاري الانتقال إلى إدارة السائقين..." : "Opening Drivers management...",
-          action: "NAVIGATE",
-          navigateUrl: "/drivers",
-        });
-      }
-
-      if (
-        lower.includes("setting") ||
-        lower.includes("settings") ||
-        lower.includes("whatsapp") ||
-        message.includes("الإعدادات") ||
-        message.includes("اعدادات") ||
-        message.includes("واتساب")
-      ) {
-        return NextResponse.json<AssistantResponse>({
-          reply: lang === "ar" ? "جاري فتح صفحة الإعدادات وبوابة الواتساب..." : "Opening Settings & WhatsApp Gateway...",
-          action: "NAVIGATE",
-          navigateUrl: "/settings",
-        });
-      }
-
-      if (
-        lower.includes("dashboard") ||
-        lower.includes("home") ||
-        message.includes("الرئيسية") ||
-        message.includes("لوحة التحكم")
-      ) {
-        return NextResponse.json<AssistantResponse>({
-          reply: lang === "ar" ? "جاري التوجه إلى لوحة التحكم الرئيسية..." : "Opening Dashboard Overview...",
-          action: "NAVIGATE",
-          navigateUrl: "/",
-        });
-      }
-    }
-
-    // =========================================================================
-    // 6. OVERVIEW / FLEET STATS COMMANDS
-    // =========================================================================
-    if (
-      lower.includes("how many") ||
-      lower.includes("available cars") ||
-      lower.includes("fleet status") ||
-      lower.includes("overview") ||
-      lower.includes("stats") ||
-      message.includes("كم سيارة") ||
-      message.includes("السيارات المتوفرة") ||
-      message.includes("كم عقد") ||
-      message.includes("إحصائيات") ||
-      message.includes("احصائيات") ||
-      message.includes("حالة الأسطول")
-    ) {
-      const [totalUnits, availableUnits, rentedUnits, maintenanceUnits, activeContracts] = await Promise.all([
-        Unit.countDocuments(),
-        Unit.countDocuments({ status: "Available" }),
-        Unit.countDocuments({ status: "Rented" }),
-        Unit.countDocuments({ status: "Maintenance" }),
-        Contract.countDocuments({ status: "Active" }),
-      ]);
-
-      const reply =
-        lang === "ar"
-          ? `حالة الأسطول الحالية: يوجد إجمالي ${totalUnits} سيارة، منها ${availableUnits} سيارة متوفرة وجاهزة للتأجير، و ${rentedUnits} مؤجرة حالياً، بالإضافة إلى ${activeContracts} عقد نشط.`
-          : `Fleet status overview: ${totalUnits} total vehicles, with ${availableUnits} available for rent, ${rentedUnits} currently rented, and ${activeContracts} active contracts.`;
-
-      return NextResponse.json<AssistantResponse>({
-        reply,
-        action: "OVERVIEW",
-        data: {
-          type: "overview",
-          stats: {
-            totalUnits,
-            availableUnits,
-            rentedUnits,
-            maintenanceUnits,
-            activeContracts,
-          },
-        },
-      });
-    }
-
-    // =========================================================================
-    // 7. SEARCH FOR CLIENT / PERSON
-    // =========================================================================
-    const isClientSearch =
-      lower.includes("search for") ||
-      lower.includes("find client") ||
-      lower.includes("find customer") ||
-      lower.includes("search client") ||
-      lower.includes("who is") ||
-      message.includes("ابحث عن") ||
-      message.includes("بحث عن") ||
-      message.includes("مين هو") ||
-      message.includes("من هو") ||
-      message.includes("معلومات العميل");
-
-    const cleanQuery = message
-      .replace(/search for|find client|find customer|search client|who is/gi, "")
-      .replace(/ابحث عن عميل|ابحث عن|بحث عن|مين هو|من هو|معلومات العميل|عميل/gi, "")
-      .trim();
-
-    if (isClientSearch && cleanQuery.length >= 2) {
-      const clients = await Client.find({
-        $or: [
-          { name: { $regex: cleanQuery, $options: "i" } },
-          { phone: { $regex: cleanQuery, $options: "i" } },
-          { email: { $regex: cleanQuery, $options: "i" } },
-          { idNumber: { $regex: cleanQuery, $options: "i" } },
-        ],
-      })
-        .limit(5)
-        .lean();
-
-      if (clients.length > 0) {
-        const reply =
-          lang === "ar"
-            ? `عثرت على ${clients.length} عميل يطابق بحثك عن "${cleanQuery}". تفضل النتائج:`
-            : `Found ${clients.length} client(s) matching "${cleanQuery}". Here are the details:`;
 
         return NextResponse.json<AssistantResponse>({
-          reply,
-          action: "SEARCH_RESULT",
-          data: {
-            type: "clients",
-            items: clients.map((c: any) => ({
-              id: c._id,
-              name: c.name,
-              phone: c.phone || "No phone",
-              email: c.email || "",
-              status: c.status || "Active",
-              clientType: c.clientType || "Resident",
-              idNumber: c.idNumber || c.passportNumber || "",
-            })),
-          },
+          reply: aiReply,
+          action: "NONE",
         });
-      }
-    }
-
-    // =========================================================================
-    // 8. SEARCH FOR VEHICLE / PLATE
-    // =========================================================================
-    const isVehicleSearch =
-      lower.includes("plate") ||
-      lower.includes("find car") ||
-      lower.includes("search car") ||
-      message.includes("لوحة");
-
-    if (isVehicleSearch && cleanQuery.length >= 2) {
-      const vehicleQuery = cleanQuery
-        .replace(/plate|car|vehicle|لوحة|سيارة|مركبة/gi, "")
-        .trim();
-
-      const searchTarget = vehicleQuery.length >= 2 ? vehicleQuery : cleanQuery;
-
-      const units = await Unit.find({
-        $or: [
-          { plate: { $regex: searchTarget, $options: "i" } },
-          { make: { $regex: searchTarget, $options: "i" } },
-          { model: { $regex: searchTarget, $options: "i" } },
-        ],
-      })
-        .limit(5)
-        .lean();
-
-      if (units.length > 0) {
-        const reply =
-          lang === "ar"
-            ? `عثرت على ${units.length} سيارة تطابق "${searchTarget}". تفضل التفاصيل:`
-            : `Found ${units.length} vehicle(s) matching "${searchTarget}". Here are the details:`;
-
+      } catch {
+        // If LLM returned plain text instead of JSON, return it directly as a chat message
         return NextResponse.json<AssistantResponse>({
-          reply,
-          action: "SEARCH_RESULT",
-          data: {
-            type: "vehicles",
-            items: units.map((u: any) => ({
-              id: u._id,
-              title: `${u.make} ${u.model} (${u.year})`,
-              plate: u.plate,
-              color: u.color,
-              status: u.status,
-              dailyRate: u.dailyRate,
-              mileage: u.mileage,
-              image: u.images?.[0] || null,
-            })),
-          },
+          reply: rawBrainOutput,
+          action: "NONE",
         });
       }
-    }
-
-    // =========================================================================
-    // 9. SEARCH CONTRACTS BY NUMBER OR NAME
-    // =========================================================================
-    if (cleanQuery.length >= 2) {
-      const contractNum = Number(cleanQuery.replace(/[^0-9]/g, ""));
-      const queryConds: any[] = [];
-      if (!isNaN(contractNum) && contractNum > 0) {
-        queryConds.push({ contractNumber: contractNum });
-      }
-      queryConds.push({ "clientId.name": { $regex: cleanQuery, $options: "i" } });
-      queryConds.push({ personalizedPersonName: { $regex: cleanQuery, $options: "i" } });
-
-      const contracts = await Contract.find({ $or: queryConds })
-        .populate("clientId", "name phone")
-        .populate("unitId", "make model plate")
-        .limit(3)
-        .lean();
-
-      if (contracts.length > 0) {
-        const reply =
-          lang === "ar"
-            ? `عثرت على عقد يطابق "${cleanQuery}". تفضل التفاصيل أدناه:`
-            : `Found contract(s) matching "${cleanQuery}":`;
-
-        return NextResponse.json<AssistantResponse>({
-          reply,
-          action: "SEARCH_RESULT",
-          data: {
-            type: "contracts",
-            items: contracts.map((c: any) => ({
-              id: c._id,
-              contractNumber: c.contractNumber || c._id?.toString().slice(-6),
-              customer: (c.clientId as any)?.name || c.personalizedPersonName || "Customer",
-              vehicle: (c.unitId as any)
-                ? `${(c.unitId as any).make} ${(c.unitId as any).model} (${(c.unitId as any).plate})`
-                : "Vehicle",
-              status: c.status,
-              deliveryStatus: c.deliveryStatus,
-              startDate: c.startDate,
-              endDate: c.endDate,
-              totalAmount: c.totalAmount || 0,
-            })),
-          },
-        });
-      }
-    }
-
-    // =========================================================================
-    // 10. INTELLIGENT AI CONVERSATION (Using Groq LLM)
-    // =========================================================================
-    const systemPrompt = `You are "Leon Assistant", the high-tech, courteous and efficient Voice AI Assistant for Leon Rent A Car in Dubai/UAE.
-You assist the rental agency admin with fleet management, bookings, clients, and vehicle inquiries.
-Answer concisely (1-3 sentences maximum) in friendly spoken ${lang === "ar" ? "Arabic (لهجة مهذبة مفهومة)" : "English"}.
-If asked what you can do, explain that you can automatically create contracts, add new clients directly, open client or car details, click buttons, and navigate anywhere in the dashboard.`;
-
-    const aiReply = await callGroqLLM(message, systemPrompt);
-
-    if (aiReply) {
-      return NextResponse.json<AssistantResponse>({
-        reply: aiReply,
-        action: "NONE",
-      });
     }
 
     return NextResponse.json<AssistantResponse>({
       reply:
         lang === "ar"
-          ? "أنا مساعد ليون الذكي. يمكنني إنشاء عقود تلقائياً، إضافة عملاء جدد، فتح صفحات تفاصيل العملاء والسيارات، والانتقال لأي صفحة ترغب بها!"
-          : "I am Leon Assistant. I can auto-create contracts, add new clients, open client or vehicle details, and navigate anywhere in the system!",
+          ? "أنا معك! أخبرني ماذا تريد أن نفعل؟ (مثلاً: إضافة عميل، إنشاء عقد، أو فتح صفحة عميل)"
+          : "I'm here! Tell me what you'd like to do (e.g., create a contract, add a client, or open any page).",
       action: "NONE",
     });
   } catch (error: any) {
     console.error("AI Assistant API error:", error);
     return NextResponse.json(
       {
-        reply: "عذراً، حدث خطأ أثناء المعالجة. يرجى المحاولة مرة أخرى.",
+        reply: "Something went wrong, please try again.",
         action: "NONE",
       },
       { status: 500 }
