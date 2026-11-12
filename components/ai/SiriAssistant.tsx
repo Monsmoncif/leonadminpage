@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Mic,
@@ -12,18 +13,21 @@ import {
   Sparkles,
   Phone,
   ArrowRight,
-  Maximize2,
-  Minimize2,
   Trash2,
-  Car,
+  Loader2,
   User,
-  Calendar,
+  Car,
   FileText,
+  Calendar,
+  Plus,
   Search,
+  Eye,
+  CheckCircle2,
 } from "lucide-react";
 
 interface SearchClientItem {
   id: string;
+  _id?: string;
   name: string;
   phone: string;
   email?: string;
@@ -34,7 +38,11 @@ interface SearchClientItem {
 
 interface SearchVehicleItem {
   id: string;
-  title: string;
+  _id?: string;
+  title?: string;
+  make?: string;
+  model?: string;
+  year?: number;
   plate: string;
   color?: string;
   status: string;
@@ -45,6 +53,7 @@ interface SearchVehicleItem {
 
 interface SearchContractItem {
   id: string;
+  _id?: string;
   contractNumber: number | string;
   customer: string;
   vehicle: string;
@@ -72,12 +81,23 @@ interface Message {
 const DEFAULT_WELCOME: Message = {
   id: "welcome",
   sender: "assistant",
-  text: "مرحباً بك! أنا المساعد الذكي لنظام ليون. كيف يمكنني مساعدتك اليوم؟ يمكنك التحدث معي بالصوت أو الكتابة.",
+  text: "Welcome to Leon Assistant! You can speak or type commands to create a new contract, open client details, search vehicles, or navigate to any page.",
   timestamp: new Date(),
+};
+
+const getInitials = (name: string) => {
+  if (!name) return "C";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
 };
 
 export default function SiriAssistant() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -86,13 +106,16 @@ export default function SiriAssistant() {
   const [transcript, setTranscript] = useState("");
   const [inputValue, setInputValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([DEFAULT_WELCOME]);
 
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Initialize Speech Synthesis and Speech Recognition
   useEffect(() => {
@@ -124,7 +147,7 @@ export default function SiriAssistant() {
           console.warn("Speech recognition error:", event.error);
           setIsListening(false);
           if (event.error === "not-allowed") {
-            setTranscript("Microphone blocked. Please allow mic permission (يرجى السماح بالمايكروفون)");
+            setTranscript("Microphone permission denied. Please allow mic access in browser.");
           }
         };
 
@@ -137,9 +160,9 @@ export default function SiriAssistant() {
     }
   }, [lang]);
 
-  // When speech transcript stops and has text, automatically submit
+  // Automatically submit when voice recognition finishes capturing speech
   useEffect(() => {
-    if (!isListening && transcript.trim().length > 0) {
+    if (!isListening && transcript.trim().length > 0 && !transcript.startsWith("Microphone permission")) {
       const textToSubmit = transcript.trim();
       setTranscript("");
       handleSendMessage(textToSubmit);
@@ -166,13 +189,14 @@ export default function SiriAssistant() {
           .trim();
 
         const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.lang = lang === "ar" ? "ar-XA" : "en-US";
+        const isArabicText = /[\u0600-\u06FF]/.test(cleanText);
+        utterance.lang = isArabicText ? "ar-XA" : "en-US";
         utterance.rate = 1.0;
         utterance.pitch = 1.0;
 
         const voices = synthRef.current.getVoices();
         const preferredVoice = voices.find((v) =>
-          lang === "ar" ? v.lang.startsWith("ar") : v.lang.startsWith("en")
+          isArabicText ? v.lang.startsWith("ar") : v.lang.startsWith("en")
         );
         if (preferredVoice) utterance.voice = preferredVoice;
 
@@ -186,7 +210,7 @@ export default function SiriAssistant() {
         setIsSpeaking(false);
       }
     },
-    [isMuted, lang]
+    [isMuted]
   );
 
   // Toggle listening
@@ -199,6 +223,7 @@ export default function SiriAssistant() {
     } else {
       if (synthRef.current) synthRef.current.cancel();
       setIsSpeaking(false);
+      setTranscript("");
 
       if (recognitionRef.current) {
         try {
@@ -209,6 +234,16 @@ export default function SiriAssistant() {
         }
       }
     }
+  };
+
+  const handleClose = () => {
+    if (synthRef.current) synthRef.current.cancel();
+    try {
+      recognitionRef.current?.stop();
+    } catch {}
+    setIsListening(false);
+    setIsSpeaking(false);
+    setIsOpen(false);
   };
 
   // Send message to assistant
@@ -227,12 +262,13 @@ export default function SiriAssistant() {
     setIsProcessing(true);
 
     try {
+      const detectedLang = /[\u0600-\u06FF]/.test(text) ? "ar" : lang;
       const res = await fetch("/api/ai/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text.trim(),
-          lang,
+          lang: detectedLang,
         }),
       });
 
@@ -263,7 +299,7 @@ export default function SiriAssistant() {
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: "assistant",
-        text: "عذراً، حدث خطأ أثناء الاتصال. يرجى المحاولة مرة أخرى.",
+        text: "Connection error. Please try again. (حدث خطأ أثناء الاتصال، يرجى المحاولة مرة أخرى)",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errMsg]);
@@ -278,208 +314,282 @@ export default function SiriAssistant() {
     setMessages([DEFAULT_WELCOME]);
   };
 
-  return (
-    <>
-      {/* ============================================================ */}
-      {/* 🔴 FLOATING CIRCLE BUTTON (Clean, Static, NO ANIMATION)       */}
-      {/* ============================================================ */}
-      {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-[90]">
+  const modalContent = isOpen ? (
+    <div
+      className="fixed inset-0 z-[100] w-screen h-screen min-h-screen flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in overflow-y-auto"
+      onClick={handleClose}
+    >
+      {/* Modal Container - Identical styling to Add New Customer (CreateClientModal) */}
+      <div
+        className="bg-card w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] sm:max-h-[88vh] my-auto border border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header (Identical to Add New Customer Modal) */}
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-border flex items-center justify-between shrink-0 bg-white">
+          <div>
+            <h2 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-1.5 sm:gap-2">
+              <Sparkles className="text-brand shrink-0" size={18} />
+              <span>Leon Assistant</span>
+            </h2>
+            <p className="text-[10px] sm:text-xs text-text-secondary mt-0.5 line-clamp-1 sm:line-clamp-none">
+              Voice & AI command center • Create contracts, open client details, search vehicles, and navigate pages.
+            </p>
+          </div>
           <button
             type="button"
-            onClick={() => {
-              setIsOpen(true);
-              setTimeout(() => {
-                toggleListening();
-              }, 300);
-            }}
-            title="Leon Assistant"
-            className="w-14 h-14 sm:w-15 sm:h-15 rounded-full bg-brand text-white shadow-lg hover:bg-brand-dark flex items-center justify-center transition-all cursor-pointer border border-white/20 active:scale-95"
+            onClick={handleClose}
+            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors cursor-pointer shrink-0"
           >
-            <Mic size={24} className="text-white" />
+            <X size={18} />
           </button>
         </div>
-      )}
 
-      {/* ============================================================ */}
-      {/* ⚪ RED & WHITE ASSISTANT CARD (Completely Redesigned UI/UX) */}
-      {/* ============================================================ */}
-      {isOpen && (
-        <div
-          className={`fixed z-[99] transition-all duration-200 ease-out flex flex-col ${
-            isExpanded
-              ? "inset-3 sm:inset-8 max-w-4xl mx-auto rounded-2xl"
-              : "bottom-4 right-4 sm:bottom-6 sm:right-6 w-[380px] sm:w-[410px] max-w-[calc(100vw-2rem)] h-[580px] max-h-[calc(100vh-2.5rem)] rounded-2xl"
-          } bg-white border border-border shadow-2xl overflow-hidden text-text-primary font-sans`}
-        >
-          {/* Top Brand Stripe */}
-          <div className="h-1 w-full bg-brand" />
-
-          {/* ===== HEADER ===== */}
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-white">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-brand text-white flex items-center justify-center shrink-0 shadow-2xs font-bold text-xs">
-                L
+        {/* Modal Body (Identical to Add New Customer Modal) */}
+        <div className="p-2.5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/40 space-y-3 sm:space-y-4">
+          {/* Voice Language & Control Bar (Matches Customer Profile Type Selector Box) */}
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-border shadow-xs space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div>
+                <label className="block text-[11px] sm:text-xs font-bold text-text-secondary mb-1.5">
+                  Voice Recognition Language (لغة التحدث والتعرف الصوتي)
+                </label>
+                <div className="grid grid-cols-2 gap-1 p-0.5 sm:p-1 bg-gray-100 rounded-lg sm:rounded-xl border border-gray-200 w-full sm:w-72">
+                  <button
+                    type="button"
+                    onClick={() => setLang("en")}
+                    className={`py-1.5 sm:py-2 px-3 rounded-md sm:rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      lang === "en"
+                        ? "bg-white text-brand shadow-xs font-bold"
+                        : "text-text-muted hover:text-text-primary"
+                    }`}
+                  >
+                    <span>English</span>
+                    <span className="text-[10px] font-normal">(EN)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLang("ar")}
+                    className={`py-1.5 sm:py-2 px-3 rounded-md sm:rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      lang === "ar"
+                        ? "bg-white text-brand shadow-xs font-bold"
+                        : "text-text-muted hover:text-text-primary"
+                    }`}
+                  >
+                    <span>العربية</span>
+                    <span className="text-[10px] font-normal">(عربي)</span>
+                  </button>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h3 className="text-xs sm:text-sm font-bold text-text-primary truncate flex items-center gap-1.5">
-                  <span>Leon Assistant</span>
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isListening ? "bg-brand" : "bg-emerald-500"}`} />
-                </h3>
-                <p className="text-[11px] text-text-muted truncate">
-                  {isListening ? "جاري الاستماع إليك..." : isSpeaking ? "يتحدث الآن..." : "جاهز للرد عليك"}
-                </p>
+
+              {/* Microphone & Audio Controls */}
+              <div className="flex items-center gap-2 self-start sm:self-end">
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                    isListening
+                      ? "bg-brand text-white border-brand shadow-xs"
+                      : "bg-white hover:bg-gray-50 text-text-primary border-border shadow-2xs"
+                  }`}
+                >
+                  {isListening ? <MicOff size={14} /> : <Mic size={14} className="text-brand" />}
+                  <span>
+                    {isListening
+                      ? lang === "ar"
+                        ? "جاري الاستماع..."
+                        : "Listening..."
+                      : lang === "ar"
+                      ? "اضغط للتحدث"
+                      : "Start Voice"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMuted(!isMuted);
+                    if (synthRef.current) synthRef.current.cancel();
+                    setIsSpeaking(false);
+                  }}
+                  className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                    isMuted
+                      ? "bg-red-50 text-brand border-red-200"
+                      : "bg-white hover:bg-gray-50 text-text-secondary border-border"
+                  }`}
+                  title={isMuted ? "Unmute Audio" : "Mute Audio"}
+                >
+                  {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearHistory}
+                  className="p-2 rounded-xl bg-white hover:bg-red-50 text-text-secondary hover:text-red-600 border border-border transition-colors cursor-pointer"
+                  title="Clear History"
+                >
+                  <Trash2 size={15} />
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 shrink-0">
-              {/* Language Switch */}
-              <button
-                type="button"
-                onClick={() => setLang((l) => (l === "ar" ? "en" : "ar"))}
-                className="px-2 py-1 text-[11px] font-bold rounded-md bg-gray-100 hover:bg-gray-200 text-text-secondary transition-colors cursor-pointer"
-                title="Language"
-              >
-                {lang === "ar" ? "عربي" : "EN"}
-              </button>
-
-              {/* Mute Toggle */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMuted(!isMuted);
-                  if (synthRef.current) synthRef.current.cancel();
-                  setIsSpeaking(false);
-                }}
-                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                  isMuted ? "bg-red-50 text-brand" : "hover:bg-gray-100 text-text-secondary"
-                }`}
-                title={isMuted ? "Unmute" : "Mute"}
-              >
-                {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-              </button>
-
-              {/* Clear Chat */}
-              <button
-                type="button"
-                onClick={handleClearHistory}
-                className="p-1.5 rounded-md hover:bg-gray-100 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-                title="Clear Chat"
-              >
-                <Trash2 size={14} />
-              </button>
-
-              {/* Expand Toggle */}
-              <button
-                type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="hidden sm:inline-flex p-1.5 rounded-md hover:bg-gray-100 text-text-secondary transition-colors cursor-pointer"
-                title={isExpanded ? "Minimize" : "Expand"}
-              >
-                {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              </button>
-
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (synthRef.current) synthRef.current.cancel();
-                  try {
-                    recognitionRef.current?.stop();
-                  } catch {}
-                  setIsListening(false);
-                  setIsSpeaking(false);
-                  setIsOpen(false);
-                }}
-                className="p-1.5 rounded-md hover:bg-gray-100 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-                title="Close"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* ===== VOICE STATUS BANNER (Sleek, Clean, No Gimmicks) ===== */}
-          <div className="px-4 py-2.5 bg-gray-50 border-b border-border flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={toggleListening}
-                className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                  isListening
-                    ? "bg-brand text-white shadow-xs"
-                    : "bg-white border border-border text-text-secondary hover:text-brand hover:border-brand"
-                }`}
-                title={isListening ? "Stop listening" : "Tap to speak"}
-              >
-                {isListening ? <Mic size={14} /> : <Mic size={14} />}
-              </button>
-              <div className="min-w-0 flex-1">
-                {isListening ? (
-                  <p className="text-xs font-semibold text-brand truncate" dir="auto">
-                    {transcript || "تفضل، أنا أستمع إليك..."}
-                  </p>
-                ) : isSpeaking ? (
-                  <p className="text-xs font-semibold text-brand truncate">
-                    جاري التحدث...
-                  </p>
-                ) : (
-                  <p className="text-xs text-text-muted truncate">
-                    اضغط على المايك للتحدث أو اكتب بالأسفل
-                  </p>
+            {/* Live Voice Transcript Banner */}
+            {(isListening || transcript) && (
+              <div className="p-2.5 rounded-xl bg-red-50/70 border border-red-200/80 flex items-center justify-between gap-2 text-xs text-brand font-semibold">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Mic size={14} className="text-brand shrink-0" />
+                  <span className="truncate" dir="auto">
+                    {transcript || (lang === "ar" ? "تحدث الآن... أنا أستمع إليك" : "Speak now... Listening to your voice")}
+                  </span>
+                </div>
+                {isListening && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-brand border border-red-200 font-bold shrink-0">
+                    LIVE
+                  </span>
                 )}
-              </div>
-            </div>
-
-            {/* Subtle voice bars */}
-            {isListening && (
-              <div className="flex items-center gap-0.5 shrink-0">
-                <span className="w-1 h-3 bg-brand rounded-full animate-pulse" />
-                <span className="w-1 h-4 bg-brand rounded-full animate-pulse" style={{ animationDelay: "150ms" }} />
-                <span className="w-1 h-2.5 bg-brand rounded-full animate-pulse" style={{ animationDelay: "300ms" }} />
               </div>
             )}
           </div>
 
-          {/* ===== CONVERSATION FEED ===== */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white scrollbar-thin scrollbar-thumb-gray-200">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+          {/* Quick Actions Card (Matches Add New Customer Section Card) */}
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-border shadow-xs">
+            <label className="block text-[11px] sm:text-xs font-bold text-text-secondary mb-2">
+              Quick Actions (إجراءات سريعة بضغطة واحدة)
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSendMessage("Create new contract")}
+                className="p-2.5 rounded-xl border border-border bg-gray-50/70 hover:bg-red-50/60 hover:border-brand/40 text-left transition-all cursor-pointer flex items-center gap-2 group"
               >
-                <div
-                  className={`max-w-[85%] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm leading-relaxed ${
-                    msg.sender === "user"
-                      ? "bg-brand text-white rounded-br-none shadow-xs font-medium"
-                      : "bg-gray-50 text-text-primary border border-border rounded-bl-none shadow-2xs"
-                  }`}
-                  dir={msg.text.match(/[\u0600-\u06FF]/) ? "rtl" : "ltr"}
-                >
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                  <Plus size={14} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-text-primary block truncate group-hover:text-brand">
+                    New Contract
+                  </span>
+                  <span className="text-[10px] text-text-muted block truncate">إنشاء عقد جديد</span>
+                </div>
+              </button>
 
-                  {/* Navigation Action */}
+              <button
+                type="button"
+                onClick={() => handleSendMessage("open a client page details")}
+                className="p-2.5 rounded-xl border border-border bg-gray-50/70 hover:bg-red-50/60 hover:border-brand/40 text-left transition-all cursor-pointer flex items-center gap-2 group"
+              >
+                <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                  <User size={14} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-text-primary block truncate group-hover:text-brand">
+                    Client Details
+                  </span>
+                  <span className="text-[10px] text-text-muted block truncate">صفحة تفاصيل العميل</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSendMessage("How many cars available today?")}
+                className="p-2.5 rounded-xl border border-border bg-gray-50/70 hover:bg-red-50/60 hover:border-brand/40 text-left transition-all cursor-pointer flex items-center gap-2 group"
+              >
+                <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                  <Car size={14} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-text-primary block truncate group-hover:text-brand">
+                    Fleet Status
+                  </span>
+                  <span className="text-[10px] text-text-muted block truncate">السيارات المتوفرة</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSendMessage("Open Calendar")}
+                className="p-2.5 rounded-xl border border-border bg-gray-50/70 hover:bg-red-50/60 hover:border-brand/40 text-left transition-all cursor-pointer flex items-center gap-2 group"
+              >
+                <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                  <Calendar size={14} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-text-primary block truncate group-hover:text-brand">
+                    Calendar
+                  </span>
+                  <span className="text-[10px] text-text-muted block truncate">جدول المواعيد</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Conversation & Results Section (Matches Add New Customer Section Cards) */}
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-border shadow-xs space-y-3.5 min-h-[240px]">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+              <span className="text-xs sm:text-sm font-bold text-text-primary flex items-center gap-1.5">
+                <FileText size={15} className="text-brand" />
+                <span>Assistant Activity & Results (سجل الأوامر والنتائج)</span>
+              </span>
+              <span className="text-[11px] text-text-muted">{messages.length} messages</span>
+            </div>
+
+            <div className="space-y-3">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`p-3 sm:p-4 rounded-xl border transition-all ${
+                    msg.sender === "user"
+                      ? "bg-red-50/50 border-red-200/80 ml-auto max-w-[90%]"
+                      : "bg-gray-50/70 border-gray-200/80 mr-auto w-full"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center gap-1">
+                      {msg.sender === "user" ? (
+                        <>
+                          <User size={11} className="text-brand" />
+                          <span className="text-brand">You (أنت)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={11} className="text-brand" />
+                          <span className="text-text-primary">Leon Assistant</span>
+                        </>
+                      )}
+                    </span>
+                    <span className="text-[10px] text-text-muted tabular-nums">
+                      {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+
+                  <p
+                    className="text-xs sm:text-sm font-medium text-text-primary leading-relaxed whitespace-pre-wrap"
+                    dir={msg.text.match(/[\u0600-\u06FF]/) ? "rtl" : "ltr"}
+                  >
+                    {msg.text}
+                  </p>
+
+                  {/* Direct Navigation Button */}
                   {msg.navigateUrl && (
-                    <div className="mt-2.5 pt-2 border-t border-border">
+                    <div className="mt-3 pt-2.5 border-t border-gray-200/70 flex justify-end">
                       <button
                         type="button"
                         onClick={() => {
                           router.push(msg.navigateUrl!);
                           setIsOpen(false);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                        className="px-4 py-2 bg-brand text-white hover:bg-brand-dark rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                       >
-                        <span>الانتقال للصفحة الآن</span>
+                        <span>Open Page Now (فتح الصفحة الآن)</span>
                         <ArrowRight size={13} />
                       </button>
                     </div>
                   )}
 
-                  {/* ===== CLIENTS CARDS ===== */}
+                  {/* ===== CLIENTS RESULTS ===== */}
                   {msg.data?.type === "clients" && msg.data.items && (
-                    <div className="mt-2.5 space-y-1.5 pt-2 border-t border-border">
+                    <div className="mt-3 pt-2.5 border-t border-gray-200/70 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {msg.data.items.map((client: SearchClientItem, idx: number) => {
-                        const targetId = client.id || (client as any)._id;
+                        const targetId = client.id || client._id;
                         return (
                           <div
                             key={targetId || idx}
@@ -487,31 +597,40 @@ export default function SiriAssistant() {
                               router.push(targetId ? `/clients/${targetId}` : `/clients`);
                               setIsOpen(false);
                             }}
-                            className="p-2.5 rounded-lg bg-white hover:bg-gray-50 border border-border flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                            className="bg-white p-3 rounded-xl border border-border hover:border-brand shadow-2xs flex items-center justify-between gap-3 cursor-pointer transition-all"
                           >
-                            <div className="min-w-0">
-                              <strong className="text-xs font-bold text-text-primary block truncate">
-                                {client.name}
-                              </strong>
-                              <p className="text-[11px] text-text-secondary flex items-center gap-1 mt-0.5">
-                                <Phone size={10} className="text-brand shrink-0" />
-                                <span>{client.phone}</span>
-                              </p>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-9 h-9 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs shrink-0">
+                                {getInitials(client.name)}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-xs font-bold text-text-primary block truncate">
+                                  {client.name}
+                                </span>
+                                <span className="text-[11px] text-text-secondary flex items-center gap-1 mt-0.5">
+                                  <Phone size={10} className="text-brand shrink-0" />
+                                  <span>{client.phone}</span>
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold shrink-0">
-                              {client.status || "Active"}
-                            </span>
+                            <button
+                              type="button"
+                              className="px-2.5 py-1.5 bg-brand text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+                            >
+                              <Eye size={12} />
+                              <span>Details</span>
+                            </button>
                           </div>
                         );
                       })}
                     </div>
                   )}
 
-                  {/* ===== VEHICLES CARDS ===== */}
+                  {/* ===== VEHICLES RESULTS ===== */}
                   {msg.data?.type === "vehicles" && msg.data.items && (
-                    <div className="mt-2.5 space-y-1.5 pt-2 border-t border-border">
+                    <div className="mt-3 pt-2.5 border-t border-gray-200/70 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {msg.data.items.map((veh: SearchVehicleItem, idx: number) => {
-                        const targetId = veh.id || (veh as any)._id;
+                        const targetId = veh.id || veh._id;
                         return (
                           <div
                             key={targetId || idx}
@@ -519,18 +638,18 @@ export default function SiriAssistant() {
                               router.push(targetId ? `/units/${targetId}` : `/units`);
                               setIsOpen(false);
                             }}
-                            className="p-2.5 rounded-lg bg-white hover:bg-gray-50 border border-border flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                            className="bg-white p-3 rounded-xl border border-border hover:border-brand shadow-2xs flex items-center justify-between gap-3 cursor-pointer transition-all"
                           >
                             <div className="min-w-0">
-                              <strong className="text-xs font-bold text-text-primary block truncate">
-                                {veh.title || `${(veh as any).make || ""} ${(veh as any).model || ""}`}
-                              </strong>
-                              <p className="text-[11px] text-brand font-mono font-bold mt-0.5">
-                                {veh.plate}
-                              </p>
+                              <span className="text-xs font-bold text-text-primary block truncate">
+                                {veh.title || `${veh.make || ""} ${veh.model || ""}`}
+                              </span>
+                              <span className="text-[11px] text-text-muted block mt-0.5">
+                                Plate: <strong className="text-brand font-bold">{veh.plate}</strong>
+                              </span>
                             </div>
                             <span
-                              className={`text-[10px] px-2 py-0.5 rounded-full border font-bold shrink-0 ${
+                              className={`text-[10px] px-2.5 py-1 rounded-full border font-bold shrink-0 ${
                                 veh.status === "Available"
                                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                   : "bg-blue-50 text-blue-700 border-blue-200"
@@ -544,9 +663,9 @@ export default function SiriAssistant() {
                     </div>
                   )}
 
-                  {/* ===== CONTRACTS CARDS ===== */}
+                  {/* ===== CONTRACTS RESULTS ===== */}
                   {msg.data?.type === "contracts" && msg.data.items && (
-                    <div className="mt-2.5 space-y-1.5 pt-2 border-t border-border">
+                    <div className="mt-3 pt-2.5 border-t border-gray-200/70 space-y-2">
                       {msg.data.items.map((cnt: SearchContractItem, idx: number) => (
                         <div
                           key={cnt.id || idx}
@@ -554,15 +673,17 @@ export default function SiriAssistant() {
                             router.push(`/bookings`);
                             setIsOpen(false);
                           }}
-                          className="p-2.5 rounded-lg bg-white hover:bg-gray-50 border border-border flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                          className="bg-white p-3 rounded-xl border border-border hover:border-brand shadow-2xs flex items-center justify-between gap-3 cursor-pointer transition-all"
                         >
                           <div className="min-w-0">
-                            <strong className="text-xs font-bold text-text-primary block truncate">
-                              عقد #{cnt.contractNumber} • {cnt.customer}
-                            </strong>
-                            <p className="text-[11px] text-text-secondary truncate mt-0.5">{cnt.vehicle}</p>
+                            <span className="text-xs font-bold text-text-primary block truncate">
+                              Contract #{cnt.contractNumber} • {cnt.customer}
+                            </span>
+                            <span className="text-[11px] text-text-secondary block truncate mt-0.5">
+                              {cnt.vehicle}
+                            </span>
                           </div>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-brand border border-red-200 font-bold shrink-0">
+                          <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-50 text-brand border border-red-200 font-bold shrink-0">
                             {cnt.status}
                           </span>
                         </div>
@@ -572,102 +693,69 @@ export default function SiriAssistant() {
 
                   {/* ===== OVERVIEW STATS ===== */}
                   {msg.data?.type === "overview" && msg.data.stats && (
-                    <div className="mt-2.5 grid grid-cols-2 gap-1.5 pt-2 border-t border-border">
-                      <div className="p-2 rounded-lg bg-white border border-border text-center">
-                        <span className="text-[10px] text-text-secondary block">السيارات المتاحة</span>
-                        <strong className="text-sm font-bold text-emerald-600">
+                    <div className="mt-3 pt-2.5 border-t border-gray-200/70 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="bg-white p-3 rounded-xl border border-border text-center shadow-2xs">
+                        <span className="text-[10px] font-bold text-text-muted uppercase block">Available</span>
+                        <strong className="text-base font-bold text-emerald-600 mt-0.5 block">
                           {msg.data.stats.availableUnits}
                         </strong>
                       </div>
-                      <div className="p-2 rounded-lg bg-white border border-border text-center">
-                        <span className="text-[10px] text-text-secondary block">العقود النشطة</span>
-                        <strong className="text-sm font-bold text-brand">
+                      <div className="bg-white p-3 rounded-xl border border-border text-center shadow-2xs">
+                        <span className="text-[10px] font-bold text-text-muted uppercase block">Active Contracts</span>
+                        <strong className="text-base font-bold text-brand mt-0.5 block">
                           {msg.data.stats.activeContracts}
                         </strong>
                       </div>
-                      <div className="p-2 rounded-lg bg-white border border-border text-center">
-                        <span className="text-[10px] text-text-secondary block">السيارات المؤجرة</span>
-                        <strong className="text-sm font-bold text-blue-600">
+                      <div className="bg-white p-3 rounded-xl border border-border text-center shadow-2xs">
+                        <span className="text-[10px] font-bold text-text-muted uppercase block">Rented</span>
+                        <strong className="text-base font-bold text-blue-600 mt-0.5 block">
                           {msg.data.stats.rentedUnits}
                         </strong>
                       </div>
-                      <div className="p-2 rounded-lg bg-white border border-border text-center">
-                        <span className="text-[10px] text-text-secondary block">إجمالي الأسطول</span>
-                        <strong className="text-sm font-bold text-text-primary">
+                      <div className="bg-white p-3 rounded-xl border border-border text-center shadow-2xs">
+                        <span className="text-[10px] font-bold text-text-muted uppercase block">Total Fleet</span>
+                        <strong className="text-base font-bold text-text-primary mt-0.5 block">
                           {msg.data.stats.totalUnits}
                         </strong>
                       </div>
                     </div>
                   )}
                 </div>
-                <span className="text-[9px] text-text-muted mt-1 px-1">
-                  {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
-            ))}
+              ))}
 
-            {isProcessing && (
-              <div className="flex items-center gap-1.5 text-text-muted text-xs px-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand animate-ping" />
-                <span>جاري المعالجة والبحث...</span>
-              </div>
-            )}
+              {isProcessing && (
+                <div className="p-3 rounded-xl bg-gray-50 border border-border flex items-center gap-2 text-xs text-text-secondary font-medium">
+                  <Loader2 size={14} className="animate-spin text-brand" />
+                  <span>Processing your request... (جاري تنفيذ طلبك...)</span>
+                </div>
+              )}
 
-            <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} />
+            </div>
           </div>
+        </div>
 
-          {/* ===== SUGGESTION PILLS ===== */}
-          <div className="px-3 py-2 border-t border-border flex items-center gap-1.5 overflow-x-auto scrollbar-none bg-white">
-            <button
-              type="button"
-              onClick={() => handleSendMessage("أنشئ عقد جديد")}
-              className="px-2.5 py-1 rounded-md bg-gray-50 hover:bg-red-50 text-text-secondary hover:text-brand text-[11px] font-semibold border border-border shrink-0 cursor-pointer transition-colors"
-            >
-              + عقد جديد
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSendMessage("كم سيارة متوفرة اليوم؟")}
-              className="px-2.5 py-1 rounded-md bg-gray-50 hover:bg-red-50 text-text-secondary hover:text-brand text-[11px] font-semibold border border-border shrink-0 cursor-pointer transition-colors"
-            >
-              🚗 السيارات المتاحة
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSendMessage("ابحث عن عميل")}
-              className="px-2.5 py-1 rounded-md bg-gray-50 hover:bg-red-50 text-text-secondary hover:text-brand text-[11px] font-semibold border border-border shrink-0 cursor-pointer transition-colors"
-            >
-              🔍 بحث عميل
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSendMessage("افتح التقويم")}
-              className="px-2.5 py-1 rounded-md bg-gray-50 hover:bg-red-50 text-text-secondary hover:text-brand text-[11px] font-semibold border border-border shrink-0 cursor-pointer transition-colors"
-            >
-              📅 التقويم
-            </button>
-          </div>
-
-          {/* ===== INPUT BAR ===== */}
-          <div className="p-3 border-t border-border bg-gray-50">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage(inputValue);
-              }}
-              className="flex items-center gap-2"
-            >
+        {/* Footer (Identical to Add New Customer Modal) */}
+        <div className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-t border-border bg-white shrink-0">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage(inputValue);
+            }}
+            className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3"
+          >
+            <div className="relative flex-1 flex items-center gap-2">
               <button
                 type="button"
                 onClick={toggleListening}
-                className={`p-2 rounded-lg transition-colors cursor-pointer shrink-0 border ${
+                className={`p-2.5 rounded-xl border transition-colors cursor-pointer shrink-0 ${
                   isListening
-                    ? "bg-brand text-white border-brand shadow-xs"
-                    : "bg-white hover:bg-gray-100 text-text-secondary border-border"
+                    ? "bg-brand text-white border-brand"
+                    : "bg-gray-50 hover:bg-gray-100 text-text-secondary border-border"
                 }`}
-                title={isListening ? "إيقاف الاستماع" : "بدء التحدث بالصوت"}
+                title="Voice Input"
               >
-                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                {isListening ? <MicOff size={16} /> : <Mic size={16} className="text-brand" />}
               </button>
 
               <input
@@ -675,22 +763,69 @@ export default function SiriAssistant() {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={lang === "ar" ? "اكتب أمرك أو استفسارك هنا..." : "Type your command here..."}
-                className="flex-1 bg-white border border-border rounded-lg px-3 py-2 text-xs sm:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20 font-medium"
+                placeholder={
+                  lang === "ar"
+                    ? "اكتب أمرك هنا (مثال: افتح تفاصيل العميل، عقد جديد)..."
+                    : "Type your command (e.g. open a client page details, create contract)..."
+                }
+                className="w-full border border-border rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
                 dir={inputValue.match(/[\u0600-\u06FF]/) ? "rtl" : "ltr"}
               />
+            </div>
 
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-text-secondary border border-border rounded-xl hover:bg-gray-100 transition-colors cursor-pointer text-center"
+              >
+                Cancel
+              </button>
               <button
                 type="submit"
                 disabled={!inputValue.trim() || isProcessing}
-                className="p-2 rounded-lg bg-brand hover:bg-brand-dark disabled:opacity-40 text-white font-bold transition-colors cursor-pointer shrink-0"
+                className="flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-colors font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-sm disabled:opacity-50"
               >
-                <Send size={15} />
+                {isProcessing ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" /> Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send size={14} />
+                    <span>Send Command</span>
+                  </>
+                )}
               </button>
-            </form>
-          </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <>
+      {/* Floating Static Red Circle Button (Bottom-Right, No Animation, No Text) */}
+      {!isOpen && (
+        <div className="fixed bottom-6 right-6 z-[90]">
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(true);
+              setTimeout(() => {
+                toggleListening();
+              }, 300);
+            }}
+            title="Leon Assistant"
+            className="w-14 h-14 rounded-full bg-brand text-white shadow-lg hover:bg-brand-dark flex items-center justify-center transition-colors cursor-pointer border border-white/20"
+          >
+            <Mic size={24} className="text-white" />
+          </button>
         </div>
       )}
+
+      {mounted && typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent}
     </>
   );
 }
