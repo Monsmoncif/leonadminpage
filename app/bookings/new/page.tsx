@@ -772,6 +772,108 @@ export function NewRentalAdminPageContent() {
     });
   }, [contractId]);
 
+  const aiAutoPilotKeyRef = useRef<string>("");
+  const [aiTriggerSubmit, setAiTriggerSubmit] = useState(false);
+
+  // Leon Assistant Auto-Pilot & URL Parameter Pre-Selection
+  useEffect(() => {
+    if (isPageLoading || isEditMode) return;
+
+    const paramUnitId = searchParams.get("unitId");
+    const paramClientId = searchParams.get("clientId");
+    const paramType = searchParams.get("contractType") as "Shop" | "Delivery" | "Personalized" | null;
+    const paramDays = searchParams.get("days");
+    const paramStep = searchParams.get("step");
+    const isAutoPilot = searchParams.get("autoPilot") === "true";
+    const isAutoSubmit = searchParams.get("autoSubmit") === "true";
+    const openAddClient = searchParams.get("openAddClient") === "true";
+
+    const currentQueryKey = `${paramUnitId || ""}-${paramClientId || ""}-${paramType || ""}-${paramDays || ""}-${paramStep || ""}-${isAutoPilot}-${isAutoSubmit}-${openAddClient}`;
+    if (currentQueryKey === "-----false-false-false" || aiAutoPilotKeyRef.current === currentQueryKey) {
+      return;
+    }
+    aiAutoPilotKeyRef.current = currentQueryKey;
+
+    if (openAddClient) {
+      setIsClientModalOpen(true);
+    }
+
+    if (paramType && ["Shop", "Delivery", "Personalized"].includes(paramType)) {
+      setContractType(paramType);
+    }
+
+    // 1. Select Vehicle
+    let chosenUnit = paramUnitId ? units.find((u) => String(u._id) === String(paramUnitId)) : null;
+    if (!chosenUnit && isAutoPilot && units.length > 0) {
+      chosenUnit =
+        units.find((u) => u.status === "Available" && isUnitBookable(u)) ||
+        units.find((u) => u.status === "Available") ||
+        units[0];
+    }
+
+    if (chosenUnit) {
+      setSelectedVehicle(chosenUnit._id);
+      const daysCount = paramDays && !isNaN(Number(paramDays)) && Number(paramDays) > 0 ? Number(paramDays) : 3;
+      const startStr = new Date().toISOString().split("T")[0];
+      const endStr = new Date(Date.now() + daysCount * 86400000).toISOString().split("T")[0];
+      const unitRate = Number(chosenUnit.dailyRate) || 85;
+      setRentalData((prev) => ({
+        ...prev,
+        startDate: startStr,
+        endDate: endStr,
+        dailyRate: unitRate,
+        collectionAmount: unitRate * daysCount,
+        checkoutMileage: Number(chosenUnit.mileage) || 0,
+      }));
+    }
+
+    // 2. Select Client
+    let chosenClient = paramClientId ? clients.find((c) => String(c._id) === String(paramClientId)) : null;
+    if (!chosenClient && isAutoPilot && clients.length > 0) {
+      chosenClient = clients.find((c) => c.status === "Active") || clients[0];
+    }
+
+    if (chosenClient) {
+      setSelectedClient(chosenClient._id);
+      if (paramType === "Personalized" || contractType === "Personalized") {
+        setPersonName(chosenClient.name || "");
+      }
+    }
+
+    // 3. Step Advancement & Auto-Submit
+    if (isAutoPilot && chosenUnit && chosenClient) {
+      toast.info(`Leon Assistant selected ${chosenUnit.make} ${chosenUnit.model} & ${chosenClient.name} automatically!`);
+      const t1 = setTimeout(() => setCurrentStep(2), 250);
+      const t2 = setTimeout(() => setCurrentStep(3), 550);
+      const t3 = setTimeout(() => setCurrentStep(4), 850);
+      const t4 = isAutoSubmit
+        ? setTimeout(() => {
+            setAiTriggerSubmit(true);
+          }, 1400)
+        : null;
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        if (t4) clearTimeout(t4);
+      };
+    } else if (paramStep && !isNaN(Number(paramStep))) {
+      setCurrentStep(Math.min(4, Math.max(1, Number(paramStep))));
+    } else if (chosenUnit && chosenClient) {
+      setCurrentStep(4);
+    } else if (chosenUnit) {
+      setCurrentStep(2);
+    }
+  }, [isPageLoading, isEditMode, units, clients, searchParams]);
+
+  useEffect(() => {
+    if (aiTriggerSubmit && selectedVehicle && (selectedClient || contractType === "Delivery")) {
+      setAiTriggerSubmit(false);
+      handleGenerate();
+    }
+  }, [aiTriggerSubmit, selectedVehicle, selectedClient, contractType]);
+
   const getUnitConflict = (unit: any, startDateStr?: string, endDateStr?: string, reqCheckoutTime?: string, reqCheckinTime?: string) => {
     if (!unit) return null;
     if (unit.status === "Maintenance" || unit.status === "Out of Service") {

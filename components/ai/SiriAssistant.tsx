@@ -20,10 +20,16 @@ import {
   FileText,
   Calendar,
   Plus,
+  UserPlus,
   Search,
   Eye,
   CheckCircle2,
 } from "lucide-react";
+import CreateClientModal from "@/components/modals/CreateClientModal";
+import CreateCompanyModal from "@/components/modals/CreateCompanyModal";
+import CreateUnitModal from "@/components/modals/CreateUnitModal";
+import { invalidateClientCache } from "@/lib/client-cache";
+import { useToast } from "@/components/providers/ToastProvider";
 
 interface SearchClientItem {
   id: string;
@@ -97,6 +103,7 @@ const getInitials = (name: string) => {
 
 export default function SiriAssistant() {
   const router = useRouter();
+  const toast = useToast();
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -107,6 +114,11 @@ export default function SiriAssistant() {
   const [inputValue, setInputValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [messages, setMessages] = useState<Message[]>([DEFAULT_WELCOME]);
+
+  // Autonomous Action Modals triggered directly by Leon Assistant
+  const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
+  const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
+  const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -246,6 +258,30 @@ export default function SiriAssistant() {
     setIsOpen(false);
   };
 
+  const executeDomClick = (targetText: string) => {
+    if (typeof document === "undefined") return false;
+    const lowerTarget = (targetText || "").toLowerCase().trim();
+    const buttons = Array.from(document.querySelectorAll("button, a")) as HTMLElement[];
+
+    for (const btn of buttons) {
+      if (btn.closest("[data-leon-assistant-modal='true']")) continue;
+      const text = (btn.innerText || btn.textContent || btn.getAttribute("title") || "").toLowerCase().trim();
+      if (!text) continue;
+
+      if (
+        text.includes(lowerTarget) ||
+        (lowerTarget.includes("next") && (text.includes("next") || text.includes("continue") || text.includes("التالي"))) ||
+        (lowerTarget.includes("back") && (text.includes("back") || text.includes("previous") || text.includes("رجوع"))) ||
+        (lowerTarget.includes("submit") && (text.includes("create") || text.includes("save") || text.includes("dispatch") || text.includes("confirm"))) ||
+        (lowerTarget.includes("client") && (text.includes("add customer") || text.includes("add client") || text.includes("new customer")))
+      ) {
+        btn.click();
+        return true;
+      }
+    }
+    return false;
+  };
+
   // Send message to assistant
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isProcessing) return;
@@ -288,11 +324,50 @@ export default function SiriAssistant() {
       setMessages((prev) => [...prev, assistantMsg]);
       speakText(replyText);
 
+      if (data.action === "CLIENT_CREATED") {
+        invalidateClientCache("clients");
+      }
+
+      if (data.uiAction === "OPEN_ADD_CLIENT_MODAL") {
+        setTimeout(() => {
+          setIsOpen(false);
+          setIsAddClientModalOpen(true);
+        }, 500);
+        return;
+      }
+
+      if (data.uiAction === "OPEN_ADD_COMPANY_MODAL") {
+        setTimeout(() => {
+          setIsOpen(false);
+          setIsAddCompanyModalOpen(true);
+        }, 500);
+        return;
+      }
+
+      if (data.uiAction === "OPEN_ADD_UNIT_MODAL") {
+        setTimeout(() => {
+          setIsOpen(false);
+          setIsAddUnitModalOpen(true);
+        }, 500);
+        return;
+      }
+
+      if (data.uiAction === "CLICK_BUTTON") {
+        setTimeout(() => {
+          setIsOpen(false);
+          const clicked = executeDomClick(data.uiTarget || "next");
+          if (clicked) {
+            toast.success(`Leon Assistant clicked "${data.uiTarget || "Next"}"`);
+          }
+        }, 500);
+        return;
+      }
+
       if (data.navigateUrl) {
         setTimeout(() => {
           router.push(data.navigateUrl);
           setIsOpen(false);
-        }, 700);
+        }, 650);
       }
     } catch (err: any) {
       console.error("AI Error:", err);
@@ -453,12 +528,12 @@ export default function SiriAssistant() {
           {/* Quick Actions Card (Matches Add New Customer Section Card) */}
           <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-border shadow-xs">
             <label className="block text-[11px] sm:text-xs font-bold text-text-secondary mb-2">
-              Quick Actions (إجراءات سريعة بضغطة واحدة)
+              Quick Actions (إجراءات تلقائية سريعة بضغطة واحدة)
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
-                onClick={() => handleSendMessage("Create new contract")}
+                onClick={() => handleSendMessage("Auto create contract now")}
                 className="p-2.5 rounded-xl border border-border bg-gray-50/70 hover:bg-red-50/60 hover:border-brand/40 text-left transition-all cursor-pointer flex items-center gap-2 group"
               >
                 <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
@@ -466,9 +541,25 @@ export default function SiriAssistant() {
                 </div>
                 <div className="min-w-0">
                   <span className="text-xs font-bold text-text-primary block truncate group-hover:text-brand">
-                    New Contract
+                    Auto Contract
                   </span>
-                  <span className="text-[10px] text-text-muted block truncate">إنشاء عقد جديد</span>
+                  <span className="text-[10px] text-text-muted block truncate">إنشاء عقد تلقائي</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSendMessage("Add new client")}
+                className="p-2.5 rounded-xl border border-border bg-gray-50/70 hover:bg-red-50/60 hover:border-brand/40 text-left transition-all cursor-pointer flex items-center gap-2 group"
+              >
+                <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                  <UserPlus size={14} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-text-primary block truncate group-hover:text-brand">
+                    Add New Client
+                  </span>
+                  <span className="text-[10px] text-text-muted block truncate">إضافة عميل جديد</span>
                 </div>
               </button>
 
@@ -501,22 +592,6 @@ export default function SiriAssistant() {
                     Fleet Status
                   </span>
                   <span className="text-[10px] text-text-muted block truncate">السيارات المتوفرة</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSendMessage("Open Calendar")}
-                className="p-2.5 rounded-xl border border-border bg-gray-50/70 hover:bg-red-50/60 hover:border-brand/40 text-left transition-all cursor-pointer flex items-center gap-2 group"
-              >
-                <div className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                  <Calendar size={14} />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-text-primary block truncate group-hover:text-brand">
-                    Calendar
-                  </span>
-                  <span className="text-[10px] text-text-muted block truncate">جدول المواعيد</span>
                 </div>
               </button>
             </div>
@@ -826,6 +901,49 @@ export default function SiriAssistant() {
       )}
 
       {mounted && typeof document !== "undefined" ? createPortal(modalContent, document.body) : modalContent}
+
+      {/* Direct Action Modals triggered by Leon Assistant */}
+      <CreateClientModal
+        isOpen={isAddClientModalOpen}
+        onClose={() => setIsAddClientModalOpen(false)}
+        onSuccess={(newClient) => {
+          setIsAddClientModalOpen(false);
+          invalidateClientCache("clients");
+          if (newClient?._id || newClient?.id) {
+            router.push(`/clients/${newClient._id || newClient.id}`);
+          } else {
+            router.push("/clients");
+          }
+        }}
+      />
+
+      <CreateCompanyModal
+        isOpen={isAddCompanyModalOpen}
+        onClose={() => setIsAddCompanyModalOpen(false)}
+        onSuccess={(newCompany) => {
+          setIsAddCompanyModalOpen(false);
+          invalidateClientCache("clients");
+          if (newCompany?._id || newCompany?.id) {
+            router.push(`/clients/${newCompany._id || newCompany.id}`);
+          } else {
+            router.push("/clients");
+          }
+        }}
+      />
+
+      <CreateUnitModal
+        isOpen={isAddUnitModalOpen}
+        onClose={() => setIsAddUnitModalOpen(false)}
+        onSuccess={(newUnit) => {
+          setIsAddUnitModalOpen(false);
+          invalidateClientCache("units");
+          if (newUnit?._id || newUnit?.id) {
+            router.push(`/units/${newUnit._id || newUnit.id}`);
+          } else {
+            router.push("/units");
+          }
+        }}
+      />
     </>
   );
 }

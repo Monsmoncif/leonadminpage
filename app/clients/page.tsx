@@ -109,6 +109,16 @@ export default function ClientsPage() {
 
   useEffect(() => {
     fetchClients();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("action") === "add-client") {
+        setEditTarget(null);
+        setIsModalOpen(true);
+      } else if (params.get("action") === "add-company") {
+        setEditTarget(null);
+        setIsCompanyModalOpen(true);
+      }
+    }
   }, []);
 
   const handleDeleteConfirm = async () => {
