@@ -24,6 +24,7 @@ import {
 import Link from "next/link";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
+import { getClientCache, setClientCache } from "@/lib/client-cache";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -345,8 +346,12 @@ export default function CalendarPage() {
   const [dayModalDate, setDayModalDate] = useState<Date | null>(null);
   const [dayModalFilter, setDayModalFilter] = useState<"all" | "pickup" | "return">("all");
   const [dayModalSearch, setDayModalSearch] = useState("");
-  const [rawContracts, setRawContracts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedCalendar =
+    typeof window !== "undefined"
+      ? getClientCache<any[]>("calendar_contracts") || getClientCache<{ contracts: any[] }>("contracts")?.contracts
+      : null;
+  const [rawContracts, setRawContracts] = useState<any[]>(cachedCalendar || []);
+  const [isLoading, setIsLoading] = useState(!cachedCalendar);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContractForDetails, setSelectedContractForDetails] = useState<any | null>(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
@@ -377,20 +382,22 @@ export default function CalendarPage() {
   // Fetch contracts once on initial mount (NEVER on month change)
   const fetchContracts = async (silent = false) => {
     try {
-      if (!silent) setIsLoading(true);
+      if (!silent && !getClientCache("calendar_contracts")) setIsLoading(true);
       const res = await fetch("/api/contracts?full=false", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setRawContracts(data.contracts || []);
+      const list = data.contracts || [];
+      setRawContracts(list);
+      setClientCache("calendar_contracts", list);
     } catch (error) {
       console.error("Failed to fetch contracts:", error);
     } finally {
-      if (!silent) setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchContracts();
+    fetchContracts(Boolean(cachedCalendar));
   }, []);
 
   // Compute all bookings in-memory from rawContracts

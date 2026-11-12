@@ -22,6 +22,7 @@ import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
 import TablePagination from "@/components/ui/TablePagination";
 import { useToast } from "@/components/providers/ToastProvider";
+import { getClientCache, setClientCache } from "@/lib/client-cache";
 
 interface ReportResponse {
   _id: string;
@@ -34,9 +35,10 @@ interface ReportResponse {
 }
 
 export default function ReportsPage() {
+  const cachedReports = typeof window !== "undefined" ? getClientCache<ReportResponse[]>("reports_list") : null;
   const toast = useToast();
-  const [reports, setReports] = useState<ReportResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState<ReportResponse[]>(cachedReports || []);
+  const [loading, setLoading] = useState(!cachedReports);
   const [generatingType, setGeneratingType] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReportResponse | null>(null);
@@ -72,23 +74,25 @@ export default function ReportsPage() {
   ];
 
   useEffect(() => {
-    fetchReports();
+    fetchReports(0, Boolean(cachedReports));
   }, []);
 
-  const fetchReports = async (retryCount = 0) => {
+  const fetchReports = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
     try {
-      setLoading(true);
+      if (!silent && !getClientCache("reports_list")) setLoading(true);
       const res = await fetch("/api/reports", { cache: "no-store" });
       if (!res.ok) throw new Error(`Failed to fetch reports (${res.status})`);
       const data = await res.json();
-      setReports(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setReports(list);
+      setClientCache("reports_list", list);
     } catch (err) {
       console.error(`Reports fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise((res) => setTimeout(res, delay));
-        return fetchReports(retryCount + 1);
+        return fetchReports(retryCount + 1, silent);
       }
       setReports([]);
     } finally {

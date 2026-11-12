@@ -9,9 +9,11 @@ import bcrypt from "bcryptjs";
 export async function GET() {
   try {
     await connectDB();
-    const drivers = await Driver.find({}).sort({ createdAt: -1 }).lean();
-    const allContracts = await Contract.find({}).select("driverId deliveryDriverId returnDriverId status").lean();
-    const allUsers = await User.find({ role: "driver" }).select("_id name email phone status createdAt").lean();
+    const [drivers, allContracts, allUsers] = await Promise.all([
+      Driver.find({}).sort({ createdAt: -1 }).lean(),
+      Contract.find({}).select("driverId deliveryDriverId returnDriverId status").lean(),
+      User.find({ role: "driver" }).select("_id name email phone status createdAt").lean(),
+    ]);
 
     const emailToUserId = allUsers.reduce((acc: any, user: any) => {
       if (user.email) acc[user.email.toLowerCase()] = String(user._id);

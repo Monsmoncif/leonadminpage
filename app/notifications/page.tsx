@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Bell, Check, Trash2, Calendar, FileText, AlertTriangle, Clock, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 import { refreshUnreadNotifications } from "@/lib/unread-notifications";
+import { getClientCache, setClientCache } from "@/lib/client-cache";
 
 interface NotificationResponse {
   _id: string;
@@ -47,26 +48,29 @@ const formatNotificationMessage = (msg: string) => {
 };
 
 export default function NotificationsPage() {
+  const cachedNotifications = typeof window !== "undefined" ? getClientCache<NotificationResponse[]>("notifications_list") : null;
   const toast = useToast();
-  const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<NotificationResponse[]>(cachedNotifications || []);
+  const [loading, setLoading] = useState(!cachedNotifications);
   
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState<NotificationResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    fetchNotifications();
+    fetchNotifications(0, Boolean(cachedNotifications));
   }, []);
 
-  const fetchNotifications = async (retryCount = 0) => {
+  const fetchNotifications = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
     try {
-      setLoading(true);
+      if (!silent && !getClientCache("notifications_list")) setLoading(true);
       const res = await fetch("/api/notifications", { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        setNotifications(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setNotifications(list);
+        setClientCache("notifications_list", list);
       } else {
         throw new Error(`Failed to fetch notifications (${res.status})`);
       }
@@ -75,7 +79,7 @@ export default function NotificationsPage() {
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise(res => setTimeout(res, delay));
-        return fetchNotifications(retryCount + 1);
+        return fetchNotifications(retryCount + 1, silent);
       }
       setNotifications([]);
     } finally {

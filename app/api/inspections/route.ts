@@ -17,10 +17,11 @@ export async function GET() {
     const _d = User;
 
     const inspections = await Inspection.find({})
-      .populate("contractId")
-      .populate("unitId")
-      .populate("driverId")
-      .sort({ createdAt: -1 });
+      .populate("contractId", "contractNumber status startDate endDate")
+      .populate("unitId", "make model plate year color")
+      .populate("driverId", "name")
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json(inspections, { status: 200 });
   } catch (error: any) {

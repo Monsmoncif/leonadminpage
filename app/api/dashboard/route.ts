@@ -112,104 +112,158 @@ export async function GET(request: Request) {
       Contract.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }),
     ]);
 
-    // Calculate this month's revenue properly (excluding personalized contracts and damage charges which go directly to mechanic/repairs)
-    const revenueThisMonthResult = await Contract.aggregate([
-      { 
-        $match: { 
-          contractType: { $ne: "Personalized" },
-          personalizedPersonName: { $in: [null, ""] },
-          $or: [
-            // Contracts completed this month (full amount earned)
-            { status: "Completed", updatedAt: { $gte: startOfThisMonth } },
-            // Active contracts that started this month (deposit collected)
-            { status: "Active", startDate: { $gte: startOfThisMonth } }
-          ]
-        }
-      },
-      { 
-        $group: { 
-          _id: null, 
-          total: { 
-            $sum: {
-              $max: [
-                0,
-                {
-                  $subtract: [
-                    { $ifNull: ["$totalAmount", 0] },
-                    { $ifNull: ["$damageCharge", 0] }
-                  ]
-                }
-              ]
-            } 
-          } 
-        } 
-      },
+    const startOfSelectedYear = new Date(selectedYear, 0, 1);
+    const endOfSelectedYear = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
+
+    // Run all dashboard revenue, chart, and upcoming return queries in parallel
+    const [
+      revenueThisMonthResult,
+      revenueLastMonthResult,
+      totalRevenueResult,
+      contractsPerMonth,
+      revenuePerMonth,
+      mostRented,
+      upcomingReturnsRaw,
+    ] = await Promise.all([
+      Contract.aggregate([
+        {
+          $match: {
+            contractType: { $ne: "Personalized" },
+            personalizedPersonName: { $in: [null, ""] },
+            $or: [
+              { status: "Completed", updatedAt: { $gte: startOfThisMonth } },
+              { status: "Active", startDate: { $gte: startOfThisMonth } }
+            ]
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: {
+              $sum: {
+                $max: [
+                  0,
+                  { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] }
+                ]
+              }
+            }
+          }
+        },
+      ]),
+      Contract.aggregate([
+        {
+          $match: {
+            contractType: { $ne: "Personalized" },
+            personalizedPersonName: { $in: [null, ""] },
+            $or: [
+              { status: "Completed", updatedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } },
+              { status: "Active", startDate: { $gte: startOfLastMonth, $lte: endOfLastMonth } }
+            ]
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: {
+              $sum: {
+                $max: [
+                  0,
+                  { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] }
+                ]
+              }
+            }
+          }
+        },
+      ]),
+      Contract.aggregate([
+        {
+          $match: {
+            contractType: { $ne: "Personalized" },
+            personalizedPersonName: { $in: [null, ""] },
+            status: { $in: ["Active", "Completed"] }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: {
+              $sum: {
+                $max: [
+                  0,
+                  { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] }
+                ]
+              }
+            }
+          }
+        },
+      ]),
+      Contract.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: startOfSelectedYear, $lte: endOfSelectedYear }
+          }
+        },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Contract.aggregate([
+        {
+          $match: {
+            contractType: { $ne: "Personalized" },
+            personalizedPersonName: { $in: [null, ""] },
+            status: { $in: ["Active", "Completed"] }
+          }
+        },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            revenue: {
+              $sum: {
+                $max: [
+                  0,
+                  { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] }
+                ]
+              }
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Contract.aggregate([
+        {
+          $group: {
+            _id: "$unitId",
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1 } },
+        { $limit: 4 },
+        {
+          $lookup: {
+            from: "units",
+            localField: "_id",
+            foreignField: "_id",
+            as: "unit",
+          },
+        },
+        { $unwind: { path: "$unit", preserveNullAndEmptyArrays: true } },
+      ]),
+      Contract.find({ status: "Active" })
+        .sort({ endDate: 1 })
+        .limit(4)
+        .select("contractNumber endDate clientId unitId")
+        .populate("clientId", "name")
+        .populate("unitId", "make model plate")
+        .lean(),
     ]);
+
     const revenueThisMonth = revenueThisMonthResult.length > 0 ? revenueThisMonthResult[0].total : 0;
-
-    // Calculate last month's revenue for comparison (excluding personalized contracts and damage charges)
-    const revenueLastMonthResult = await Contract.aggregate([
-      { 
-        $match: { 
-          contractType: { $ne: "Personalized" },
-          personalizedPersonName: { $in: [null, ""] },
-          $or: [
-            // Contracts completed last month (full amount earned)
-            { status: "Completed", updatedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } },
-            // Active contracts that started last month (deposit collected)
-            { status: "Active", startDate: { $gte: startOfLastMonth, $lte: endOfLastMonth } }
-          ]
-        }
-      },
-      { 
-        $group: { 
-          _id: null, 
-          total: { 
-            $sum: {
-              $max: [
-                0,
-                {
-                  $subtract: [
-                    { $ifNull: ["$totalAmount", 0] },
-                    { $ifNull: ["$damageCharge", 0] }
-                  ]
-                }
-              ]
-            } 
-          } 
-        } 
-      },
-    ]);
     const revenueLastMonth = revenueLastMonthResult.length > 0 ? revenueLastMonthResult[0].total : 0;
-
-    // Calculate total lifetime revenue for context (excluding personalized contracts and damage charges)
-    const totalRevenueResult = await Contract.aggregate([
-      { 
-        $match: { 
-          contractType: { $ne: "Personalized" },
-          personalizedPersonName: { $in: [null, ""] },
-          status: { $in: ["Active", "Completed"] } 
-        } 
-      },
-      { 
-        $group: { 
-          _id: null, 
-          total: { 
-            $sum: {
-              $max: [
-                0,
-                {
-                  $subtract: [
-                    { $ifNull: ["$totalAmount", 0] },
-                    { $ifNull: ["$damageCharge", 0] }
-                  ]
-                }
-              ]
-            } 
-          } 
-        } 
-      },
-    ]);
     const totalRevenue = totalRevenueResult.length > 0 ? totalRevenueResult[0].total : 0;
 
     // Helper for percentage change
@@ -225,100 +279,21 @@ export async function GET(request: Request) {
       vehicles: calcChange(unitsThisMonth, unitsLastMonth),
     };
 
-    // Contracts per month (for bar chart)
-    const startOfSelectedYear = new Date(selectedYear, 0, 1);
-    const endOfSelectedYear = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
-
-    const contractsPerMonth = await Contract.aggregate([
-      { 
-        $match: { 
-          createdAt: { $gte: startOfSelectedYear, $lte: endOfSelectedYear } 
-        } 
-      },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const rentalsPerMonthData = monthNames.map((month, idx) => {
       const found = contractsPerMonth.find((c: any) => c._id === idx + 1);
       return { month, rentals: found ? found.count : 0 };
     });
 
-    // Revenue per month (for line chart) - excluding personalized contracts and damage charges
-    const revenuePerMonth = await Contract.aggregate([
-      { 
-        $match: { 
-          contractType: { $ne: "Personalized" },
-          personalizedPersonName: { $in: [null, ""] },
-          status: { $in: ["Active", "Completed"] } 
-        } 
-      },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          revenue: { 
-            $sum: {
-              $max: [
-                0,
-                {
-                  $subtract: [
-                    { $ifNull: ["$totalAmount", 0] },
-                    { $ifNull: ["$damageCharge", 0] }
-                  ]
-                }
-              ]
-            } 
-          },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
     const revenueData = monthNames.map((month, idx) => {
       const found = revenuePerMonth.find((r: any) => r._id === idx + 1);
       return { month, revenue: found ? found.revenue : 0 };
     });
 
-    // Most rented vehicles
-    const mostRented = await Contract.aggregate([
-      {
-        $group: {
-          _id: "$unitId",
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { count: -1 } },
-      { $limit: 4 },
-      {
-        $lookup: {
-          from: "units",
-          localField: "_id",
-          foreignField: "_id",
-          as: "unit",
-        },
-      },
-      { $unwind: { path: "$unit", preserveNullAndEmptyArrays: true } },
-    ]);
-
     const mostRentedCarsData = mostRented.map((item: any) => ({
       name: item.unit ? `${item.unit.make} ${item.unit.model}` : "Unknown Vehicle",
       value: item.count,
     }));
-
-    // Upcoming returns (active contracts ending soonest)
-    const upcomingReturnsRaw = await Contract.find({ status: "Active" })
-      .sort({ endDate: 1 })
-      .limit(4)
-      .select("contractNumber endDate clientId unitId")
-      .populate("clientId", "name")
-      .populate("unitId", "make model plate")
-      .lean();
 
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);

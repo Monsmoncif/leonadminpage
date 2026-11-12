@@ -18,8 +18,6 @@ const emptyResponse = {
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    // One-time cleanup of any test vehicle
-    await Unit.deleteMany({ plate: "GG10273" });
 
     // 1. Synchronize vehicle statuses based on today's active contracts
     await syncUnitStatuses();

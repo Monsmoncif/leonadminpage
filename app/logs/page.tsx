@@ -17,6 +17,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
+import { getClientCache, setClientCache } from "@/lib/client-cache";
 
 interface LogResponse {
   _id: string;
@@ -56,9 +57,10 @@ const formatDate = (dateString: string) => {
 };
 
 export default function ActivityLogsPage() {
+  const cachedLogs = typeof window !== "undefined" ? getClientCache<LogResponse[]>("logs_list") : null;
   const toast = useToast();
-  const [logs, setLogs] = useState<LogResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState<LogResponse[]>(cachedLogs || []);
+  const [loading, setLoading] = useState(!cachedLogs);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -69,23 +71,24 @@ export default function ActivityLogsPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    fetchLogs();
+    fetchLogs(0, Boolean(cachedLogs));
   }, []);
 
-  const fetchLogs = async (retryCount = 0) => {
+  const fetchLogs = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
     try {
-      setLoading(true);
+      if (!silent && !getClientCache("logs_list")) setLoading(true);
       const res = await fetch("/api/logs", { cache: 'no-store' });
       if (!res.ok) throw new Error(`Failed to fetch logs (${res.status})`);
       const data = await res.json();
       setLogs(data);
+      setClientCache("logs_list", data);
     } catch (err) {
       console.error(`Logs fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise(res => setTimeout(res, delay));
-        return fetchLogs(retryCount + 1);
+        return fetchLogs(retryCount + 1, silent);
       }
     } finally {
       setLoading(false);

@@ -43,10 +43,15 @@ export async function GET(req: Request) {
     const damages = await Damage.find(filter)
       .populate({
         path: "contractId",
+        select: "contractId contractNumber driverId",
         populate: { path: "driverId", select: "name email" }
       })
-      .populate("unitId")
-      .sort({ createdAt: -1 });
+      .populate({
+        path: "unitId",
+        select: "-images -documents -vidangeHistory"
+      })
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json(damages, { status: 200 });
   } catch (error: any) {

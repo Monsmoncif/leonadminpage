@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import "./globals.css";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Providers } from "./providers";
@@ -20,15 +22,22 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let session = null;
+  try {
+    session = await getServerSession(authOptions);
+  } catch {
+    session = null;
+  }
+
   return (
     <html lang="en-GB" className="h-full" suppressHydrationWarning>
       <body className="min-h-screen font-sans antialiased bg-surface" suppressHydrationWarning>
-        <Providers>
+        <Providers session={session}>
           <ClientLayout>{children}</ClientLayout>
         </Providers>
       </body>

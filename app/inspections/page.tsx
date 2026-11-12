@@ -30,14 +30,20 @@ import {
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/providers/ToastProvider";
 import CreateInspectionModal from "@/components/modals/CreateInspectionModal";
+import { getClientCache, setClientCache } from "@/lib/client-cache";
 
 const ANGLES = ["Front View", "Rear View", "Left Side", "Right Side", "Dashboard / Mileage", "Front Interior", "Rear Interior", "Trunk / Boot"];
 
 export default function InspectionsPage() {
+  const cachedInspData =
+    typeof window !== "undefined"
+      ? getClientCache<{ inspections: any[]; contracts: any[] }>("inspections_data")
+      : null;
+
   const toast = useToast();
-  const [inspections, setInspections] = useState<any[]>([]);
-  const [contracts, setContracts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [inspections, setInspections] = useState<any[]>(cachedInspData?.inspections || []);
+  const [contracts, setContracts] = useState<any[]>(cachedInspData?.contracts || []);
+  const [loading, setLoading] = useState(!cachedInspData);
   const [error, setError] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState<"list" | "compare">("list");
@@ -56,10 +62,10 @@ export default function InspectionsPage() {
   // Image Lightbox state
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const fetchData = async (retryCount = 0) => {
+  const fetchData = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
     try {
-      setLoading(true);
+      if (!silent && !getClientCache("inspections_data")) setLoading(true);
       setError(null);
 
       // Fetch both in parallel and wait for BOTH to finish
@@ -68,33 +74,40 @@ export default function InspectionsPage() {
           if (!res.ok) throw new Error("Failed to fetch inspections");
           return res.json();
         }),
-        fetch("/api/contracts", { cache: "no-store" }).then(res => {
+        fetch("/api/contracts?full=false", { cache: "no-store" }).then(res => {
           if (!res.ok) throw new Error("Failed to fetch contracts");
           return res.json();
         })
       ]);
 
+      let freshInspections: any[] = [];
+      let freshContracts: any[] = [];
+
       // Process inspections
       if (inspectionsResult.status === "fulfilled") {
-        setInspections(inspectionsResult.value);
+        freshInspections = inspectionsResult.value;
+        setInspections(freshInspections);
       } else {
         throw new Error(inspectionsResult.reason?.message || "Failed to fetch inspections");
       }
 
       // Process contracts
       if (contractsResult.status === "fulfilled") {
-        setContracts(contractsResult.value.contracts || []);
+        freshContracts = contractsResult.value.contracts || [];
+        setContracts(freshContracts);
       } else {
         // Contracts failing is non-critical, log and continue
         console.warn("Contracts fetch failed:", contractsResult.reason);
         setContracts([]);
       }
+
+      setClientCache("inspections_data", { inspections: freshInspections, contracts: freshContracts });
     } catch (err: any) {
       console.error(`Inspections loading error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise(res => setTimeout(res, delay));
-        return fetchData(retryCount + 1);
+        return fetchData(retryCount + 1, silent);
       }
       setError(err.message || "Failed to load inspections");
     } finally {
@@ -103,7 +116,7 @@ export default function InspectionsPage() {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(0, Boolean(cachedInspData));
   }, []);
 
   const handleDeleteConfirm = async () => {

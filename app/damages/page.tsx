@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Search, Plus, Filter, Edit, Trash2, ChevronDown } from "lucide-react";
 import CreateDamageModal from "@/components/modals/CreateDamageModal";
 import DeleteConfirmModal from "@/components/modals/DeleteConfirmModal";
+import { getClientCache, setClientCache } from "@/lib/client-cache";
 
 interface DamageResponse {
   _id: string;
@@ -27,8 +28,9 @@ interface DamageResponse {
 }
 
 export default function DamagesPage() {
-  const [damages, setDamages] = useState<DamageResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedDamages = typeof window !== "undefined" ? getClientCache<DamageResponse[]>("damages_list") : null;
+  const [damages, setDamages] = useState<DamageResponse[]>(cachedDamages || []);
+  const [loading, setLoading] = useState(!cachedDamages);
   const [error, setError] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [damageToEdit, setDamageToEdit] = useState<DamageResponse | null>(null);
@@ -36,7 +38,7 @@ export default function DamagesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    fetchDamages();
+    fetchDamages(0, Boolean(cachedDamages));
   }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,21 +47,22 @@ export default function DamagesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const fetchDamages = async (retryCount = 0) => {
+  const fetchDamages = async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
     try {
-      setLoading(true);
+      if (!silent && !getClientCache("damages_list")) setLoading(true);
       const res = await fetch("/api/damages", { cache: 'no-store' });
       if (!res.ok) throw new Error("Failed to fetch damages");
       const data = await res.json();
       setDamages(data);
+      setClientCache("damages_list", data);
       setError("");
     } catch (err: any) {
       console.error(`Damages fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
         await new Promise(res => setTimeout(res, delay));
-        return fetchDamages(retryCount + 1);
+        return fetchDamages(retryCount + 1, silent);
       }
       setError(err.message);
     } finally {

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await connectDB();
-    const reports = await Report.find({}).sort({ dateGenerated: -1 });
+    const reports = await Report.find({}).sort({ dateGenerated: -1 }).lean();
     return NextResponse.json(reports, { status: 200 });
   } catch (error: any) {
     console.warn("Reports API: MongoDB not available, returning empty data.", error.message);

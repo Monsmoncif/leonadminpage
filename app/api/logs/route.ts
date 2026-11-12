@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await connectDB();
-    const logs = await Log.find({}).sort({ createdAt: -1 }).limit(100);
+    const logs = await Log.find({}).sort({ createdAt: -1 }).limit(100).lean();
     return NextResponse.json(logs);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
