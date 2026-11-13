@@ -31,6 +31,19 @@ interface Message {
   };
 }
 
+function renderFormattedText(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, idx) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return (
+        <strong key={idx} className="font-semibold text-gray-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return <React.Fragment key={idx}>{part}</React.Fragment>;
+  });
+}
+
 const INITIAL_MESSAGE: Message = {
   id: "welcome",
   sender: "assistant",
@@ -353,7 +366,7 @@ export default function SiriAssistant() {
                   }`}
                   dir={msg.text.match(/[\u0600-\u06FF]/) ? "rtl" : "ltr"}
                 >
-                  {msg.text}
+                  {msg.sender === "assistant" ? renderFormattedText(msg.text) : msg.text}
 
                   {/* Compact Client Cards */}
                   {msg.data?.type === "clients" && msg.data.items && (
@@ -416,7 +429,7 @@ export default function SiriAssistant() {
                       {msg.data.items.map((cnt: any, idx: number) => (
                         <div
                           key={cnt.id || idx}
-                          onClick={() => router.push(`/bookings`)}
+                          onClick={() => router.push(cnt.id ? `/bookings/${cnt.id}` : `/bookings`)}
                           className="bg-white p-2 rounded-xl border border-gray-200 hover:border-brand flex items-center justify-between gap-2 cursor-pointer transition-all"
                         >
                           <div className="min-w-0">

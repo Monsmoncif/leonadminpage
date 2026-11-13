@@ -1,9 +1,14 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import connectDB from "@/lib/db";
 import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
-import { Contract } from "@/models/Contract";
+import {
+  LEON_BACKEND_KNOWLEDGE,
+  BackendQuerySpec,
+  executeBackendQuery,
+  getRichBackendContext,
+  invalidateBackendContextCache,
+} from "@/lib/assistant-backend";
 
 interface AssistantResponse {
   reply: string;
@@ -186,15 +191,41 @@ function parseRentalDates(message: string, todayDate: string) {
   return { startDate, endDate, days };
 }
 
-// Call Multi-Provider AI Brain (Groq -> OpenAI -> Gemini) with full error visibility
+// Call Multi-Provider AI Brain (Groq active models -> OpenAI -> Gemini) with full error visibility
 async function callSmartAIBrain(
-  messagesPayload: { role: "system" | "user" | "assistant"; content: string }[]
+  messagesPayload: { role: "system" | "user" | "assistant"; content: string }[],
+  options: { jsonMode?: boolean; maxTokens?: number } = {}
 ): Promise<string | null> {
-  // 1. Primary: Groq (ultra-fast inference)
+  const jsonMode = options.jsonMode !== false;
+  const maxTokens = options.maxTokens ?? 1000;
+
+  // 1. Primary: Groq (benchmark-verified models on active key)
   const groqKey = process.env.GROQ_API_KEY;
   if (groqKey) {
-    const groqModels = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "llama-3.1-8b-instant"];
-    for (const model of groqModels) {
+    const groqConfigs: { model: string; extra: Record<string, any> }[] = [
+      {
+        model: "openai/gpt-oss-120b",
+        extra: {
+          reasoning_effort: "low",
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+        },
+      },
+      {
+        model: "qwen/qwen3.8-27b",
+        extra: {
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+        },
+      },
+      {
+        model: "openai/gpt-oss-20b",
+        extra: {
+          reasoning_effort: "low",
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+        },
+      },
+    ];
+
+    for (const { model, extra } of groqConfigs) {
       try {
         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
@@ -206,9 +237,10 @@ async function callSmartAIBrain(
             model,
             messages: messagesPayload,
             temperature: 0.25,
-            max_tokens: 900,
+            max_tokens: maxTokens,
+            ...extra,
           }),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(9000),
         });
 
         if (res.ok) {
@@ -239,8 +271,8 @@ async function callSmartAIBrain(
           model: "gpt-4o-mini",
           messages: messagesPayload,
           temperature: 0.25,
-          max_tokens: 900,
-          response_format: { type: "json_object" },
+          max_tokens: maxTokens,
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
         }),
         signal: AbortSignal.timeout(8000),
       });
@@ -281,8 +313,8 @@ async function callSmartAIBrain(
               contents: convContents,
               generationConfig: {
                 temperature: 0.25,
-                maxOutputTokens: 900,
-                responseMimeType: "application/json",
+                maxOutputTokens: maxTokens,
+                ...(jsonMode ? { responseMimeType: "application/json" } : {}),
               },
             }),
             signal: AbortSignal.timeout(8000),
@@ -304,57 +336,6 @@ async function callSmartAIBrain(
   }
 
   return null;
-}
-
-// Short 3s server cache for fleet context: fast burst reuse without stale cars/clients
-interface ServerFleetCache {
-  timestamp: number;
-  allClients: any[];
-  allUnits: any[];
-  recentContracts: any[];
-  totalUnits: number;
-  availableUnits: number;
-  rentedUnits: number;
-  activeContractsCount: number;
-}
-let serverFleetCache: ServerFleetCache | null = null;
-
-async function getLiveFleetContext() {
-  const now = Date.now();
-  if (serverFleetCache && now - serverFleetCache.timestamp < 3_000) {
-    return serverFleetCache;
-  }
-
-  await connectDB();
-  const [allClients, allUnits, recentContracts, totalUnits, availableUnits, rentedUnits, activeContractsCount] =
-    await Promise.all([
-      Client.find().select("name phone customerType status").sort({ updatedAt: -1 }).limit(500).lean(),
-      Unit.find().select("make model plate year color dailyRate status").sort({ updatedAt: -1 }).limit(300).lean(),
-      Contract.find()
-        .select("contractNumber status clientId unitId personalizedPersonName createdAt")
-        .sort({ createdAt: -1 })
-        .populate("clientId", "name phone")
-        .populate("unitId", "make model plate")
-        .limit(10)
-        .lean(),
-      Unit.countDocuments(),
-      Unit.countDocuments({ status: "Available" }),
-      Unit.countDocuments({ status: "Rented" }),
-      Contract.countDocuments({ status: "Active" }),
-    ]);
-
-  serverFleetCache = {
-    timestamp: now,
-    allClients,
-    allUnits,
-    recentContracts,
-    totalUnits,
-    availableUnits,
-    rentedUnits,
-    activeContractsCount,
-  };
-
-  return serverFleetCache;
 }
 
 export async function POST(req: Request) {
@@ -455,7 +436,8 @@ export async function POST(req: Request) {
       });
     }
 
-    // Load live context from MongoDB or 30s cache for maximum responsiveness
+    // Load complete live backend context (all KPIs, fleet, contracts, clients, drivers, damages, inspections, transactions, logs, alerts)
+    const backendCtx = await getRichBackendContext();
     const {
       allClients,
       allUnits,
@@ -463,8 +445,10 @@ export async function POST(req: Request) {
       totalUnits,
       availableUnits,
       rentedUnits,
+      maintenanceUnits,
       activeContractsCount,
-    } = await getLiveFleetContext();
+      kpis,
+    } = backendCtx;
 
     // Helpers to find Client and Unit with scored matching (NEVER guess random fallback [0])
     const tokensOf = (s: string) =>
@@ -639,125 +623,32 @@ export async function POST(req: Request) {
     const existingDays = existingParams.get("days");
     const existingPrice = existingParams.get("price");
 
-    // Live Summaries for the LLM Brain
-    const clientsSummary = allClients
-      .slice(0, 60)
-      .map((c: any) => `- Name: "${c.name}" | Phone: ${c.phone || "N/A"}`)
-      .join("\n");
-
-    const availableUnitsList = (allUnits as any[]).filter((u) => u.status === "Available");
-    const unitsSummary = (availableUnitsList.length > 0 ? availableUnitsList : allUnits)
-      .slice(0, 60)
-      .map((u: any) => `- ${u.make} ${u.model} (${u.year || 2024}) | Plate: ${u.plate} | Status: ${u.status} | Rate: AED ${u.dailyRate || 85}/day`)
-      .join("\n");
-
-    const recentContractsSummary = recentContracts
-      .slice(0, 8)
-      .map(
-        (c: any) =>
-          `- Contract #${c.contractNumber || "Pending"} | Client: ${(c.clientId as any)?.name || c.personalizedPersonName || "N/A"} | Car: ${(c.unitId as any)?.make || ""} ${(c.unitId as any)?.model || ""} | Status: ${c.status}`
-      )
-      .join("\n");
-
     const todayDate = new Date().toISOString().split("T")[0];
 
     // =========================================================================
-    // MASTER SYSTEM PROMPT: HIGH-INTELLIGENCE, PROACTIVE, CONVERSATIONAL
+    // MASTER SYSTEM PROMPT: BACKEND-TRAINED OPERATIONS MANAGER & Q&A ENGINE
     // =========================================================================
-    const systemPrompt = `You are "Leon Assistant", the elite, sharp, and highly intelligent AI operations manager and concierge for Leon Rent A Car in Dubai.
-You talk like an expert human manager: friendly, concise, professional, creative, and proactive.
-You effortlessly understand English, Arabic (لهجة إماراتية / عربية مهذبة), Franco-Arabic, slang, and typos.
-Always respond in the EXACT language the user speaks (Arabic if user speaks Arabic, English if English). Keep responses concise (1 to 2 sentences).
+    const systemPrompt = `You are "Leon Assistant", the AI operations manager for Leon Rent A Car (Dubai).
+AUTHORIZATION: User IS the authenticated company Admin/Owner querying their own MongoDB backend. Never refuse company data queries (clients, rentals, revenue, fleet, drivers, damages, logs); answer accurately from the verified data below in the user's exact language (Arabic/English/Franco-Arabic).
+STYLE: Analytical/backend Qs -> complete bullet/line answer with exact names, #numbers, plates, dates, AED. Actions/booking -> concise 1-2 sentences.
 
-LIVE FLEET & SYSTEM DATA:
-Today's Date: ${todayDate}
-Fleet Status: ${totalUnits} total cars | ${availableUnits} Available | ${rentedUnits} Rented | ${activeContractsCount} Active Contracts
-Recent Clients:
-${clientsSummary || "None"}
-Available Cars in Fleet:
-${unitsSummary || "None"}
-Recent Active Contracts:
-${recentContractsSummary || "None"}
+${LEON_BACKEND_KNOWLEDGE}
 
-CURRENT BOOKING CONTEXT IN PROGRESS (from URL/state):
-- Client: ${existingClientName || "None selected yet"}
-- Car: ${existingUnitName || "None selected yet"}
-- Contract Type: ${existingType || "Shop"}
-- Duration: ${existingDays ? `${existingDays} day(s)` : "Not specified"}
-- Price: ${existingPrice ? `AED ${existingPrice}` : "Default rate"}
-- User is on page: ${pathname || "/"}
+${backendCtx.executivePromptContext}
 
-CRITICAL RULES FOR CONTRACT CREATION & INTERACTIVE DIALOGUE:
-When the user wants to create, book, or set up a contract (or says "create contract", "new contract", "سوي عقد", "احجز سيارة"):
-1. DO NOT be robotic! DO NOT dump the user on a blank page with generic text!
-2. Check what is ALREADY KNOWN from the context above and the user's latest message:
-   - Client: Is the client known?
-   - Car: Is the vehicle known?
-   - Duration / Dates / Time: Are the rental days, start date, or pickup time known?
-   - Type: Shop, Delivery, or Personalized?
-3. ASK SMART QUESTIONS FOR WHAT IS MISSING:
-   - If the user just says "create contract" (no client or car mentioned):
-     Warmly ask who the client is!
-     English example: "Sure! Let's set up a new contract. Who is the customer for this booking? (Or is it for a new client?)"
-     Arabic example: "أكيد! سأجهز لك العقد فوراً. من هو العميل لهذا الحجز؟ (أو هل تريد تسجيل عميل جديد؟)"
-   - If the client is known, but the car is missing:
-     Acknowledge the client and ask for the vehicle and duration!
-     English example: "Got it, for [Client Name]! Which vehicle from our fleet would you like to assign, and for how many days or what dates?"
-     Arabic example: "تمام للأخ [اسم العميل]! أي سيارة من الأسطول تحب نحددها، وكم مدة الحجز أو التواريخ؟"
-   - If the car is known, but the client is missing:
-     Acknowledge the car and ask who the client is!
-   - If client, car, and duration are known:
-     Summarize clearly and ask if ready to finalize or if it's Personalized / Delivery:
-     English example: "Everything is ready: [Car] for [Client] for [Days] days. Shall I go ahead and finalize the contract now?"
-     Arabic example: "كل البيانات جاهزة: [السيارة] للأخ [العميل] لمدة [الأيام] أيام. هل أعتمد وأنشئ العقد الآن؟"
-   - If the user confirms ("yes", "create it", "confirm", "auto", "نعم", "اعتمد"):
-     Confirm with enthusiasm and set readyToSubmit = true!
-4. If the user provides multiple pieces of info at once (e.g., "create contract for Khalil with Nissan Patrol for 3 days cash 1500"):
-   Extract all of them immediately, DO NOT ask for what they already gave you!
-5. If the user asks for suggestions or what cars are available:
-   Suggest real available models from the fleet list!
-6. VEHICLE FLEET MATCHING & INTEGRITY:
-   - Check if the requested vehicle is in our "Available Cars in Fleet" list above.
-   - IF THE REQUESTED CAR IS NOT IN OUR FLEET:
-     DO NOT invent, pretend, or auto-create a fictitious car!
-     Politely explain that this car is not currently in our fleet.
-     Present the actual available vehicles in our fleet (e.g., Mercedes-Benz C300).
-     Ask if they would like to select one of the available cars, or if they want you to open the "Add Car" form to register a new vehicle into the fleet.
-     Keep the customer name and duration in "contractData" so they don't have to repeat them!
-   - IF THE CAR IS IN OUR FLEET:
-     Assign it immediately in "contractData.carName"!
-7. DATES AND DURATION RECOGNITION:
-   - When user provides dates like "from today now too 14/11/2026", parse:
-     startDate = today's date (${todayDate}),
-     endDate = "2026-11-14",
-     days = difference in days between startDate and endDate (e.g. 2 days).
-8. STRICT ENTITY INTEGRITY (NEVER GUESS WRONG CLIENT OR CAR):
-   - NEVER substitute a random client or vehicle if the requested one is not in the list above.
-   - For "OPEN_CLIENT_DETAILS", "OPEN_VEHICLE_DETAILS", "SEARCH_CLIENT", or "SEARCH_VEHICLE", always put the exact client/vehicle name or plate the user asked for in "searchQuery", and NEVER invent a clientId or unitId.
-9. ASK FOR MORE CAR DETAILS WHEN ONLY A CAR NAME IS GIVEN:
-   - Whenever the user gives a car name without a plate number (especially when looking up a car, or if multiple cars share the brand/model, or the car is not found), ask clearly for more details such as the **plate number, model year, or color** so you identify the exact vehicle.
+BOOKING STATE: Client=${existingClientName || "None"}, Car=${existingUnitName || "None"}, Type=${existingType || "Shop"}, Days=${existingDays || "?"}, Price=${existingPrice || "Default"}, Page=${pathname || "/"}
 
-OUTPUT FORMAT:
-You MUST return ONLY a single valid JSON object (no markdown, no backticks, no code fence). Schema:
+RULES:
+1. BACKEND Q&A: Answer from LIVE METRICS/lists above when complete. If user asks about an older/specific client, full vehicle history/vidange/inspections, date-range revenue/transactions, filtered contracts, logs, drivers, or full expiries NOT fully shown above, set "intent":"QUERY_BACKEND" with "backendQuery" to query MongoDB live!
+2. CONTRACT WIZARD: Only set "intent":"CONTRACT_FLOW" when user wants to CREATE/BOOK/SET UP a new contract (NOT questions like "how many contracts", "rental history", "overdue contracts"). Never invent missing cars; ask plate/year/color when car is bare/ambiguous.
+3. ENTITY INTEGRITY: Use "OPEN_CLIENT_DETAILS"/"OPEN_VEHICLE_DETAILS"/"NAVIGATE" only for open/go/lookup commands, NEVER to hijack analytical questions. Put queried name/plate in "searchQuery"; never guess IDs.
+
+Return ONLY valid JSON:
 {
-  "reply": "Your conversational, friendly, human-like response to the user",
-  "intent": "CONTRACT_FLOW" | "OPEN_CLIENT_DETAILS" | "OPEN_VEHICLE_DETAILS" | "OPEN_ADD_CLIENT_MODAL" | "NAVIGATE" | "SEARCH_CLIENT" | "SEARCH_VEHICLE" | "FLEET_OVERVIEW" | "GENERAL_CHAT",
-  "contractData": {
-    "clientName": string | null,
-    "carName": string | null,
-    "contractType": "Shop" | "Delivery" | "Personalized" | null,
-    "days": number | null,
-    "startDate": "YYYY-MM-DD" | null,
-    "endDate": "YYYY-MM-DD" | null,
-    "checkoutTime": string | null,
-    "totalPrice": number | null,
-    "dailyRate": number | null,
-    "deposit": number | null,
-    "advancePayment": number | null,
-    "paymentMethod": "Cash" | "Card" | "Crypto" | null,
-    "pickupLocation": string | null,
-    "readyToSubmit": boolean
-  },
+  "reply": "string",
+  "intent": "QUERY_BACKEND" | "CONTRACT_FLOW" | "OPEN_CLIENT_DETAILS" | "OPEN_VEHICLE_DETAILS" | "OPEN_ADD_CLIENT_MODAL" | "OPEN_ADD_UNIT_MODAL" | "NAVIGATE" | "SEARCH_CLIENT" | "SEARCH_VEHICLE" | "FLEET_OVERVIEW" | "GENERAL_CHAT",
+  "backendQuery": { "queryType": "client_profile"|"vehicle_profile"|"contracts_query"|"transactions_query"|"damages_query"|"inspections_query"|"logs_query"|"drivers_query"|"expiries_check"|"revenue_summary", "search": string|null, "status": string|null, "dateFrom": "YYYY-MM-DD"|null, "dateTo": "YYYY-MM-DD"|null, "limit": number|null } | null,
+  "contractData": { "clientName": string|null, "carName": string|null, "contractType": "Shop"|"Delivery"|"Personalized"|null, "days": number|null, "startDate": "YYYY-MM-DD"|null, "endDate": "YYYY-MM-DD"|null, "checkoutTime": string|null, "totalPrice": number|null, "dailyRate": number|null, "deposit": number|null, "advancePayment": number|null, "paymentMethod": "Cash"|"Card"|"Crypto"|null, "pickupLocation": string|null, "readyToSubmit": boolean },
   "targetUrl": string | null,
   "clientId": string | null,
   "unitId": string | null,
@@ -766,22 +657,57 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
 
     const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: systemPrompt },
-      ...history.slice(-12).map((h) => ({
+      ...history.slice(-8).map((h) => ({
         role: (h.sender === "user" ? "user" : "assistant") as "user" | "assistant",
         content: h.text,
       })),
       { role: "user", content: message },
     ];
 
-    // Deterministic Extraction from Message (guarantees 100% accuracy even if LLM is offline or fails)
-    const hasContractWords = /\b(contract|contrac|booking|rent|rental|reserve)\b|عقد|حجز|تأجير|استئجار/i.test(lower);
+    // Deterministic Extraction & Question vs Action Classification
+    const isAnalyticalQuestion =
+      /[?؟]$/.test(message.trim()) ||
+      /\b(who|what|when|where|why|how|which|whom|whose|does|did|do|can|could|tell\s+me|give\s+me|show\s+me|explain|summarize|summary|report|revenue|profit|income|expense|earning|money|overdue|late|unpaid|pending|balance|deposit|damage|damages|inspection|inspections|oil|vidange|mileage|km|insurance|registration|expiry|expired|expire|driver|drivers|log|logs|activity|notification|notifications|alert|alerts|history|spending|spent|total\s+spent|status\s+of|all\s+contracts|past\s+contracts|rental\s+history|rate|price|cost|last\s+time|who\s+rented|how\s+many|how\s+much|workflow)\b/i.test(
+        lower
+      ) ||
+      /(?:^|\s)(كم|من\s|منو|مين|متى|وين|أين|اين|ليش|لماذا|هل|ما\s+هي|ما\s+هو|ماهي|ماهو|شو|ايش|وش|احسب|لخص|عطني|خبرني|قول\s+لي|اشرح|تقارير|ارباح|أرباح|دخل|مصاريف|فواتير|متأخر|تأخير|أضرار|اضرار|صيانة|الزيت|فيدانج|رخصة|تأمين|سائق|سائقين|تنبيهات|اشعارات|إشعارات|سجل|ملخص|سعر|كيف|غير\s+مدفوع)/.test(
+        message
+      );
+
+    const explicitNavigateToEntity =
+      /\b(open|toopen|to\s*open|go\s*to)\b.*(?:\bpage\b|\bdetails?\b|\bprofile\b)|(?:\bdetails?\b|\bprofile\b|\bpage\b)\s+(?:of|for)\b|افتح\s+(?:صفحة|ملف|تفاصيل)/i.test(
+        lower
+      ) && !/\b(history|contracts|spent|spending|overdue|damages)\b|تاريخ|سجل|عقود|متأخر/i.test(lower);
+
+    const isCreatingContractPhrase =
+      /\b(create|make|setup|set\s+up|start|draft|prepare|book|reserve|forclien|with\s+car|sleect\s+car|select\s+car)\b|\b(?:new|add(?:\s+a)?)\s+(?:contract|booking|rental)\b|انشاء|إنشاء|سوي|سويلي|اعمل|جهز|احجز|عقد\s+جديد|حجز\s+جديد/i.test(
+        lower
+      );
+
+    const isHowToQuestion =
+      /^\s*(?:how\s+(?:do|can|does|to|should)|what\s+(?:is|are|does)|why\s+|explain\b|كيف\s+|ما\s+هو\s+|اشرح)/i.test(
+        lower
+      ) && !/\b(?:for\s+client|forclien|with\s+car|from\s+today)\b/i.test(lower);
+
+    const hasContractWords =
+      /\b(contract|contrac|booking|rent|rental|reserve)\b|عقد|حجز|تأجير|استئجار/i.test(lower) &&
+      !isHowToQuestion &&
+      (isCreatingContractPhrase || !isAnalyticalQuestion);
+
     const wantsClientDetails =
       !hasContractWords &&
-      (/(?:\bopen\b|\btoopen\b|\bto\s*open\b|\bshow\b|\bview\b|\bfind\b|\bsearch\b|\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b).*(?:\bclient\b|\bclinet\b|\bcustomer\b)|(?:\bclient\b|\bclinet\b|\bcustomer\b).*(?:\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b)|(?:افتح|عرض|تفاصيل|ملف).*(?:عميل|العميل|زبون)/i.test(lower));
+      (explicitNavigateToEntity || !isAnalyticalQuestion) &&
+      (/(?:\bopen\b|\btoopen\b|\bto\s*open\b|\bshow\b|\bview\b|\bfind\b|\bsearch\b|\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b).*(?:\bclient\b|\bclinet\b|\bcustomer\b)|(?:\bclient\b|\bclinet\b|\bcustomer\b).*(?:\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b)|(?:افتح|عرض|تفاصيل|ملف).*(?:عميل|العميل|زبون)/i.test(
+        lower
+      ));
+
     const wantsVehicleDetails =
       !hasContractWords &&
       !/\b(add\s+car|add\s+new\s+car|new\s+car|add\s+vehicle|create\s+car)\b|اضافة\s+سيارة|إضافة\s+سيارة/i.test(lower) &&
-      (/(?:\bopen\b|\btoopen\b|\bto\s*open\b|\bshow\b|\bview\b|\bfind\b|\bsearch\b|\bcheck\b|\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b).*(?:\bcar\b|\bvehicle\b|\bunit\b)|(?:\bcar\b|\bvehicle\b|\bunit\b).*(?:\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b)|(?:افتح|عرض|تفاصيل|فحص).*(?:سيارة|السيارة|مركبة)/i.test(lower));
+      (explicitNavigateToEntity || !isAnalyticalQuestion) &&
+      (/(?:\bopen\b|\btoopen\b|\bto\s*open\b|\bshow\b|\bview\b|\bfind\b|\bsearch\b|\bcheck\b|\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b).*(?:\bcar\b|\bvehicle\b|\bunit\b)|(?:\bcar\b|\bvehicle\b|\bunit\b).*(?:\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b)|(?:افتح|عرض|تفاصيل|فحص).*(?:سيارة|السيارة|مركبة)/i.test(
+        lower
+      ));
 
     const explicitClientDetailMatch =
       message.match(/\b(?:details?|profile|page)\s+(?:of|for)\s*:?\s*([A-Za-z\u0600-\u06FF0-9\s+]{2,50}?)\s*$/i) ||
@@ -805,7 +731,10 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
     const extractedClientName =
       rawExtractedClient && !reservedClientNoise.test(rawExtractedClient) ? rawExtractedClient : null;
 
-    const isFleetQuestion = /\b(how many|list|show|available\s+cars|cars\s+available|all\s+cars|fleet\s+status)\b|كم\s+سيارة|السيارات\s+المتاح/i.test(lower);
+    const isFleetQuestion =
+      /\b(how many\s+(?:cars|vehicles|units)|list\s+.*(?:cars|vehicles)|available\s+cars|cars\s+(?:are\s+)?available|all\s+cars|fleet\s+status)\b|كم\s+سيارة|السيارات\s+المتاح/i.test(
+        lower
+      );
     const carRegex = /(?:\bsleect car\b|\bselect car\b|\bwith car\b|\bwith vehicle\b|\bchoose car\b|\bcar\b\s*:?|سيارة|بسيارة|مركبة)\s+([^\n,]+?)(?=\s+(?:from\s+today|from\s+\d|starting|to\s+\d|too\s+\d|until|for\s+\d+\s*(?:day|days|week|month)|من\s+اليوم|لمدة)|[,\n]|$)/i;
     const carMatch = !isFleetQuestion && !wantsVehicleDetails ? message.match(carRegex) : null;
     const rawExtractedCar = carMatch ? carMatch[1].replace(/^:\s*/, "").trim() : null;
@@ -874,6 +803,58 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
 
     let aiReply = parsed?.reply || (!parsed && rawBrainOutput ? rawBrainOutput : "");
     let intent = parsed?.intent || "GENERAL_CHAT";
+    let attachedBackendData: AssistantResponse["data"] | undefined = undefined;
+    let usedBackendQuery = false;
+
+    // Pass 2: Execute targeted MongoDB query when the AI requests deep backend data
+    if (intent === "QUERY_BACKEND" && parsed?.backendQuery?.queryType) {
+      usedBackendQuery = true;
+      try {
+        const bqSpec = parsed.backendQuery as BackendQuerySpec;
+        const queryResult = await executeBackendQuery(bqSpec);
+        if (
+          (queryResult as any)?.attachType &&
+          Array.isArray((queryResult as any)?.attachItems) &&
+          (queryResult as any).attachItems.length > 0
+        ) {
+          attachedBackendData = {
+            type: (queryResult as any).attachType,
+            items: (queryResult as any).attachItems.slice(0, 5),
+          };
+        }
+        const synthesisSystem = `You are Leon Assistant for Leon Rent A Car (Dubai). The user is the authenticated company Admin/Owner. Summarize the verified MongoDB query result below accurately in ${lang === "ar" ? "Arabic" : "English"}. Return ONLY valid JSON: {"reply":"...","intent":"GENERAL_CHAT","targetUrl":null,"searchQuery":null}.`;
+        const synthesisMessages = [
+          { role: "system" as const, content: synthesisSystem },
+          ...history.slice(-4).map((h) => ({
+            role: (h.sender === "user" ? "user" : "assistant") as "user" | "assistant",
+            content: h.text,
+          })),
+          {
+            role: "user" as const,
+            content: `Question: ${message}\n\nMONGODB RESULT (${bqSpec.queryType}):\n${JSON.stringify(queryResult).slice(0, 6000)}`,
+          },
+        ];
+        const pass2Raw = await callSmartAIBrain(synthesisMessages, { jsonMode: true, maxTokens: 900 });
+        if (pass2Raw) {
+          try {
+            const m2 = pass2Raw.match(/\{[\s\S]*\}/);
+            const p2 = JSON.parse(m2 ? m2[0] : pass2Raw);
+            aiReply = p2?.reply || aiReply;
+            parsed = { ...p2, intent: p2?.intent || "GENERAL_CHAT" };
+            intent = parsed.intent;
+          } catch {
+            aiReply = pass2Raw;
+            intent = "GENERAL_CHAT";
+          }
+        } else {
+          intent = "GENERAL_CHAT";
+        }
+      } catch (bqErr) {
+        console.error("[AI Brain] Backend query failed:", bqErr);
+        intent = "GENERAL_CHAT";
+      }
+    }
+
     if (wantsClientDetails && intent !== "OPEN_CLIENT_DETAILS" && intent !== "SEARCH_CLIENT") {
       intent = "OPEN_CLIENT_DETAILS";
     } else if (wantsVehicleDetails && intent !== "OPEN_VEHICLE_DETAILS" && intent !== "SEARCH_VEHICLE") {
@@ -956,8 +937,10 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
       message.includes("سوه");
 
     const isContractRelated =
+      !usedBackendQuery &&
       !wantsClientDetails &&
       !wantsVehicleDetails &&
+      !isHowToQuestion &&
       (!askedForVehicleDetails || hasContractWords || intent === "CONTRACT_FLOW") &&
       !explicitNonContractIntent.has(intent) &&
       (intent === "CONTRACT_FLOW" ||
@@ -966,8 +949,8 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
         askedForCar ||
         askedForDays ||
         askedToFinalize ||
-        Boolean(cData.clientName || cData.carName || cData.days) ||
-        (pathname.startsWith("/bookings/new") && looksLikeConfirmWord));
+        (!isAnalyticalQuestion && Boolean(cData.clientName || cData.carName || cData.days)) ||
+        (pathname.startsWith("/bookings/new") && looksLikeConfirmWord && !isAnalyticalQuestion));
 
     if (isContractRelated) {
       // 1. Resolve Client
@@ -994,7 +977,7 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
             status: "Active",
           });
           resolvedClient = newClient.toObject ? newClient.toObject() : newClient;
-          serverFleetCache = null;
+          invalidateBackendContextCache();
         }
       }
 
@@ -1370,7 +1353,7 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
       });
     }
 
-    // Handle follow-up plate/details OR bare car-name mentions smartly by asking for plate/details
+    // Handle follow-up plate/details OR bare car-name mentions ONLY when user isn't asking an analytical question
     const parsedMsgCar = parseCarDetails(message);
     const matchedUnitsFromMessage = !hasContractWords && !wantsClientDetails && !isFleetQuestion ? findUnitMatches(message) : null;
     const isBareCarOrVehicleDetailsFlow =
@@ -1380,6 +1363,7 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
       (!hasContractWords &&
         !wantsClientDetails &&
         !isFleetQuestion &&
+        !isAnalyticalQuestion &&
         intent === "GENERAL_CHAT" &&
         (parsedMsgCar.isKnownMake ||
           Boolean(parsedMsgCar.plate) ||
@@ -1497,13 +1481,16 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
       });
     }
 
-    if (intent === "FLEET_OVERVIEW" || (!parsed && /\b(fleet|available|cars|stats|overview|how many)\b|السيارات|المتاح|الأسطول|كم سيارة/i.test(lower))) {
+    if (
+      intent === "FLEET_OVERVIEW" ||
+      (!parsed && isFleetQuestion)
+    ) {
       return NextResponse.json<AssistantResponse>({
         reply:
           aiReply ||
           (lang === "ar"
-            ? `لديك حالياً ${availableUnits} سيارة متاحة من أصل ${totalUnits}، و${rentedUnits} مؤجرة مع ${activeContractsCount} عقد نشط.`
-            : `We currently have ${availableUnits} available cars out of ${totalUnits} total, with ${rentedUnits} rented and ${activeContractsCount} active contracts.`),
+            ? `لديك حالياً ${availableUnits} سيارة متاحة من أصل ${totalUnits}، و${rentedUnits} مؤجرة، و${maintenanceUnits} في الصيانة مع ${activeContractsCount} عقد نشط.`
+            : `We currently have ${availableUnits} available cars out of ${totalUnits} total, with ${rentedUnits} rented, ${maintenanceUnits} in maintenance, and ${activeContractsCount} active contracts.`),
         action: "OVERVIEW",
         data: {
           type: "overview",
@@ -1511,6 +1498,7 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
             totalUnits,
             availableUnits,
             rentedUnits,
+            maintenanceUnits,
             activeContracts: activeContractsCount,
           },
         },
@@ -1572,23 +1560,55 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
       });
     }
 
-    // Deterministic navigation fallback if AI provider didn't respond
-    if (!parsed) {
-      const navMap: { pattern: RegExp; url: string; labelEn: string; labelAr: string }[] = [
-        { pattern: /\b(dashboard|home)\b|الرئيسية|الداشبورد/i, url: "/", labelEn: "Opening Dashboard.", labelAr: "فتحت لك لوحة التحكم." },
-        { pattern: /\b(bookings|contracts)\b|العقود|الحجوزات/i, url: "/bookings", labelEn: "Opening Contracts.", labelAr: "فتحت لك صفحة العقود." },
-        { pattern: /\b(clients|customers)\b|العملاء/i, url: "/clients", labelEn: "Opening Clients.", labelAr: "فتحت لك صفحة العملاء." },
-        { pattern: /\b(units|vehicles)\b|المركبات|الوحدات/i, url: "/units", labelEn: "Opening Vehicles.", labelAr: "فتحت لك صفحة السيارات." },
-        { pattern: /\b(calendar)\b|التقويم/i, url: "/calendar", labelEn: "Opening Calendar.", labelAr: "فتحت لك التقويم." },
-        { pattern: /\b(reports|analytics)\b|التقارير/i, url: "/reports", labelEn: "Opening Reports.", labelAr: "فتحت لك التقارير." },
-      ];
-      for (const nav of navMap) {
-        if (nav.pattern.test(message)) {
-          return NextResponse.json<AssistantResponse>({
-            reply: lang === "ar" ? nav.labelAr : nav.labelEn,
-            action: "NAVIGATE",
-            navigateUrl: nav.url,
-          });
+    // Smart Backend Q&A Fallback when AI provider is offline or returned empty
+    if (!aiReply) {
+      if (/\b(revenue|income|profit|earning|money)\b|ارباح|أرباح|دخل|ايرادات|إيرادات/i.test(lower)) {
+        aiReply =
+          lang === "ar"
+            ? `إيرادات العقود هذا الشهر: AED ${kpis.revenueThisMonth.toLocaleString("en-US")} (الشهر الماضي: AED ${kpis.revenueLastMonth.toLocaleString("en-US")})، والإجمالي التراكمي: AED ${kpis.revenueAllTime.toLocaleString("en-US")}. المبالغ المعلّقة: AED ${kpis.pendingBalanceTotal.toLocaleString("en-US")}.`
+            : `Contract revenue this month: AED ${kpis.revenueThisMonth.toLocaleString("en-US")} (last month: AED ${kpis.revenueLastMonth.toLocaleString("en-US")}), all-time net: AED ${kpis.revenueAllTime.toLocaleString("en-US")}. Unpaid balances: AED ${kpis.pendingBalanceTotal.toLocaleString("en-US")}.`;
+      } else if (/\b(damage|damages)\b|أضرار|اضرار/i.test(lower)) {
+        aiReply =
+          lang === "ar"
+            ? `يوجد حالياً ${kpis.pendingDamagesCount} تقارير أضرار معلقة بتكلفة تقديرية AED ${kpis.pendingDamagesCost.toLocaleString("en-US")}.`
+            : `There are currently ${kpis.pendingDamagesCount} pending damage report(s) with an estimated cost of AED ${kpis.pendingDamagesCost.toLocaleString("en-US")}.`;
+      } else if (/\b(overdue|unpaid|balance)\b|\bpending\s+(balance|payment|payments|contract|contracts)\b|متأخر|غير مدفوع|معلق/i.test(lower)) {
+        aiReply =
+          lang === "ar"
+            ? `يوجد حالياً ${kpis.overdueContracts} عقد متأخر عن التسليم، و${kpis.unpaidContracts} عقد غير مدفوع بالكامل (إجمالي المتبقي AED ${kpis.pendingBalanceTotal.toLocaleString("en-US")}).`
+            : `There are currently ${kpis.overdueContracts} overdue contract(s) and ${kpis.unpaidContracts} unpaid/partial contract(s) with AED ${kpis.pendingBalanceTotal.toLocaleString("en-US")} pending.`;
+      } else if (/\bhow\s+(?:do\s+i|can\s+i|to)\b|كيف\s+(?:أنشئ|انشئ|أسوي|اسوي|أعمل|اعمل)/i.test(lower) && /\b(contract|booking)\b|عقد/i.test(lower)) {
+        aiReply =
+          lang === "ar"
+            ? "لإنشاء عقد جديد: افتح صفحة `/bookings/new`، اختر النوع (Shop أو Delivery أو Personalized)، ثم حدد العميل والسيارة والتواريخ والأسعار والدفعة المقدمة، أو اكتب لي: «أنشئ عقد لاسم العميل بسيارة ... لمدة X أيام»."
+            : "To create a contract: go to `/bookings/new`, choose the contract type (Shop, Delivery, or Personalized), select the client and vehicle, set dates, daily rate, deposit/advance payment, and submit — or tell me the client, car, and days and I'll prepare it for you.";
+      } else if (/\b(contract|contracts)\b|عقود|عقد/i.test(lower)) {
+        aiReply =
+          lang === "ar"
+            ? `ملخص العقود: ${kpis.totalContracts} إجمالي | ${activeContractsCount} نشط | ${kpis.draftContracts} مسودة | ${kpis.completedContracts} مكتمل | ${kpis.overdueContracts} متأخر.`
+            : `Contracts summary: ${kpis.totalContracts} total | ${activeContractsCount} Active | ${kpis.draftContracts} Draft | ${kpis.completedContracts} Completed | ${kpis.overdueContracts} Overdue.`;
+      } else {
+        const navMap: { pattern: RegExp; url: string; labelEn: string; labelAr: string }[] = [
+          { pattern: /\b(dashboard|home)\b|الرئيسية|الداشبورد/i, url: "/", labelEn: "Opening Dashboard.", labelAr: "فتحت لك لوحة التحكم." },
+          { pattern: /\b(bookings|contracts)\b|العقود|الحجوزات/i, url: "/bookings", labelEn: "Opening Contracts.", labelAr: "فتحت لك صفحة العقود." },
+          { pattern: /\b(clients|customers)\b|العملاء/i, url: "/clients", labelEn: "Opening Clients.", labelAr: "فتحت لك صفحة العملاء." },
+          { pattern: /\b(units|vehicles)\b|المركبات|الوحدات/i, url: "/units", labelEn: "Opening Vehicles.", labelAr: "فتحت لك صفحة السيارات." },
+          { pattern: /\b(calendar)\b|التقويم/i, url: "/calendar", labelEn: "Opening Calendar.", labelAr: "فتحت لك التقويم." },
+          { pattern: /\b(reports|analytics)\b|التقارير/i, url: "/reports", labelEn: "Opening Reports.", labelAr: "فتحت لك التقارير." },
+          { pattern: /\b(damages)\b|الأضرار/i, url: "/damages", labelEn: "Opening Damages.", labelAr: "فتحت لك صفحة الأضرار." },
+          { pattern: /\b(drivers)\b|السائقين/i, url: "/drivers", labelEn: "Opening Drivers.", labelAr: "فتحت لك صفحة السائقين." },
+          { pattern: /\b(inspections)\b|الفحوصات/i, url: "/inspections", labelEn: "Opening Inspections.", labelAr: "فتحت لك صفحة الفحوصات." },
+          { pattern: /\b(logs)\b|السجلات/i, url: "/logs", labelEn: "Opening Activity Logs.", labelAr: "فتحت لك سجل النشاط." },
+          { pattern: /\b(notifications)\b|الإشعارات/i, url: "/notifications", labelEn: "Opening Notifications.", labelAr: "فتحت لك الإشعارات." },
+        ];
+        for (const nav of navMap) {
+          if (nav.pattern.test(message)) {
+            return NextResponse.json<AssistantResponse>({
+              reply: lang === "ar" ? nav.labelAr : nav.labelEn,
+              action: "NAVIGATE",
+              navigateUrl: nav.url,
+            });
+          }
         }
       }
     }
@@ -1597,9 +1617,10 @@ You MUST return ONLY a single valid JSON object (no markdown, no backticks, no c
       reply:
         aiReply ||
         (lang === "ar"
-          ? `أهلاً بك! لدينا ${availableUnits} سيارة متاحة الآن. أخبرني بما تريد فعله (إنشاء عقد، البحث عن عميل أو سيارة، أو عرض ملخص الأسطول).`
-          : `How can I help? We currently have ${availableUnits} available cars. Ask me to create a contract, search clients/vehicles, or check fleet status.`),
-      action: "NONE",
+          ? `أهلاً بك! لدينا ${availableUnits} سيارة متاحة من أصل ${totalUnits} و${activeContractsCount} عقد نشط. اسألني عن أي عميل، سيارة، إيرادات، عقود متأخرة، أضرار، أو اطلب إنشاء عقد.`
+          : `How can I help? We currently have ${availableUnits}/${totalUnits} available cars and ${activeContractsCount} active contracts. Ask me anything about revenue, clients, cars, overdue contracts, damages, or creating a contract.`),
+      action: attachedBackendData ? "SEARCH_RESULT" : "NONE",
+      ...(attachedBackendData ? { data: attachedBackendData } : {}),
     });
   } catch (error: any) {
     console.error("AI Assistant API error:", error);
