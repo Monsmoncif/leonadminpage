@@ -225,12 +225,11 @@ contractSchema.index({ createdAt: -1 });
 contractSchema.index({ unitId: 1, status: 1, startDate: 1 });
 contractSchema.index({ status: 1, deliveryStatus: 1, startDate: 1 });
 contractSchema.index({ status: 1, updatedAt: -1 });
-contractSchema.index({ contractNumber: 1 });
 contractSchema.index({ driverId: 1, status: 1 });
 contractSchema.index({ deliveryDriverId: 1, status: 1 });
 contractSchema.index({ returnDriverId: 1, status: 1 });
 
-if (mongoose.models.Contract) {
+if (process.env.NODE_ENV !== "production" && mongoose.models.Contract) {
   mongoose.deleteModel("Contract");
 }
 

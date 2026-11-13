@@ -109,7 +109,7 @@ clientSchema.index({ idNumber: 1 });
 clientSchema.index({ customerType: 1 });
 clientSchema.index({ companyName: 1 });
 
-if (mongoose.models.Client) {
+if (process.env.NODE_ENV !== "production" && mongoose.models.Client) {
   mongoose.deleteModel("Client");
 }
 

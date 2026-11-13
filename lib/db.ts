@@ -28,12 +28,29 @@ if (!MONGODB_URI) {
 let cached = (globalThis as any).__mongoose_cache;
 
 if (!cached) {
-  cached = (globalThis as any).__mongoose_cache = { conn: null, promise: null };
+  cached = (globalThis as any).__mongoose_cache = { conn: null, promise: null, listenersAttached: false };
+}
+
+if (!cached.listenersAttached) {
+  cached.listenersAttached = true;
+  mongoose.connection.on("disconnected", () => {
+    cached.conn = null;
+    cached.promise = null;
+  });
+  mongoose.connection.on("error", () => {
+    cached.conn = null;
+    cached.promise = null;
+  });
 }
 
 async function connectDB(): Promise<typeof mongoose> {
   if (cached.conn) {
-    return cached.conn;
+    if (mongoose.connection.readyState === 1) {
+      return cached.conn;
+    }
+    // Reset stale cached connection if MongoDB restarted or dropped the socket
+    cached.conn = null;
+    cached.promise = null;
   }
 
   // If a connection attempt is already in progress, wait for it
