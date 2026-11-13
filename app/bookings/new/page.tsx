@@ -36,8 +36,7 @@ import {
   Trash2,
   Edit,
   Edit2,
-  Building2,
-  Sparkles
+  Building2
 } from "lucide-react";
 import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
@@ -139,16 +138,6 @@ function NewRentalAdminPageContent() {
   const [isPageLoading, setIsPageLoading] = useState(
     !contractId && cachedUnits && cachedClients ? false : true
   );
-
-  // Leon AI Auto-Pilot Step-by-Step HUD State
-  const [aiAutoPilotStepInfo, setAiAutoPilotStepInfo] = useState<{
-    active: boolean;
-    currentStep: number;
-    statusText: string;
-    carName?: string;
-    clientName?: string;
-    duration?: string;
-  } | null>(null);
 
   // Contract Type (defaults to Delivery for drivers, Shop for admins, or Personalized)
   const [contractType, setContractType] = useState<"Delivery" | "Shop" | "Personalized">("Shop");
@@ -857,10 +846,6 @@ function NewRentalAdminPageContent() {
       setSelectedVehicle(chosenUnit._id);
     }
 
-    let calculatedStartStr = new Date().toISOString().split("T")[0];
-    let calculatedEndStr = new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0];
-    let calculatedDaysCount = 3;
-
     if (chosenUnit || paramStartDate || paramEndDate || paramPrice || paramDays) {
       const startStr = isValidDate(paramStartDate) ? (paramStartDate as string) : new Date().toISOString().split("T")[0];
       let daysCount = paramDays && !isNaN(Number(paramDays)) && Number(paramDays) > 0 ? Number(paramDays) : 3;
@@ -871,10 +856,6 @@ function NewRentalAdminPageContent() {
       } else {
         endStr = new Date(new Date(startStr).getTime() + daysCount * 86400000).toISOString().split("T")[0];
       }
-
-      calculatedStartStr = startStr;
-      calculatedEndStr = endStr;
-      calculatedDaysCount = daysCount;
 
       const unitRate = Number(paramDailyRate) > 0 ? Number(paramDailyRate) : Number(chosenUnit?.dailyRate) || 85;
       const totalPrice = Number(paramPrice) > 0 ? Number(paramPrice) : unitRate * daysCount;
@@ -941,48 +922,20 @@ function NewRentalAdminPageContent() {
 
     // 3. Step Advancement & Auto-Submit (Visible Step-by-Step Experience)
     const hasClientSelected = Boolean(chosenClient || paramClientId);
-    const clientDisplayName = chosenClient?.name || paramClientName || "Customer";
     if (isAutoPilot && chosenUnit && hasClientSelected) {
       const isPersonalizedFlow = paramType === "Personalized";
-      const carLabel = `${chosenUnit.make} ${chosenUnit.model}${chosenUnit.plate ? ` (${chosenUnit.plate})` : ""}`;
 
       // Step 1: Start at Step 1 (Car)
       setCurrentStep(1);
-      setAiAutoPilotStepInfo({
-        active: true,
-        currentStep: 1,
-        statusText: `Step 1/4: Selected vehicle ${carLabel} ✓`,
-        carName: `${chosenUnit.make} ${chosenUnit.model}`,
-        clientName: clientDisplayName,
-        duration: `${calculatedDaysCount} Days`,
-      });
 
       // Step 2: Transition to Step 2 (Client) after 800ms
       const t1 = setTimeout(() => {
         setCurrentStep(2);
-        setAiAutoPilotStepInfo((prev) =>
-          prev
-            ? {
-                ...prev,
-                currentStep: 2,
-                statusText: `Step 2/4: Assigned customer ${clientDisplayName} ✓`,
-              }
-            : null
-        );
       }, 800);
 
       // Step 3: Transition to Step 3 (Dates & Pricing) after 1650ms
       const t2 = setTimeout(() => {
         setCurrentStep(3);
-        setAiAutoPilotStepInfo((prev) =>
-          prev
-            ? {
-                ...prev,
-                currentStep: 3,
-                statusText: `Step 3/4: Configured dates (${calculatedStartStr} → ${calculatedEndStr} • ${calculatedDaysCount} Days) ✓`,
-              }
-            : null
-        );
       }, 1650);
 
       // Step 4: Transition to Step 4 (Review) after 2500ms
@@ -990,15 +943,6 @@ function NewRentalAdminPageContent() {
         ? null
         : setTimeout(() => {
             setCurrentStep(4);
-            setAiAutoPilotStepInfo((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    currentStep: 4,
-                    statusText: `Step 4/4: Reviewing contract & ready to finalize ✓`,
-                  }
-                : null
-            );
           }, 2500);
 
       // Trigger submission after full visual review if autoSubmit was requested
@@ -1008,16 +952,11 @@ function NewRentalAdminPageContent() {
           }, isPersonalizedFlow ? 2400 : 3600)
         : null;
 
-      const t5 = setTimeout(() => {
-        setAiAutoPilotStepInfo((prev) => (prev ? { ...prev, active: false } : null));
-      }, isAutoSubmit ? 4800 : 4200);
-
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);
         if (t3) clearTimeout(t3);
         if (t4) clearTimeout(t4);
-        clearTimeout(t5);
       };
     } else if (paramStep && !isNaN(Number(paramStep))) {
       setCurrentStep(Math.min(4, Math.max(1, Number(paramStep))));
@@ -3643,49 +3582,6 @@ function NewRentalAdminPageContent() {
           </div>
         )}
       </div>
-
-      {/* Leon AI Auto-Pilot Step-by-Step HUD Banner */}
-      {aiAutoPilotStepInfo?.active && (
-        <div className="bg-gradient-to-r from-red-600 via-red-600 to-rose-700 text-white rounded-xl p-3 sm:p-4 shadow-md border border-red-500 animate-fade-in-up">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0 animate-pulse">
-                <Sparkles size={18} className="text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full text-white">
-                    Leon AI Auto-Pilot (الطيار الآلي)
-                  </span>
-                  <span className="text-[11px] text-white/90 font-bold">
-                    الخطوة {aiAutoPilotStepInfo.currentStep} من {totalSteps}
-                  </span>
-                </div>
-                <p className="text-xs sm:text-sm font-bold text-white mt-0.5">
-                  {aiAutoPilotStepInfo.statusText}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {aiAutoPilotStepInfo.carName && (
-                <span className="text-[11px] bg-black/20 text-white px-2.5 py-1 rounded-md font-semibold border border-white/10">
-                  🚗 {aiAutoPilotStepInfo.carName}
-                </span>
-              )}
-              {aiAutoPilotStepInfo.clientName && (
-                <span className="text-[11px] bg-black/20 text-white px-2.5 py-1 rounded-md font-semibold border border-white/10">
-                  👤 {aiAutoPilotStepInfo.clientName}
-                </span>
-              )}
-              {aiAutoPilotStepInfo.duration && (
-                <span className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-md font-semibold border border-white/10">
-                  📅 {aiAutoPilotStepInfo.duration}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Stepper Header */}
       <div className="bg-card rounded-xl border border-border shadow-2xs p-2.5 sm:p-4 animate-fade-in-up stagger-1">
