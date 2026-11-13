@@ -555,9 +555,58 @@ export async function POST(req: Request) {
       return scored[0].client;
     };
 
+    const isEditDistAtMostOne = (a: string, b: string) => {
+      if (a === b) return true;
+      if (Math.abs(a.length - b.length) > 1) return false;
+      let i = 0;
+      let j = 0;
+      let edits = 0;
+      while (i < a.length && j < b.length) {
+        if (a[i] === b[j]) {
+          i++;
+          j++;
+        } else {
+          edits++;
+          if (edits > 1) return false;
+          if (a.length > b.length) i++;
+          else if (b.length > a.length) j++;
+          else {
+            i++;
+            j++;
+          }
+        }
+      }
+      if (i < a.length || j < b.length) edits++;
+      return edits <= 1;
+    };
+
+    const detectRequestedUnitStatus = (rawQ: string): "Available" | "Rented" | "Maintenance" | null => {
+      const qL = rawQ.toLowerCase();
+      if (/\b(rented|hired|booked|occupied)\b|مستأجر|مستأجرة|مؤجر|مؤجرة|مشغول|مشغولة/i.test(qL)) return "Rented";
+      if (/\b(maintenance|repair|workshop|broken|service)\b|صيانة|ورشة|عطلان/i.test(qL)) return "Maintenance";
+      if (/\b(available|availb\w*|avalab\w*|avialab\w*|avaliab\w*|free|ready|dispo|disponible)\b|متاح|متاحة|متوفر|متوفرة|فاضي|فاضية|جاهز|جاهزة/i.test(qL)) {
+        return "Available";
+      }
+      for (const tok of tokensOf(qL)) {
+        if (tok.length >= 6 && (isEditDistAtMostOne(tok, "available") || isEditDistAtMostOne(tok, "avaliable") || isEditDistAtMostOne(tok, "availble"))) {
+          return "Available";
+        }
+      }
+      return null;
+    };
+
     const findUnitMatches = (q?: string | null) => {
+      const requestedStatus = q ? detectRequestedUnitStatus(q) : null;
       if (!q || q.trim().length < 2) {
-        return { matches: [] as any[], hasExplicitPlate: false, isBrandOnly: false, matchedMakeOrModelOrPlate: false };
+        return {
+          matches: [] as any[],
+          baseMatches: [] as any[],
+          brandMatchesCount: 0,
+          requestedStatus,
+          hasExplicitPlate: false,
+          isBrandOnly: false,
+          matchedMakeOrModelOrPlate: false,
+        };
       }
       const compact = (s: string) => s.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, "");
       const qCompact = compact(q);
@@ -571,23 +620,60 @@ export async function POST(req: Request) {
           return p.length >= 3 && (qCompact.includes(p) || p === qCompact);
         });
         if (plateMatches.length > 0) {
-          return { matches: plateMatches, hasExplicitPlate: true, isBrandOnly: false, matchedMakeOrModelOrPlate: true };
+          return {
+            matches: plateMatches,
+            baseMatches: plateMatches,
+            brandMatchesCount: plateMatches.length,
+            requestedStatus,
+            hasExplicitPlate: true,
+            isBrandOnly: false,
+            matchedMakeOrModelOrPlate: true,
+          };
         }
       }
 
-      // 2. Word-boundary & safe compound token match (prevents "hi" from matching "Lamborghini" or "White")
+      // 2. Word-boundary & safe compound/fuzzy token match (strips status/filter typos like "availbale" & prevents "hi" substring hits)
       const labelNoise = new Set([
-        "plate", "car", "vehicle", "unit", "select", "sleect", "selected", "open", "toopen",
-        "show", "view", "details", "detail", "page", "profile", "find", "search", "check",
-        "of", "for", "the", "about", "please", "with", "so", "what", "need", "want", "is",
+        "plate", "car", "cars", "vehicle", "vehicles", "unit", "units", "model", "models",
+        "select", "sleect", "selected", "open", "toopen", "show", "view", "details", "detail",
+        "page", "profile", "find", "search", "check", "list", "give", "any", "all", "do", "have",
+        "of", "for", "the", "about", "please", "with", "so", "what", "which", "need", "want", "is",
         "are", "was", "were", "this", "that", "these", "those", "my", "your", "our", "can", "you", "me",
+        "available", "availbale", "avalable", "avaliable", "availble", "avialable", "free", "ready",
+        "rented", "hired", "booked", "maintenance", "repair", "out", "service",
         "hi", "hello", "hey", "halo", "yo", "salam", "marhaba", "ahlan", "thanks", "thank", "thx",
         "ok", "okay", "yes", "no", "good", "bad", "nice", "great", "stupid", "tupid", "man", "bro", "sir", "help", "test",
-        "سيارة", "لوحة", "تفاصيل", "افتح", "عرض", "مرحبا", "اهلا", "أهلا", "شكرا", "تمام",
+        "سيارة", "سيارات", "مركبة", "مركبات", "لوحة", "تفاصيل", "افتح", "عرض", "كل", "قائمة",
+        "متاح", "متاحة", "متوفر", "متوفرة", "فاضية", "مستأجر", "مستأجرة", "مؤجر", "مؤجرة", "صيانة",
+        "مرحبا", "اهلا", "أهلا", "شكرا", "تمام",
       ]);
-      const qt = tokensOf(q).filter((t) => !labelNoise.has(t));
+      const isAvailabilityNoiseToken = (t: string) =>
+        labelNoise.has(t) ||
+        Boolean(detectRequestedUnitStatus(t)) ||
+        (t.length >= 6 && (isEditDistAtMostOne(t, "available") || isEditDistAtMostOne(t, "availble")));
+      const qt = tokensOf(q).filter((t) => !isAvailabilityNoiseToken(t));
       if (qt.length === 0) {
-        return { matches: [] as any[], hasExplicitPlate, isBrandOnly: false, matchedMakeOrModelOrPlate: false };
+        if (requestedStatus) {
+          const statusMatches = (allUnits as any[]).filter((u) => u.status === requestedStatus);
+          return {
+            matches: statusMatches,
+            baseMatches: statusMatches,
+            brandMatchesCount: statusMatches.length,
+            requestedStatus,
+            hasExplicitPlate: false,
+            isBrandOnly: false,
+            matchedMakeOrModelOrPlate: false,
+          };
+        }
+        return {
+          matches: [] as any[],
+          baseMatches: [] as any[],
+          brandMatchesCount: 0,
+          requestedStatus,
+          hasExplicitPlate,
+          isBrandOnly: false,
+          matchedMakeOrModelOrPlate: false,
+        };
       }
 
       const isBrandOnly = !hasExplicitPlate && qt.length <= 1;
@@ -605,7 +691,16 @@ export async function POST(req: Request) {
         if (tc.length === 3) {
           return words.some((w) => w === tok || w.startsWith(tok) || compact(w) === tc || compact(w).startsWith(tc));
         }
-        return words.some((w) => w.includes(tok)) || textCompact.includes(tc);
+        if (words.some((w) => w.includes(tok)) || textCompact.includes(tc)) {
+          return true;
+        }
+        if (tc.length >= 5) {
+          return words.some((w) => {
+            const wc = compact(w);
+            return wc.length >= 5 && isEditDistAtMostOne(wc, tc);
+          });
+        }
+        return false;
       };
 
       const hay = (u: any) =>
@@ -618,27 +713,31 @@ export async function POST(req: Request) {
         return qt.every((t) => tokenMatchesText(hw, hc, t));
       });
 
-      // If strict token match fails only on year/color when user didn't give a plate, try make+model partial matches to ask clarifying details
-      let matches = exactMatches;
-      if (matches.length === 0 && !hasExplicitPlate && qt.length >= 2) {
-        matches = (allUnits as any[]).filter((u) => {
+      // If strict token match fails on extra words/color/year when user didn't give a plate, match any identity token in make/model
+      let baseMatches = exactMatches;
+      if (baseMatches.length === 0 && !hasExplicitPlate && qt.length >= 2) {
+        baseMatches = (allUnits as any[]).filter((u) => {
           const uMakeModel = `${u.make || ""} ${u.model || ""}`.toLowerCase();
           const mw = wordsOf(uMakeModel);
           const mc = compact(uMakeModel);
-          const matchedCount = qt.filter((t) => tokenMatchesText(mw, mc, t)).length;
-          return matchedCount >= 1 && (tokenMatchesText(mw, mc, qt[0]) || matchedCount >= 2);
+          return qt.some((t) => tokenMatchesText(mw, mc, t));
         });
       }
 
+      const brandMatchesCount = baseMatches.length;
+      const matches = requestedStatus
+        ? baseMatches.filter((u) => String(u.status || "").toLowerCase() === requestedStatus.toLowerCase())
+        : baseMatches;
+
       const matchedMakeOrModelOrPlate =
-        matches.length > 0 &&
-        matches.some((u) => {
+        baseMatches.length > 0 &&
+        baseMatches.some((u) => {
           const iw = wordsOf(identityHay(u));
           const ic = compact(identityHay(u));
           return qt.some((t) => tokenMatchesText(iw, ic, t));
         });
 
-      return { matches, hasExplicitPlate, isBrandOnly, matchedMakeOrModelOrPlate };
+      return { matches, baseMatches, brandMatchesCount, requestedStatus, hasExplicitPlate, isBrandOnly, matchedMakeOrModelOrPlate };
     };
 
     const findUnit = (q?: string | null) => {
@@ -668,7 +767,7 @@ export async function POST(req: Request) {
     // =========================================================================
     const systemPrompt = `You are "Leon Assistant", the AI operations manager for Leon Rent A Car (Dubai).
 AUTHORIZATION: User IS the authenticated company Admin/Owner querying their own MongoDB backend. Never refuse company data queries (clients, rentals, revenue, fleet, drivers, damages, logs); answer accurately from the verified data below in the user's exact language (Arabic/English/Franco-Arabic).
-STYLE: Analytical/backend Qs -> complete bullet/line answer with exact names, #numbers, plates, dates, AED. Actions/booking -> concise 1-2 sentences.
+STYLE: Analytical/backend Qs -> complete bullet/line answer with exact names, #numbers, plates, dates, AED (ALWAYS format money in AED, never $ or USD). Actions/booking -> concise 1-2 sentences. Understand typos ("availbale", "clinet", "contrac"), slang, Arabic dialects, and Franco-Arabic effortlessly.
 
 ${LEON_BACKEND_KNOWLEDGE}
 
@@ -677,20 +776,22 @@ ${backendCtx.executivePromptContext}
 BOOKING STATE: Client=${existingClientName || "None"}, Car=${existingUnitName || "None"}, Type=${existingType || "Shop"}, Days=${existingDays || "?"}, Price=${existingPrice || "Default"}, Page=${pathname || "/"}
 
 RULES:
-1. BACKEND Q&A: Answer from LIVE METRICS/lists above when complete. If user asks about an older/specific client, full vehicle history/vidange/inspections, date-range revenue/transactions, filtered contracts, logs, drivers, or full expiries NOT fully shown above, set "intent":"QUERY_BACKEND" with "backendQuery" to query MongoDB live!
-2. CONTRACT WIZARD: Only set "intent":"CONTRACT_FLOW" when user wants to CREATE/BOOK/SET UP a new contract (NOT questions like "how many contracts", "rental history", "overdue contracts"). Never invent missing cars; ask plate/year/color when car is bare/ambiguous.
-3. ENTITY INTEGRITY: Use "OPEN_CLIENT_DETAILS"/"OPEN_VEHICLE_DETAILS"/"NAVIGATE" only for open/go/lookup commands, NEVER to hijack analytical questions. Put queried name/plate in "searchQuery"; never guess IDs.
+1. BACKEND Q&A & FULL ACCESS: You have complete read access to every collection in MongoDB (fleet, clients, contracts, drivers, damages, inspections, transactions, logs, expiries, revenue). Answer directly from LIVE METRICS/lists above when complete. When user asks for specific/filtered cars, older clients, full history/vidange/inspections, date-range revenue/transactions, contracts, logs, drivers, or expiries not fully shown above, set "intent":"QUERY_BACKEND" with "backendQuery".
+2. FLEET AVAILABILITY & FILTERING: If user asks for available/rented/maintenance/cheapest/specific cars (e.g. "availbale mercedes", "free bmw", "rented urus", "black cars under 500"), set "intent":"GENERAL_CHAT" (or "QUERY_BACKEND" "fleet_query" if fleet > 100), list ALL matching cars with plate, year, color, status & AED rate, and set "searchQuery" + optional "filterStatus" so clickable car cards appear. NEVER ask for plate number on availability/filter questions!
+3. CONTRACT WIZARD: Only set "intent":"CONTRACT_FLOW" when user wants to CREATE/BOOK/SET UP a new contract (NOT questions like "how many contracts", "rental history", "overdue contracts"). Never invent missing cars; ask plate/year/color when selecting a bare/ambiguous car.
+4. ENTITY INTEGRITY: Use "OPEN_CLIENT_DETAILS"/"OPEN_VEHICLE_DETAILS"/"NAVIGATE" only when user asks to open/go to a page or types ONLY a bare entity name, NEVER to hijack analytical/availability questions. Put queried name/plate in "searchQuery"; never guess IDs.
 
 Return ONLY valid JSON:
 {
   "reply": "string",
   "intent": "QUERY_BACKEND" | "CONTRACT_FLOW" | "OPEN_CLIENT_DETAILS" | "OPEN_VEHICLE_DETAILS" | "OPEN_ADD_CLIENT_MODAL" | "OPEN_ADD_UNIT_MODAL" | "NAVIGATE" | "SEARCH_CLIENT" | "SEARCH_VEHICLE" | "FLEET_OVERVIEW" | "GENERAL_CHAT",
-  "backendQuery": { "queryType": "client_profile"|"vehicle_profile"|"contracts_query"|"transactions_query"|"damages_query"|"inspections_query"|"logs_query"|"drivers_query"|"expiries_check"|"revenue_summary", "search": string|null, "status": string|null, "dateFrom": "YYYY-MM-DD"|null, "dateTo": "YYYY-MM-DD"|null, "limit": number|null } | null,
+  "backendQuery": { "queryType": "fleet_query"|"clients_query"|"client_profile"|"vehicle_profile"|"contracts_query"|"transactions_query"|"damages_query"|"inspections_query"|"logs_query"|"drivers_query"|"expiries_check"|"revenue_summary", "search": string|null, "status": string|null, "dateFrom": "YYYY-MM-DD"|null, "dateTo": "YYYY-MM-DD"|null, "limit": number|null } | null,
   "contractData": { "clientName": string|null, "carName": string|null, "contractType": "Shop"|"Delivery"|"Personalized"|null, "days": number|null, "startDate": "YYYY-MM-DD"|null, "endDate": "YYYY-MM-DD"|null, "checkoutTime": string|null, "totalPrice": number|null, "dailyRate": number|null, "deposit": number|null, "advancePayment": number|null, "paymentMethod": "Cash"|"Card"|"Crypto"|null, "pickupLocation": string|null, "readyToSubmit": boolean },
   "targetUrl": string | null,
   "clientId": string | null,
   "unitId": string | null,
-  "searchQuery": string | null
+  "searchQuery": string | null,
+  "filterStatus": "Available" | "Rented" | "Maintenance" | null
 }`;
 
     const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
@@ -703,17 +804,25 @@ Return ONLY valid JSON:
     ];
 
     // Deterministic Extraction & Question vs Action Classification
+    const detectedQueryStatus = detectRequestedUnitStatus(message);
+    const hasAvailabilityOrFilterWords =
+      Boolean(detectedQueryStatus) ||
+      /\b(availab\w*|availb\w*|avalab\w*|avialab\w*|avaliab\w*|free|ready|rented|booked|maintenance|repair|cheapest|most\s+expensive)\b|متاح|متاحة|متوفر|متوفرة|مستأجر|مستأجرة|فاضي|فاضية|صيانة|أرخص|ارخص|أغلى|اغلى/i.test(
+        lower
+      );
+
     const isAnalyticalQuestion =
       /[?؟]$/.test(message.trim()) ||
-      /\b(who|what|when|where|why|how|which|whom|whose|does|did|do|can|could|tell\s+me|give\s+me|show\s+me|explain|summarize|summary|report|revenue|profit|income|expense|earning|money|overdue|late|unpaid|pending|balance|deposit|damage|damages|inspection|inspections|oil|vidange|mileage|km|insurance|registration|expiry|expired|expire|driver|drivers|log|logs|activity|notification|notifications|alert|alerts|history|spending|spent|total\s+spent|status\s+of|all\s+contracts|past\s+contracts|rental\s+history|rate|price|cost|last\s+time|who\s+rented|how\s+many|how\s+much|workflow)\b/i.test(
+      Boolean(detectedQueryStatus) ||
+      /\b(who|what|when|where|why|how|which|whom|whose|does|did|do|can|could|tell\s+me|give\s+me|show\s+me|explain|summarize|summary|report|revenue|profit|income|expense|earning|money|overdue|late|unpaid|pending|balance|deposit|damage|damages|inspection|inspections|oil|vidange|mileage|km|insurance|registration|expiry|expired|expire|driver|drivers|log|logs|activity|notification|notifications|alert|alerts|history|spending|spent|total\s+spent|status\s+of|all\s+contracts|past\s+contracts|rental\s+history|rate|price|cost|last\s+time|who\s+rented|how\s+many|how\s+much|workflow|availab\w*|availb\w*|avalab\w*|cheapest|expensive)\b/i.test(
         lower
       ) ||
-      /(?:^|\s)(كم|من\s|منو|مين|متى|وين|أين|اين|ليش|لماذا|هل|ما\s+هي|ما\s+هو|ماهي|ماهو|شو|ايش|وش|احسب|لخص|عطني|خبرني|قول\s+لي|اشرح|تقارير|ارباح|أرباح|دخل|مصاريف|فواتير|متأخر|تأخير|أضرار|اضرار|صيانة|الزيت|فيدانج|رخصة|تأمين|سائق|سائقين|تنبيهات|اشعارات|إشعارات|سجل|ملخص|سعر|كيف|غير\s+مدفوع)/.test(
+      /(?:^|\s)(كم|من\s|منو|مين|متى|وين|أين|اين|ليش|لماذا|هل|ما\s+هي|ما\s+هو|ماهي|ماهو|شو|ايش|وش|احسب|لخص|عطني|خبرني|قول\s+لي|اشرح|تقارير|ارباح|أرباح|دخل|مصاريف|فواتير|متأخر|تأخير|أضرار|اضرار|صيانة|الزيت|فيدانج|رخصة|تأمين|سائق|سائقين|تنبيهات|اشعارات|إشعارات|سجل|ملخص|سعر|كيف|غير\s+مدفوع|متاح|متاحة|متوفر|متوفرة|مستأجرة)/.test(
         message
       );
 
     const explicitNavigateToEntity =
-      /\b(open|toopen|to\s*open|go\s*to)\b.*(?:\bpage\b|\bdetails?\b|\bprofile\b)|(?:\bdetails?\b|\bprofile\b|\bpage\b)\s+(?:of|for)\b|افتح\s+(?:صفحة|ملف|تفاصيل)/i.test(
+      /\b(open|toopen|to\s*open|go\s*to)\b.*(?:\bpage\b|\bdetails?\b|\bprofile\b|\bcar\b|\bvehicle\b|\bunit\b|\bclient\b|\bcustomer\b)|(?:\bdetails?\b|\bprofile\b|\bpage\b)\s+(?:of|for)\b|افتح\s+(?:صفحة|ملف|تفاصيل)/i.test(
         lower
       ) && !/\b(history|contracts|spent|spending|overdue|damages)\b|تاريخ|سجل|عقود|متأخر/i.test(lower);
 
@@ -737,8 +846,26 @@ Return ONLY valid JSON:
       !isHowToQuestion &&
       (isCreatingContractPhrase || !isAnalyticalQuestion);
 
+    const mentionsFleetDomain =
+      parseCarDetails(message).isKnownMake ||
+      Boolean(parseCarDetails(message).plate) ||
+      Boolean(detectedQueryStatus) ||
+      /\b(car|cars|vehicle|vehicles|unit|units|fleet|suv|sedan|supercar)\b|سيارة|سيارات|مركبة|الأسطول|اسطول/i.test(lower);
+    const mentionsNonFleetDomain =
+      /\b(revenue|profit|earning|income|overdue|unpaid|balance|damage|damages|client|clients|customer|customers|driver|drivers|inspection|inspections|log|logs|contract|contracts|booking|bookings)\b|عقد|عقود|أرباح|ارباح|إيرادات|متأخر|أضرار|اضرار|عميل|عملاء|سائق/i.test(
+        lower
+      );
+    const isFleetFilterQuery =
+      !hasContractWords &&
+      !isCreatingContractPhrase &&
+      !explicitNavigateToEntity &&
+      hasAvailabilityOrFilterWords &&
+      mentionsFleetDomain &&
+      (!mentionsNonFleetDomain || Boolean(detectedQueryStatus) || parseCarDetails(message).isKnownMake);
+
     const wantsClientDetails =
       !hasContractWords &&
+      !isFleetFilterQuery &&
       (explicitNavigateToEntity || !isAnalyticalQuestion) &&
       (/(?:\bopen\b|\btoopen\b|\bto\s*open\b|\bshow\b|\bview\b|\bfind\b|\bsearch\b|\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b).*(?:\bclient\b|\bclinet\b|\bcustomer\b)|(?:\bclient\b|\bclinet\b|\bcustomer\b).*(?:\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b)|(?:افتح|عرض|تفاصيل|ملف).*(?:عميل|العميل|زبون)/i.test(
         lower
@@ -746,6 +873,7 @@ Return ONLY valid JSON:
 
     const wantsVehicleDetails =
       !hasContractWords &&
+      !isFleetFilterQuery &&
       !/\b(add\s+car|add\s+new\s+car|new\s+car|add\s+vehicle|create\s+car)\b|اضافة\s+سيارة|إضافة\s+سيارة/i.test(lower) &&
       (explicitNavigateToEntity || !isAnalyticalQuestion) &&
       (/(?:\bopen\b|\btoopen\b|\bto\s*open\b|\bshow\b|\bview\b|\bfind\b|\bsearch\b|\bcheck\b|\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b).*(?:\bcar\b|\bvehicle\b|\bunit\b)|(?:\bcar\b|\bvehicle\b|\bunit\b).*(?:\bdetails\b|\bdetail\b|\bprofile\b|\bpage\b)|(?:افتح|عرض|تفاصيل|فحص).*(?:سيارة|السيارة|مركبة)/i.test(
@@ -777,7 +905,7 @@ Return ONLY valid JSON:
     const isFleetQuestion =
       /\b(how many\s+(?:cars|vehicles|units)|list\s+.*(?:cars|vehicles)|available\s+cars|cars\s+(?:are\s+)?available|all\s+cars|fleet\s+status)\b|كم\s+سيارة|السيارات\s+المتاح/i.test(
         lower
-      );
+      ) && !parseCarDetails(message).isKnownMake;
     const carRegex = /(?:\bsleect car\b|\bselect car\b|\bwith car\b|\bwith vehicle\b|\bchoose car\b|\bcar\b\s*:?|سيارة|بسيارة|مركبة)\s+([^\n,]+?)(?=\s+(?:from\s+today|from\s+\d|starting|to\s+\d|too\s+\d|until|for\s+\d+\s*(?:day|days|week|month)|من\s+اليوم|لمدة)|[,\n]|$)/i;
     const carMatch = !isFleetQuestion && !wantsVehicleDetails ? message.match(carRegex) : null;
     const rawExtractedCar = carMatch ? carMatch[1].replace(/^:\s*/, "").trim() : null;
@@ -865,7 +993,7 @@ Return ONLY valid JSON:
             items: (queryResult as any).attachItems.slice(0, 5),
           };
         }
-        const synthesisSystem = `You are Leon Assistant for Leon Rent A Car (Dubai). The user is the authenticated company Admin/Owner. Summarize the verified MongoDB query result below accurately in ${lang === "ar" ? "Arabic" : "English"}. Return ONLY valid JSON: {"reply":"...","intent":"GENERAL_CHAT","targetUrl":null,"searchQuery":null}.`;
+        const synthesisSystem = `You are Leon Assistant for Leon Rent A Car (Dubai). The user is the authenticated company Admin/Owner. Summarize the verified MongoDB query result below accurately in ${lang === "ar" ? "Arabic" : "English"}. Always write monetary amounts in AED (never $ or USD). Return ONLY valid JSON: {"reply":"...","intent":"GENERAL_CHAT","targetUrl":null,"searchQuery":null}.`;
         const synthesisMessages = [
           { role: "system" as const, content: synthesisSystem },
           ...history.slice(-4).map((h) => ({
@@ -1397,26 +1525,48 @@ Return ONLY valid JSON:
       });
     }
 
-    // Handle follow-up plate/details OR bare car-name mentions ONLY when user isn't greeting or asking an analytical question
+    // Handle follow-up plate/details OR pure bare car-name mentions ONLY when user isn't greeting, filtering, or asking an analytical question
     const parsedMsgCar = parseCarDetails(message);
     const matchedUnitsFromMessage =
-      !isGreetingOrSmallTalk && !isAnalyticalQuestion && !usedBackendQuery && !hasContractWords && !wantsClientDetails && !isFleetQuestion
+      !isGreetingOrSmallTalk &&
+      !isAnalyticalQuestion &&
+      !isFleetFilterQuery &&
+      !usedBackendQuery &&
+      !hasContractWords &&
+      !wantsClientDetails &&
+      !isFleetQuestion
         ? findUnitMatches(message)
         : null;
+    const hasBareVehicleCandidate =
+      Boolean(parsedMsgCar.isKnownMake) ||
+      Boolean(parsedMsgCar.plate) ||
+      Boolean(matchedUnitsFromMessage && matchedUnitsFromMessage.matchedMakeOrModelOrPlate);
+    const bareTokens = tokensOf(message);
+    const hasConversationalQuestionOrVerb =
+      /[?؟]/.test(message) ||
+      /\b(who|what|when|where|why|how|which|can|could|would|should|do|does|did|is|are|was|were|have|has|had|tell|give|show|list|find|explain|compare|recommend|suggest|check|price|rate|cost|history|damage|damages|oil|vidange|insurance|expire|overdue|unpaid|revenue|profit|earned|earning|client|customer|contract)\b/i.test(
+        lower
+      );
+    const isPureBareCarInput =
+      hasBareVehicleCandidate &&
+      !isFleetFilterQuery &&
+      !isAnalyticalQuestion &&
+      !hasAvailabilityOrFilterWords &&
+      !hasConversationalQuestionOrVerb &&
+      bareTokens.length >= 1 &&
+      bareTokens.length <= 5;
     const isBareCarOrVehicleDetailsFlow =
       !isGreetingOrSmallTalk &&
       !usedBackendQuery &&
+      !isFleetFilterQuery &&
       (intent === "OPEN_VEHICLE_DETAILS" ||
-        intent === "SEARCH_VEHICLE" ||
-        askedForVehicleDetails ||
+        (!isAnalyticalQuestion && askedForVehicleDetails) ||
         (!hasContractWords &&
           !wantsClientDetails &&
           !isFleetQuestion &&
           !isAnalyticalQuestion &&
           intent === "GENERAL_CHAT" &&
-          (parsedMsgCar.isKnownMake ||
-            Boolean(parsedMsgCar.plate) ||
-            Boolean(matchedUnitsFromMessage && matchedUnitsFromMessage.matchedMakeOrModelOrPlate))));
+          (isPureBareCarInput || (!parsed && hasBareVehicleCandidate))));
 
     if (isBareCarOrVehicleDetailsFlow) {
       let carLookupQuery =
@@ -1589,24 +1739,89 @@ Return ONLY valid JSON:
     }
 
     if (intent === "SEARCH_VEHICLE") {
-      const q = (parsed?.searchQuery || "").toLowerCase();
-      const matched = (allUnits as any[])
-        .filter((u) => !q || u.make?.toLowerCase().includes(q) || u.model?.toLowerCase().includes(q) || u.plate?.toLowerCase().includes(q))
-        .slice(0, 4);
+      const searchQ = parsed?.searchQuery || message;
+      const explicitFilterStatus = parsed?.filterStatus as string | undefined;
+      const fm = findUnitMatches(searchQ);
+      const effectiveStatus = explicitFilterStatus || fm.requestedStatus || detectedQueryStatus;
+      let matched = fm.matches;
+      if (effectiveStatus && !fm.requestedStatus) {
+        matched = matched.filter(
+          (u: any) => String(u.status || "").toLowerCase() === effectiveStatus.toLowerCase()
+        );
+      }
+
+      if (matched.length === 0) {
+        if (fm.brandMatchesCount > 0 && effectiveStatus) {
+          const statusDetails = fm.baseMatches
+            .slice(0, 4)
+            .map((u: any) => `${u.make} ${u.model} (Plate: ${u.plate} — ${u.status})`)
+            .join(" | ");
+          return NextResponse.json<AssistantResponse>({
+            reply:
+              aiReply ||
+              (lang === "ar"
+                ? `يوجد ${fm.brandMatchesCount} سيارة مطابقة لـ "${searchQ}" في الأسطول، لكن لا توجد أي واحدة بحالة "${effectiveStatus}" حالياً${statusDetails ? ` (${statusDetails})` : ""}.`
+                : `We have ${fm.brandMatchesCount} vehicle(s) matching "${searchQ}" in our fleet, but none are currently ${effectiveStatus}${statusDetails ? ` (${statusDetails})` : ""}.`),
+            action: "NONE",
+          });
+        }
+        return NextResponse.json<AssistantResponse>({
+          reply:
+            aiReply ||
+            (lang === "ar"
+              ? `لم أجد سيارات مطابقة لـ "${searchQ}" في الأسطول حالياً.`
+              : `No vehicles matching "${searchQ}" were found in our fleet right now.`),
+          action: "NONE",
+        });
+      }
 
       return NextResponse.json<AssistantResponse>({
         reply: aiReply || (lang === "ar" ? "نتائج البحث في الأسطول:" : "Here are the matching fleet vehicles:"),
         action: "SEARCH_RESULT",
         data: {
           type: "vehicles",
-          items: matched.map((u) => ({
+          items: matched.slice(0, 6).map((u: any) => ({
             id: u._id,
-            title: `${u.make} ${u.model}`,
+            title: `${u.make} ${u.model} (${u.year || "N/A"} • ${u.color || "N/A"})`,
             plate: u.plate,
             status: u.status,
           })),
         },
       });
+    }
+
+    // Attach clickable vehicle cards when AI answered a fleet filter, availability, or brand query in GENERAL_CHAT
+    if (
+      aiReply &&
+      !attachedBackendData &&
+      !isGreetingOrSmallTalk &&
+      !hasContractWords &&
+      (isFleetFilterQuery ||
+        (parsed?.searchQuery &&
+          (parsed?.filterStatus || parseCarDetails(String(parsed.searchQuery)).isKnownMake)))
+    ) {
+      const explicitFilterStatus = (parsed?.filterStatus as string | undefined) || detectedQueryStatus;
+      const cardQuery = parsed?.searchQuery
+        ? `${parsed.searchQuery}${explicitFilterStatus ? ` ${explicitFilterStatus}` : ""}`
+        : message;
+      const fm = findUnitMatches(cardQuery);
+      let matched = fm.matches;
+      if (explicitFilterStatus && !fm.requestedStatus) {
+        matched = matched.filter(
+          (u: any) => String(u.status || "").toLowerCase() === explicitFilterStatus.toLowerCase()
+        );
+      }
+      if (matched.length > 0 && (fm.matchedMakeOrModelOrPlate || isFleetFilterQuery)) {
+        attachedBackendData = {
+          type: "vehicles",
+          items: matched.slice(0, 6).map((u: any) => ({
+            id: u._id,
+            title: `${u.make} ${u.model} (${u.year || "N/A"} • ${u.color || "N/A"})`,
+            plate: u.plate,
+            status: u.status,
+          })),
+        };
+      }
     }
 
     // Smart Backend Q&A Fallback when AI provider is offline or returned empty
@@ -1616,6 +1831,52 @@ Return ONLY valid JSON:
           lang === "ar"
             ? `أهلاً بك! لدينا حالياً ${availableUnits}/${totalUnits} سيارة متاحة و${activeContractsCount} عقد نشط. كيف أساعدك اليوم؟`
             : `Hi! We currently have ${availableUnits}/${totalUnits} vehicles available and ${activeContractsCount} active contracts. How can I help you today?`;
+      } else if (isFleetFilterQuery) {
+        const fm = findUnitMatches(message);
+        const effStatus = fm.requestedStatus || detectedQueryStatus;
+        if (fm.matches.length > 0) {
+          const previewList = fm.matches
+            .slice(0, 6)
+            .map(
+              (u: any) =>
+                `- **${u.make} ${u.model}** (${u.year || "N/A"}, ${u.color || "N/A"}) — Plate: **${u.plate}** | ${u.status} | AED ${u.dailyRate || 85}/day`
+            )
+            .join("\n");
+          aiReply =
+            lang === "ar"
+              ? `وجدت ${fm.matches.length} سيارة${effStatus ? ` (${effStatus === "Available" ? "متاحة" : effStatus === "Rented" ? "مؤجرة" : "في الصيانة"})` : ""}:\n${previewList}`
+              : `Found ${fm.matches.length} matching vehicle(s)${effStatus ? ` (${effStatus})` : ""}:\n${previewList}`;
+          attachedBackendData = {
+            type: "vehicles",
+            items: fm.matches.slice(0, 6).map((u: any) => ({
+              id: u._id,
+              title: `${u.make} ${u.model} (${u.year || "N/A"} • ${u.color || "N/A"})`,
+              plate: u.plate,
+              status: u.status,
+            })),
+          };
+        } else if (fm.brandMatchesCount > 0 && effStatus) {
+          const statusDetails = fm.baseMatches
+            .slice(0, 4)
+            .map((u: any) => `${u.make} ${u.model} (Plate: ${u.plate} — ${u.status})`)
+            .join(" | ");
+          aiReply =
+            lang === "ar"
+              ? `يوجد ${fm.brandMatchesCount} سيارة مطابقة في الأسطول، لكن لا توجد أي واحدة بحالة ${effStatus} حالياً${statusDetails ? ` (${statusDetails})` : ""}.`
+              : `We have ${fm.brandMatchesCount} matching vehicle(s) in our fleet, but none are currently ${effStatus}${statusDetails ? ` (${statusDetails})` : ""}.`;
+        } else {
+          const fallbackPool = (allUnits as any[]).filter((u) =>
+            effStatus ? u.status === effStatus : u.status === "Available"
+          );
+          const availPreview = fallbackPool
+            .slice(0, 5)
+            .map((u: any) => `${u.make} ${u.model} (Plate: ${u.plate} • AED ${u.dailyRate || 85}/day)`)
+            .join(" | ");
+          aiReply =
+            lang === "ar"
+              ? `لم أجد سيارات مطابقة تماماً لطلبك. ${effStatus || "المتاح"} حالياً (${fallbackPool.length}): ${availPreview || "لا يوجد"}`
+              : `I couldn't find a matching vehicle for that filter in our fleet. Currently ${effStatus || "Available"} (${fallbackPool.length}): ${availPreview || "None"}.`;
+        }
       } else if (/\b(revenue|income|profit|earning|money)\b|ارباح|أرباح|دخل|ايرادات|إيرادات/i.test(lower)) {
         aiReply =
           lang === "ar"

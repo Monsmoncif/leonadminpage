@@ -22,6 +22,8 @@ LEON RENT A CAR BACKEND & BUSINESS RULES:
 
 export interface BackendQuerySpec {
   queryType:
+    | "fleet_query"
+    | "clients_query"
     | "client_profile"
     | "vehicle_profile"
     | "contracts_query"
@@ -439,7 +441,7 @@ export async function getRichBackendContext(forceRefresh = false): Promise<RichB
     return (order[a.status] ?? 4) - (order[b.status] ?? 4);
   });
   const unitsSummary = sortedUnits
-    .slice(0, 50)
+    .slice(0, 100)
     .map((u) => {
       const kmInfo = u.mileage ? `|KM:${u.mileage}` : "";
       return `- ${u.make} ${u.model}(${u.year || "?"},${u.color || "?"})|${u.plate}|${u.status}|AED ${u.dailyRate || 0}/d${kmInfo}`;
@@ -538,7 +540,7 @@ LIVE METRICS (${now.toISOString().split("T")[0]}):
 - Net Revenue: Month AED ${kpis.revenueThisMonth.toLocaleString("en-US")} | LastMo AED ${kpis.revenueLastMonth.toLocaleString("en-US")} | AllTime AED ${kpis.revenueAllTime.toLocaleString("en-US")} | Tx In AED ${kpis.transactionIncome.toLocaleString("en-US")} / Out AED ${kpis.transactionExpense.toLocaleString("en-US")}
 - Pending Damages: ${kpis.pendingDamagesCount} (AED ${kpis.pendingDamagesCost.toLocaleString("en-US")}) | Unread Alerts: ${kpis.unreadNotificationsCount}
 
-FLEET (${Math.min(50, sortedUnits.length)}/${totalUnits}):
+FLEET (${Math.min(100, sortedUnits.length)}/${totalUnits}):
 ${unitsSummary || "None"}
 
 RECENT CLIENTS (${Math.min(20, (allClients as any[]).length)}/${totalClientsCount}):
@@ -580,6 +582,94 @@ export async function executeBackendQuery(spec: BackendQuerySpec) {
   const dbReady = mongoose.connection.readyState === 1;
 
   switch (spec.queryType) {
+    case "fleet_query": {
+      const filter: any = {};
+      if (spec.status) {
+        filter.status = new RegExp(`^${escapeRx(spec.status)}$`, "i");
+      }
+      if (rx) {
+        filter.$or = [
+          { make: rx },
+          { model: rx },
+          { plate: rx },
+          { color: rx },
+          { fuelType: rx },
+          { transmission: rx },
+        ];
+      }
+      const units = await Unit.find(filter)
+        .select("make model plate year color status dailyRate dailyKmLimit mileage fuelType transmission capacity")
+        .sort({ status: 1, make: 1, model: 1 })
+        .limit(limit)
+        .lean();
+
+      return {
+        count: units.length,
+        vehicles: (units as any[]).map((u) => ({
+          id: u._id,
+          title: `${u.make} ${u.model}`,
+          year: u.year,
+          color: u.color,
+          plate: u.plate,
+          status: u.status,
+          dailyRate: u.dailyRate,
+          dailyKmLimit: u.dailyKmLimit,
+          mileage: u.mileage,
+        })),
+        attachType: "vehicles" as const,
+        attachItems: (units as any[]).map((u) => ({
+          id: u._id,
+          title: `${u.make} ${u.model} (${u.year || "N/A"} • ${u.color || "N/A"})`,
+          plate: u.plate,
+          status: u.status,
+        })),
+      };
+    }
+
+    case "clients_query": {
+      const filter: any = {};
+      if (spec.status) {
+        if (/b2b|b2c/i.test(spec.status)) {
+          filter.customerType = new RegExp(`^${escapeRx(spec.status)}$`, "i");
+        } else {
+          filter.status = new RegExp(`^${escapeRx(spec.status)}$`, "i");
+        }
+      }
+      if (rx) {
+        filter.$or = [
+          { name: rx },
+          { phone: rx },
+          { companyName: rx },
+          { email: rx },
+          { nationality: rx },
+        ];
+      }
+      const clients = await Client.find(filter)
+        .select("name companyName customerType clientType phone email nationality status")
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .lean();
+
+      return {
+        count: clients.length,
+        clients: (clients as any[]).map((c) => ({
+          id: c._id,
+          name: c.name,
+          companyName: c.companyName,
+          customerType: c.customerType,
+          phone: c.phone,
+          nationality: c.nationality,
+          status: c.status,
+        })),
+        attachType: "clients" as const,
+        attachItems: (clients as any[]).map((c) => ({
+          id: c._id,
+          name: c.name,
+          phone: c.phone || "N/A",
+        })),
+      };
+    }
+
     case "client_profile": {
       if (!rx) return { summary: "No client search term provided.", records: [] };
       const clients = await Client.find({
