@@ -9,7 +9,7 @@ import { User } from "@/models/User";
 import { Log } from "@/models/Log";
 import { Notification } from "@/models/Notification";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { sendDriverTaskNotification } from "@/lib/contract-notifications";
 
 export async function POST(

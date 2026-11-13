@@ -40,227 +40,193 @@ const emptyResponse = {
 export async function GET(request: Request) {
   try {
     await connectDB();
+    void User;
     await syncUnitStatuses();
 
     // Date calculations for changes (This month vs Last month)
     const { searchParams } = new URL(request.url);
     const yearParam = searchParams.get("year");
-    const selectedYear = yearParam ? parseInt(yearParam) : new Date().getFullYear();
+    const selectedYear = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
 
     const now = new Date();
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-
-    // Run all queries in parallel for speed
-    const [
-      totalUnits,
-      availableUnits,
-      rentedUnits,
-      maintenanceUnits,
-      totalClients,
-      totalDrivers,
-      totalContracts,
-      activeContracts,
-      completedContracts,
-      cancelledContracts,
-      overdueContracts,
-      recentContracts,
-      recentActivity,
-      
-      // Historical data for percentage changes
-      clientsThisMonth,
-      clientsLastMonth,
-      unitsThisMonth,
-      unitsLastMonth,
-      contractsThisMonth,
-      contractsLastMonth,
-    ] = await Promise.all([
-      Unit.countDocuments(),
-      Unit.countDocuments({ status: "Available" }),
-      Unit.countDocuments({ status: "Rented" }),
-      Unit.countDocuments({ status: "Maintenance" }),
-      Client.countDocuments(),
-      Driver.countDocuments(),
-      Contract.countDocuments(),
-      Contract.countDocuments({ status: "Active" }),
-      Contract.countDocuments({ status: "Completed" }),
-      Contract.countDocuments({ status: "Cancelled" }),
-      Contract.countDocuments({ status: "Active", endDate: { $lt: new Date() } }),
-      Contract.find()
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select("contractNumber status totalAmount createdAt startDate endDate customer personalizedPersonName clientId unitId driverId deliveryDriverId returnDriverId")
-        .populate("clientId", "name")
-        .populate("unitId", "make model plate")
-        .populate("driverId", "name")
-        .lean(),
-      Contract.find()
-        .sort({ createdAt: -1 })
-        .limit(4)
-        .select("contractNumber status totalAmount createdAt customer personalizedPersonName clientId unitId")
-        .populate("clientId", "name")
-        .populate("unitId", "make model plate")
-        .lean(),
-        
-      // For changes
-      Client.countDocuments({ createdAt: { $gte: startOfThisMonth } }),
-      Client.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }),
-      Unit.countDocuments({ createdAt: { $gte: startOfThisMonth } }),
-      Unit.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }),
-      Contract.countDocuments({ createdAt: { $gte: startOfThisMonth } }),
-      Contract.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }),
-    ]);
-
     const startOfSelectedYear = new Date(selectedYear, 0, 1);
     const endOfSelectedYear = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
 
-    // Run all dashboard revenue, chart, and upcoming return queries in parallel
-    const [
-      revenueThisMonthResult,
-      revenueLastMonthResult,
-      totalRevenueResult,
-      contractsPerMonth,
-      revenuePerMonth,
-      mostRented,
-      upcomingReturnsRaw,
-    ] = await Promise.all([
-      Contract.aggregate([
-        {
-          $match: {
-            contractType: { $ne: "Personalized" },
-            personalizedPersonName: { $in: [null, ""] },
-            $or: [
-              { status: "Completed", updatedAt: { $gte: startOfThisMonth } },
-              { status: "Active", startDate: { $gte: startOfThisMonth } }
-            ]
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: {
-              $sum: {
-                $max: [
-                  0,
-                  { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] }
-                ]
-              }
-            }
-          }
-        },
-      ]),
-      Contract.aggregate([
-        {
-          $match: {
-            contractType: { $ne: "Personalized" },
-            personalizedPersonName: { $in: [null, ""] },
-            $or: [
-              { status: "Completed", updatedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } },
-              { status: "Active", startDate: { $gte: startOfLastMonth, $lte: endOfLastMonth } }
-            ]
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: {
-              $sum: {
-                $max: [
-                  0,
-                  { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] }
-                ]
-              }
-            }
-          }
-        },
-      ]),
-      Contract.aggregate([
-        {
-          $match: {
-            contractType: { $ne: "Personalized" },
-            personalizedPersonName: { $in: [null, ""] },
-            status: { $in: ["Active", "Completed"] }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: {
-              $sum: {
-                $max: [
-                  0,
-                  { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] }
-                ]
-              }
-            }
-          }
-        },
-      ]),
-      Contract.aggregate([
-        {
-          $match: {
-            createdAt: { $gte: startOfSelectedYear, $lte: endOfSelectedYear }
-          }
-        },
-        {
-          $group: {
-            _id: { $month: "$createdAt" },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { _id: 1 } },
-      ]),
-      Contract.aggregate([
-        {
-          $match: {
-            contractType: { $ne: "Personalized" },
-            personalizedPersonName: { $in: [null, ""] },
-            status: { $in: ["Active", "Completed"] }
-          }
-        },
-        {
-          $group: {
-            _id: { $month: "$createdAt" },
-            revenue: {
-              $sum: {
-                $max: [
-                  0,
-                  { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] }
-                ]
-              }
+    const netRevenueExpr = {
+      $sum: {
+        $max: [
+          0,
+          { $subtract: [{ $ifNull: ["$totalAmount", 0] }, { $ifNull: ["$damageCharge", 0] }] },
+        ],
+      },
+    };
+
+    // Execute just 6 parallel queries instead of 26 to stay fast and avoid connection-pool pressure
+    const [unitFacetRes, clientFacetRes, totalDrivers, contractFacetRes, recentActivity, upcomingReturnsRaw] =
+      await Promise.all([
+        Unit.aggregate([
+          {
+            $facet: {
+              total: [{ $count: "count" }],
+              byStatus: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
+              thisMonth: [{ $match: { createdAt: { $gte: startOfThisMonth } } }, { $count: "count" }],
+              lastMonth: [
+                { $match: { createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } } },
+                { $count: "count" },
+              ],
             },
           },
-        },
-        { $sort: { _id: 1 } },
-      ]),
-      Contract.aggregate([
-        {
-          $group: {
-            _id: "$unitId",
-            count: { $sum: 1 },
+        ]),
+        Client.aggregate([
+          {
+            $facet: {
+              total: [{ $count: "count" }],
+              thisMonth: [{ $match: { createdAt: { $gte: startOfThisMonth } } }, { $count: "count" }],
+              lastMonth: [
+                { $match: { createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } } },
+                { $count: "count" },
+              ],
+            },
           },
-        },
-        { $sort: { count: -1 } },
-        { $limit: 4 },
-        {
-          $lookup: {
-            from: "units",
-            localField: "_id",
-            foreignField: "_id",
-            as: "unit",
+        ]),
+        Driver.countDocuments(),
+        Contract.aggregate([
+          {
+            $facet: {
+              total: [{ $count: "count" }],
+              byStatus: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
+              overdue: [
+                { $match: { status: "Active", endDate: { $lt: now } } },
+                { $count: "count" },
+              ],
+              thisMonthCount: [{ $match: { createdAt: { $gte: startOfThisMonth } } }, { $count: "count" }],
+              lastMonthCount: [
+                { $match: { createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } } },
+                { $count: "count" },
+              ],
+              revenueThisMonth: [
+                {
+                  $match: {
+                    contractType: { $ne: "Personalized" },
+                    personalizedPersonName: { $in: [null, ""] },
+                    $or: [
+                      { status: "Completed", updatedAt: { $gte: startOfThisMonth } },
+                      { status: "Active", startDate: { $gte: startOfThisMonth } },
+                    ],
+                  },
+                },
+                { $group: { _id: null, total: netRevenueExpr } },
+              ],
+              revenueLastMonth: [
+                {
+                  $match: {
+                    contractType: { $ne: "Personalized" },
+                    personalizedPersonName: { $in: [null, ""] },
+                    $or: [
+                      { status: "Completed", updatedAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } },
+                      { status: "Active", startDate: { $gte: startOfLastMonth, $lte: endOfLastMonth } },
+                    ],
+                  },
+                },
+                { $group: { _id: null, total: netRevenueExpr } },
+              ],
+              totalRevenue: [
+                {
+                  $match: {
+                    contractType: { $ne: "Personalized" },
+                    personalizedPersonName: { $in: [null, ""] },
+                    status: { $in: ["Active", "Completed"] },
+                  },
+                },
+                { $group: { _id: null, total: netRevenueExpr } },
+              ],
+              contractsPerMonth: [
+                { $match: { createdAt: { $gte: startOfSelectedYear, $lte: endOfSelectedYear } } },
+                { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+                { $sort: { _id: 1 } },
+              ],
+              revenuePerMonth: [
+                {
+                  $match: {
+                    contractType: { $ne: "Personalized" },
+                    personalizedPersonName: { $in: [null, ""] },
+                    status: { $in: ["Active", "Completed"] },
+                  },
+                },
+                { $group: { _id: { $month: "$createdAt" }, revenue: netRevenueExpr } },
+                { $sort: { _id: 1 } },
+              ],
+              mostRented: [
+                { $group: { _id: "$unitId", count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+                { $limit: 4 },
+                {
+                  $lookup: {
+                    from: "units",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "unit",
+                  },
+                },
+                { $unwind: { path: "$unit", preserveNullAndEmptyArrays: true } },
+              ],
+            },
           },
-        },
-        { $unwind: { path: "$unit", preserveNullAndEmptyArrays: true } },
-      ]),
-      Contract.find({ status: "Active" })
-        .sort({ endDate: 1 })
-        .limit(4)
-        .select("contractNumber endDate clientId unitId")
-        .populate("clientId", "name")
-        .populate("unitId", "make model plate")
-        .lean(),
-    ]);
+        ]),
+        Contract.find()
+          .sort({ createdAt: -1 })
+          .limit(4)
+          .select("contractNumber status totalAmount createdAt customer personalizedPersonName clientId unitId")
+          .populate({ path: "clientId", select: "name", strictPopulate: false })
+          .populate({ path: "unitId", select: "make model plate", strictPopulate: false })
+          .lean(),
+        Contract.find({ status: "Active" })
+          .sort({ endDate: 1 })
+          .limit(4)
+          .select("contractNumber endDate clientId unitId")
+          .populate({ path: "clientId", select: "name", strictPopulate: false })
+          .populate({ path: "unitId", select: "make model plate", strictPopulate: false })
+          .lean(),
+      ]);
+
+    const uFacet = unitFacetRes[0] || {};
+    const cFacet = clientFacetRes[0] || {};
+    const kFacet = contractFacetRes[0] || {};
+
+    const unitStatusMap = new Map<string, number>(
+      (uFacet.byStatus || []).map((s: any) => [s._id, s.count || 0])
+    );
+    const contractStatusMap = new Map<string, number>(
+      (kFacet.byStatus || []).map((s: any) => [s._id, s.count || 0])
+    );
+
+    const totalUnits = uFacet.total?.[0]?.count || 0;
+    const availableUnits = unitStatusMap.get("Available") || 0;
+    const rentedUnits = unitStatusMap.get("Rented") || 0;
+    const maintenanceUnits = unitStatusMap.get("Maintenance") || 0;
+    const unitsThisMonth = uFacet.thisMonth?.[0]?.count || 0;
+    const unitsLastMonth = uFacet.lastMonth?.[0]?.count || 0;
+
+    const totalClients = cFacet.total?.[0]?.count || 0;
+    const clientsThisMonth = cFacet.thisMonth?.[0]?.count || 0;
+    const clientsLastMonth = cFacet.lastMonth?.[0]?.count || 0;
+
+    const totalContracts = kFacet.total?.[0]?.count || 0;
+    const activeContracts = contractStatusMap.get("Active") || 0;
+    const completedContracts = contractStatusMap.get("Completed") || 0;
+    const overdueContracts = kFacet.overdue?.[0]?.count || 0;
+    const contractsThisMonth = kFacet.thisMonthCount?.[0]?.count || 0;
+    const contractsLastMonth = kFacet.lastMonthCount?.[0]?.count || 0;
+
+    const revenueThisMonthResult = kFacet.revenueThisMonth || [];
+    const revenueLastMonthResult = kFacet.revenueLastMonth || [];
+    const totalRevenueResult = kFacet.totalRevenue || [];
+    const contractsPerMonth = kFacet.contractsPerMonth || [];
+    const revenuePerMonth = kFacet.revenuePerMonth || [];
+    const mostRented = kFacet.mostRented || [];
 
     const revenueThisMonth = revenueThisMonthResult.length > 0 ? revenueThisMonthResult[0].total : 0;
     const revenueLastMonth = revenueLastMonthResult.length > 0 ? revenueLastMonthResult[0].total : 0;

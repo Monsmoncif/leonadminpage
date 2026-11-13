@@ -1,29 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { generateContractPdfFromPrintUrl, generateContractPdf, clearPdfJobs } from "@/lib/pdf-generator";
+import { generateContractPdfFromPrintUrl, generateContractPdf } from "@/lib/pdf-generator";
 import connectDB from "@/lib/db";
 import { Contract } from "@/models/Contract";
 import { Client } from "@/models/Client";
 import { Unit } from "@/models/Unit";
 import { formatDateDMY } from "@/lib/date-utils";
 import { isResidentClient } from "@/lib/client-utils";
-
-// In-memory cache for fast repeated and prefetched downloads
-export const pdfCache = new Map<string, { buffer: Buffer; updatedAt?: string; clientUpdatedAt?: string; unitUpdatedAt?: string; timestamp: number }>();
-export const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-export function clearPdfCache(contractId?: string) {
-  if (contractId) {
-    pdfCache.delete(contractId);
-    clearPdfJobs(contractId);
-    console.log(`[PdfCache] Cleared PDF cache and jobs for contract ${contractId}`);
-  } else {
-    pdfCache.clear();
-    clearPdfJobs();
-    console.log("[PdfCache] Cleared all PDF cache and jobs");
-  }
-}
+import { pdfCache, CACHE_TTL_MS, clearPdfCache } from "@/lib/pdf-cache";
 
 export async function GET(
   req: Request,

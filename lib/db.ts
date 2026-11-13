@@ -44,7 +44,7 @@ async function connectDB(): Promise<typeof mongoose> {
       socketTimeoutMS: 45000,
       connectTimeoutMS: 15000,
       maxPoolSize: 10,
-      minPoolSize: 2,
+      minPoolSize: 0,
       retryWrites: true,
       retryReads: true,
     };

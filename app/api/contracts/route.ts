@@ -11,7 +11,7 @@ import { Notification } from "@/models/Notification";
 import { User } from "@/models/User";
 import nodemailer from "nodemailer";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { sendClientContractNotification, sendDriverTaskNotification, sendHandoverReminderNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
 import { formatDateWords, calculateRentalDays } from "@/lib/date-utils";

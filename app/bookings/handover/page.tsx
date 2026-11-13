@@ -44,7 +44,7 @@ const STEPS = [
   { id: 4, title: "Sign & Review", icon: PenTool },
 ];
 
-export const formatTimeDisplay = (rawTime?: string): string => {
+const formatTimeDisplay = (rawTime?: string): string => {
   if (!rawTime || typeof rawTime !== "string") return "8:00 AM";
   const trimmed = rawTime.trim();
   if (!trimmed || trimmed.toLowerCase() === "pending handover") return "Pending Handover";

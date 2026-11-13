@@ -4,8 +4,7 @@ import connectDB from "@/lib/db";
 import { Client } from "@/models/Client";
 import { Contract } from "@/models/Contract";
 import { Unit } from "@/models/Unit";
-import { clearPdfCache } from "@/app/api/contracts/[id]/pdf/route";
-import { clearConsentPdfCache } from "@/app/api/contracts/[id]/consent-pdf/route";
+import { clearPdfCache, clearConsentPdfCache } from "@/lib/pdf-cache";
 
 export async function GET(
   req: NextRequest,

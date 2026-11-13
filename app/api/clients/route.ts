@@ -34,19 +34,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ clients, stats });
   } catch (error: any) {
-    console.warn(
-      "Clients API: MongoDB not available, returning empty data.",
-      error.message
+    console.error("Clients API error:", error.message);
+    return NextResponse.json(
+      { error: "Failed to load clients data", message: error.message },
+      { status: 500 }
     );
-    return NextResponse.json({
-      clients: [],
-      stats: {
-        totalCustomers: 0,
-        newThisMonth: 0,
-        activeRentals: 0,
-        blacklisted: 0,
-      },
-    });
   }
 }
 

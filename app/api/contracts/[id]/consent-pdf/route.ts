@@ -7,16 +7,7 @@ import { Client } from "@/models/Client";
 import { buildPrivacyConsentHtml } from "@/lib/privacy-consent-template";
 import puppeteer from "puppeteer-core";
 import fs from "fs";
-
-const consentPdfCache = new Map<string, { buffer: Buffer; updatedAt?: string; timestamp: number }>();
-
-export function clearConsentPdfCache(contractId?: string) {
-  if (contractId) {
-    consentPdfCache.delete(contractId);
-  } else {
-    consentPdfCache.clear();
-  }
-}
+import { consentPdfCache } from "@/lib/pdf-cache";
 
 function getBrowserExecutablePath(): string | null {
   const possiblePaths = [

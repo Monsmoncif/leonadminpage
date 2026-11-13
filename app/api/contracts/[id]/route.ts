@@ -12,11 +12,10 @@ import { Notification } from "@/models/Notification";
 import { Inspection } from "@/models/Inspection";
 import nodemailer from "nodemailer";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { sendClientContractNotification, sendDriverTaskNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
-import { clearPdfCache } from "@/app/api/contracts/[id]/pdf/route";
-import { clearConsentPdfCache } from "@/app/api/contracts/[id]/consent-pdf/route";
+import { clearPdfCache, clearConsentPdfCache } from "@/lib/pdf-cache";
 import { calculateRentalDays } from "@/lib/date-utils";
 
 export async function GET(

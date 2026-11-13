@@ -119,8 +119,15 @@ export default function Dashboard() {
 
     try {
       const res = await fetch(`/api/dashboard?year=${year}`, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`Failed to fetch dashboard data (${res.status})`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        const detail = errBody?.message || errBody?.error;
+        throw new Error(detail ? `Failed to fetch dashboard data (${res.status}): ${detail}` : `Failed to fetch dashboard data (${res.status})`);
+      }
       const json = await res.json();
+      if (!json?.stats) {
+        throw new Error("Invalid dashboard response payload");
+      }
       setData(json);
       setClientCache(`dashboard_${year}`, json);
       setError(null);

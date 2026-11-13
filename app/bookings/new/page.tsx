@@ -112,7 +112,7 @@ const PERSONALIZED_STEPS = [
   { id: 3, title: "Dates & Sign", icon: Calendar },
 ];
 
-export function NewRentalAdminPageContent() {
+function NewRentalAdminPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const contractId = searchParams.get("contractId") || searchParams.get("edit");

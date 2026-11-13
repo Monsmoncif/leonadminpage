@@ -6,7 +6,7 @@ import { Contract } from "@/models/Contract";
 import { Client } from "@/models/Client";
 import { Driver } from "@/models/Driver";
 import { syncUnitStatuses } from "@/lib/unit-status";
-import { clearPdfCache } from "@/app/api/contracts/[id]/pdf/route";
+import { clearPdfCache } from "@/lib/pdf-cache";
 import mongoose from "mongoose";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
