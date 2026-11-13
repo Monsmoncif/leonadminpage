@@ -463,8 +463,11 @@ export async function POST(req: Request) {
       "open", "toopen", "show", "view", "get", "find", "search", "details", "detail",
       "profile", "page", "client", "clinet", "customer", "of", "for", "named", "name",
       "the", "about", "please", "me", "check", "look", "up", "so", "what", "need", "want",
-      "is", "to", "hi", "hello", "hey", "can", "you", "give",
+      "is", "to", "hi", "hello", "hey", "halo", "yo", "salam", "thanks", "thank", "ok", "okay",
+      "can", "you", "give", "this", "that", "good", "nice", "great", "man", "bro", "sir",
+      "stupid", "tupid", "bad", "help",
       "افتح", "عرض", "ملف", "تفاصيل", "صفحة", "العميل", "عميل", "عن", "ابحث",
+      "مرحبا", "اهلا", "أهلا", "شكرا", "تمام",
     ]);
 
     const cleanClientQuery = (q?: string | null) => {
@@ -478,7 +481,8 @@ export async function POST(req: Request) {
     const scoreClientList = (clientsList: any[], q?: string | null) => {
       if (!q || q.trim().length < 2) return [];
       const cleaned = cleanClientQuery(q);
-      const effectiveQ = cleaned || q.toLowerCase().trim();
+      const effectiveQ = cleaned;
+      if (!effectiveQ) return [];
       const qt = tokensOf(effectiveQ);
       const qDigits = q.replace(/\D/g, "");
 
@@ -493,15 +497,18 @@ export async function POST(req: Request) {
           score = 1000;
         } else if (qDigits.length >= 6 && cDigits.includes(qDigits)) {
           score = 900;
-        } else if (qt.length > 0 && qt.every((t) => cNameRaw.includes(t))) {
+        } else if (
+          qt.length > 0 &&
+          qt.every((t) => (t.length <= 2 ? ct.includes(t) : cNameRaw.includes(t)))
+        ) {
           score = 500 + qt.length * 20;
-        } else if (ct.length >= 2 && qt.length >= 2 && ct.every((t) => qt.some((qtTok) => qtTok === t || t.includes(qtTok)))) {
+        } else if (ct.length >= 2 && qt.length >= 2 && ct.every((t) => qt.some((qtTok) => qtTok === t || (qtTok.length >= 3 && t.includes(qtTok))))) {
           // Bidirectional: DB client name ("ourci ahmed") is a full subset of longer query ("ourci ahmed mouncif")
           score = 420 + ct.length * 20;
         } else if (qt.length > 0 && ct.length > 0) {
           let overlap = 0;
           for (const t of qt) {
-            if (ct.some((ctTok) => ctTok === t || ctTok.includes(t) || (ctTok.length >= 3 && t.includes(ctTok)))) {
+            if (ct.some((ctTok) => ctTok === t || (t.length >= 3 && ctTok.includes(t)) || (ctTok.length >= 3 && t.includes(ctTok)))) {
               overlap++;
             }
           }
@@ -524,7 +531,7 @@ export async function POST(req: Request) {
       // Direct DB fallback if not in cached top 500
       if (scored.length === 0) {
         const cleaned = cleanClientQuery(q);
-        const qt = tokensOf(cleaned || q).filter((t) => t.length >= 2);
+        const qt = tokensOf(cleaned).filter((t) => t.length >= 2);
         if (qt.length > 0) {
           const dbMatches = await Client.find({
             $or: qt.map((t) => ({ name: { $regex: escapeRegex(t), $options: "i" } })),
@@ -550,57 +557,88 @@ export async function POST(req: Request) {
 
     const findUnitMatches = (q?: string | null) => {
       if (!q || q.trim().length < 2) {
-        return { matches: [] as any[], hasExplicitPlate: false, isBrandOnly: false };
+        return { matches: [] as any[], hasExplicitPlate: false, isBrandOnly: false, matchedMakeOrModelOrPlate: false };
       }
       const compact = (s: string) => s.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, "");
       const qCompact = compact(q);
       const parsedDetails = parseCarDetails(q);
-      let hasExplicitPlate = Boolean(parsedDetails.plate);
+      const hasExplicitPlate = Boolean(parsedDetails.plate);
 
-      // 1. Exact/contained Plate Number match (strongest identifier)
-      if (qCompact.length >= 3) {
+      // 1. Exact/contained Plate Number match (strongest identifier; ignore short conversational words)
+      if (qCompact.length >= 3 && !/^[a-z]+$/.test(qCompact)) {
         const plateMatches = (allUnits as any[]).filter((u) => {
           const p = compact(u.plate || "");
           return p.length >= 3 && (qCompact.includes(p) || p === qCompact);
         });
         if (plateMatches.length > 0) {
-          return { matches: plateMatches, hasExplicitPlate: true, isBrandOnly: false };
+          return { matches: plateMatches, hasExplicitPlate: true, isBrandOnly: false, matchedMakeOrModelOrPlate: true };
         }
       }
 
-      // 2. Token match across make, model, plate, year, color + compact match ("RS Q3" <-> "Rsq3")
+      // 2. Word-boundary & safe compound token match (prevents "hi" from matching "Lamborghini" or "White")
       const labelNoise = new Set([
         "plate", "car", "vehicle", "unit", "select", "sleect", "selected", "open", "toopen",
         "show", "view", "details", "detail", "page", "profile", "find", "search", "check",
         "of", "for", "the", "about", "please", "with", "so", "what", "need", "want", "is",
-        "سيارة", "لوحة", "تفاصيل", "افتح", "عرض",
+        "are", "was", "were", "this", "that", "these", "those", "my", "your", "our", "can", "you", "me",
+        "hi", "hello", "hey", "halo", "yo", "salam", "marhaba", "ahlan", "thanks", "thank", "thx",
+        "ok", "okay", "yes", "no", "good", "bad", "nice", "great", "stupid", "tupid", "man", "bro", "sir", "help", "test",
+        "سيارة", "لوحة", "تفاصيل", "افتح", "عرض", "مرحبا", "اهلا", "أهلا", "شكرا", "تمام",
       ]);
       const qt = tokensOf(q).filter((t) => !labelNoise.has(t));
-      const tokensToCheck = qt.length > 0 ? qt : tokensOf(q);
-      const isBrandOnly = !hasExplicitPlate && tokensToCheck.length <= 1;
+      if (qt.length === 0) {
+        return { matches: [] as any[], hasExplicitPlate, isBrandOnly: false, matchedMakeOrModelOrPlate: false };
+      }
+
+      const isBrandOnly = !hasExplicitPlate && qt.length <= 1;
+      const wordsOf = (s: string) =>
+        s
+          .toLowerCase()
+          .split(/[\s,.\-•|/\\:()]+/)
+          .filter((w) => w.length > 0);
+      const tokenMatchesText = (words: string[], textCompact: string, tok: string) => {
+        const tc = compact(tok);
+        if (!tc) return false;
+        if (tc.length <= 2) {
+          return words.some((w) => w === tok || compact(w) === tc);
+        }
+        if (tc.length === 3) {
+          return words.some((w) => w === tok || w.startsWith(tok) || compact(w) === tc || compact(w).startsWith(tc));
+        }
+        return words.some((w) => w.includes(tok)) || textCompact.includes(tc);
+      };
 
       const hay = (u: any) =>
         `${u.make || ""} ${u.model || ""} ${u.plate || ""} ${u.year || ""} ${u.color || ""}`.toLowerCase();
-      const hayCompact = (u: any) => compact(hay(u));
+      const identityHay = (u: any) => `${u.make || ""} ${u.model || ""} ${u.plate || ""}`.toLowerCase();
 
-      const exactMatches = (allUnits as any[]).filter(
-        (u) =>
-          tokensToCheck.length > 0 &&
-          tokensToCheck.every((t) => hay(u).includes(t) || hayCompact(u).includes(compact(t)))
-      );
+      const exactMatches = (allUnits as any[]).filter((u) => {
+        const hw = wordsOf(hay(u));
+        const hc = compact(hay(u));
+        return qt.every((t) => tokenMatchesText(hw, hc, t));
+      });
 
       // If strict token match fails only on year/color when user didn't give a plate, try make+model partial matches to ask clarifying details
       let matches = exactMatches;
-      if (matches.length === 0 && !hasExplicitPlate && tokensToCheck.length >= 2) {
+      if (matches.length === 0 && !hasExplicitPlate && qt.length >= 2) {
         matches = (allUnits as any[]).filter((u) => {
           const uMakeModel = `${u.make || ""} ${u.model || ""}`.toLowerCase();
-          const uMakeCompact = compact(uMakeModel);
-          const matchedCount = tokensToCheck.filter((t) => uMakeModel.includes(t) || uMakeCompact.includes(compact(t))).length;
-          return matchedCount >= 1 && (uMakeModel.includes(tokensToCheck[0]) || matchedCount >= 2);
+          const mw = wordsOf(uMakeModel);
+          const mc = compact(uMakeModel);
+          const matchedCount = qt.filter((t) => tokenMatchesText(mw, mc, t)).length;
+          return matchedCount >= 1 && (tokenMatchesText(mw, mc, qt[0]) || matchedCount >= 2);
         });
       }
 
-      return { matches, hasExplicitPlate, isBrandOnly };
+      const matchedMakeOrModelOrPlate =
+        matches.length > 0 &&
+        matches.some((u) => {
+          const iw = wordsOf(identityHay(u));
+          const ic = compact(identityHay(u));
+          return qt.some((t) => tokenMatchesText(iw, ic, t));
+        });
+
+      return { matches, hasExplicitPlate, isBrandOnly, matchedMakeOrModelOrPlate };
     };
 
     const findUnit = (q?: string | null) => {
@@ -678,6 +716,11 @@ Return ONLY valid JSON:
       /\b(open|toopen|to\s*open|go\s*to)\b.*(?:\bpage\b|\bdetails?\b|\bprofile\b)|(?:\bdetails?\b|\bprofile\b|\bpage\b)\s+(?:of|for)\b|افتح\s+(?:صفحة|ملف|تفاصيل)/i.test(
         lower
       ) && !/\b(history|contracts|spent|spending|overdue|damages)\b|تاريخ|سجل|عقود|متأخر/i.test(lower);
+
+    const isGreetingOrSmallTalk =
+      /^\s*(?:hi+|hello+|hey+|halo+|yo+|hola|bonjour|salut|good\s*(?:morning|afternoon|evening|night)|morning|evening|salam|salaam|as[-\s]*salamu?\s*alaikum|marhaba|ahlan|labas|kifak|thanks?|thank\s*you|thx|ty|ok|okay|k|cool|nice|great|awesome|fine|bye|goodbye|test|help|who\s*are\s*you|what\s*can\s*you\s*do|how\s*are\s*you|sup|what'?s\s*up|مرحبا+|أهلا+|اهلا+|السلام\s*عليكم|وعليكم\s*السلام|صباح\s*الخير|مساء\s*الخير|كيف\s*حالك|كيفك|شلونك|اخبارك|أخبارك|لباس|لاباس|شكرا+|شكراً|مشكور|تمام|اوك|أوك|حسناً|طيب|يعطيك\s*العافية|مساعدة|من\s*أنت)[\s!?.؟،,]*$/i.test(
+        lower
+      );
 
     const isCreatingContractPhrase =
       /\b(create|make|setup|set\s+up|start|draft|prepare|book|reserve|forclien|with\s+car|sleect\s+car|select\s+car)\b|\b(?:new|add(?:\s+a)?)\s+(?:contract|booking|rental)\b|انشاء|إنشاء|سوي|سويلي|اعمل|جهز|احجز|عقد\s+جديد|حجز\s+جديد/i.test(
@@ -937,6 +980,7 @@ Return ONLY valid JSON:
       message.includes("سوه");
 
     const isContractRelated =
+      !isGreetingOrSmallTalk &&
       !usedBackendQuery &&
       !wantsClientDetails &&
       !wantsVehicleDetails &&
@@ -1353,21 +1397,26 @@ Return ONLY valid JSON:
       });
     }
 
-    // Handle follow-up plate/details OR bare car-name mentions ONLY when user isn't asking an analytical question
+    // Handle follow-up plate/details OR bare car-name mentions ONLY when user isn't greeting or asking an analytical question
     const parsedMsgCar = parseCarDetails(message);
-    const matchedUnitsFromMessage = !hasContractWords && !wantsClientDetails && !isFleetQuestion ? findUnitMatches(message) : null;
+    const matchedUnitsFromMessage =
+      !isGreetingOrSmallTalk && !isAnalyticalQuestion && !usedBackendQuery && !hasContractWords && !wantsClientDetails && !isFleetQuestion
+        ? findUnitMatches(message)
+        : null;
     const isBareCarOrVehicleDetailsFlow =
-      intent === "OPEN_VEHICLE_DETAILS" ||
-      intent === "SEARCH_VEHICLE" ||
-      askedForVehicleDetails ||
-      (!hasContractWords &&
-        !wantsClientDetails &&
-        !isFleetQuestion &&
-        !isAnalyticalQuestion &&
-        intent === "GENERAL_CHAT" &&
-        (parsedMsgCar.isKnownMake ||
-          Boolean(parsedMsgCar.plate) ||
-          Boolean(matchedUnitsFromMessage && matchedUnitsFromMessage.matches.length > 0)));
+      !isGreetingOrSmallTalk &&
+      !usedBackendQuery &&
+      (intent === "OPEN_VEHICLE_DETAILS" ||
+        intent === "SEARCH_VEHICLE" ||
+        askedForVehicleDetails ||
+        (!hasContractWords &&
+          !wantsClientDetails &&
+          !isFleetQuestion &&
+          !isAnalyticalQuestion &&
+          intent === "GENERAL_CHAT" &&
+          (parsedMsgCar.isKnownMake ||
+            Boolean(parsedMsgCar.plate) ||
+            Boolean(matchedUnitsFromMessage && matchedUnitsFromMessage.matchedMakeOrModelOrPlate))));
 
     if (isBareCarOrVehicleDetailsFlow) {
       let carLookupQuery =
@@ -1562,7 +1611,12 @@ Return ONLY valid JSON:
 
     // Smart Backend Q&A Fallback when AI provider is offline or returned empty
     if (!aiReply) {
-      if (/\b(revenue|income|profit|earning|money)\b|ارباح|أرباح|دخل|ايرادات|إيرادات/i.test(lower)) {
+      if (isGreetingOrSmallTalk) {
+        aiReply =
+          lang === "ar"
+            ? `أهلاً بك! لدينا حالياً ${availableUnits}/${totalUnits} سيارة متاحة و${activeContractsCount} عقد نشط. كيف أساعدك اليوم؟`
+            : `Hi! We currently have ${availableUnits}/${totalUnits} vehicles available and ${activeContractsCount} active contracts. How can I help you today?`;
+      } else if (/\b(revenue|income|profit|earning|money)\b|ارباح|أرباح|دخل|ايرادات|إيرادات/i.test(lower)) {
         aiReply =
           lang === "ar"
             ? `إيرادات العقود هذا الشهر: AED ${kpis.revenueThisMonth.toLocaleString("en-US")} (الشهر الماضي: AED ${kpis.revenueLastMonth.toLocaleString("en-US")})، والإجمالي التراكمي: AED ${kpis.revenueAllTime.toLocaleString("en-US")}. المبالغ المعلّقة: AED ${kpis.pendingBalanceTotal.toLocaleString("en-US")}.`
