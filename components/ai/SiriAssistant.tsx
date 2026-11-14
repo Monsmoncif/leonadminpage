@@ -621,21 +621,21 @@ export default function SiriAssistant() {
             />
 
             {pendingImages.length > 0 && (
-              <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1">
+              <div className="mb-2.5 flex items-center gap-2.5 overflow-x-auto min-h-[88px] pt-3 pb-2.5 px-2.5 rounded-xl bg-gray-50/90 border border-gray-200/80">
                 {pendingImages.map((src, idx) => (
                   <div key={idx} className="relative shrink-0 group">
                     <img
                       src={src}
                       alt={`Attachment ${idx + 1}`}
-                      className="w-11 h-11 object-cover rounded-lg border border-gray-200"
+                      className="w-16 h-16 object-cover rounded-xl border border-gray-200 bg-white shadow-xs"
                     />
                     <button
                       type="button"
                       onClick={() => setPendingImages((prev) => prev.filter((_, i) => i !== idx))}
                       title="Remove image"
-                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] hover:bg-brand cursor-pointer shadow"
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-brand cursor-pointer shadow-sm"
                     >
-                      <X size={10} />
+                      <X size={11} />
                     </button>
                   </div>
                 ))}
