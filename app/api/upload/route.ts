@@ -1,20 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs/promises";
 import path from "path";
-import crypto from "crypto";
-
-const MIME_MAP: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "image/svg+xml": "svg",
-  "application/pdf": "pdf",
-  "application/octet-stream": "bin",
-};
+import { saveBufferToUploads, saveImageToUploads } from "@/lib/server-upload";
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,24 +23,9 @@ export async function POST(req: NextRequest) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
       const ext = path.extname(file.name).replace(".", "").toLowerCase() || "jpg";
-      
-      const safeFolder = folder.replace(/[^a-zA-Z0-9_-]/g, "") || "general";
-      const randomId = crypto.randomBytes(6).toString("hex");
-      const filename = `${Date.now()}-${randomId}.${ext}`;
 
-      const uploadDir = path.join(process.cwd(), "public", "uploads", safeFolder);
-      await fs.mkdir(uploadDir, { recursive: true });
-
-      const targetPath = path.join(uploadDir, filename);
-      await fs.writeFile(targetPath, buffer);
-
-      const fileUrl = `/uploads/${safeFolder}/${filename}`;
-      return NextResponse.json({
-        url: fileUrl,
-        secure_url: fileUrl,
-        filename,
-        size: buffer.length,
-      });
+      const result = await saveBufferToUploads(buffer, ext, folder);
+      return NextResponse.json(result);
     }
 
     const body = await req.json();
@@ -63,51 +36,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
-    // If it's already an existing HTTP/local URL, return it directly
-    if (
-      typeof image === "string" &&
-      (image.startsWith("http://") ||
-        image.startsWith("https://") ||
-        image.startsWith("/uploads/"))
-    ) {
-      return NextResponse.json({ url: image, secure_url: image });
-    }
-
-    let buffer: Buffer;
-    let ext = "jpg";
-
-    if (typeof image === "string") {
-      const dataUriMatch = image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-+.]+);base64,(.+)$/);
-      if (dataUriMatch) {
-        const mime = dataUriMatch[1].toLowerCase();
-        ext = MIME_MAP[mime] || "jpg";
-        buffer = Buffer.from(dataUriMatch[2], "base64");
-      } else {
-        // Raw base64 string
-        buffer = Buffer.from(image, "base64");
-      }
-    } else {
+    if (typeof image !== "string") {
       return NextResponse.json({ error: "Invalid image data format" }, { status: 400 });
     }
 
-    const safeFolder = folder.replace(/[^a-zA-Z0-9_-]/g, "") || "general";
-    const randomId = crypto.randomBytes(6).toString("hex");
-    const filename = `${Date.now()}-${randomId}.${ext}`;
-
-    const uploadDir = path.join(process.cwd(), "public", "uploads", safeFolder);
-    await fs.mkdir(uploadDir, { recursive: true });
-
-    const targetPath = path.join(uploadDir, filename);
-    await fs.writeFile(targetPath, buffer);
-
-    const fileUrl = `/uploads/${safeFolder}/${filename}`;
-
-    return NextResponse.json({
-      url: fileUrl,
-      secure_url: fileUrl,
-      filename,
-      size: buffer.length,
-    });
+    const result = await saveImageToUploads(image, folder);
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("Local disk upload error:", error);
     return NextResponse.json(

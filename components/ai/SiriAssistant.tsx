@@ -11,6 +11,7 @@ import {
   Phone,
   Loader2,
   ArrowRight,
+  Paperclip,
 } from "lucide-react";
 import CreateClientModal from "@/components/modals/CreateClientModal";
 import CreateCompanyModal from "@/components/modals/CreateCompanyModal";
@@ -18,10 +19,55 @@ import CreateUnitModal from "@/components/modals/CreateUnitModal";
 import { invalidateClientCache } from "@/lib/client-cache";
 import { useToast } from "@/components/providers/ToastProvider";
 
+const MAX_ASSISTANT_IMAGES = 6;
+
+async function compressAssistantImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = String(event.target?.result || "");
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 1280;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", 0.8));
+            return;
+          }
+          resolve(dataUrl);
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 interface Message {
   id: string;
   sender: "user" | "assistant";
   text: string;
+  images?: string[];
   action?: string;
   navigateUrl?: string;
   data?: {
@@ -56,7 +102,11 @@ export default function SiriAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [isPreparingImages, setIsPreparingImages] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hadImagesInLastRequest, setHadImagesInLastRequest] = useState(false);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
 
   // Direct Action Modals triggered by Leon Assistant
@@ -68,6 +118,7 @@ export default function SiriAssistant() {
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const latestVoiceTextRef = useRef<string>("");
 
   useEffect(() => {
@@ -145,29 +196,74 @@ export default function SiriAssistant() {
     return false;
   };
 
+  const handleFilesSelected = useCallback(
+    async (filesInput: FileList | File[] | null) => {
+      if (!filesInput) return;
+      const files = Array.from(filesInput).filter((f) => f.type.startsWith("image/"));
+      if (files.length === 0) {
+        toast.error("Please select image files (JPG, PNG, WEBP) of ID, Passport, or License.");
+        return;
+      }
+
+      const remaining = MAX_ASSISTANT_IMAGES - pendingImages.length;
+      if (remaining <= 0) {
+        toast.error(`Maximum ${MAX_ASSISTANT_IMAGES} images per message.`);
+        return;
+      }
+
+      const selected = files.slice(0, remaining);
+      setIsPreparingImages(true);
+      try {
+        const compressed = await Promise.all(selected.map((f) => compressAssistantImage(f)));
+        setPendingImages((prev) => [...prev, ...compressed].slice(0, MAX_ASSISTANT_IMAGES));
+        setTimeout(() => inputRef.current?.focus(), 50);
+      } catch {
+        toast.error("Failed to load image preview.");
+      } finally {
+        setIsPreparingImages(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    },
+    [pendingImages.length, toast]
+  );
+
   const handleSendMessage = useCallback(
-    async (text: string, shouldSpeak = false) => {
+    async (text: string, shouldSpeak = false, explicitImages?: string[]) => {
       const trimmed = text.trim();
-      if (!trimmed || isProcessing) return;
+      const imagesToSend = explicitImages ?? pendingImages;
+      if ((!trimmed && imagesToSend.length === 0) || isProcessing) return;
+
+      const recentArabic = messages.slice(-4).some((m) => /[\u0600-\u06FF]/.test(m.text));
+      const detectedLang = /[\u0600-\u06FF]/.test(trimmed) || (!trimmed && recentArabic) ? "ar" : "en";
+      const displayText =
+        trimmed ||
+        (detectedLang === "ar"
+          ? `📎 تم إرفاق ${imagesToSend.length} صورة للمسح وإنشاء العميل`
+          : `📎 Uploaded ${imagesToSend.length} document${imagesToSend.length > 1 ? "s" : ""} for client scan`);
 
       const userMsg: Message = {
         id: Date.now().toString(),
         sender: "user",
-        text: trimmed,
+        text: displayText,
+        images: imagesToSend.length > 0 ? imagesToSend : undefined,
       };
 
       setMessages((prev) => [...prev, userMsg]);
       setInputValue("");
+      if (!explicitImages) setPendingImages([]);
       latestVoiceTextRef.current = "";
+      setHadImagesInLastRequest(imagesToSend.length > 0);
       setIsProcessing(true);
 
       try {
-        const detectedLang = /[\u0600-\u06FF]/.test(trimmed) ? "ar" : "en";
         const res = await fetch("/api/ai/assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: trimmed,
+            images: imagesToSend,
             lang: detectedLang,
             history: messages.slice(-12).map((m) => ({ sender: m.sender, text: m.text, action: m.action })),
             pathname: typeof window !== "undefined" ? window.location.pathname : "",
@@ -196,6 +292,9 @@ export default function SiriAssistant() {
         if (data.action === "CLIENT_CREATED" || data.action === "CREATE_CONTRACT") {
           invalidateClientCache("clients");
           invalidateClientCache("units");
+          if (data.action === "CLIENT_CREATED" && typeof window !== "undefined" && window.location.pathname === "/clients") {
+            router.refresh();
+          }
         }
 
         if (data.uiAction === "OPEN_ADD_CLIENT_MODAL") {
@@ -235,9 +334,10 @@ export default function SiriAssistant() {
         ]);
       } finally {
         setIsProcessing(false);
+        setHadImagesInLastRequest(false);
       }
     },
-    [isProcessing, messages, router, speakText, toast]
+    [isProcessing, messages, pendingImages, router, speakText, toast]
   );
 
   // Toggle voice recognition directly on user click (synchronously preserves browser gesture permission)
@@ -332,8 +432,31 @@ export default function SiriAssistant() {
       {isOpen && (
         <div
           data-leon-chat-box="true"
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!isDraggingOver) setIsDraggingOver(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setIsDraggingOver(false);
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDraggingOver(false);
+            if (e.dataTransfer?.files?.length) {
+              handleFilesSelected(e.dataTransfer.files);
+            }
+          }}
           className="fixed bottom-5 right-5 z-[95] w-[340px] sm:w-[370px] h-[460px] max-h-[82vh] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
         >
+          {isDraggingOver && (
+            <div className="absolute inset-0 z-20 bg-white/90 border-2 border-dashed border-brand rounded-2xl flex flex-col items-center justify-center p-4 text-center pointer-events-none">
+              <Paperclip size={24} className="text-brand mb-1.5" />
+              <p className="text-xs font-semibold text-gray-800">Drop ID, Passport or License images</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">AI will scan and create the client automatically</p>
+            </div>
+          )}
           {/* Minimal Header */}
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
             <div className="flex items-center gap-2">
@@ -366,6 +489,18 @@ export default function SiriAssistant() {
                   }`}
                   dir={msg.text.match(/[\u0600-\u06FF]/) ? "rtl" : "ltr"}
                 >
+                  {msg.images && msg.images.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {msg.images.map((src, i) => (
+                        <img
+                          key={i}
+                          src={src}
+                          alt={`Document ${i + 1}`}
+                          className="w-14 h-14 object-cover rounded-lg border border-white/30 bg-black/10"
+                        />
+                      ))}
+                    </div>
+                  )}
                   {msg.sender === "assistant" ? renderFormattedText(msg.text) : msg.text}
 
                   {/* Compact Client Cards */}
@@ -380,9 +515,16 @@ export default function SiriAssistant() {
                             className="bg-white p-2 rounded-xl border border-gray-200 hover:border-brand flex items-center justify-between gap-2 cursor-pointer transition-all"
                           >
                             <div className="min-w-0">
-                              <span className="text-xs font-bold text-gray-900 block truncate">
-                                {client.name}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-gray-900 block truncate">
+                                  {client.name}
+                                </span>
+                                {client.clientType && (
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 shrink-0">
+                                    {client.clientType}
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-gray-500 flex items-center gap-1">
                                 <Phone size={9} className="text-brand" />
                                 {client.phone}
@@ -453,7 +595,7 @@ export default function SiriAssistant() {
               <div className="flex items-start">
                 <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-xs bg-gray-100 text-gray-600 text-xs flex items-center gap-2">
                   <Loader2 size={13} className="animate-spin text-brand" />
-                  <span>Thinking...</span>
+                  <span>{hadImagesInLastRequest ? "Scanning document & creating client..." : "Thinking..."}</span>
                 </div>
               </div>
             )}
@@ -469,13 +611,72 @@ export default function SiriAssistant() {
             }}
             className="p-2.5 border-t border-gray-100 bg-white shrink-0"
           >
-            <div className="flex items-center gap-1.5 bg-gray-100 rounded-full px-3 py-1.5 border border-gray-200 focus-within:border-brand focus-within:bg-white transition-all">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFilesSelected(e.target.files)}
+            />
+
+            {pendingImages.length > 0 && (
+              <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1">
+                {pendingImages.map((src, idx) => (
+                  <div key={idx} className="relative shrink-0 group">
+                    <img
+                      src={src}
+                      alt={`Attachment ${idx + 1}`}
+                      className="w-11 h-11 object-cover rounded-lg border border-gray-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPendingImages((prev) => prev.filter((_, i) => i !== idx))}
+                      title="Remove image"
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] hover:bg-brand cursor-pointer shadow"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 bg-gray-100 rounded-full px-2.5 py-1.5 border border-gray-200 focus-within:border-brand focus-within:bg-white transition-all">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessing || isPreparingImages || pendingImages.length >= MAX_ASSISTANT_IMAGES}
+                title="Upload ID, Passport or Driving License"
+                aria-label="Upload document image"
+                className="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 hover:text-brand hover:bg-gray-200/70 disabled:opacity-40 transition-colors cursor-pointer shrink-0"
+              >
+                {isPreparingImages ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={15} />}
+              </button>
+
               <input
                 ref={inputRef}
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={isListening ? "Listening..." : "Message Leon Assistant..."}
+                onPaste={(e) => {
+                  const items = Array.from(e.clipboardData?.items || []);
+                  const imageFiles = items
+                    .filter((item) => item.type.startsWith("image/"))
+                    .map((item) => item.getAsFile())
+                    .filter((f): f is File => Boolean(f));
+                  if (imageFiles.length > 0) {
+                    e.preventDefault();
+                    handleFilesSelected(imageFiles);
+                  }
+                }}
+                placeholder={
+                  isListening
+                    ? "Listening..."
+                    : pendingImages.length > 0
+                    ? "Add phone or note (optional) & send..."
+                    : "Message Leon Assistant..."
+                }
                 className="flex-1 bg-transparent text-xs sm:text-[13px] text-gray-900 placeholder:text-gray-400 focus:outline-none min-w-0 py-1"
                 dir={inputValue.match(/[\u0600-\u06FF]/) ? "rtl" : "ltr"}
               />
@@ -495,7 +696,7 @@ export default function SiriAssistant() {
 
               <button
                 type="submit"
-                disabled={!inputValue.trim() || isProcessing}
+                disabled={(!inputValue.trim() && pendingImages.length === 0) || isProcessing || isPreparingImages}
                 className="w-7 h-7 rounded-full bg-brand text-white hover:bg-brand-dark disabled:opacity-40 flex items-center justify-center transition-colors cursor-pointer shrink-0"
               >
                 <ArrowUp size={15} />

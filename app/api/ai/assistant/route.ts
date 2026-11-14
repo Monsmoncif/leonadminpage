@@ -9,6 +9,10 @@ import {
   getRichBackendContext,
   invalidateBackendContextCache,
 } from "@/lib/assistant-backend";
+import {
+  handleAiClientDocumentUpload,
+  tryUpdateRecentClientContactFromFollowUp,
+} from "@/lib/ai-client-scanner";
 
 interface AssistantResponse {
   reply: string;
@@ -343,13 +347,18 @@ export async function POST(req: Request) {
     const body = await req.json();
     const message = (body.message || "").trim();
     const lower = message.toLowerCase();
+    const images: string[] = Array.isArray(body.images)
+      ? body.images.filter((img: unknown): img is string => typeof img === "string" && img.trim().length > 0).slice(0, 6)
+      : typeof body.image === "string" && body.image.trim().length > 0
+      ? [body.image.trim()]
+      : [];
     const history: { sender: string; text: string; action?: string }[] = Array.isArray(body.history) ? body.history : [];
     const pathname: string = typeof body.pathname === "string" ? body.pathname : "";
     const currentSearch: string = typeof body.currentSearch === "string" ? body.currentSearch : "";
     const isArabic = /[\u0600-\u06FF]/.test(message);
     const lang = isArabic ? "ar" : body.lang || "en";
 
-    if (!message) {
+    if (!message && images.length === 0) {
       return NextResponse.json<AssistantResponse>({
         reply: lang === "ar" ? "أهلاً بك! كيف أساعدك اليوم؟" : "Hey! How can I assist you today?",
         action: "NONE",
@@ -357,7 +366,7 @@ export async function POST(req: Request) {
     }
 
     // =========================================================================
-    // FAST PATH: DIRECT UI ACTIONS (Immediate response without LLM lag)
+    // FAST PATH: DIRECT UI ACTIONS & DOCUMENT OCR CLIENT CREATION
     // =========================================================================
     const lastAssistantMsgObj = [...history].reverse().find((h) => h.sender !== "user");
     const lastAssistantText = lastAssistantMsgObj?.text?.toLowerCase() || "";
@@ -365,6 +374,33 @@ export async function POST(req: Request) {
     const awaitingConfirmation =
       pathname.startsWith("/bookings/new") ||
       /finalize|confirm|اعتمد|أنشئ|هل أعتمد|which car|أي سيارة|who is the customer|من هو العميل/.test(lastAssistantText);
+
+    let preScannedClient: any = null;
+    let preScannedClientResponse: AssistantResponse | null = null;
+
+    if (images.length > 0) {
+      const scanOutcome = await handleAiClientDocumentUpload({
+        images,
+        message,
+        lang,
+      });
+      if (!scanOutcome.wantsContract || !scanOutcome.client) {
+        return NextResponse.json<AssistantResponse>(scanOutcome.response);
+      }
+      preScannedClient = scanOutcome.client;
+      preScannedClientResponse = scanOutcome.response;
+    }
+
+    if (images.length === 0) {
+      const followUpRes = await tryUpdateRecentClientContactFromFollowUp({
+        message,
+        lang,
+        lastAssistantMsg: lastAssistantMsgObj,
+      });
+      if (followUpRes) {
+        return NextResponse.json<AssistantResponse>(followUpRes);
+      }
+    }
 
     if (
       lower.includes("click ") ||
@@ -842,7 +878,7 @@ Return ONLY valid JSON:
       ) && !/\b(?:for\s+client|forclien|with\s+car|from\s+today)\b/i.test(lower);
 
     const hasContractWords =
-      /\b(contract|contrac|booking|rent|rental|reserve)\b|عقد|حجز|تأجير|استئجار/i.test(lower) &&
+      /\b(contract|contrac|book|booking|rent|rental|reserve)\b|عقد|حجز|تأجير|استئجار/i.test(lower) &&
       !isHowToQuestion &&
       (isCreatingContractPhrase || !isAnalyticalQuestion);
 
@@ -907,8 +943,18 @@ Return ONLY valid JSON:
         lower
       ) && !parseCarDetails(message).isKnownMake;
     const carRegex = /(?:\bsleect car\b|\bselect car\b|\bwith car\b|\bwith vehicle\b|\bchoose car\b|\bcar\b\s*:?|سيارة|بسيارة|مركبة)\s+([^\n,]+?)(?=\s+(?:from\s+today|from\s+\d|starting|to\s+\d|too\s+\d|until|for\s+\d+\s*(?:day|days|week|month)|من\s+اليوم|لمدة)|[,\n]|$)/i;
+    const directBookCarRegex = /\b(?:book|rent|booking|hire|احجز|استأجر|أجر)\s+(?:a\s+|an\s+|the\s+)?([^\n,]+?)(?=\s+(?:from\s+today|from\s+\d|starting|to\s+\d|too\s+\d|until|for\s+\d+\s*(?:day|days|week|month)|من\s+اليوم|لمدة)|[,\n]|$)/i;
     const carMatch = !isFleetQuestion && !wantsVehicleDetails ? message.match(carRegex) : null;
-    const rawExtractedCar = carMatch ? carMatch[1].replace(/^:\s*/, "").trim() : null;
+    const directBookMatch =
+      !carMatch && hasContractWords && !isFleetQuestion && !wantsVehicleDetails
+        ? message.match(directBookCarRegex)
+        : null;
+    const directBookCandidate = directBookMatch?.[1]?.replace(/^:\s*/, "").trim() || null;
+    const rawExtractedCar = carMatch
+      ? carMatch[1].replace(/^:\s*/, "").trim()
+      : directBookCandidate && parseCarDetails(directBookCandidate).isKnownMake
+      ? directBookCandidate
+      : null;
     const reservedCarStartNoise = /^(are|is|was|were|available|free|rented|all|many|status|count|should|can|do|does|did|to|the|for|in|on|at|details|detail|page|profile)\b/i;
     const extractedCarName =
       rawExtractedCar && rawExtractedCar.length >= 2 && !reservedCarStartNoise.test(rawExtractedCar)
@@ -1126,8 +1172,8 @@ Return ONLY valid JSON:
 
     if (isContractRelated) {
       // 1. Resolve Client
-      let resolvedClient: any = null;
-      if (cData.clientName) {
+      let resolvedClient: any = preScannedClient || null;
+      if (!resolvedClient && cData.clientName) {
         const clientMatches = await findClientMatches(cData.clientName);
         resolvedClient = clientMatches[0]?.client || null;
         if (
@@ -1431,6 +1477,10 @@ Return ONLY valid JSON:
     // =========================================================================
     // 2. OTHER INTELLIGENT INTENTS
     // =========================================================================
+    if (preScannedClientResponse) {
+      return NextResponse.json<AssistantResponse>(preScannedClientResponse);
+    }
+
     if (intent === "OPEN_ADD_CLIENT_MODAL") {
       return NextResponse.json<AssistantResponse>({
         reply:
