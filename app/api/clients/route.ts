@@ -8,22 +8,66 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB();
     const isFullDocs = req.nextUrl.searchParams.get("withDocuments") === "true";
-    let query = Client.find().sort({ createdAt: -1 });
-    if (!isFullDocs) {
-      query = query.select("-documents");
+    const isSlim = req.nextUrl.searchParams.get("slim") === "true";
+    const skipStats = req.nextUrl.searchParams.get("skipStats") === "true";
+    const search = req.nextUrl.searchParams.get("search")?.trim();
+    const pageParam = req.nextUrl.searchParams.get("page");
+    const limitParam = req.nextUrl.searchParams.get("limit");
+    const page = pageParam ? Math.max(1, parseInt(pageParam, 10)) : null;
+    const limit = limitParam ? Math.max(1, parseInt(limitParam, 10)) : null;
+
+    let filter: any = {};
+    if (search) {
+      const escaped = search.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      const rx = new RegExp(escaped, "i");
+      filter = {
+        $or: [
+          { name: rx },
+          { companyName: rx },
+          { email: rx },
+          { phone: rx },
+          { idNumber: rx },
+          { passportNumber: rx },
+          { licenseNumber: rx },
+          { nationality: rx },
+        ],
+      };
+    }
+
+    let query = Client.find(filter).sort({ createdAt: -1 });
+    if (isSlim || !isFullDocs) {
+      query = query.select("-documents -__v");
+    }
+
+    if (page && limit) {
+      query = query.skip((page - 1) * limit).limit(limit);
     }
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Run client query and stats counting in parallel using database indexes
-    const [clients, totalCustomers, newThisMonth, activeRentals, blacklisted] = await Promise.all([
+    const [clients, countedTotal, clientStatsAgg, activeRentals] = await Promise.all([
       query.lean(),
-      Client.countDocuments(),
-      Client.countDocuments({ createdAt: { $gte: startOfMonth } }),
-      Contract.countDocuments({ status: "Active" }),
-      Client.countDocuments({ status: "Blacklisted" }),
+      page && limit ? Client.countDocuments(filter) : Promise.resolve(null),
+      skipStats
+        ? Promise.resolve(null)
+        : Client.aggregate([
+            {
+              $facet: {
+                total: [{ $count: "count" }],
+                newThisMonth: [{ $match: { createdAt: { $gte: startOfMonth } } }, { $count: "count" }],
+                blacklisted: [{ $match: { status: "Blacklisted" } }, { $count: "count" }],
+              },
+            },
+          ]),
+      skipStats ? Promise.resolve(0) : Contract.countDocuments({ status: "Active" }),
     ]);
+
+    const totalCount = countedTotal !== null ? countedTotal : clients.length;
+    const facetRow = clientStatsAgg?.[0];
+    const totalCustomers = facetRow?.total?.[0]?.count || 0;
+    const newThisMonth = facetRow?.newThisMonth?.[0]?.count || 0;
+    const blacklisted = facetRow?.blacklisted?.[0]?.count || 0;
 
     const stats = {
       totalCustomers,
@@ -32,7 +76,14 @@ export async function GET(req: NextRequest) {
       blacklisted,
     };
 
-    return NextResponse.json({ clients, stats });
+    return NextResponse.json({
+      clients,
+      stats,
+      totalCount,
+      totalPages: limit ? Math.max(1, Math.ceil(totalCount / limit)) : 1,
+      page: page || 1,
+      limit: limit || totalCount,
+    });
   } catch (error: any) {
     console.error("Clients API error:", error.message);
     return NextResponse.json(

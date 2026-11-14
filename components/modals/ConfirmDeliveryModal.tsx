@@ -257,7 +257,7 @@ export default function ConfirmDeliveryModal({
   // Fetch all clients for search / second driver selection
   const fetchClientsList = async () => {
     try {
-      const res = await fetch("/api/clients", { cache: "no-store" });
+      const res = await fetch("/api/clients?slim=true&skipStats=true", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         const list = data.clients || (Array.isArray(data) ? data : []);

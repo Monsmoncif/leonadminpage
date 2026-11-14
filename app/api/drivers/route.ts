@@ -6,14 +6,68 @@ import { Contract } from "@/models/Contract";
 import { User } from "@/models/User";
 import bcrypt from "bcryptjs";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await connectDB();
-    const [drivers, allContracts, allUsers] = await Promise.all([
-      Driver.find({}).sort({ createdAt: -1 }).lean(),
-      Contract.find({}).select("driverId deliveryDriverId returnDriverId status").lean(),
+    const { searchParams } = new URL(req.url);
+    const isSlim = searchParams.get("slim") === "true";
+    const withDocuments = searchParams.get("withDocuments") === "true";
+
+    let driverQuery = Driver.find({}).sort({ createdAt: -1 });
+    if (!withDocuments) {
+      driverQuery = driverQuery.select("-documents -password");
+    } else {
+      driverQuery = driverQuery.select("-password");
+    }
+
+    const contractStatsPromise = isSlim
+      ? Promise.resolve(null)
+      : Contract.aggregate([
+          {
+            $facet: {
+              total: [{ $count: "count" }],
+              byDriver: [
+                {
+                  $project: {
+                    status: 1,
+                    refs: {
+                      $setUnion: [
+                        { $cond: [{ $ifNull: ["$driverId", false] }, [{ $toString: "$driverId" }], []] },
+                        { $cond: [{ $ifNull: ["$deliveryDriverId", false] }, [{ $toString: "$deliveryDriverId" }], []] },
+                        { $cond: [{ $ifNull: ["$returnDriverId", false] }, [{ $toString: "$returnDriverId" }], []] },
+                      ],
+                    },
+                  },
+                },
+                { $unwind: "$refs" },
+                {
+                  $group: {
+                    _id: "$refs",
+                    completedContracts: { $sum: { $cond: [{ $eq: ["$status", "Completed"] }, 1, 0] } },
+                    activeRentals: { $sum: { $cond: [{ $eq: ["$status", "Active"] }, 1, 0] } },
+                  },
+                },
+              ],
+            },
+          },
+        ]);
+
+    const [drivers, contractAgg, allUsers] = await Promise.all([
+      driverQuery.lean(),
+      contractStatsPromise,
       User.find({ role: "driver" }).select("_id name email phone status createdAt").lean(),
     ]);
+
+    const countsMap = new Map<string, { completedContracts: number; activeRentals: number }>();
+    const facetRes = contractAgg?.[0];
+    if (facetRes?.byDriver) {
+      for (const row of facetRes.byDriver) {
+        countsMap.set(String(row._id), {
+          completedContracts: row.completedContracts || 0,
+          activeRentals: row.activeRentals || 0,
+        });
+      }
+    }
 
     const emailToUserId = allUsers.reduce((acc: any, user: any) => {
       if (user.email) acc[user.email.toLowerCase()] = String(user._id);
@@ -28,20 +82,16 @@ export async function GET() {
       if (emailLower) processedEmails.add(emailLower);
 
       const driverIdStr = userId || String(driver._id);
-      const driverContracts = allContracts.filter((c: any) => 
-        String(c.driverId) === driverIdStr ||
-        String(c.deliveryDriverId) === driverIdStr ||
-        String(c.returnDriverId) === driverIdStr ||
-        String(c.driverId) === String(driver._id)
-      );
+      const primaryStats = countsMap.get(driverIdStr);
+      const fallbackStats = userId && String(driver._id) !== userId ? countsMap.get(String(driver._id)) : undefined;
 
       return {
         ...driver,
         _id: userId || String(driver._id),
         driverModelId: String(driver._id),
         userId: userId || String(driver._id),
-        completedContracts: driverContracts.filter((c: any) => c.status === "Completed").length,
-        activeRentals: driverContracts.filter((c: any) => c.status === "Active").length,
+        completedContracts: (primaryStats?.completedContracts || 0) + (fallbackStats?.completedContracts || 0),
+        activeRentals: (primaryStats?.activeRentals || 0) + (fallbackStats?.activeRentals || 0),
       };
     });
 
@@ -51,11 +101,7 @@ export async function GET() {
       if (emailLower && !processedEmails.has(emailLower)) {
         processedEmails.add(emailLower);
         const userIdStr = String(u._id);
-        const driverContracts = allContracts.filter((c: any) => 
-          String(c.driverId) === userIdStr ||
-          String(c.deliveryDriverId) === userIdStr ||
-          String(c.returnDriverId) === userIdStr
-        );
+        const userStats = countsMap.get(userIdStr);
 
         driversWithStats.push({
           _id: userIdStr,
@@ -67,15 +113,15 @@ export async function GET() {
           license: "Standard",
           licenseExpiry: "2028-12-31",
           status: u.status === "inactive" ? "Deactivated" : "Active",
-          completedContracts: driverContracts.filter((c: any) => c.status === "Completed").length,
-          activeRentals: driverContracts.filter((c: any) => c.status === "Active").length,
+          completedContracts: userStats?.completedContracts || 0,
+          activeRentals: userStats?.activeRentals || 0,
           documents: [],
           createdAt: u.createdAt
         });
       }
     }
 
-    const contractsHandled = allContracts.length;
+    const contractsHandled = facetRes?.total?.[0]?.count || 0;
 
     const stats = {
       totalDrivers: driversWithStats.length,

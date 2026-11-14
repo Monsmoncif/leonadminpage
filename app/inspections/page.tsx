@@ -74,7 +74,7 @@ export default function InspectionsPage() {
           if (!res.ok) throw new Error("Failed to fetch inspections");
           return res.json();
         }),
-        fetch("/api/contracts?full=false", { cache: "no-store" }).then(res => {
+        fetch("/api/contracts?lite=true&skipStats=true&limit=200", { cache: "no-store" }).then(res => {
           if (!res.ok) throw new Error("Failed to fetch contracts");
           return res.json();
         })

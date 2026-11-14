@@ -85,7 +85,9 @@ async function checkUpcomingHandoverReminders() {
 export async function GET(req: Request) {
   try {
     await connectDB();
-    await checkUpcomingHandoverReminders();
+
+    // Run throttled reminder scan asynchronously so it never blocks UI polls
+    void checkUpcomingHandoverReminders();
 
     // Lightweight mode used by the header/sidebar badge: return only the unread count.
     const { searchParams } = new URL(req.url);
@@ -94,7 +96,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ unread });
     }
 
-    const rawNotifications = await Notification.find({}).sort({ createdAt: -1 }).lean();
+    const rawNotifications = await Notification.find({})
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
     const sanitized = rawNotifications.map((n: any) => {
       let msg = n.message || "";
       msg = msg

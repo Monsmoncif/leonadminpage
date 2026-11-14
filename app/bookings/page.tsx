@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -110,12 +110,18 @@ const getCarStatusBadge = (status: string) => {
   return "bg-amber-50 text-amber-700 border-amber-200";
 };
 
+const DEFAULT_CONTRACTS_CACHE_KEY = "contracts:1:10:All:";
+const getContractsCacheKey = (page: number, limit: number, status: string, search: string) =>
+  `contracts:${page}:${limit}:${status}:${search}`;
+
 export default function ContractsPage() {
-  const cachedData = typeof window !== "undefined" ? getClientCache<{ contracts: any[], stats: any, totalCount?: number }>("contracts") : null;
-  const [data, setData] = useState<{ contracts: any[], stats: any, totalCount?: number } | null>(cachedData);
+  const cachedData = typeof window !== "undefined" ? getClientCache<{ contracts: any[], stats: any, totalCount?: number, totalPages?: number }>(DEFAULT_CONTRACTS_CACHE_KEY) : null;
+  const [data, setData] = useState<{ contracts: any[], stats: any, totalCount?: number, totalPages?: number } | null>(cachedData);
   const [loading, setLoading] = useState(!cachedData);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [contractToDelete, setContractToDelete] = useState<any>(null);
@@ -169,7 +175,8 @@ export default function ContractsPage() {
       }
       const driverName = contract.deliveryDriver || contract.driver || "driver";
       toast.success(`Booking dispatched to ${driverName}! Task sent to driver.`);
-      fetchContracts();
+      invalidateClientCache("contracts");
+      fetchContracts(0, true);
     } catch (err: any) {
       toast.error(err.message || "Failed to dispatch contract");
     } finally {
@@ -178,41 +185,89 @@ export default function ContractsPage() {
   };
 
   const lastFetchRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const hasDataRef = useRef(Boolean(data));
+  hasDataRef.current = Boolean(data);
+  const queryParamsRef = useRef({ currentPage, itemsPerPage, statusFilter, debouncedSearch });
+  queryParamsRef.current = { currentPage, itemsPerPage, statusFilter, debouncedSearch };
 
-  const fetchContracts = async (retryCount = 0, silent = false) => {
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setDebouncedSearch("");
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchContracts = useCallback(async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
-    const shouldShowSpinner = !silent && !data && !getClientCache("contracts");
-    if (shouldShowSpinner) setLoading(true);
+    const { currentPage: p, itemsPerPage: l, statusFilter: s, debouncedSearch: q } = queryParamsRef.current;
+    const cacheKey = getContractsCacheKey(p, l, s, q);
+    const cachedHit = getClientCache<{ contracts: any[], stats: any, totalCount?: number, totalPages?: number }>(cacheKey);
+
+    if (cachedHit) {
+      setData(cachedHit);
+      setLoading(false);
+    }
+
+    const hasExistingData = Boolean(hasDataRef.current || cachedHit);
+    if (!silent && !hasExistingData) {
+      setLoading(true);
+    } else if (!silent) {
+      setIsFetching(true);
+    }
+
+    if (retryCount === 0 && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await fetch(`/api/contracts?full=false&t=${Date.now()}`, { cache: 'no-store' });
+      const qs = new URLSearchParams({
+        lite: "true",
+        full: "false",
+        page: String(p),
+        limit: String(l),
+        t: String(Date.now()),
+      });
+      if (s && s !== "All") qs.set("status", s);
+      if (q) qs.set("search", q);
+
+      const res = await fetch(`/api/contracts?${qs.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error(`Failed to fetch contracts data (${res.status})`);
       const json = await res.json();
       setData(json);
-      setClientCache("contracts", json);
+      setClientCache(cacheKey, json);
       setError(null);
       lastFetchRef.current = Date.now();
     } catch (err: any) {
+      if (err?.name === "AbortError") return;
       console.error(`Contracts fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
-        await new Promise(res => setTimeout(res, delay));
+        await new Promise((res) => setTimeout(res, delay));
         return fetchContracts(retryCount + 1, silent);
       }
-      if (!silent && !data) setError(err.message);
+      if (!silent && !hasExistingData) setError(err.message);
     } finally {
       setLoading(false);
+      setIsFetching(false);
     }
-  };
-
-  useEffect(() => {
-    fetchContracts();
   }, []);
 
   useEffect(() => {
-    try {
-      router.prefetch("/bookings/handover");
-    } catch {}
+    fetchContracts(0, Boolean(getClientCache(getContractsCacheKey(currentPage, itemsPerPage, statusFilter, debouncedSearch))));
+  }, [currentPage, itemsPerPage, statusFilter, debouncedSearch]);
 
+  useEffect(() => {
     const onVisibilityChange = () => {
       // Silent background refresh only when returning to this browser tab after 60s
       if (document.visibilityState === "visible" && Date.now() - lastFetchRef.current > 60000) {
@@ -222,8 +277,9 @@ export default function ContractsPage() {
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [router]);
+  }, [fetchContracts]);
 
   const handleDeleteConfirm = async () => {
     if (!contractToDelete) return;
@@ -285,44 +341,15 @@ export default function ContractsPage() {
     cancelled: 0,
   };
 
-  // Pure instant in-memory filtering (matches Clients / Customers page)
-  const filteredContracts = contracts.filter((c: any) => {
-    if (!searchQuery && statusFilter === "All") return true;
-
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !q ||
-      (c.id && String(c.id).toLowerCase().includes(q)) ||
-      (c.contractNumber && String(c.contractNumber).toLowerCase().includes(q)) ||
-      (c.customer && c.customer.toLowerCase().includes(q)) ||
-      (c.personalizedPersonName && c.personalizedPersonName.toLowerCase().includes(q)) ||
-      (c.additionalDriverName && c.additionalDriverName.toLowerCase().includes(q)) ||
-      (c.customerPhone && c.customerPhone.includes(q)) ||
-      (c.customerEmail && c.customerEmail.toLowerCase().includes(q)) ||
-      (c.customerIdNumber && c.customerIdNumber.toLowerCase().includes(q)) ||
-      (c.customerLicense && c.customerLicense.toLowerCase().includes(q)) ||
-      (c.vehicle && c.vehicle.toLowerCase().includes(q)) ||
-      (c.vehiclePlate && c.vehiclePlate.toLowerCase().includes(q)) ||
-      (c.driver && c.driver.toLowerCase().includes(q)) ||
-      (c.deliveryDriver && c.deliveryDriver.toLowerCase().includes(q)) ||
-      (c.returnDriver && c.returnDriver.toLowerCase().includes(q));
-
-    const matchesStatus = statusFilter === "All" || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const totalItems = filteredContracts.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-  const paginatedContracts = filteredContracts.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const totalItems = data?.totalCount ?? contracts.length;
+  const totalPages = Math.max(1, data?.totalPages ?? Math.ceil(totalItems / itemsPerPage));
+  const paginatedContracts = contracts;
 
   const hasAnyContractsTotal =
     (stats.activeContracts + stats.pendingSignatures + stats.completedThisMonth + stats.cancelled) > 0 ||
     (data?.totalCount ?? 0) > 0 ||
     contracts.length > 0;
-  const showZeroTotalState = !loading && !hasAnyContractsTotal && !searchQuery && statusFilter === "All";
+  const showZeroTotalState = !loading && !isFetching && !hasAnyContractsTotal && !searchQuery && !debouncedSearch && statusFilter === "All";
 
   const sparklineData = {
     active: [10, 15, 12, 18, 24, 22, 28],
@@ -528,7 +555,7 @@ export default function ContractsPage() {
             </div>
 
             {/* Table (Matches Clients Page Table Style & Hover) */}
-            <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover">
+            <div className={`bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover transition-opacity ${isFetching ? "opacity-65" : ""}`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px] sm:text-xs md:text-sm">
                   <thead>
@@ -611,6 +638,7 @@ export default function ContractsPage() {
                                 {clientId ? (
                                   <Link
                                     href={`/clients/${clientId}`}
+                                    prefetch={false}
                                     title={`View client details: ${contract.customer}`}
                                     className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs shrink-0 shadow-xs hover:ring-2 hover:ring-red-500/70 transition-all cursor-pointer ${getAvatarColor(contract.customer, contract._id || idx)}`}
                                   >
@@ -625,6 +653,7 @@ export default function ContractsPage() {
                                   {clientId ? (
                                     <Link
                                       href={`/clients/${clientId}`}
+                                      prefetch={false}
                                       className="font-semibold text-text-primary text-[11px] sm:text-xs md:text-sm block break-words leading-tight hover:text-red-600 hover:underline transition-colors cursor-pointer"
                                       title={`View client details: ${contract.customer}`}
                                     >
@@ -672,6 +701,7 @@ export default function ContractsPage() {
                               {unitId ? (
                                 <Link
                                   href={`/units/${unitId}`}
+                                  prefetch={false}
                                   className="group block cursor-pointer"
                                   title={`View vehicle details: ${contract.vehicle}`}
                                 >
@@ -759,7 +789,8 @@ export default function ContractsPage() {
                                         throw new Error(errJson?.error || "Failed to update status");
                                       }
                                       toast.success(`Status updated to ${newStatus}`);
-                                      fetchContracts();
+                                      invalidateClientCache("contracts");
+                                      fetchContracts(0, true);
                                     } catch (err: any) {
                                       toast.error(err.message || "Failed to update status");
                                     }
@@ -875,6 +906,7 @@ export default function ContractsPage() {
 
                                 <Link 
                                   href={`/bookings/edit?contractId=${contract._id}`}
+                                  prefetch={false}
                                   className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                   title="Edit Contract" 
                                   onClick={(e) => e.stopPropagation()}
@@ -884,6 +916,7 @@ export default function ContractsPage() {
                                 {contract.status === "Active" && (contract.deliveryStatus === "Delivered" || isPersonalizedContract(contract)) && (
                                   <Link 
                                     href={`/bookings/return?contractId=${contract._id}`}
+                                    prefetch={false}
                                     className="p-1 sm:p-1.5 text-text-muted hover:text-brand hover:bg-brand/10 rounded-md sm:rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center" 
                                     title="Return Vehicle (إرجاع السيارة)" 
                                     onClick={(e) => e.stopPropagation()}

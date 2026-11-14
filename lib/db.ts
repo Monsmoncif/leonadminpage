@@ -60,28 +60,31 @@ async function connectDB(): Promise<typeof mongoose> {
       serverSelectionTimeoutMS: 15000,
       socketTimeoutMS: 45000,
       connectTimeoutMS: 15000,
-      maxPoolSize: 10,
-      minPoolSize: 0,
+      maxPoolSize: 15,
+      minPoolSize: 2,
       retryWrites: true,
       retryReads: true,
     };
 
     cached.promise = mongoose
       .connect(MONGODB_URI!, opts)
-      .then(async (mongooseInstance) => {
+      .then((mongooseInstance) => {
         console.log("✅ MongoDB connected successfully");
-        try {
-          const clientsCol = mongooseInstance.connection.db?.collection("clients");
-          if (clientsCol) {
-            const indexes = await clientsCol.indexes();
-            if (indexes.some((idx) => idx.name === "email_1")) {
-              await clientsCol.dropIndex("email_1");
-              console.log("✅ Dropped legacy email_1 unique index on clients collection");
+        // Run one-time legacy index check asynchronously so it never delays cold connections
+        void (async () => {
+          try {
+            const clientsCol = mongooseInstance.connection.db?.collection("clients");
+            if (clientsCol) {
+              const indexes = await clientsCol.indexes();
+              if (indexes.some((idx) => idx.name === "email_1")) {
+                await clientsCol.dropIndex("email_1");
+                console.log("✅ Dropped legacy email_1 unique index on clients collection");
+              }
             }
+          } catch {
+            // Ignore if index does not exist
           }
-        } catch {
-          // Ignore if index does not exist
-        }
+        })();
         return mongooseInstance;
       })
       .catch((error) => {

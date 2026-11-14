@@ -72,6 +72,10 @@ export async function GET(req: Request) {
           $or: [
             { name: searchRegex },
             { phone: searchRegex },
+            { email: searchRegex },
+            { idNumber: searchRegex },
+            { passportNumber: searchRegex },
+            { licenseNumber: searchRegex },
           ]
         }).select("_id").lean(),
         Unit.find({
@@ -130,36 +134,19 @@ export async function GET(req: Request) {
     }
 
     const isFull = searchParams.get("full") === "true";
+    const isLite = searchParams.get("lite") === "true";
+    const skipStats = searchParams.get("skipStats") === "true";
 
-    // Fast parallel calculations using database indexes
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const statsFilter = driverId ? baseFilter : {};
 
-    const [totalCount, activeCount, draftCount, completedMonthCount, cancelledCount] = await Promise.all([
-      Contract.countDocuments(filter),
-      Contract.countDocuments({ ...statsFilter, status: "Active" }),
-      Contract.countDocuments({ ...statsFilter, status: "Draft" }),
-      Contract.countDocuments({ ...statsFilter, status: "Completed", updatedAt: { $gte: startOfMonth } }),
-      Contract.countDocuments({ ...statsFilter, status: "Cancelled" }),
-    ]);
-
-    const stats = {
-      activeContracts: activeCount,
-      pendingSignatures: draftCount,
-      completedThisMonth: completedMonthCount,
-      cancelled: cancelledCount,
-    };
-
-    let contractsQuery = Contract.find(filter)
-      .sort({ createdAt: -1 })
-      .populate({ path: "clientId", select: "name phone licenseNumber licenseExpiry idNumber nationality address clientType licenseIssuedDate licenseIssuedBy", strictPopulate: false })
-      .populate({ path: "unitId", select: "make model plate mileage images color year fuelType", strictPopulate: false })
-      .populate({ path: "driverId", select: "name", strictPopulate: false })
-      .populate({ path: "deliveryDriverId", select: "name", strictPopulate: false })
-      .populate({ path: "returnDriverId", select: "name", strictPopulate: false });
-
-    if (!isFull) {
+    let contractsQuery = Contract.find(filter).sort({ createdAt: -1 });
+    if (isLite) {
+      contractsQuery = contractsQuery.select(
+        "contractNumber isDispatched clientId unitId driverId deliveryDriverId returnDriverId personalizedPersonName additionalDriverName additionalDriverPhone contractType rentalType customerType startDate endDate checkoutTime checkinTime deliveredAt returnedAt depositAmount advancePayment totalAmount status createdAt updatedAt deliveryStatus paymentMethod paymentStatus pickupLocation dropoffLocation totalDays"
+      );
+    } else if (!isFull) {
       contractsQuery = contractsQuery.select(
         "-adminSignature -customerSignature -returnCustomerSignature -inspectionPhotos -returnPhotos -damagePhotos -moneyPhotos -returnMoneyPhotos -privacyConsentDoc"
       );
@@ -169,68 +156,160 @@ export async function GET(req: Request) {
       contractsQuery = contractsQuery.skip((page - 1) * limit).limit(limit);
     }
 
-    const contracts = await contractsQuery.lean();
+    const statsPromise = skipStats
+      ? Promise.resolve(null)
+      : Contract.aggregate([
+          ...(Object.keys(statsFilter).length > 0 ? [{ $match: statsFilter }] : []),
+          {
+            $facet: {
+              active: [{ $match: { status: "Active" } }, { $count: "count" }],
+              draft: [{ $match: { status: "Draft" } }, { $count: "count" }],
+              completedMonth: [
+                { $match: { status: "Completed", updatedAt: { $gte: startOfMonth } } },
+                { $count: "count" },
+              ],
+              cancelled: [{ $match: { status: "Cancelled" } }, { $count: "count" }],
+            },
+          },
+        ]);
 
-    const formattedContracts = contracts.map((c: any) => ({
-      ...c,
-      id: c.contractNumber ? String(c.contractNumber) : "Pending",
-      contractNumber: c.contractNumber || null,
-      isDispatched: Boolean(c.isDispatched || c.contractNumber || c.status === "Active" || c.deliveryStatus === "Delivered"),
-      _id: c._id.toString(), // Real ID
-      clientId: c.clientId?._id?.toString() || c.clientId || "",
-      clientObj: typeof c.clientId === "object" ? c.clientId : null,
-      unitId: c.unitId?._id?.toString() || c.unitId || "",
-      driverId: c.driverId?._id?.toString() || c.driverId || "",
-      deliveryDriverId: c.deliveryDriverId?._id?.toString() || c.deliveryDriverId || "",
-      returnDriverId: c.returnDriverId?._id?.toString() || c.returnDriverId || "",
-      customer: c.personalizedPersonName || c.clientId?.name || (c.contractType === "Personalized" ? (c.additionalDriverName || "Personal Use") : "Unknown"),
-      personalizedPersonName: c.personalizedPersonName || "",
-      customerPhone: c.clientId?.phone || c.additionalDriverPhone || "",
-      customerAddress: c.clientId?.address || c.pickupLocation || "",
-      customerEmail: c.clientId?.email || "",
-      customerIdNumber: c.clientId?.idNumber || c.clientId?.passportNumber || "",
-      customerNationality: c.clientId?.nationality || "",
-      customerLicense: c.clientId?.licenseNumber || c.additionalDriverLicense || "",
-      customerLicenseExpiry: c.clientId?.licenseExpiry || c.additionalDriverExpiry || "",
-      customerLicenseIssuedDate: c.clientId?.licenseIssuedDate || c.additionalDriverIssuedAt || "",
-      driver: c.contractType === "Personalized" ? "Personal Use" : (c.deliveryDriverId?.name || c.driverId?.name || "None"),
-      deliveryDriver: c.contractType === "Personalized" ? "Personal Use" : (c.deliveryDriverId?.name || (c.driverId && !c.returnDriverId ? c.driverId?.name : "None")),
-      returnDriver: c.returnDriverId?.name || "None",
-      vehicle: c.unitId ? `${c.unitId.make} ${c.unitId.model} (${c.unitId.plate})` : "Unknown Vehicle",
-      vehiclePlate: c.unitId?.plate || "",
-      vehicleColor: c.unitId?.color || "",
-      vehicleYear: c.unitId?.year || "",
-      vehicleFuel: c.unitId?.fuelType || "",
-      vehicleImage: c.unitId?.images?.[0] || null,
-      unitMileage: c.checkoutMileage !== undefined ? c.checkoutMileage : (c.unitId?.mileage || 0),
-      depositAmount: Number(c.depositAmount) || 0,
-      rawStartDate: c.startDate,
-      rawEndDate: c.endDate,
-      checkoutTime: c.checkoutTime || "08:00 AM",
-      checkinTime: c.checkinTime || "",
-      deliveredAt: c.deliveredAt || null,
-      returnedAt: c.returnedAt || (c.status === "Completed" ? (c.updatedAt || new Date().toISOString()) : null),
-      startDate: formatDateWords(c.startDate),
-      endDate: formatDateWords(c.endDate),
-      deposit: `$${c.depositAmount || 0}`,
-      advancePayment: c.advancePayment || 0,
-      rentAmount: `$${c.totalAmount || 0}`,
-      status: c.status,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt || null,
-      notes: c.notes || "",
-      returnNotes: c.returnNotes || "",
-      pickupLocation: c.pickupLocation || c.deliveryLocation || c.location || "Main Office",
-      dropoffLocation: c.dropoffLocation || c.returnLocation || "",
-      contractType: c.contractType || "Delivery",
-      rentalType: c.rentalType || (c.totalDays >= 30 ? "Monthly" : "Daily"),
-      customerType: c.customerType || "B2C",
-      deliveryStatus: c.deliveryStatus || "Pending",
-      paymentMethod: c.paymentMethod || "Cash",
-      paymentStatus: c.paymentStatus || "Pending",
-      customerSignature: c.customerSignature || "",
-      adminSignature: c.adminSignature || "",
-    }));
+    const totalCountPromise = page && limit ? Contract.countDocuments(filter) : Promise.resolve(null);
+
+    // Stage 1: Fetch contracts, pagination count, and aggregated stats in parallel
+    const [contracts, countedTotal, statsAgg] = await Promise.all([
+      contractsQuery.lean(),
+      totalCountPromise,
+      statsPromise,
+    ]);
+
+    const totalCount = countedTotal !== null ? countedTotal : contracts.length;
+    const statsFacet = statsAgg?.[0];
+    const stats = statsFacet
+      ? {
+          activeContracts: statsFacet.active?.[0]?.count || 0,
+          pendingSignatures: statsFacet.draft?.[0]?.count || 0,
+          completedThisMonth: statsFacet.completedMonth?.[0]?.count || 0,
+          cancelled: statsFacet.cancelled?.[0]?.count || 0,
+        }
+      : { ...emptyResponse.stats };
+
+    // Stage 2: Batch-resolve related Client, Unit, and User docs in parallel (3 queries max instead of 5 sequential .populate() calls)
+    const clientIdSet = new Set<string>();
+    const unitIdSet = new Set<string>();
+    const userIdSet = new Set<string>();
+
+    for (const c of contracts as any[]) {
+      if (c.clientId && mongoose.Types.ObjectId.isValid(String(c.clientId))) {
+        clientIdSet.add(String(c.clientId));
+      }
+      if (c.unitId && mongoose.Types.ObjectId.isValid(String(c.unitId))) {
+        unitIdSet.add(String(c.unitId));
+      }
+      for (const uid of [c.driverId, c.deliveryDriverId, c.returnDriverId]) {
+        if (uid && mongoose.Types.ObjectId.isValid(String(uid))) {
+          userIdSet.add(String(uid));
+        }
+      }
+    }
+
+    const [clientsList, unitsList, usersList] = await Promise.all([
+      clientIdSet.size > 0
+        ? Client.find({ _id: { $in: Array.from(clientIdSet) } })
+            .select(
+              isLite
+                ? "name phone"
+                : "name phone email passportNumber licenseNumber licenseExpiry idNumber nationality address clientType licenseIssuedDate licenseIssuedBy"
+            )
+            .lean()
+        : Promise.resolve([]),
+      unitIdSet.size > 0
+        ? Unit.find({ _id: { $in: Array.from(unitIdSet) } })
+            .select(
+              isLite
+                ? "make model plate mileage color year fuelType"
+                : isFull
+                ? "make model plate mileage images color year fuelType"
+                : { make: 1, model: 1, plate: 1, mileage: 1, color: 1, year: 1, fuelType: 1, images: { $slice: 1 } }
+            )
+            .lean()
+        : Promise.resolve([]),
+      userIdSet.size > 0
+        ? User.find({ _id: { $in: Array.from(userIdSet) } }).select("name").lean()
+        : Promise.resolve([]),
+    ]);
+
+    const clientMap = new Map<string, any>(clientsList.map((doc: any) => [doc._id.toString(), doc]));
+    const unitMap = new Map<string, any>(unitsList.map((doc: any) => [doc._id.toString(), doc]));
+    const userMap = new Map<string, any>(usersList.map((doc: any) => [doc._id.toString(), doc]));
+
+    const formattedContracts = contracts.map((c: any) => {
+      const clientDoc = c.clientId ? clientMap.get(String(c.clientId)) || null : null;
+      const unitDoc = c.unitId ? unitMap.get(String(c.unitId)) || null : null;
+      const driverDoc = c.driverId ? userMap.get(String(c.driverId)) || null : null;
+      const deliveryDriverDoc = c.deliveryDriverId ? userMap.get(String(c.deliveryDriverId)) || null : null;
+      const returnDriverDoc = c.returnDriverId ? userMap.get(String(c.returnDriverId)) || null : null;
+
+      return {
+        ...c,
+        id: c.contractNumber ? String(c.contractNumber) : "Pending",
+        contractNumber: c.contractNumber || null,
+        isDispatched: Boolean(c.isDispatched || c.contractNumber || c.status === "Active" || c.deliveryStatus === "Delivered"),
+        _id: c._id.toString(), // Real ID
+        clientId: clientDoc?._id?.toString() || (c.clientId ? String(c.clientId) : ""),
+        clientObj: clientDoc,
+        unitId: unitDoc?._id?.toString() || (c.unitId ? String(c.unitId) : ""),
+        driverId: driverDoc?._id?.toString() || (c.driverId ? String(c.driverId) : ""),
+        deliveryDriverId: deliveryDriverDoc?._id?.toString() || (c.deliveryDriverId ? String(c.deliveryDriverId) : ""),
+        returnDriverId: returnDriverDoc?._id?.toString() || (c.returnDriverId ? String(c.returnDriverId) : ""),
+        customer: c.personalizedPersonName || clientDoc?.name || (c.contractType === "Personalized" ? (c.additionalDriverName || "Personal Use") : "Unknown"),
+        personalizedPersonName: c.personalizedPersonName || "",
+        customerPhone: clientDoc?.phone || c.additionalDriverPhone || "",
+        customerAddress: clientDoc?.address || c.pickupLocation || "",
+        customerEmail: clientDoc?.email || "",
+        customerIdNumber: clientDoc?.idNumber || clientDoc?.passportNumber || "",
+        customerNationality: clientDoc?.nationality || "",
+        customerLicense: clientDoc?.licenseNumber || c.additionalDriverLicense || "",
+        customerLicenseExpiry: clientDoc?.licenseExpiry || c.additionalDriverExpiry || "",
+        customerLicenseIssuedDate: clientDoc?.licenseIssuedDate || c.additionalDriverIssuedAt || "",
+        driver: c.contractType === "Personalized" ? "Personal Use" : (deliveryDriverDoc?.name || driverDoc?.name || "None"),
+        deliveryDriver: c.contractType === "Personalized" ? "Personal Use" : (deliveryDriverDoc?.name || (driverDoc && !returnDriverDoc ? driverDoc.name : "None")),
+        returnDriver: returnDriverDoc?.name || "None",
+        vehicle: unitDoc ? `${unitDoc.make} ${unitDoc.model} (${unitDoc.plate})` : "Unknown Vehicle",
+        vehiclePlate: unitDoc?.plate || "",
+        vehicleColor: unitDoc?.color || "",
+        vehicleYear: unitDoc?.year || "",
+        vehicleFuel: unitDoc?.fuelType || "",
+        vehicleImage: unitDoc?.images?.[0] || null,
+        unitMileage: c.checkoutMileage !== undefined ? c.checkoutMileage : (unitDoc?.mileage || 0),
+        depositAmount: Number(c.depositAmount) || 0,
+        rawStartDate: c.startDate,
+        rawEndDate: c.endDate,
+        checkoutTime: c.checkoutTime || "08:00 AM",
+        checkinTime: c.checkinTime || "",
+        deliveredAt: c.deliveredAt || null,
+        returnedAt: c.returnedAt || (c.status === "Completed" ? (c.updatedAt || new Date().toISOString()) : null),
+        startDate: formatDateWords(c.startDate),
+        endDate: formatDateWords(c.endDate),
+        deposit: `$${c.depositAmount || 0}`,
+        advancePayment: c.advancePayment || 0,
+        rentAmount: `$${c.totalAmount || 0}`,
+        status: c.status,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt || null,
+        notes: c.notes || "",
+        returnNotes: c.returnNotes || "",
+        pickupLocation: c.pickupLocation || c.deliveryLocation || c.location || "Main Office",
+        dropoffLocation: c.dropoffLocation || c.returnLocation || "",
+        contractType: c.contractType || "Delivery",
+        rentalType: c.rentalType || (c.totalDays >= 30 ? "Monthly" : "Daily"),
+        customerType: c.customerType || "B2C",
+        deliveryStatus: c.deliveryStatus || "Pending",
+        paymentMethod: c.paymentMethod || "Cash",
+        paymentStatus: c.paymentStatus || "Pending",
+        customerSignature: c.customerSignature || "",
+        adminSignature: c.adminSignature || "",
+      };
+    });
 
     return NextResponse.json({
       contracts: formattedContracts,

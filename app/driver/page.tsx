@@ -163,7 +163,7 @@ export default function DriverDashboard() {
 
     try {
       // Fetch all contracts so all drivers can see all orders
-      const res = await fetch(`/api/contracts`, { cache: 'no-store' });
+      const res = await fetch(`/api/contracts?lite=true&skipStats=true`, { cache: 'no-store' });
       const data = await res.json();
 
       const rawContracts: any[] = data.contracts || [];

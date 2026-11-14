@@ -211,7 +211,7 @@ export default function RegisterClientModal({
   const fetchClients = async () => {
     setLoadingClients(true);
     try {
-      const res = await fetch("/api/clients", { cache: "no-store" });
+      const res = await fetch("/api/clients?slim=true&skipStats=true", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setClients(data.clients || (Array.isArray(data) ? data : []));

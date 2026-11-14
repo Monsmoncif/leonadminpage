@@ -19,26 +19,55 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
-    // 1. Synchronize vehicle statuses based on today's active contracts
-    await syncUnitStatuses();
+    // Sync unit statuses asynchronously so initial page loads never block on a write round trip
+    void syncUnitStatuses();
 
-    // 2. Fetch all units
     const isFull = req.nextUrl.searchParams.get("full") === "true";
-    let unitsQuery = Unit.find().sort({ createdAt: -1 });
-    if (!isFull) {
-      unitsQuery = unitsQuery.select("-documents");
-    }
-    const units = await unitsQuery.lean();
+    const isSlim = req.nextUrl.searchParams.get("slim") === "true";
 
-    // 3. Fetch active/draft contracts to attach upcoming bookings
-    const activeContracts = await Contract.find({
-      status: { $in: ["Active", "Draft"] },
-      deliveryStatus: { $ne: "Returned" },
-    })
-      .select("_id contractNumber unitId startDate endDate status checkoutTime checkinTime returnedAt")
-      .lean();
+    let unitsQuery = Unit.find().sort({ createdAt: -1 });
+    if (isSlim) {
+      unitsQuery = unitsQuery.select({
+        make: 1,
+        model: 1,
+        plate: 1,
+        year: 1,
+        color: 1,
+        category: 1,
+        fuelType: 1,
+        transmission: 1,
+        seats: 1,
+        mileage: 1,
+        dailyRate: 1,
+        weeklyRate: 1,
+        monthlyRate: 1,
+        status: 1,
+        images: { $slice: 1 },
+      });
+    } else if (!isFull) {
+      unitsQuery = unitsQuery.select({
+        documents: 0,
+        vidangeHistory: 0,
+        images: { $slice: 1 },
+      });
+    }
+
+    // Run Unit query and active Contract bookings lookup in parallel
+    const [units, activeContracts] = await Promise.all([
+      unitsQuery.lean(),
+      Contract.find({
+        status: { $in: ["Active", "Draft"] },
+        deliveryStatus: { $ne: "Returned" },
+      })
+        .select("_id contractNumber unitId startDate endDate status deliveryStatus checkoutTime checkinTime returnedAt")
+        .lean(),
+    ]);
+
+    const nowEndOfDay = new Date();
+    nowEndOfDay.setHours(23, 59, 59, 999);
 
     const bookingsByUnit: Record<string, any[]> = {};
+    const rentedUnitSet = new Set<string>();
     for (const c of activeContracts) {
       if (!c.unitId) continue;
       const uid = c.unitId.toString();
@@ -53,12 +82,33 @@ export async function GET(req: NextRequest) {
         checkinTime: c.checkinTime || "",
         returnedAt: c.returnedAt || null,
       });
+
+      if (
+        c.deliveryStatus === "Delivered" &&
+        c.startDate &&
+        c.endDate &&
+        new Date(c.startDate) <= nowEndOfDay &&
+        new Date(c.endDate) > nowEndOfDay
+      ) {
+        rentedUnitSet.add(uid);
+      }
     }
 
-    const unitsWithBookings = units.map((u: any) => ({
-      ...u,
-      activeBookings: bookingsByUnit[u._id.toString()] || [],
-    }));
+    const unitsWithBookings = units.map((u: any) => {
+      const uid = u._id.toString();
+      const computedStatus =
+        u.status === "Maintenance" || u.status === "Out of Service"
+          ? u.status
+          : rentedUnitSet.has(uid)
+          ? "Rented"
+          : "Available";
+
+      return {
+        ...u,
+        status: computedStatus,
+        activeBookings: bookingsByUnit[uid] || [],
+      };
+    });
     
     const stats = {
       totalVehicles: unitsWithBookings.length,

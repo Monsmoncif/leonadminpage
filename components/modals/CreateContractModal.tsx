@@ -241,9 +241,9 @@ export default function CreateContractModal({
     setLoadingData(true);
     try {
       const [unitsRes, clientsRes, driversRes] = await Promise.all([
-        fetch("/api/units", { cache: "no-store" }),
-        fetch("/api/clients", { cache: "no-store" }),
-        fetch("/api/drivers", { cache: "no-store" })
+        fetch("/api/units?slim=true", { cache: "no-store" }),
+        fetch("/api/clients?slim=true&skipStats=true", { cache: "no-store" }),
+        fetch("/api/drivers?slim=true", { cache: "no-store" })
       ]);
       
       const unitsData = await unitsRes.json();

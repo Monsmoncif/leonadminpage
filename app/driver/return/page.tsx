@@ -195,7 +195,7 @@ export default function VehicleReturnPage() {
   useEffect(() => {
     const qId = searchParams.get("contractId");
 
-    fetch("/api/contracts", { cache: "no-store" })
+    fetch("/api/contracts?lite=true&skipStats=true&limit=150", { cache: "no-store" })
       .then((res) => res.json())
       .then(async (contractsData) => {
         const allList = contractsData.contracts || [];

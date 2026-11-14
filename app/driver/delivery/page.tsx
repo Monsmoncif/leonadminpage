@@ -287,7 +287,7 @@ export default function ConfirmDeliveryPage() {
 
         // Fetch all clients
         try {
-          const clientRes = await fetch("/api/clients", { cache: "no-store" });
+          const clientRes = await fetch("/api/clients?slim=true&skipStats=true", { cache: "no-store" });
           if (clientRes.ok) {
             const clientData = await clientRes.json();
             const list = Array.isArray(clientData) ? clientData : clientData.clients || [];

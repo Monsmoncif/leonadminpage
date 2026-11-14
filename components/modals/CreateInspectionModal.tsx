@@ -44,7 +44,7 @@ export default function CreateInspectionModal({
     const fetchContracts = async () => {
       try {
         setLoadingContracts(true);
-        const res = await fetch("/api/contracts");
+        const res = await fetch("/api/contracts?lite=true&skipStats=true&limit=100");
         const json = await res.json();
         if (res.ok) {
           // Allow all contracts (Draft/Active/Completed) for inspections

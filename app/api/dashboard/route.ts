@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   try {
     await connectDB();
     void User;
-    await syncUnitStatuses();
+    void syncUnitStatuses();
 
     // Date calculations for changes (This month vs Last month)
     const { searchParams } = new URL(request.url);

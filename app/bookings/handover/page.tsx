@@ -245,7 +245,7 @@ function ConfirmHandoverPageContent() {
         // If no contractId in URL, fetch list to find target contract
         if (!targetContractId) {
           try {
-            const listRes = await fetch("/api/contracts", { cache: "no-store" });
+            const listRes = await fetch("/api/contracts?lite=true&skipStats=true&limit=100", { cache: "no-store" });
             if (listRes.ok) {
               const listData = await listRes.json();
               const allContracts = listData.contracts || [];
@@ -262,7 +262,7 @@ function ConfirmHandoverPageContent() {
           }
         } else {
           // If contractId is already in URL, fetch contracts switcher list in background without blocking!
-          fetch("/api/contracts", { cache: "no-store" })
+          fetch("/api/contracts?lite=true&skipStats=true&limit=100", { cache: "no-store" })
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
               if (data?.contracts) setContractsList(data.contracts);
@@ -279,7 +279,7 @@ function ConfirmHandoverPageContent() {
         // Fetch target contract immediately and clients in parallel (Fast non-blocking)
         const [res] = await Promise.all([
           fetch(`/api/contracts/${targetContractId}`, { cache: "no-store" }),
-          fetch("/api/clients", { cache: "no-store" })
+          fetch("/api/clients?slim=true&skipStats=true", { cache: "no-store" })
             .then((cRes) => (cRes.ok ? cRes.json() : null))
             .then((clientData) => {
               if (clientData) {

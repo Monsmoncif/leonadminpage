@@ -46,8 +46,8 @@ export default function CreateDamageModal({
       try {
         setLoadingData(true);
         const [unitsRes, contractsRes] = await Promise.all([
-          fetch("/api/units"),
-          fetch("/api/contracts"),
+          fetch("/api/units?slim=true"),
+          fetch("/api/contracts?lite=true&skipStats=true&limit=100"),
         ]);
         
         if (unitsRes.ok) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search,
   Plus,
@@ -66,10 +66,15 @@ const getClientStatusClasses = (status: string) => {
   }
 };
 
+const DEFAULT_CLIENTS_CACHE_KEY = "clients:1:10:";
+const getClientsCacheKey = (page: number, limit: number, search: string) =>
+  `clients:${page}:${limit}:${search}`;
+
 export default function ClientsPage() {
-  const cachedData = typeof window !== "undefined" ? getClientCache<{ clients: any[]; stats: any }>("clients") : null;
-  const [data, setData] = useState<{ clients: any[]; stats: any } | null>(cachedData);
+  const cachedData = typeof window !== "undefined" ? getClientCache<{ clients: any[]; stats: any; totalCount?: number; totalPages?: number }>(DEFAULT_CLIENTS_CACHE_KEY) : null;
+  const [data, setData] = useState<{ clients: any[]; stats: any; totalCount?: number; totalPages?: number } | null>(cachedData);
   const [loading, setLoading] = useState(!cachedData);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -77,38 +82,91 @@ export default function ClientsPage() {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const toast = useToast();
   const router = useRouter();
 
-  const fetchClients = async (retryCount = 0, silent = false) => {
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const hasDataRef = useRef(Boolean(data));
+  hasDataRef.current = Boolean(data);
+  const queryParamsRef = useRef({ currentPage, itemsPerPage, debouncedSearch });
+  queryParamsRef.current = { currentPage, itemsPerPage, debouncedSearch };
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setDebouncedSearch("");
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchClients = useCallback(async (retryCount = 0, silent = false) => {
     const MAX_RETRIES = 3;
-    const shouldShowSpinner = !silent && !data && !getClientCache("clients");
-    if (shouldShowSpinner) setLoading(true);
+    const { currentPage: p, itemsPerPage: l, debouncedSearch: q } = queryParamsRef.current;
+    const cacheKey = getClientsCacheKey(p, l, q);
+    const cachedHit = getClientCache<{ clients: any[]; stats: any; totalCount?: number; totalPages?: number }>(cacheKey);
+
+    if (cachedHit) {
+      setData(cachedHit);
+      setLoading(false);
+    }
+
+    const hasExistingData = Boolean(hasDataRef.current || cachedHit);
+    if (!silent && !hasExistingData) {
+      setLoading(true);
+    } else if (!silent) {
+      setIsFetching(true);
+    }
+
+    if (retryCount === 0 && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await fetch("/api/clients?full=true", { cache: "no-store" });
+      const qs = new URLSearchParams({
+        page: String(p),
+        limit: String(l),
+      });
+      if (q) qs.set("search", q);
+
+      const res = await fetch(`/api/clients?${qs.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error(`Failed to fetch clients data (${res.status})`);
       const json = await res.json();
-      const formatted = Array.isArray(json) ? { clients: json, stats: {} } : json;
+      const formatted = Array.isArray(json) ? { clients: json, stats: {}, totalCount: json.length, totalPages: 1 } : json;
       setData(formatted);
-      setClientCache("clients", formatted);
+      setClientCache(cacheKey, formatted);
       setError(null);
     } catch (err: any) {
+      if (err?.name === "AbortError") return;
       console.error(`Clients fetch error (attempt ${retryCount + 1}):`, err);
       if (retryCount < MAX_RETRIES) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 4000);
-        await new Promise(res => setTimeout(res, delay));
+        await new Promise((res) => setTimeout(res, delay));
         return fetchClients(retryCount + 1, silent);
       }
-      if (!silent && !data) setError(err.message);
+      if (!silent && !hasExistingData) setError(err.message);
     } finally {
       setLoading(false);
+      setIsFetching(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchClients();
+    fetchClients(0, Boolean(getClientCache(getClientsCacheKey(currentPage, itemsPerPage, debouncedSearch))));
+  }, [currentPage, itemsPerPage, debouncedSearch, fetchClients]);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("action") === "add-client") {
@@ -119,6 +177,9 @@ export default function ClientsPage() {
         setIsCompanyModalOpen(true);
       }
     }
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, []);
 
   const handleDeleteConfirm = async () => {
@@ -137,11 +198,16 @@ export default function ClientsPage() {
         const newClients = data.clients.filter(
           (c: any) => c._id !== deleteTarget._id
         );
-        setData({ ...data, clients: newClients });
+        setData({
+          ...data,
+          clients: newClients,
+          totalCount: Math.max(0, (data.totalCount ?? newClients.length) - 1),
+        });
       }
       invalidateClientCache("clients");
       toast.success(`${deleteTarget.name} deleted successfully.`);
       setDeleteTarget(null);
+      fetchClients(0, true);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -161,7 +227,8 @@ export default function ClientsPage() {
         throw new Error(resJson.error || "Failed to update customer status");
       }
       toast.success(`Customer status updated to ${newStatus}`);
-      fetchClients();
+      invalidateClientCache("clients");
+      fetchClients(0, true);
     } catch (err: any) {
       toast.error(err.message || "Failed to update customer status");
     }
@@ -198,24 +265,17 @@ export default function ClientsPage() {
   const clients = data?.clients || [];
   const stats = data?.stats || {};
 
-  const filteredClients = clients.filter((client: any) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      client.name?.toLowerCase().includes(q) ||
-      client.email?.toLowerCase().includes(q) ||
-      client.phone?.includes(q) ||
-      client.idNumber?.toLowerCase().includes(q) ||
-      client.licenseNumber?.toLowerCase().includes(q) ||
-      client.nationality?.toLowerCase().includes(q)
-    );
-  });
-
-  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
-  const paginatedClients = filteredClients.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const filteredClients = clients;
+  const totalItems = data?.totalCount ?? clients.length;
+  const totalPages = Math.max(1, data?.totalPages ?? Math.ceil(totalItems / itemsPerPage));
+  const paginatedClients = clients;
+  const showZeroTotalState =
+    !loading &&
+    !isFetching &&
+    clients.length === 0 &&
+    (stats.totalCustomers ?? 0) === 0 &&
+    !searchQuery &&
+    !debouncedSearch;
 
   const sparklineData = {
     total: [120, 125, 132, 138, 145, 152, 160],
@@ -335,7 +395,7 @@ export default function ClientsPage() {
       )}
 
       {/* Empty State */}
-      {!loading && clients.length === 0 && (
+      {showZeroTotalState && (
         <div className="flex flex-col items-center justify-center min-h-[50vh] bg-white rounded-2xl border border-dashed border-gray-300">
           <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
             <Users size={32} className="text-gray-300" />
@@ -360,7 +420,7 @@ export default function ClientsPage() {
       )}
 
       {/* Data Loaded Table */}
-      {!loading && clients.length > 0 && (
+      {!loading && !showZeroTotalState && (
         <div className="grid grid-cols-12 gap-6 animate-fade-in-up stagger-2">
           <div className="col-span-12 flex flex-col gap-6">
             {/* Toolbar (Matches Bookings Page) */}
@@ -381,7 +441,7 @@ export default function ClientsPage() {
             </div>
 
             {/* Table (Matches Bookings Page Table Style & Responsive UX) */}
-            <div className="bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover">
+            <div className={`bg-card rounded-xl sm:rounded-2xl border border-border shadow-xs sm:shadow-sm overflow-hidden card-hover transition-opacity ${isFetching ? "opacity-65" : ""}`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px] sm:text-xs md:text-sm">
                   <thead>
@@ -551,10 +611,13 @@ export default function ClientsPage() {
               <TablePagination
                 currentPage={currentPage}
                 totalPages={totalPages}
-                totalItems={filteredClients.length}
+                totalItems={totalItems}
                 itemsPerPage={itemsPerPage}
                 onPageChange={setCurrentPage}
-                onItemsPerPageChange={setItemsPerPage}
+                onItemsPerPageChange={(limit) => {
+                  setItemsPerPage(limit);
+                  setCurrentPage(1);
+                }}
                 itemLabel="customers"
               />
             </div>

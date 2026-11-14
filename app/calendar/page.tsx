@@ -383,7 +383,7 @@ export default function CalendarPage() {
   const fetchContracts = async (silent = false) => {
     try {
       if (!silent && !getClientCache("calendar_contracts")) setIsLoading(true);
-      const res = await fetch("/api/contracts?full=false", { cache: "no-store" });
+      const res = await fetch("/api/contracts?lite=true&skipStats=true", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       const list = data.contracts || [];

@@ -49,7 +49,7 @@ export default function DriverSidebar() {
       if (!session?.user?.id) return;
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       try {
-        const res = await fetch(`/api/contracts?driverId=${session.user.id}`, { cache: "no-store" });
+        const res = await fetch(`/api/contracts?driverId=${session.user.id}&lite=true&skipStats=true`, { cache: "no-store" });
         const data = await res.json();
         const driverId = session.user.id;
         

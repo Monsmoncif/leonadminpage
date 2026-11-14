@@ -83,7 +83,7 @@ export default function TopBar() {
     const fetchDriverNotifications = async () => {
       if (document.visibilityState === "hidden") return;
       try {
-        const res = await fetch(`/api/contracts?driverId=${sessionUserId}`, { cache: "no-store" });
+        const res = await fetch(`/api/contracts?driverId=${sessionUserId}&lite=true&skipStats=true`, { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
 

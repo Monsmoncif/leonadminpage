@@ -207,8 +207,8 @@ function ReturnPageContent() {
   // Load contracts and drivers
   useEffect(() => {
     Promise.all([
-      fetch(`/api/contracts?t=${Date.now()}`, { cache: "no-store" }).then(res => res.json()),
-      fetch(`/api/drivers?t=${Date.now()}`, { cache: "no-store" }).then(res => res.json())
+      fetch(`/api/contracts?lite=true&skipStats=true&limit=150&t=${Date.now()}`, { cache: "no-store" }).then(res => res.json()),
+      fetch(`/api/drivers?slim=true&t=${Date.now()}`, { cache: "no-store" }).then(res => res.json())
     ])
       .then(([contractsData, driversData]) => {
         const list = contractsData.contracts || [];
@@ -227,6 +227,8 @@ function ReturnPageContent() {
             setSelectedContractId(match._id || match.id);
             return;
           }
+          setSelectedContractId(qId);
+          return;
         }
         
         if (activeList.length > 0) {

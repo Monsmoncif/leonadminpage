@@ -615,7 +615,7 @@ function NewRentalAdminPageContent() {
 
   const fetchUnits = async () => {
     try {
-      const res = await fetch("/api/units", { cache: "no-store" });
+      const res = await fetch("/api/units?slim=true", { cache: "no-store" });
       const data = await res.json();
       const list = data.units || [];
       setUnits(list);
@@ -627,7 +627,7 @@ function NewRentalAdminPageContent() {
 
   const fetchClients = async () => {
     try {
-      const res = await fetch("/api/clients", { cache: "no-store" });
+      const res = await fetch("/api/clients?slim=true&skipStats=true", { cache: "no-store" });
       const data = await res.json();
       const list = data.clients || [];
       setClients(list);
@@ -639,7 +639,7 @@ function NewRentalAdminPageContent() {
 
   const fetchDrivers = async () => {
     try {
-      const res = await fetch("/api/drivers", { cache: "no-store" });
+      const res = await fetch("/api/drivers?slim=true", { cache: "no-store" });
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.drivers || []);
       setDrivers(list);
