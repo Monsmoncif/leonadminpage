@@ -165,7 +165,14 @@ export async function GET(req: Request) {
               active: [{ $match: { status: "Active" } }, { $count: "count" }],
               draft: [{ $match: { status: "Draft" } }, { $count: "count" }],
               completedMonth: [
-                { $match: { status: "Completed", updatedAt: { $gte: startOfMonth } } },
+                {
+                  $match: {
+                    status: "Completed",
+                    updatedAt: { $gte: startOfMonth },
+                    contractType: { $ne: "Personalized" },
+                    personalizedPersonName: { $in: [null, ""] },
+                  },
+                },
                 { $count: "count" },
               ],
               cancelled: [{ $match: { status: "Cancelled" } }, { $count: "count" }],
