@@ -16,7 +16,15 @@ import { authOptions } from "@/lib/auth";
 import { sendClientContractNotification, sendDriverTaskNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
 import { clearPdfCache, clearConsentPdfCache } from "@/lib/pdf-cache";
-import { calculateRentalDays } from "@/lib/date-utils";
+import {
+  calculateRentalDays,
+  parseContractDateToUTCMidnight,
+  formatDateToInput,
+  getBusinessTodayISO,
+  getBusinessTimeFormatted,
+  formatDateWords,
+  BUSINESS_TIMEZONE,
+} from "@/lib/date-utils";
 
 export async function GET(
   request: Request,
@@ -106,12 +114,10 @@ export async function PUT(
     }
 
     // Recalculate duration & amount if dates or rates are updated
-    const startDateVal = body.startDate ? new Date(body.startDate) : new Date(existingContract.startDate);
-    startDateVal.setHours(0, 0, 0, 0);
-    const endDateVal = body.endDate ? new Date(body.endDate) : new Date(existingContract.endDate);
-    endDateVal.setHours(0, 0, 0, 0);
+    const startDateVal = parseContractDateToUTCMidnight(body.startDate ?? existingContract.startDate);
+    const endDateVal = parseContractDateToUTCMidnight(body.endDate ?? existingContract.endDate);
 
-    if (isNaN(startDateVal.getTime()) || isNaN(endDateVal.getTime())) {
+    if (!startDateVal || !endDateVal) {
       return NextResponse.json({ error: "Invalid start or end date." }, { status: 400 });
     }
 
@@ -191,8 +197,7 @@ export async function PUT(
       });
 
       if (conflictingContract) {
-        const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-        const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+        const conflictEnd = formatDateWords(conflictingContract.endDate);
         const returnHour = conflictingContract.checkinTime || conflictingContract.checkoutTime || "10:00 AM";
         return NextResponse.json(
           { error: `Date Conflict: Vehicle (${targetUnitDoc.make} ${targetUnitDoc.model} - ${targetUnitDoc.plate}) is booked until ${conflictEnd} (${returnHour}). Please select a checkout time after ${returnHour} or choose another car.` },
@@ -240,11 +245,7 @@ export async function PUT(
       const completedMoment = body.returnedAt ? new Date(body.returnedAt) : new Date();
       if (isPersonalized) {
         updatedData.returnedAt = completedMoment;
-        updatedData.checkinTime = body.checkinTime || completedMoment.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        });
+        updatedData.checkinTime = body.checkinTime || getBusinessTimeFormatted(completedMoment);
       } else if (!body.returnedAt && !existingContract.returnedAt) {
         updatedData.returnedAt = completedMoment;
       }
@@ -254,18 +255,16 @@ export async function PUT(
       }
     }
 
-    // Enforce that contract can only be confirmed as Delivered & Active on or after the start date
-    const nowStartOfDay = new Date();
-    nowStartOfDay.setHours(0, 0, 0, 0);
-    const contractStartDate = new Date(existingContract.startDate);
-    contractStartDate.setHours(0, 0, 0, 0);
+    // Enforce that contract can only be confirmed as Delivered & Active on or after the UAE start date
+    const dubaiTodayISO = getBusinessTodayISO();
+    const contractStartISO = formatDateToInput(existingContract.startDate);
 
-    const isEarlyHandover = contractStartDate > nowStartOfDay;
+    const isEarlyHandover = Boolean(contractStartISO && contractStartISO > dubaiTodayISO);
     const isActivating = (body.deliveryStatus === "Delivered" && existingContract.deliveryStatus !== "Delivered") ||
                          (body.status === "Active" && existingContract.status !== "Active");
 
     if (isActivating && isEarlyHandover) {
-      const formattedStart = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      const formattedStart = formatDateWords(existingContract.startDate);
       return NextResponse.json(
         { 
           error: `Contract handover cannot be activated before its start date (${formattedStart}). Handover can be confirmed once the start date arrives.` 

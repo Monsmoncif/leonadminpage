@@ -14,7 +14,13 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { sendClientContractNotification, sendDriverTaskNotification, sendHandoverReminderNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
-import { formatDateWords, calculateRentalDays } from "@/lib/date-utils";
+import {
+  formatDateWords,
+  calculateRentalDays,
+  parseContractDateToUTCMidnight,
+  getBusinessStartOfMonthUTC,
+  BUSINESS_TIMEZONE,
+} from "@/lib/date-utils";
 
 const emptyResponse = {
   contracts: [],
@@ -137,8 +143,7 @@ export async function GET(req: Request) {
     const isLite = searchParams.get("lite") === "true";
     const skipStats = searchParams.get("skipStats") === "true";
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfMonth = getBusinessStartOfMonthUTC();
     const statsFilter = driverId ? baseFilter : {};
 
     let contractsQuery = Contract.find(filter).sort({ createdAt: -1 });
@@ -344,13 +349,11 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    // Calculate total days
-    const start = new Date(body.startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(body.endDate);
-    end.setHours(0, 0, 0, 0);
+    // Calculate total days using canonical UAE (Asia/Dubai) calendar dates
+    const start = parseContractDateToUTCMidnight(body.startDate);
+    const end = parseContractDateToUTCMidnight(body.endDate);
 
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    if (!start || !end) {
       return NextResponse.json({ error: "Invalid start or end date." }, { status: 400 });
     }
 
@@ -406,8 +409,7 @@ export async function POST(req: Request) {
     });
 
     if (conflictingContract) {
-      const conflictStart = new Date(conflictingContract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-      const conflictEnd = new Date(conflictingContract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      const conflictEnd = formatDateWords(conflictingContract.endDate);
       const returnHour = conflictingContract.checkinTime || conflictingContract.checkoutTime || "10:00 AM";
       return NextResponse.json(
         { error: `Date Conflict: Vehicle (${unitDoc.make} ${unitDoc.model} - ${unitDoc.plate}) is booked until ${conflictEnd} (${returnHour}). Please select a checkout time after ${returnHour} or choose another car.` },

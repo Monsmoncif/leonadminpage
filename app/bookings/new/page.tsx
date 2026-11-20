@@ -49,23 +49,21 @@ import AdditionalDriverModal from "@/components/modals/AdditionalDriverModal";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
+import RentalDaysControl from "@/components/ui/RentalDaysControl";
 import { areDatesOverlapping } from "@/lib/date-overlap";
-import { calculateRentalDays, formatRentalDuration } from "@/lib/date-utils";
+import {
+  calculateRentalDays,
+  formatRentalDuration,
+  getBusinessTodayISO,
+  getBusinessTimeFormatted,
+  addDaysToISODate,
+  formatDateToInput,
+  computeEndDateForRentalDays,
+  formatDateShort,
+  formatDateWords,
+} from "@/lib/date-utils";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys, compressImage } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
-
-const formatDateToInput = (dateStr: string) => {
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return new Date().toISOString().split("T")[0];
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  } catch {
-    return new Date().toISOString().split("T")[0];
-  }
-};
 
 const DELIVERY_STEPS = [
   { id: 1, title: "Car", icon: ExecutiveCarIcon },
@@ -257,23 +255,18 @@ function NewRentalAdminPageContent() {
     setCompanyToEdit(null);
   };
 
-  const getCurrentFormattedTime = () => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date());
-  };
+  const getCurrentFormattedTime = () => getBusinessTimeFormatted();
 
-  // Form State
+  // Form State — initialized in UAE (Asia/Dubai) calendar date so midnight UAE never reverts to UTC yesterday
+  const initialStartDate = getBusinessTodayISO();
   const [rentalData, setRentalData] = useState({
     driverId: "",
     deliveryDriverId: "",
     returnDriverId: "",
     rentalType: "Daily" as "Daily" | "Monthly",
     customerType: "B2C" as "B2C" | "B2B",
-    startDate: new Date().toISOString().split("T")[0],
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    startDate: initialStartDate,
+    endDate: addDaysToISODate(initialStartDate, 7),
     checkoutTime: "10:00 AM",
     checkinTime: "",
     collectionAmount: 595, // Price driver or admin will collect for the rental
@@ -680,8 +673,8 @@ function NewRentalAdminPageContent() {
       }
 
       // 3. Rental Data & Timing
-      const editStart = c.startDate ? formatDateToInput(c.startDate) : new Date().toISOString().split("T")[0];
-      const editEnd = c.endDate ? formatDateToInput(c.endDate) : new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+      const editStart = c.startDate ? formatDateToInput(c.startDate) : getBusinessTodayISO();
+      const editEnd = c.endDate ? formatDateToInput(c.endDate) : addDaysToISODate(editStart, 7);
       const days = calculateRentalDays(editStart, editEnd, c.checkoutTime, c.checkinTime);
       const editDailyRate = c.dailyRate || 85;
       const extraFees = (c.babySeatFees || 0) + (c.deliveryCharges || 0) + (c.salikFees || c.salikCharge || 0) + (c.tintingFees || 0) + (c.cleaningFees || 0);
@@ -847,14 +840,14 @@ function NewRentalAdminPageContent() {
     }
 
     if (chosenUnit || paramStartDate || paramEndDate || paramPrice || paramDays) {
-      const startStr = isValidDate(paramStartDate) ? (paramStartDate as string) : new Date().toISOString().split("T")[0];
+      const startStr = isValidDate(paramStartDate) ? (paramStartDate as string) : getBusinessTodayISO();
       let daysCount = paramDays && !isNaN(Number(paramDays)) && Number(paramDays) > 0 ? Number(paramDays) : 3;
       let endStr: string;
       if (isValidDate(paramEndDate)) {
         endStr = paramEndDate as string;
-        daysCount = Math.max(1, Math.round((new Date(endStr).getTime() - new Date(startStr).getTime()) / 86400000));
+        daysCount = Math.max(1, calculateRentalDays(startStr, endStr));
       } else {
-        endStr = new Date(new Date(startStr).getTime() + daysCount * 86400000).toISOString().split("T")[0];
+        endStr = addDaysToISODate(startStr, daysCount);
       }
 
       const unitRate = Number(paramDailyRate) > 0 ? Number(paramDailyRate) : Number(chosenUnit?.dailyRate) || 85;
@@ -1096,13 +1089,9 @@ function NewRentalAdminPageContent() {
       }
     }
 
-    // Validate dates order
+    // Validate dates order using canonical calendar strings (immune to timezone shifts)
     if (rentalData.startDate && rentalData.endDate) {
-      const s = new Date(rentalData.startDate);
-      s.setHours(0, 0, 0, 0);
-      const e = new Date(rentalData.endDate);
-      e.setHours(0, 0, 0, 0);
-      if (s > e) {
+      if (formatDateToInput(rentalData.startDate) > formatDateToInput(rentalData.endDate)) {
         toast.error("Start date cannot be after expected end date. Please adjust the return date. (تاريخ البداية لا يمكن أن يكون بعد تاريخ الإرجاع)");
         return;
       }
@@ -1196,11 +1185,7 @@ function NewRentalAdminPageContent() {
     setIsLoading(true);
     try {
       if (rentalData.startDate && rentalData.endDate) {
-        const s = new Date(rentalData.startDate);
-        s.setHours(0, 0, 0, 0);
-        const e = new Date(rentalData.endDate);
-        e.setHours(0, 0, 0, 0);
-        if (s > e) {
+        if (formatDateToInput(rentalData.startDate) > formatDateToInput(rentalData.endDate)) {
           toast.error("Start date cannot be after expected end date. (تاريخ البداية لا يمكن أن يكون بعد تاريخ الإرجاع)");
           setIsLoading(false);
           return;
@@ -2065,8 +2050,7 @@ function NewRentalAdminPageContent() {
               <button
                 type="button"
                 onClick={() => {
-                  const s = new Date(rentalData.startDate);
-                  const monthEnd = new Date(s.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+                  const monthEnd = addDaysToISODate(rentalData.startDate, 30);
                   setRentalData(prev => ({
                     ...prev,
                     rentalType: "Monthly",
@@ -2143,18 +2127,12 @@ function NewRentalAdminPageContent() {
                   onChange={e => {
                     const newStart = e.target.value;
                     if (!newStart) return;
-                    const s = new Date(newStart);
-                    s.setHours(0, 0, 0, 0);
 
                     const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
 
                     let resolvedEnd = rentalData.endDate;
                     if (newStart > rentalData.endDate) {
-                      const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
-                      const y = updatedEnd.getFullYear();
-                      const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
-                      const d = String(updatedEnd.getDate()).padStart(2, "0");
-                      resolvedEnd = `${y}-${m}-${d}`;
+                      resolvedEnd = addDaysToISODate(newStart, prevDuration);
                     }
 
                     const days = calculateRentalDays(newStart, resolvedEnd, rentalData.checkoutTime, rentalData.checkinTime);
@@ -2265,14 +2243,28 @@ function NewRentalAdminPageContent() {
               </div>
             </div>
 
-            {/* Rental Duration & Order Helper */}
-            <div className="flex items-center justify-between text-xs px-1">
+            {/* Rental Duration, Editable Days & Order Helper */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs px-1">
               <span className="text-text-muted">
                 Rental Duration (مدة الإيجار):{" "}
                 <strong className="text-brand font-bold">
                   {formatRentalDuration(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime)}
                 </strong>
               </span>
+              <RentalDaysControl
+                days={totalDays}
+                onChange={(nextDays) => {
+                  const nextEnd = computeEndDateForRentalDays(rentalData.startDate, nextDays, rentalData.checkoutTime, rentalData.checkinTime);
+                  const actualDays = calculateRentalDays(rentalData.startDate, nextEnd, rentalData.checkoutTime, rentalData.checkinTime);
+                  const rate = Number(rentalData.dailyRate) || 0;
+                  setRentalData(prev => ({
+                    ...prev,
+                    rentalType: actualDays >= 30 ? "Monthly" : "Daily",
+                    endDate: nextEnd,
+                    collectionAmount: rate > 0 ? Math.round(rate * actualDays * 100) / 100 : prev.collectionAmount,
+                  }));
+                }}
+              />
               {rentalData.startDate > rentalData.endDate && (
                 <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
                   <AlertCircle size={13} />
@@ -2286,15 +2278,11 @@ function NewRentalAdminPageContent() {
               const selectedUnit = units.find(u => u._id === selectedVehicle);
               const conflict = selectedUnit ? getUnitConflict(selectedUnit, rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime) : null;
               if (!conflict || conflict.reason !== "Booked") return null;
-              const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-              const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+              const conflictStart = formatDateWords(conflict.startDate);
+              const conflictEnd = formatDateWords(conflict.endDate);
               const returnHour = conflict.returnTime || "10:00 AM";
 
-              const sDate = new Date(rentalData.startDate);
-              const cEnd = new Date(conflict.endDate);
-              const isTurnoverConflict = sDate.getFullYear() === cEnd.getFullYear() && 
-                                         sDate.getMonth() === cEnd.getMonth() && 
-                                         sDate.getDate() === cEnd.getDate();
+              const isTurnoverConflict = formatDateToInput(rentalData.startDate) === formatDateToInput(conflict.endDate);
 
               return (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in shadow-2xs">
@@ -3178,16 +3166,10 @@ function NewRentalAdminPageContent() {
                   onChange={(e) => {
                     const newStart = e.target.value;
                     if (!newStart) return;
-                    const s = new Date(newStart);
-                    s.setHours(0, 0, 0, 0);
                     const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
                     let resolvedEnd = rentalData.endDate;
                     if (newStart > rentalData.endDate) {
-                      const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
-                      const y = updatedEnd.getFullYear();
-                      const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
-                      const d = String(updatedEnd.getDate()).padStart(2, "0");
-                      resolvedEnd = `${y}-${m}-${d}`;
+                      resolvedEnd = addDaysToISODate(newStart, prevDuration);
                     }
                     setRentalData(prev => ({ ...prev, startDate: newStart, endDate: resolvedEnd }));
                   }}
@@ -3280,14 +3262,25 @@ function NewRentalAdminPageContent() {
               </div>
             </div>
 
-            {/* Rental Duration indicator for Personalized */}
-            <div className="flex items-center justify-between text-xs px-1">
+            {/* Rental Duration & Editable Days indicator for Personalized */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs px-1">
               <span className="text-text-muted">
                 Rental Duration (مدة الإيجار):{" "}
                 <strong className="text-brand font-bold">
                   {formatRentalDuration(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime)}
                 </strong>
               </span>
+              <RentalDaysControl
+                days={calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime)}
+                onChange={(nextDays) => {
+                  const nextEnd = computeEndDateForRentalDays(rentalData.startDate, nextDays, rentalData.checkoutTime, rentalData.checkinTime);
+                  setRentalData(prev => ({
+                    ...prev,
+                    rentalType: nextDays >= 30 ? "Monthly" : "Daily",
+                    endDate: nextEnd,
+                  }));
+                }}
+              />
               {rentalData.startDate > rentalData.endDate && (
                 <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
                   <AlertCircle size={13} />
@@ -3300,15 +3293,11 @@ function NewRentalAdminPageContent() {
             {(() => {
               const conflict = selectedUnit ? getUnitConflict(selectedUnit, rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime) : null;
               if (!conflict || conflict.reason !== "Booked") return null;
-              const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-              const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+              const conflictStart = formatDateWords(conflict.startDate);
+              const conflictEnd = formatDateWords(conflict.endDate);
               const returnHour = conflict.returnTime || "10:00 AM";
 
-              const sDate = new Date(rentalData.startDate);
-              const cEnd = new Date(conflict.endDate);
-              const isTurnoverConflict = sDate.getFullYear() === cEnd.getFullYear() && 
-                                         sDate.getMonth() === cEnd.getMonth() && 
-                                         sDate.getDate() === cEnd.getDate();
+              const isTurnoverConflict = formatDateToInput(rentalData.startDate) === formatDateToInput(conflict.endDate);
 
               return (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in shadow-2xs">

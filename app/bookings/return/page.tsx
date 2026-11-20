@@ -43,6 +43,7 @@ import Link from "next/link";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
+import { getBusinessTimeFormatted, getBusinessTodayISO, formatDateToInput } from "@/lib/date-utils";
 import VehicleInspectionPhotoCapture, {
   VEHICLE_ANGLES,
   EXTRA_PHOTO_PREFIX,
@@ -182,13 +183,7 @@ function ReturnPageContent() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const getCurrentFormattedTime = () => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date());
-  };
+  const getCurrentFormattedTime = () => getBusinessTimeFormatted();
 
   // Scroll to top smoothly on step change
   const scrollToTop = () => {
@@ -311,8 +306,8 @@ function ReturnPageContent() {
       setReturnDriverId(selectedContract.returnDriverId || "");
 
       const contractReturnedDate = selectedContract.returnedAt
-        ? new Date(selectedContract.returnedAt).toISOString().split("T")[0]
-        : (selectedContract.endDate ? new Date(selectedContract.endDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]);
+        ? formatDateToInput(selectedContract.returnedAt)
+        : (selectedContract.endDate ? formatDateToInput(selectedContract.endDate) : getBusinessTodayISO());
       setReturnDate(contractReturnedDate);
 
       const nowTimeStr = getCurrentFormattedTime();

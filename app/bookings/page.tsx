@@ -32,6 +32,7 @@ import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
 import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 import { useToast } from "@/components/providers/ToastProvider";
+import { getBusinessTodayISO, formatDateToInput, formatDateWords, getBusinessTimeFormatted } from "@/lib/date-utils";
 
 // Helper for generating initials for avatars (matches clients page)
 const getInitials = (name: string) => {
@@ -146,13 +147,12 @@ export default function ContractsPage() {
       return;
     }
 
-    const nowStartOfDay = new Date();
-    nowStartOfDay.setHours(0, 0, 0, 0);
-    const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
-    contractStartDate.setHours(0, 0, 0, 0);
+    const dubaiTodayISO = getBusinessTodayISO();
+    const rawStart = contract.rawStartDate || contract.startDate;
+    const contractStartISO = formatDateToInput(rawStart);
 
-    if (contractStartDate > nowStartOfDay) {
-      const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    if (contractStartISO > dubaiTodayISO) {
+      const formattedDate = formatDateWords(rawStart);
       toast.error(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
       return;
     }
@@ -753,24 +753,19 @@ export default function ContractsPage() {
                                         toast.error("This order is assigned to a driver. The driver must confirm vehicle handover in their dashboard to activate the contract.");
                                         return;
                                       }
-                                      const nowStartOfDay = new Date();
-                                      nowStartOfDay.setHours(0, 0, 0, 0);
-                                      const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
-                                      contractStartDate.setHours(0, 0, 0, 0);
+                                      const dubaiTodayISO = getBusinessTodayISO();
+                                      const rawStart = contract.rawStartDate || contract.startDate;
+                                      const contractStartISO = formatDateToInput(rawStart);
 
-                                      if (contractStartDate > nowStartOfDay) {
-                                        const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                                      if (contractStartISO > dubaiTodayISO) {
+                                        const formattedDate = formatDateWords(rawStart);
                                         toast.error(`Cannot activate contract before start date (${formattedDate}).`);
                                         return;
                                       }
                                     }
                                     try {
                                       const now = new Date();
-                                      const currentFormattedTime = now.toLocaleTimeString("en-US", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                        hour12: true,
-                                      });
+                                      const currentFormattedTime = getBusinessTimeFormatted(now);
                                       const payload: any = { status: newStatus };
                                       if (newStatus === "Completed") {
                                         payload.deliveryStatus = "Returned";
@@ -818,12 +813,11 @@ export default function ContractsPage() {
                               <div className="flex items-center justify-end gap-1 sm:gap-1.5 transition-opacity">
                                 {(!isPersonalizedContract(contract) && contract.deliveryStatus !== "Delivered" && contract.status !== "Completed" && contract.status !== "Cancelled") && (() => {
                                   const isShop = isShopContract(contract);
-                                  const nowStartOfDay = new Date();
-                                  nowStartOfDay.setHours(0, 0, 0, 0);
-                                  const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
-                                  contractStartDate.setHours(0, 0, 0, 0);
-                                  const isFuture = contractStartDate > nowStartOfDay;
-                                  const formattedStart = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                                  const dubaiTodayISO = getBusinessTodayISO();
+                                  const rawStart = contract.rawStartDate || contract.startDate;
+                                  const contractStartISO = formatDateToInput(rawStart);
+                                  const isFuture = Boolean(contractStartISO && contractStartISO > dubaiTodayISO);
+                                  const formattedStart = formatDateWords(rawStart);
 
                                   // 1. Shop Contract: Handover in showroom
                                   if (isShop) {

@@ -25,6 +25,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/providers/ToastProvider";
+import { getBusinessTodayISO, formatDateToInput, formatDateWords } from "@/lib/date-utils";
 import { sparklineData } from "@/data/mock";
 import ConfirmDeliveryModal from "@/components/modals/ConfirmDeliveryModal";
 import TablePagination from "@/components/ui/TablePagination";
@@ -265,13 +266,12 @@ export default function DriverDashboard() {
   }) => {
     if (!deliveryModalContract) return;
 
-    const nowStartOfDay = new Date();
-    nowStartOfDay.setHours(0, 0, 0, 0);
-    const contractStartDate = new Date(deliveryModalContract.rawStartDate || deliveryModalContract.startDate);
-    contractStartDate.setHours(0, 0, 0, 0);
+    const dubaiTodayISO = getBusinessTodayISO();
+    const rawStart = deliveryModalContract.rawStartDate || deliveryModalContract.startDate;
+    const contractStartISO = formatDateToInput(rawStart);
 
-    if (contractStartDate > nowStartOfDay) {
-      const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    if (contractStartISO > dubaiTodayISO) {
+      const formattedDate = formatDateWords(rawStart);
       toast.error(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
       return;
     }

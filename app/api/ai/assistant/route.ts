@@ -13,6 +13,7 @@ import {
   handleAiClientDocumentUpload,
   tryUpdateRecentClientContactFromFollowUp,
 } from "@/lib/ai-client-scanner";
+import { getBusinessTodayISO, addDaysToISODate } from "@/lib/date-utils";
 
 interface AssistantResponse {
   reply: string;
@@ -189,7 +190,7 @@ function parseRentalDates(message: string, todayDate: string) {
   const daysMatch = message.match(/\b(\d+)\s*(?:days?|day|يوم|أيام|ايام)\b/i);
   if (daysMatch && !days) {
     days = parseInt(daysMatch[1], 10);
-    endDate = new Date(new Date(startDate).getTime() + days * 86400000).toISOString().split("T")[0];
+    endDate = addDaysToISODate(startDate, days);
   }
 
   return { startDate, endDate, days };
@@ -796,7 +797,7 @@ export async function POST(req: Request) {
     const existingDays = existingParams.get("days");
     const existingPrice = existingParams.get("price");
 
-    const todayDate = new Date().toISOString().split("T")[0];
+    const todayDate = getBusinessTodayISO();
 
     // =========================================================================
     // MASTER SYSTEM PROMPT: BACKEND-TRAINED OPERATIONS MANAGER & Q&A ENGINE

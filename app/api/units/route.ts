@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import { Unit } from "@/models/Unit";
 import { Contract } from "@/models/Contract";
 import { syncUnitStatuses } from "@/lib/unit-status";
+import { getBusinessEndOfDayUTC } from "@/lib/date-utils";
 
 const emptyResponse = {
   units: [],
@@ -63,8 +64,7 @@ export async function GET(req: NextRequest) {
         .lean(),
     ]);
 
-    const nowEndOfDay = new Date();
-    nowEndOfDay.setHours(23, 59, 59, 999);
+    const nowEndOfDay = getBusinessEndOfDayUTC();
 
     const bookingsByUnit: Record<string, any[]> = {};
     const rentedUnitSet = new Set<string>();

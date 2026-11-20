@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { useToast } from "@/components/providers/ToastProvider";
+import { formatDateToInput, addDaysToISODate, formatDateWords } from "@/lib/date-utils";
 
 interface ExtendRentalModalProps {
   isOpen: boolean;
@@ -54,15 +55,11 @@ export default function ExtendRentalModal({
   const contractNum = (contract._id || contract.id || "").toString().substring(0, 8).toUpperCase();
   const dailyRate = Number(contract.dailyRate) || 0;
 
-  // Compute dates
-  const currentEndDate = contract.rawEndDate 
-    ? new Date(contract.rawEndDate) 
-    : new Date(contract.endDate);
-  
-  const safeCurrentEndDate = isNaN(currentEndDate.getTime()) ? new Date() : currentEndDate;
-
-  const newEndDate = new Date(safeCurrentEndDate);
-  newEndDate.setDate(newEndDate.getDate() + extraDays);
+  // Compute dates cleanly using UAE (Asia/Dubai) calendar day math
+  const baseEndISO = formatDateToInput(contract.rawEndDate || contract.endDate);
+  const newEndISO = addDaysToISODate(baseEndISO, extraDays);
+  const safeCurrentEndDate = new Date(`${baseEndISO}T00:00:00Z`);
+  const newEndDate = new Date(`${newEndISO}T00:00:00Z`);
 
   const currentTotalDays = Number(contract.totalDays) || 1;
   const newTotalDays = currentTotalDays + extraDays;
@@ -87,9 +84,7 @@ export default function ExtendRentalModal({
   const paymentMethod = contract.paymentMethod || "Cash";
   const paymentStatus = contract.paymentStatus || "Pending";
 
-  const formatDateDisplay = (date: Date) => {
-    return date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-  };
+  const formatDateDisplay = (date: Date) => formatDateWords(date);
 
   const handleSubmit = async () => {
     if (extraDays < 1) {
@@ -102,7 +97,7 @@ export default function ExtendRentalModal({
 
     try {
       const payload = {
-        endDate: newEndDate.toISOString(),
+        endDate: newEndISO,
         totalDays: newTotalDays,
         totalAmount: newTotalAmount,
       };

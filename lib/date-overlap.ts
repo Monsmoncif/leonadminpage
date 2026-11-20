@@ -1,5 +1,7 @@
+import { extractCalendarYMD, getBusinessDateParts } from "./date-utils";
+
 /**
- * Utility function to parse a time string or Date into minutes from midnight (0 to 1439).
+ * Utility function to parse a time string or Date into minutes from midnight (0 to 1439) in UAE time.
  * Supports "10:00 AM", "02:30 PM", "14:30", "2:00pm", Date objects, ISO strings.
  */
 export function timeStringToMinutes(timeInput?: string | Date | null, defaultMinutes: number = 10 * 60): number {
@@ -7,7 +9,8 @@ export function timeStringToMinutes(timeInput?: string | Date | null, defaultMin
 
   if (timeInput instanceof Date) {
     if (isNaN(timeInput.getTime())) return defaultMinutes;
-    return timeInput.getHours() * 60 + timeInput.getMinutes();
+    const { hour, minute } = getBusinessDateParts(timeInput);
+    return hour * 60 + minute;
   }
 
   if (typeof timeInput !== "string") return defaultMinutes;
@@ -42,7 +45,8 @@ export function timeStringToMinutes(timeInput?: string | Date | null, defaultMin
   if (trimmed.includes("T")) {
     const d = new Date(trimmed);
     if (!isNaN(d.getTime())) {
-      return d.getHours() * 60 + d.getMinutes();
+      const { hour, minute } = getBusinessDateParts(d);
+      return hour * 60 + minute;
     }
   }
 
@@ -86,15 +90,18 @@ export function areDatesOverlapping(
     return false;
   }
 
-  // Normalize to local midnight timestamps to compare calendar dates cleanly
-  const toDayTimestamp = (d: Date) => {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  // Normalize to calendar UTC day timestamps in Asia/Dubai so overlap math is TZ-independent
+  const toDayTimestamp = (raw: Date | string) => {
+    const ymd = extractCalendarYMD(raw);
+    if (ymd) return Date.UTC(ymd.year, ymd.month - 1, ymd.day);
+    const parsed = raw instanceof Date ? raw : new Date(raw);
+    return Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
   };
 
-  const dayStartA = toDayTimestamp(sA);
-  const dayEndA = toDayTimestamp(eA);
-  const dayStartB = toDayTimestamp(sB);
-  const dayEndB = toDayTimestamp(eB);
+  const dayStartA = toDayTimestamp(startA);
+  const dayEndA = toDayTimestamp(endA);
+  const dayStartB = toDayTimestamp(startB);
+  const dayEndB = toDayTimestamp(endB);
 
   const hasTimes = Boolean(times && (times.timeStartA || times.timeEndA || times.timeStartB || times.timeEndB));
 

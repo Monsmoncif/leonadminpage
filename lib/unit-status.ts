@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Unit } from "@/models/Unit";
 import { Contract } from "@/models/Contract";
 import { areDatesOverlapping } from "./date-overlap";
+import { parseContractDateToUTCMidnight, parseContractDateToUTCEndOfDay, getBusinessEndOfDayUTC } from "./date-utils";
 
 export { areDatesOverlapping };
 
@@ -29,13 +30,10 @@ export async function checkContractDateOverlap({
   checkoutTime?: string;
   checkinTime?: string;
 }) {
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
+  const start = parseContractDateToUTCMidnight(startDate);
+  const end = parseContractDateToUTCEndOfDay(endDate);
 
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
-
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+  if (!start || !end) {
     throw new Error("Invalid start or end date.");
   }
 
@@ -110,9 +108,7 @@ export async function syncUnitStatuses(targetUnitId?: string | mongoose.Types.Ob
       lastGlobalSyncTime = Date.now();
     }
 
-    const now = new Date();
-    const nowEndOfDay = new Date(now);
-    nowEndOfDay.setHours(23, 59, 59, 999);
+    const nowEndOfDay = getBusinessEndOfDayUTC();
 
     // 1. Find contracts where the vehicle is CURRENTLY HANDED OVER and has not yet reached its finish day
     const activeContractsFilter: any = {

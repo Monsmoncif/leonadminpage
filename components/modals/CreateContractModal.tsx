@@ -38,9 +38,19 @@ import CreateCompanyModal from "@/components/modals/CreateCompanyModal";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
+import RentalDaysControl from "@/components/ui/RentalDaysControl";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES } from "@/components/ui/VehicleInspectionPhotoCapture";
 import { areDatesOverlapping } from "@/lib/date-overlap";
-import { calculateRentalDays, formatRentalDuration } from "@/lib/date-utils";
+import {
+  calculateRentalDays,
+  formatRentalDuration,
+  getBusinessTodayISO,
+  getBusinessTimeFormatted,
+  addDaysToISODate,
+  formatDateToInput,
+  computeEndDateForRentalDays,
+  formatDateWords,
+} from "@/lib/date-utils";
 import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
 const STEPS = [
@@ -118,14 +128,9 @@ export default function CreateContractModal({
   const resolvedDriverId = currentDriver?._id || currentDriver?.userId || currentUserId || "";
 
   // Form State
-  const getCurrentFormattedTime = () => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date());
-  };
+  const getCurrentFormattedTime = () => getBusinessTimeFormatted();
 
+  const initialModalStartDate = getBusinessTodayISO();
   const [inspectionPhotos, setInspectionPhotos] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     unitId: "",
@@ -136,8 +141,8 @@ export default function CreateContractModal({
     returnDriverId: "",
     rentalType: "Daily" as "Daily" | "Monthly",
     customerType: "B2C" as "B2C" | "B2B",
-    startDate: new Date().toISOString().split("T")[0],
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    startDate: initialModalStartDate,
+    endDate: addDaysToISODate(initialModalStartDate, 7),
     collectionAmount: 595, // Price driver or admin will collect for the rental
     advancePayment: 0, // Prepaid advance / عربون حجز السيارة
     dailyRate: 85,
@@ -222,19 +227,6 @@ export default function CreateContractModal({
       }));
     }
     setIsCompanyModalOpen(false);
-  };
-
-  const formatDateToInput = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return new Date().toISOString().split("T")[0];
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    } catch {
-      return new Date().toISOString().split("T")[0];
-    }
   };
 
   const fetchData = async () => {
@@ -352,8 +344,8 @@ export default function CreateContractModal({
           returnDriverId: "",
           rentalType: "Daily",
           customerType: "B2C",
-          startDate: new Date().toISOString().split("T")[0],
-          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          startDate: getBusinessTodayISO(),
+          endDate: addDaysToISODate(getBusinessTodayISO(), 7),
           collectionAmount: 595,
           advancePayment: 0,
           dailyRate: 85,
@@ -1384,8 +1376,7 @@ export default function CreateContractModal({
                         <button
                           type="button"
                           onClick={() => {
-                            const s = new Date(formData.startDate);
-                            const monthEnd = new Date(s.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+                            const monthEnd = addDaysToISODate(formData.startDate, 30);
                             setFormData(prev => ({ 
                               ...prev, 
                               rentalType: "Monthly",
@@ -1459,18 +1450,12 @@ export default function CreateContractModal({
                             onChange={e => {
                               const newStart = e.target.value;
                               if (!newStart) return;
-                              const s = new Date(newStart);
-                              s.setHours(0, 0, 0, 0);
 
                               const prevDuration = calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime);
 
                               let resolvedEnd = formData.endDate;
                               if (newStart > formData.endDate) {
-                                const updatedEnd = new Date(s.getTime() + prevDuration * 86400000);
-                                const y = updatedEnd.getFullYear();
-                                const m = String(updatedEnd.getMonth() + 1).padStart(2, "0");
-                                const d = String(updatedEnd.getDate()).padStart(2, "0");
-                                resolvedEnd = `${y}-${m}-${d}`;
+                                resolvedEnd = addDaysToISODate(newStart, prevDuration);
                               }
 
                               const days = calculateRentalDays(newStart, resolvedEnd, formData.checkoutTime, formData.checkinTime);
@@ -1601,14 +1586,28 @@ export default function CreateContractModal({
                         </div>
                       </div>
 
-                      {/* Rental Duration and Date Order Helper */}
-                      <div className="flex items-center justify-between text-xs px-1">
+                      {/* Rental Duration, Editable Days & Date Order Helper */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs px-1">
                         <span className="text-text-muted">
                           Rental Duration (مدة الإيجار):{" "}
                           <strong className="text-brand font-bold">
                             {formatRentalDuration(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime)}
                           </strong>
                         </span>
+                        <RentalDaysControl
+                          days={calculateRentalDays(formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime)}
+                          onChange={(nextDays) => {
+                            const nextEnd = computeEndDateForRentalDays(formData.startDate, nextDays, formData.checkoutTime, formData.checkinTime);
+                            const actualDays = calculateRentalDays(formData.startDate, nextEnd, formData.checkoutTime, formData.checkinTime);
+                            const rate = Number(formData.dailyRate) || 0;
+                            setFormData(prev => ({
+                              ...prev,
+                              rentalType: actualDays >= 30 ? "Monthly" : "Daily",
+                              endDate: nextEnd,
+                              collectionAmount: rate > 0 ? Math.round(rate * actualDays * 100) / 100 : prev.collectionAmount,
+                            }));
+                          }}
+                        />
                         {formData.startDate > formData.endDate && (
                           <span className="text-red-600 font-bold flex items-center gap-1 animate-pulse">
                             <AlertCircle size={13} />
@@ -1621,15 +1620,11 @@ export default function CreateContractModal({
                       {(() => {
                         const conflict = selectedVehicleObj ? getUnitConflict(selectedVehicleObj, formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime) : null;
                         if (!conflict || conflict.reason !== "Booked") return null;
-                        const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-                        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                        const conflictStart = formatDateWords(conflict.startDate);
+                        const conflictEnd = formatDateWords(conflict.endDate);
                         const returnHour = conflict.returnTime || "10:00 AM";
 
-                        const sDate = new Date(formData.startDate);
-                        const cEnd = new Date(conflict.endDate);
-                        const isTurnoverConflict = sDate.getFullYear() === cEnd.getFullYear() && 
-                                                   sDate.getMonth() === cEnd.getMonth() && 
-                                                   sDate.getDate() === cEnd.getDate();
+                        const isTurnoverConflict = formatDateToInput(formData.startDate) === formatDateToInput(conflict.endDate);
 
                         return (
                           <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-red-700 animate-fade-in shadow-2xs">

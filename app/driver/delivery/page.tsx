@@ -43,7 +43,14 @@ import FuelLevelSelector from "@/components/ui/FuelLevelSelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import VehicleInspectionPhotoCapture, { VEHICLE_ANGLES, EXTRA_PHOTO_PREFIX, getExtraPhotoKeys } from "@/components/ui/VehicleInspectionPhotoCapture";
 import CreateClientModal from "@/components/modals/CreateClientModal";
-import { calculateRentalDays } from "@/lib/date-utils";
+import {
+  calculateRentalDays,
+  getBusinessTodayISO,
+  addDaysToISODate,
+  formatDateToInput,
+  getBusinessTimeFormatted,
+  formatDateWords,
+} from "@/lib/date-utils";
 import SelectSecondDriverModal from "@/components/modals/SelectSecondDriverModal";
 import { useToast } from "@/components/providers/ToastProvider";
 
@@ -181,12 +188,13 @@ export default function ConfirmDeliveryPage() {
     issuedAt: "",
   });
 
-  // Rental Data state (Matching Admin Step 3)
+  // Rental Data state (Matching Admin Step 3 — UAE calendar date)
+  const initialDeliveryStart = getBusinessTodayISO();
   const [rentalData, setRentalData] = useState({
     rentalType: "Daily" as "Daily" | "Monthly",
     customerType: "B2C" as "B2C" | "B2B",
-    startDate: new Date().toISOString().split("T")[0],
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    startDate: initialDeliveryStart,
+    endDate: addDaysToISODate(initialDeliveryStart, 7),
     checkoutTime: "10:00 AM",
     checkinTime: "10:00 AM",
     collectionAmount: 0,
@@ -224,13 +232,7 @@ export default function ConfirmDeliveryPage() {
 
   const totalSteps = STEPS.length;
 
-  const getCurrentFormattedTime = () => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date());
-  };
+  const getCurrentFormattedTime = () => getBusinessTimeFormatted();
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -332,8 +334,8 @@ export default function ConfirmDeliveryPage() {
         setRentalData({
           rentalType: contractData.rentalType || "Daily",
           customerType: contractData.customerType || "B2C",
-          startDate: contractData.startDate ? new Date(contractData.startDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-          endDate: contractData.endDate ? new Date(contractData.endDate).toISOString().split("T")[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          startDate: contractData.startDate ? formatDateToInput(contractData.startDate) : getBusinessTodayISO(),
+          endDate: contractData.endDate ? formatDateToInput(contractData.endDate) : addDaysToISODate(getBusinessTodayISO(), 7),
           checkoutTime: initialCheckoutTime,
           checkinTime: contractData.checkinTime || "10:00 AM",
           collectionAmount: collectionVal,
@@ -687,13 +689,12 @@ export default function ConfirmDeliveryPage() {
       return;
     }
 
-    const nowStartOfDay = new Date();
-    nowStartOfDay.setHours(0, 0, 0, 0);
-    const contractStartDate = new Date(contract.rawStartDate || contract.startDate);
-    contractStartDate.setHours(0, 0, 0, 0);
+    const dubaiTodayISO = getBusinessTodayISO();
+    const rawStart = contract.rawStartDate || contract.startDate;
+    const contractStartISO = formatDateToInput(rawStart);
 
-    if (contractStartDate > nowStartOfDay) {
-      const formattedDate = contractStartDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    if (contractStartISO > dubaiTodayISO) {
+      const formattedDate = formatDateWords(rawStart);
       setError(`Handover can only be confirmed on the day of start (${formattedDate}). (لا يمكن تأكيد تسليم السيارة قبل حلول تاريخ بدء العقد)`);
       toast.error(`Handover can only be confirmed on the day of start (${formattedDate}).`);
       return;
@@ -1267,8 +1268,7 @@ export default function ConfirmDeliveryPage() {
             <button
               type="button"
               onClick={() => {
-                const s = new Date(rentalData.startDate);
-                const monthEnd = new Date(s.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+                const monthEnd = addDaysToISODate(rentalData.startDate, 30);
                 setRentalData(prev => ({
                   ...prev,
                   rentalType: "Monthly",

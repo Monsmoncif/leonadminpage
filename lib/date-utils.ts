@@ -1,48 +1,228 @@
 /**
  * Global Date Formatting Utilities for Leon Car Rental
- * Enforces Day/Month/Year (DD/MM/YYYY) format everywhere across the application.
+ * Enforces Day/Month/Year (DD/MM/YYYY) format and UAE (Asia/Dubai, UTC+4) calendar consistency
+ * across both browser clients and UTC/remote servers.
  */
+
+export const BUSINESS_TIMEZONE = "Asia/Dubai";
 
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+export interface CalendarYMD {
+  year: number;
+  month: number; // 1-12
+  day: number;   // 1-31
+}
+
+export interface BusinessDateParts extends CalendarYMD {
+  hour: number;   // 0-23
+  minute: number; // 0-59
+}
+
+/**
+ * Extracts year, month, day, hour, minute in UAE time (Asia/Dubai, UTC+4).
+ */
+export function getBusinessDateParts(dateInput?: Date | string | number): BusinessDateParts {
+  const d = dateInput instanceof Date ? dateInput : (dateInput !== undefined && dateInput !== null ? new Date(dateInput) : new Date());
+  const safe = isNaN(d.getTime()) ? new Date() : d;
+
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: BUSINESS_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(safe);
+
+    const map: Record<string, string> = {};
+    for (const p of parts) {
+      if (p.type !== "literal") map[p.type] = p.value;
+    }
+    const year = parseInt(map.year, 10);
+    const month = parseInt(map.month, 10);
+    const day = parseInt(map.day, 10);
+    const hour = parseInt(map.hour, 10) % 24;
+    const minute = parseInt(map.minute, 10);
+    if (!isNaN(year) && !isNaN(month) && !isNaN(day) && !isNaN(hour) && !isNaN(minute)) {
+      return { year, month, day, hour, minute };
+    }
+  } catch {
+    // Fallback to fixed UTC+4 offset (Asia/Dubai has no DST)
+  }
+
+  const dubai = new Date(safe.getTime() + 4 * 3600 * 1000);
+  return {
+    year: dubai.getUTCFullYear(),
+    month: dubai.getUTCMonth() + 1,
+    day: dubai.getUTCDate(),
+    hour: dubai.getUTCHours(),
+    minute: dubai.getUTCMinutes(),
+  };
+}
+
+/**
+ * Returns today's calendar date as "YYYY-MM-DD" in UAE time (Asia/Dubai).
+ */
+export function getBusinessTodayISO(refDate?: Date): string {
+  const { year, month, day } = getBusinessDateParts(refDate);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * Returns current time formatted as 12-hour clock in UAE time (e.g. "12:15 AM").
+ */
+export function getBusinessTimeFormatted(refDate?: Date): string {
+  const { hour, minute } = getBusinessDateParts(refDate);
+  const period = hour >= 12 ? "PM" : "AM";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${String(h12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+/**
+ * Extracts calendar { year, month, day } safely.
+ * Plain calendar strings ("YYYY-MM-DD", "DD/MM/YYYY") keep exact calendar day;
+ * Date instances & ISO timestamps with time ("T...") are resolved in Asia/Dubai.
+ */
+export function extractCalendarYMD(input: any): CalendarYMD | null {
+  if (!input) return null;
+  if (input instanceof Date) {
+    if (isNaN(input.getTime())) return null;
+    const { year, month, day } = getBusinessDateParts(input);
+    return { year, month, day };
+  }
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const dmy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmy) {
+      return {
+        year: parseInt(dmy[3], 10),
+        month: parseInt(dmy[2], 10),
+        day: parseInt(dmy[1], 10),
+      };
+    }
+    // Plain date string without time component (e.g. "2026-11-20")
+    const plainYmd = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (plainYmd) {
+      return {
+        year: parseInt(plainYmd[1], 10),
+        month: parseInt(plainYmd[2], 10),
+        day: parseInt(plainYmd[3], 10),
+      };
+    }
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) {
+      const { year, month, day } = getBusinessDateParts(parsed);
+      return { year, month, day };
+    }
+    // Fallback for "DD/MM/YYYY ..." with trailing text
+    const dmyPrefix = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (dmyPrefix) {
+      return {
+        year: parseInt(dmyPrefix[3], 10),
+        month: parseInt(dmyPrefix[2], 10),
+        day: parseInt(dmyPrefix[1], 10),
+      };
+    }
+    return null;
+  }
+  const parsed = new Date(input);
+  if (isNaN(parsed.getTime())) return null;
+  const { year, month, day } = getBusinessDateParts(parsed);
+  return { year, month, day };
+}
+
+/**
+ * Formats any date input as "YYYY-MM-DD" for HTML date inputs in Asia/Dubai calendar time.
+ */
+export function formatDateToInput(dateInput?: any, fallbackDate?: string): string {
+  const ymd = extractCalendarYMD(dateInput);
+  if (!ymd) return fallbackDate ?? getBusinessTodayISO();
+  return `${ymd.year}-${String(ymd.month).padStart(2, "0")}-${String(ymd.day).padStart(2, "0")}`;
+}
+
+/**
+ * Adds (or subtracts) whole calendar days cleanly without UTC/local timezone drift.
+ */
+export function addDaysToISODate(dateInput: any, deltaDays: number): string {
+  const ymd = extractCalendarYMD(dateInput) || extractCalendarYMD(getBusinessTodayISO())!;
+  const utc = new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day + Math.trunc(deltaDays)));
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}-${String(utc.getUTCDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Converts a contract date input into a canonical UTC midnight Date for that calendar day.
+ */
+export function parseContractDateToUTCMidnight(dateInput: any): Date | null {
+  const ymd = extractCalendarYMD(dateInput);
+  if (!ymd) return null;
+  return new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day, 0, 0, 0, 0));
+}
+
+/**
+ * Converts a contract date input into UTC end-of-day (23:59:59.999Z) for that calendar day.
+ */
+export function parseContractDateToUTCEndOfDay(dateInput: any): Date | null {
+  const ymd = extractCalendarYMD(dateInput);
+  if (!ymd) return null;
+  return new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day, 23, 59, 59, 999));
+}
+
+/**
+ * Returns today's start-of-day Date in UTC aligned with UAE (Asia/Dubai) calendar date.
+ */
+export function getBusinessStartOfDayUTC(refDate?: Date): Date {
+  return parseContractDateToUTCMidnight(getBusinessTodayISO(refDate))!;
+}
+
+/**
+ * Returns today's end-of-day Date in UTC aligned with UAE (Asia/Dubai) calendar date.
+ */
+export function getBusinessEndOfDayUTC(refDate?: Date): Date {
+  return parseContractDateToUTCEndOfDay(getBusinessTodayISO(refDate))!;
+}
+
+/**
+ * Returns first day of current UAE (Asia/Dubai) month at 00:00:00.000Z.
+ */
+export function getBusinessStartOfMonthUTC(refDate?: Date): Date {
+  const { year, month } = getBusinessDateParts(refDate);
+  return new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+}
+
 /**
  * Returns date formatted as "DD/MM/YYYY" (e.g. "20/10/2026")
- * Immune to client browser locale and OS regional settings.
+ * Immune to client browser locale and server timezone.
  */
 export function formatDateDMY(dateInput: any): string {
   if (!dateInput) return "";
   if (typeof dateInput === "string") {
     const trimmed = dateInput.trim();
-    // Already DD/MM/YYYY
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
       return trimmed;
     }
-    // Match YYYY-MM-DD or YYYY/MM/DD
-    const isoMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    const isoMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
     if (isoMatch) {
-      const year = isoMatch[1];
-      const month = isoMatch[2].padStart(2, "0");
-      const day = isoMatch[3].padStart(2, "0");
-      return `${day}/${month}/${year}`;
+      return `${isoMatch[3].padStart(2, "0")}/${isoMatch[2].padStart(2, "0")}/${isoMatch[1]}`;
     }
   }
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return String(dateInput);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  const ymd = extractCalendarYMD(dateInput);
+  if (!ymd) return String(dateInput);
+  return `${String(ymd.day).padStart(2, "0")}/${String(ymd.month).padStart(2, "0")}/${ymd.year}`;
 }
 
 /**
  * Returns date formatted as "DD MMM YYYY" (e.g. "20 Oct 2026")
- * Day always comes before month.
+ * Day always comes before month, resolved consistently in UAE calendar time.
  */
 export function formatDateWords(dateInput: any): string {
   if (!dateInput) return "";
   if (typeof dateInput === "string") {
     const trimmed = dateInput.trim();
-    const isoMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    const isoMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
     if (isoMatch) {
       const day = parseInt(isoMatch[3], 10);
       const monthIdx = parseInt(isoMatch[2], 10) - 1;
@@ -52,9 +232,9 @@ export function formatDateWords(dateInput: any): string {
       }
     }
   }
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return String(dateInput);
-  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+  const ymd = extractCalendarYMD(dateInput);
+  if (!ymd) return String(dateInput);
+  return `${ymd.day} ${MONTHS_SHORT[ymd.month - 1]} ${ymd.year}`;
 }
 
 /**
@@ -64,7 +244,7 @@ export function formatDateShort(dateInput: any): string {
   if (!dateInput) return "";
   if (typeof dateInput === "string") {
     const trimmed = dateInput.trim();
-    const isoMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    const isoMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
     if (isoMatch) {
       const day = parseInt(isoMatch[3], 10);
       const monthIdx = parseInt(isoMatch[2], 10) - 1;
@@ -73,62 +253,24 @@ export function formatDateShort(dateInput: any): string {
       }
     }
   }
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return String(dateInput);
-  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+  const ymd = extractCalendarYMD(dateInput);
+  if (!ymd) return String(dateInput);
+  return `${ymd.day} ${MONTHS_SHORT[ymd.month - 1]}`;
 }
 
 /**
- * Returns date & time formatted as "DD/MM/YYYY HH:MM" (e.g. "20/10/2026 14:30")
+ * Returns date & time formatted as "DD/MM/YYYY HH:MM" in UAE (Asia/Dubai) time
  */
 export function formatDateTimeDMY(dateInput: any): string {
   if (!dateInput) return "";
   const d = new Date(dateInput);
   if (isNaN(d.getTime())) return String(dateInput);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+  const { year, month, day, hour, minute } = getBusinessDateParts(d);
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 /**
- * Normalizes any date input (ISO string, DD/MM/YYYY, Date instance) to midnight (00:00:00.000)
- */
-function parseDateToMidnight(input: any): Date | null {
-  if (!input) return null;
-  if (input instanceof Date) {
-    if (isNaN(input.getTime())) return null;
-    const d = new Date(input.getTime());
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-  if (typeof input === "string") {
-    const trimmed = input.trim();
-    // Match DD/MM/YYYY
-    const dmy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (dmy) {
-      return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10), 0, 0, 0, 0);
-    }
-    // Match YYYY-MM-DD or YYYY/MM/DD
-    const ymd = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-    if (ymd) {
-      return new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10), 0, 0, 0, 0);
-    }
-    const parsed = new Date(trimmed);
-    if (isNaN(parsed.getTime())) return null;
-    parsed.setHours(0, 0, 0, 0);
-    return parsed;
-  }
-  const parsed = new Date(input);
-  if (isNaN(parsed.getTime())) return null;
-  parsed.setHours(0, 0, 0, 0);
-  return parsed;
-}
-
-/**
- * Parses a time string such as "10:00 AM", "02:53 PM", "14:30" into minutes since midnight.
+ * Parses a time string such as "10:00 AM", "02:53 PM", "12:15 AM", "00:15 AM", "14:30" into minutes since midnight.
  * Returns null when the value is empty or not a real time (e.g. "Pending Handover").
  */
 export function parseTimeToMinutes(input: any): number | null {
@@ -142,8 +284,8 @@ export function parseTimeToMinutes(input: any): number | null {
   const meridiem = m[3] ? m[3].toUpperCase() : null;
   if (minutes > 59) return null;
   if (meridiem) {
-    if (hours < 1 || hours > 12) return null;
-    if (meridiem === "A") hours = hours === 12 ? 0 : hours;
+    if (hours > 12) return null;
+    if (meridiem === "A") hours = hours === 12 || hours === 0 ? 0 : hours;
     else hours = hours === 12 ? 12 : hours + 12;
   } else if (hours > 23) {
     return null;
@@ -172,15 +314,15 @@ export function calculateRentalDuration(
   const fallback = { days: 1, hours: 0, minutes: 0, billableDays: 1 };
   if (!startDateInput || !endDateInput) return fallback;
 
-  const s = parseDateToMidnight(startDateInput);
-  const e = parseDateToMidnight(endDateInput);
+  const sYmd = extractCalendarYMD(startDateInput);
+  const eYmd = extractCalendarYMD(endDateInput);
 
-  if (!s || !e) return fallback;
+  if (!sYmd || !eYmd) return fallback;
 
-  // Whole calendar days between the two dates (UTC math avoids any DST shift)
+  // Whole calendar days between the two dates (UTC math avoids any TZ/DST shift)
   const dayDiff = Math.round(
-    (Date.UTC(e.getFullYear(), e.getMonth(), e.getDate()) -
-      Date.UTC(s.getFullYear(), s.getMonth(), s.getDate())) / 86400000
+    (Date.UTC(eYmd.year, eYmd.month - 1, eYmd.day) -
+      Date.UTC(sYmd.year, sYmd.month - 1, sYmd.day)) / 86400000
   );
   if (dayDiff <= 0) {
     // Same-day rental: show the real hours when both times are valid, billed as 1 day
@@ -220,6 +362,25 @@ export function calculateRentalDays(
   endTimeInput?: any
 ): number {
   return calculateRentalDuration(startDateInput, endDateInput, startTimeInput, endTimeInput).billableDays;
+}
+
+/**
+ * Computes the endDate ("YYYY-MM-DD") that matches a requested number of billable days
+ * from startDate, taking into account checkoutTime and checkinTime.
+ */
+export function computeEndDateForRentalDays(
+  startDateInput: any,
+  targetDays: number,
+  startTimeInput?: any,
+  endTimeInput?: any
+): string {
+  const safeDays = Math.max(1, Math.trunc(Number(targetDays) || 1));
+  const startISO = formatDateToInput(startDateInput);
+  const startMin = parseTimeToMinutes(startTimeInput);
+  const endMin = startMin === null ? null : parseTimeToMinutes(endTimeInput);
+  const extraHourAddsDay = startMin !== null && endMin !== null && endMin > startMin;
+  const calendarOffset = extraHourAddsDay ? Math.max(0, safeDays - 1) : safeDays;
+  return addDaysToISODate(startISO, calendarOffset);
 }
 
 /**
