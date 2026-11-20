@@ -11,11 +11,16 @@ import { Notification } from "@/models/Notification";
 import { Log } from "@/models/Log";
 import { Report } from "@/models/Report";
 import { User } from "@/models/User";
+import {
+  getBusinessTodayISO,
+  getBusinessStartOfMonthUTC,
+  formatDateToInput,
+} from "@/lib/date-utils";
 
 export const LEON_BACKEND_KNOWLEDGE = `
 LEON RENT A CAR BACKEND & BUSINESS RULES:
 - Pages: "/" Dashboard; "/bookings" Contracts; "/bookings/new" Contract Wizard (Types: Shop, Delivery, Personalized); "/bookings/[id]" Details, PDF (/api/contracts/[id]/pdf), Consent PDF, WhatsApp/Email; "/bookings/handover" & "/bookings/return" Checklists & Return Settlement; "/units" & "/units/[id]" Fleet, mileage, vidange/oil, insurance/reg expiry; "/clients" & "/clients/[id]" B2C/B2B, docs, Blacklist; "/drivers" & "/driver/*"; "/calendar"; "/inspections"; "/damages"; "/messages" WhatsApp; "/notifications"; "/reports"; "/logs"; "/tracking"; "/settings".
-- Vehicle Status Sync: Auto-"Rented" when contract deliveryStatus="Delivered", status not Completed/Cancelled, startDate <= today end < endDate; "Maintenance"/"Out of Service" protected from override; returns to "Available" on return/completion.
+- Vehicle Status Sync & Turnover: Auto-"Rented" when contract deliveryStatus="Delivered", status not Completed/Cancelled, startDate <= today end < endDate; "Maintenance"/"Out of Service" protected from override; returns to "Available" on return/completion. IMPORTANT: Rented/booked cars CAN be booked for future dates or same-day turnover at/after their return date & return hour (checkinTime/ret@)! Always cite exact return date & hour from Booked schedule.
 - Net Revenue: sum(max(0, totalAmount - damageCharge)) for non-Personalized Active/Completed contracts. Pending Balance: max(0, totalAmount - advancePayment) when paymentStatus!="Paid".
 - Alerts & Return Fees: Oil change due when (mileage - lastOilChangeMileage) >= oilChangeInterval (default 10k, warn >=85%). Overdue = Active & endDate < now. Return fees: extraKmCharge ((drivenKm - totalDays*dailyKmLimit)*pricePerExtraKm), salikFees, parkingFees, finesFees, fuelFees, cleaningFees, damageCharge. OCR: /api/ocr/scan-document & /api/ocr/scan-vehicle-card.
 `.trim();
@@ -46,6 +51,7 @@ export interface RichBackendContext {
   allClients: any[];
   allUnits: any[];
   recentContracts: any[];
+  activeBookingsByUnit: Record<string, any[]>;
   totalUnits: number;
   availableUnits: number;
   rentedUnits: number;
@@ -82,8 +88,8 @@ export function invalidateBackendContextCache() {
 
 function fmtDate(d: any): string {
   if (!d) return "N/A";
-  const dt = new Date(d);
-  return isNaN(dt.getTime()) ? "N/A" : dt.toISOString().split("T")[0];
+  const out = formatDateToInput(d, "");
+  return out || "N/A";
 }
 
 function escapeRx(s: string): string {
@@ -121,9 +127,9 @@ export async function getRichBackendContext(forceRefresh = false): Promise<RichB
   const now = new Date();
   const in30Days = new Date(now.getTime() + 30 * 86400000);
   const in2Days = new Date(now.getTime() + 2 * 86400000);
-  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  const startOfThisMonth = getBusinessStartOfMonthUTC(now);
+  const startOfLastMonth = new Date(Date.UTC(startOfThisMonth.getUTCFullYear(), startOfThisMonth.getUTCMonth() - 1, 1));
+  const endOfLastMonth = new Date(Date.UTC(startOfThisMonth.getUTCFullYear(), startOfThisMonth.getUTCMonth(), 0, 23, 59, 59, 999));
   const dbReady = mongoose.connection.readyState === 1;
 
   const netRevenueExpr = {
@@ -139,6 +145,7 @@ export async function getRichBackendContext(forceRefresh = false): Promise<RichB
     allClients,
     allUnits,
     recentContracts,
+    activeUnitContracts,
     totalUnits,
     availableUnits,
     rentedUnits,
@@ -180,6 +187,15 @@ export async function getRichBackendContext(forceRefresh = false): Promise<RichB
       .populate({ path: "unitId", select: "make model plate", strictPopulate: false })
       .populate({ path: "driverId", select: "name", strictPopulate: false })
       .limit(25)
+      .lean(),
+    Contract.find({
+      status: { $in: ["Active", "Draft"] },
+      deliveryStatus: { $ne: "Returned" },
+    })
+      .select("_id contractNumber unitId clientId personalizedPersonName startDate endDate checkoutTime checkinTime status deliveryStatus")
+      .populate({ path: "clientId", select: "name phone", strictPopulate: false })
+      .sort({ startDate: 1 })
+      .limit(200)
       .lean(),
     Unit.countDocuments(),
     Unit.countDocuments({ status: "Available" }),
@@ -435,8 +451,50 @@ export async function getRichBackendContext(forceRefresh = false): Promise<RichB
     }
   }
 
+  // Build per-vehicle active/draft booking schedule (dates & return hour) so AI knows exact availability & return times
+  const activeBookingsByUnit: Record<string, any[]> = {};
+  const seenContractIds = new Set<string>();
+  const rawBookingPool = [
+    ...((activeUnitContracts as any[]) || []),
+    ...((recentContracts as any[]) || []).filter(
+      (c) => (c.status === "Active" || c.status === "Draft") && c.deliveryStatus !== "Returned"
+    ),
+  ];
+  for (const c of rawBookingPool) {
+    const cid = String(c._id || "");
+    if (!cid || seenContractIds.has(cid)) continue;
+    seenContractIds.add(cid);
+    const uid = String(c.unitId?._id || c.unitId || "");
+    if (!uid) continue;
+    if (!activeBookingsByUnit[uid]) activeBookingsByUnit[uid] = [];
+    const checkoutTime = c.checkoutTime && c.checkoutTime !== "Pending Handover" ? c.checkoutTime : "10:00 AM";
+    const checkinTime = c.checkinTime && c.checkinTime !== "Pending Return" ? c.checkinTime : "";
+    activeBookingsByUnit[uid].push({
+      contractId: cid,
+      contractNumber: c.contractNumber || null,
+      status: c.status,
+      deliveryStatus: c.deliveryStatus || "Pending",
+      clientName: (c.clientId as any)?.name || c.personalizedPersonName || "Client",
+      startDate: c.startDate,
+      endDate: c.endDate,
+      startISO: fmtDate(c.startDate),
+      endISO: fmtDate(c.endDate),
+      checkoutTime,
+      checkinTime,
+      returnTime: checkinTime || checkoutTime || "10:00 AM",
+    });
+  }
+  for (const list of Object.values(activeBookingsByUnit)) {
+    list.sort((a, b) => a.startISO.localeCompare(b.startISO));
+  }
+
+  const enrichedUnits = (allUnits as any[]).map((u) => ({
+    ...u,
+    activeBookings: activeBookingsByUnit[String(u._id)] || [],
+  }));
+
   // Format vehicles compactly to stay within provider TPM budgets (full details via QUERY_BACKEND)
-  const sortedUnits = [...(allUnits as any[])].sort((a, b) => {
+  const sortedUnits = [...enrichedUnits].sort((a, b) => {
     const order: Record<string, number> = { Available: 0, Rented: 1, Maintenance: 2, "Out of Service": 3 };
     return (order[a.status] ?? 4) - (order[b.status] ?? 4);
   });
@@ -444,7 +502,12 @@ export async function getRichBackendContext(forceRefresh = false): Promise<RichB
     .slice(0, 100)
     .map((u) => {
       const kmInfo = u.mileage ? `|KM:${u.mileage}` : "";
-      return `- ${u.make} ${u.model}(${u.year || "?"},${u.color || "?"})|${u.plate}|${u.status}|AED ${u.dailyRate || 0}/d${kmInfo}`;
+      const bks = activeBookingsByUnit[String(u._id)] || [];
+      const bkText =
+        bks.length > 0
+          ? `|Booked:${bks.slice(0, 2).map((b: any) => `${b.startISO}..${b.endISO}(ret@${b.returnTime})`).join(",")}`
+          : "";
+      return `- ${u.make} ${u.model}(${u.year || "?"},${u.color || "?"})|${u.plate}|${u.status}|AED ${u.dailyRate || 0}/d${kmInfo}${bkText}`;
     })
     .join("\n");
 
@@ -458,7 +521,8 @@ export async function getRichBackendContext(forceRefresh = false): Promise<RichB
     .map((c) => {
       const clName = (c.clientId as any)?.name || c.personalizedPersonName || "N/A";
       const carLabel = c.unitId ? `${(c.unitId as any).make} ${(c.unitId as any).model}(${(c.unitId as any).plate})` : "N/A";
-      return `- #${c.contractNumber || String(c._id).slice(-6)}|${c.status}/${c.deliveryStatus || "Pending"}|${clName}|${carLabel}|${fmtDate(c.startDate)}..${fmtDate(c.endDate)}|AED ${c.totalAmount || 0}(${c.paymentStatus || "Pending"})`;
+      const retTime = c.checkinTime || c.checkoutTime || "10:00 AM";
+      return `- #${c.contractNumber || String(c._id).slice(-6)}|${c.status}/${c.deliveryStatus || "Pending"}|${clName}|${carLabel}|${fmtDate(c.startDate)}..${fmtDate(c.endDate)}(ret@${retTime})|AED ${c.totalAmount || 0}(${c.paymentStatus || "Pending"})`;
     })
     .join("\n");
 
@@ -534,7 +598,7 @@ export async function getRichBackendContext(forceRefresh = false): Promise<RichB
     .join("\n\n");
 
   const executivePromptContext = `
-LIVE METRICS (${now.toISOString().split("T")[0]}):
+LIVE METRICS (${getBusinessTodayISO(now)}):
 - Fleet: ${totalUnits} total (${availableUnits} Avail, ${rentedUnits} Rented, ${maintenanceUnits} Maint) | Clients: ${totalClientsCount} | Drivers: ${(allDrivers as any[]).length}
 - Contracts: ${kpis.totalContracts} total (${activeContractsCount} Active, ${kpis.draftContracts} Draft, ${kpis.completedContracts} Done, ${kpis.cancelledContracts} Cancel, ${kpis.overdueContracts} OVERDUE, ${kpis.unpaidContracts} Unpaid AED ${kpis.pendingBalanceTotal.toLocaleString("en-US")})
 - Net Revenue: Month AED ${kpis.revenueThisMonth.toLocaleString("en-US")} | LastMo AED ${kpis.revenueLastMonth.toLocaleString("en-US")} | AllTime AED ${kpis.revenueAllTime.toLocaleString("en-US")} | Tx In AED ${kpis.transactionIncome.toLocaleString("en-US")} / Out AED ${kpis.transactionExpense.toLocaleString("en-US")}
@@ -554,8 +618,9 @@ ${optionalSections ? "\n" + optionalSections : ""}
   cachedContext = {
     timestamp: nowTs,
     allClients,
-    allUnits,
+    allUnits: enrichedUnits,
     recentContracts,
+    activeBookingsByUnit,
     totalUnits,
     availableUnits,
     rentedUnits,
@@ -778,7 +843,7 @@ export async function executeBackendQuery(spec: BackendQuerySpec) {
       const unitIds = units.map((u: any) => u._id);
       const [contracts, damages, inspections] = await Promise.all([
         Contract.find({ unitId: { $in: unitIds } })
-          .select("contractNumber status deliveryStatus startDate endDate totalDays totalAmount paymentStatus clientId unitId personalizedPersonName")
+          .select("contractNumber status deliveryStatus startDate endDate checkoutTime checkinTime totalDays totalAmount paymentStatus clientId unitId personalizedPersonName")
           .populate({ path: "clientId", select: "name phone", strictPopulate: false })
           .sort({ startDate: -1 })
           .limit(20)
@@ -833,6 +898,9 @@ export async function executeBackendQuery(spec: BackendQuerySpec) {
           client: (c.clientId as any)?.name || c.personalizedPersonName || "N/A",
           startDate: fmtDate(c.startDate),
           endDate: fmtDate(c.endDate),
+          checkoutTime: c.checkoutTime || "10:00 AM",
+          checkinTime: c.checkinTime || "",
+          returnTime: c.checkinTime || c.checkoutTime || "10:00 AM",
           totalAmount: c.totalAmount,
           paymentStatus: c.paymentStatus,
         })),
@@ -872,7 +940,7 @@ export async function executeBackendQuery(spec: BackendQuerySpec) {
 
       const contracts = await Contract.find(filter)
         .select(
-          "contractNumber status deliveryStatus contractType startDate endDate totalDays totalAmount advancePayment depositAmount paymentStatus clientId unitId personalizedPersonName"
+          "contractNumber status deliveryStatus contractType startDate endDate checkoutTime checkinTime totalDays totalAmount advancePayment depositAmount paymentStatus clientId unitId personalizedPersonName"
         )
         .populate({ path: "clientId", select: "name phone", strictPopulate: false })
         .populate({ path: "unitId", select: "make model plate", strictPopulate: false })
@@ -893,6 +961,9 @@ export async function executeBackendQuery(spec: BackendQuerySpec) {
           vehicle: c.unitId ? `${(c.unitId as any).make} ${(c.unitId as any).model} (${(c.unitId as any).plate})` : "N/A",
           startDate: fmtDate(c.startDate),
           endDate: fmtDate(c.endDate),
+          checkoutTime: c.checkoutTime || "10:00 AM",
+          checkinTime: c.checkinTime || "",
+          returnTime: c.checkinTime || c.checkoutTime || "10:00 AM",
           totalAmount: c.totalAmount,
           advancePayment: c.advancePayment || 0,
           paymentStatus: c.paymentStatus,

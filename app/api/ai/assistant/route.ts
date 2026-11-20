@@ -13,7 +13,8 @@ import {
   handleAiClientDocumentUpload,
   tryUpdateRecentClientContactFromFollowUp,
 } from "@/lib/ai-client-scanner";
-import { getBusinessTodayISO, addDaysToISODate } from "@/lib/date-utils";
+import { getBusinessTodayISO, addDaysToISODate, formatDateWords, formatDateToInput } from "@/lib/date-utils";
+import { areDatesOverlapping, timeStringToMinutes } from "@/lib/date-overlap";
 
 interface AssistantResponse {
   reply: string;
@@ -162,38 +163,271 @@ function parseCarDetails(raw: string) {
   return { make, model, year, color, plate, isKnownMake };
 }
 
-// Helper: parse dates from user message (e.g. "from today now too 14/11/2026")
+const MONTH_NAMES_MAP: Record<string, string> = {
+  jan: "01", january: "01", feb: "02", february: "02", mar: "03", march: "03",
+  apr: "04", april: "04", may: "05", jun: "06", june: "06", jul: "07", july: "07",
+  aug: "08", august: "08", sep: "09", sept: "09", september: "09", oct: "10", october: "10",
+  nov: "11", november: "11", dec: "12", december: "12",
+};
+
+function formatHourMin12(hours24: number, minutes: number): string {
+  const h = ((hours24 % 24) + 24) % 24;
+  const m = Math.max(0, Math.min(59, minutes));
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+function parseCheckoutTimeFromMessage(message: string): string | null {
+  // 1. Explicit 12h clock (e.g. "3pm", "3:30 PM", "12:00 am", "4 مساء", "10 صباحا", "4 عصرا")
+  const m12 = message.match(
+    /(?:(?:\b(?:at|from|after|time|starts?\s+at|starting\s+at|@)\s*|الساعة\s+))?\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM|am|pm|ص|م|صباحا|صباحاً|مساء|مساءً|عصرا|عصراً|ظهرا|ظهراً|ليلا|ليلاً)(?=$|[\s,;.،!؟?\-)])/i
+  );
+  if (m12) {
+    let h = parseInt(m12[1], 10);
+    const min = m12[2] ? parseInt(m12[2], 10) : 0;
+    const rawSuffix = m12[3].toLowerCase();
+    const isPm = /^(pm|م|مساء|مساءً|عصرا|عصراً|ظهرا|ظهراً)$/.test(rawSuffix);
+    if (h >= 0 && h <= 12 && min <= 59) {
+      if (isPm && h < 12) h += 12;
+      if (!isPm && h === 12) h = 0;
+      return formatHourMin12(h, min);
+    }
+  }
+
+  // 2. Explicit 24h clock with colon (e.g. "14:30", "09:00", "00:15")
+  const m24 = message.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b(?!\s*(?:AM|PM))/i);
+  if (m24) {
+    return formatHourMin12(parseInt(m24[1], 10), parseInt(m24[2], 10));
+  }
+
+  // 3. Explicit "at <hour>" / "الساعة <hour>" without AM/PM (e.g. "at 15", "الساعة 4")
+  const mAt = message.match(/(?:\b(?:at|starting\s+at|starts?\s+at|after)\b|الساعة)\s+(\d{1,2})\b(?!\s*(?:days?|day|يوم|أيام|ايام|aed|درهم|\/|-))/i);
+  if (mAt) {
+    const h = parseInt(mAt[1], 10);
+    if (h >= 0 && h <= 23) {
+      return formatHourMin12(h, 0);
+    }
+  }
+
+  return null;
+}
+
+// Helper: parse dates, relative days, and checkout hours from user message
 function parseRentalDates(message: string, todayDate: string) {
   let startDate = todayDate;
   let endDate: string | null = null;
   let days: number | null = null;
+  let hasExplicitStartDate = false;
+  let hasExplicitEndDate = false;
+  const checkoutTime = parseCheckoutTimeFromMessage(message);
 
-  // Pattern DD/MM/YYYY or DD-MM-YYYY
-  const dateMatches = Array.from(message.matchAll(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g));
-  if (dateMatches.length === 1) {
-    const [, d, m, y] = dateMatches[0];
-    const parsedEnd = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-    if (!isNaN(new Date(parsedEnd).getTime())) {
-      endDate = parsedEnd;
-      const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000);
-      days = Math.max(1, diff);
+  const curYear = parseInt(todayDate.slice(0, 4), 10) || new Date().getUTCFullYear();
+  const foundDates: { iso: string; index: number; prefix: string }[] = [];
+  const pushFoundDate = (iso: string, index: number) => {
+    if (!isNaN(new Date(`${iso}T00:00:00Z`).getTime()) && !foundDates.some((d) => Math.abs(d.index - index) < 4)) {
+      foundDates.push({ iso, index, prefix: message.slice(Math.max(0, index - 24), index).toLowerCase() });
     }
-  } else if (dateMatches.length >= 2) {
-    const [, d1, m1, y1] = dateMatches[0];
-    const [, d2, m2, y2] = dateMatches[1];
-    startDate = `${y1}-${m1.padStart(2, "0")}-${d1.padStart(2, "0")}`;
-    endDate = `${y2}-${m2.padStart(2, "0")}-${d2.padStart(2, "0")}`;
-    const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000);
+  };
+
+  // Match YYYY-MM-DD
+  for (const m of message.matchAll(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g)) {
+    pushFoundDate(`${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`, m.index ?? 0);
+  }
+  // Match DD/MM/YYYY or DD-MM-YYYY
+  for (const m of message.matchAll(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g)) {
+    pushFoundDate(`${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`, m.index ?? 0);
+  }
+  // Match "22 Nov [2026]" or "22nd November 2026"
+  for (const m of message.matchAll(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s*,?\s*(\d{4}))?\b/gi)) {
+    const mon = MONTH_NAMES_MAP[m[2].toLowerCase()];
+    if (mon) pushFoundDate(`${m[3] || String(curYear)}-${mon}-${m[1].padStart(2, "0")}`, m.index ?? 0);
+  }
+  // Match "Nov 22[, 2026]"
+  for (const m of message.matchAll(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b/gi)) {
+    const mon = MONTH_NAMES_MAP[m[1].toLowerCase()];
+    if (mon) pushFoundDate(`${m[3] || String(curYear)}-${mon}-${m[2].padStart(2, "0")}`, m.index ?? 0);
+  }
+  foundDates.sort((a, b) => a.index - b.index);
+
+  if (foundDates.length >= 2) {
+    startDate = foundDates[0].iso;
+    endDate = foundDates[1].iso;
+    hasExplicitStartDate = true;
+    hasExplicitEndDate = true;
+    const diff = Math.round((new Date(`${endDate}T00:00:00Z`).getTime() - new Date(`${startDate}T00:00:00Z`).getTime()) / 86400000);
     days = Math.max(1, diff);
+  } else if (foundDates.length === 1) {
+    const single = foundDates[0];
+    const hasEndPrefix = /\b(?:to|too|until|till)\s*$|حتى\s*$|لغاية\s*$|إلى\s*$/i.test(single.prefix.trim());
+    const mentionsTodayBefore = /\b(?:today|now)\b|اليوم|الآن/i.test(message.slice(0, single.index));
+    if (hasEndPrefix || mentionsTodayBefore) {
+      endDate = single.iso;
+      hasExplicitEndDate = true;
+      const diff = Math.round((new Date(`${endDate}T00:00:00Z`).getTime() - new Date(`${startDate}T00:00:00Z`).getTime()) / 86400000);
+      days = Math.max(1, diff);
+      if (mentionsTodayBefore) hasExplicitStartDate = true;
+    } else {
+      startDate = single.iso;
+      hasExplicitStartDate = true;
+    }
+  } else {
+    if (/\b(?:after\s+tomorrow|day\s+after\s+tomorrow)\b|بعد\s+غد|بعد\s+بكر[هة]/i.test(message)) {
+      startDate = addDaysToISODate(todayDate, 2);
+      hasExplicitStartDate = true;
+    } else if (/\btomorrow\b|غداً|غدا|بكر[هة]/i.test(message)) {
+      startDate = addDaysToISODate(todayDate, 1);
+      hasExplicitStartDate = true;
+    } else if (/\btoday\b|اليوم/i.test(message)) {
+      startDate = todayDate;
+      hasExplicitStartDate = true;
+    }
   }
 
-  const daysMatch = message.match(/\b(\d+)\s*(?:days?|day|يوم|أيام|ايام)\b/i);
+  const daysMatch = message.match(/\b(\d+)\s*(?:days?|day|يومين|يوماً|يوما|يوم|أيام|ايام)(?=$|[\s,;.،!؟?\-)])/i);
   if (daysMatch && !days) {
     days = parseInt(daysMatch[1], 10);
+  } else if (!days && /(?:^|\s)يومين(?=$|[\s,;.،!؟?\-)])/.test(message)) {
+    days = 2;
+  }
+  if (days && !endDate) {
     endDate = addDaysToISODate(startDate, days);
   }
 
-  return { startDate, endDate, days };
+  return { startDate, endDate, days, checkoutTime, hasExplicitStartDate, hasExplicitEndDate };
+}
+
+function extractFirstPlateFromText(text: string): string | null {
+  if (!text) return null;
+  const m = text.match(
+    /(?:Plate|لوحة)\s*:?\s*\*?\*?([A-Za-z0-9][A-Za-z0-9\s-]{1,14}?)(?=\s*(?:\)|•|\||\*|—|-|،|,|\n|$))/i
+  );
+  return m ? m[1].trim() : null;
+}
+
+function formatBookingSlot(b: any, lang: string): string {
+  const startISO = b.startISO || formatDateToInput(b.startDate);
+  const endISO = b.endISO || formatDateToInput(b.endDate);
+  const retTime = b.returnTime || b.checkinTime || b.checkoutTime || "10:00 AM";
+  const startLabel = formatDateWords(startISO) || startISO;
+  const endLabel = formatDateWords(endISO) || endISO;
+  return lang === "ar"
+    ? `${startLabel} إلى ${endLabel} (${endISO}، الإرجاع الساعة ${retTime})`
+    : `${startLabel} to ${endLabel} (${endISO}, returns ${retTime})`;
+}
+
+function formatUnitReturnNote(u: any, bookings: any[], lang: string): string {
+  if (!bookings || bookings.length === 0) return "";
+  const evalPreview = evaluateUnitBookingSchedule(
+    u,
+    bookings,
+    "1900-01-01",
+    "1900-01-02",
+    "10:00 AM",
+    "10:00 AM"
+  );
+  const retDate = evalPreview.nextAvailableDate || bookings[0]?.endISO || formatDateToInput(bookings[0]?.endDate);
+  const retTime = evalPreview.nextAvailableTime || bookings[0]?.returnTime || bookings[0]?.checkinTime || bookings[0]?.checkoutTime || "10:00 AM";
+  const retWords = formatDateWords(retDate) || retDate;
+  return lang === "ar"
+    ? `ترجع يوم ${retWords} (${retDate}) الساعة ${retTime}`
+    : `Returns ${retWords} (${retDate}) at ${retTime}`;
+}
+
+function evaluateUnitBookingSchedule(
+  unit: any,
+  bookings: any[],
+  reqStart: string,
+  reqEnd: string,
+  reqCheckoutTime: string,
+  reqCheckinTime: string
+) {
+  if (!unit) return { bookable: false, reason: "not_found" as const, blocking: null, allBookings: [] as any[], nextAvailableDate: null, nextAvailableTime: null };
+  if (unit.status === "Maintenance" || unit.status === "Out of Service") {
+    return { bookable: false, reason: "maintenance" as const, blocking: null, allBookings: bookings, nextAvailableDate: null, nextAvailableTime: null };
+  }
+
+  const sortedBookings = [...(bookings || [])].sort((a, b) =>
+    String(a.startISO || formatDateToInput(a.startDate)).localeCompare(String(b.startISO || formatDateToInput(b.startDate)))
+  );
+
+  const findConflictForWindow = (startISO: string, endISO: string, startTime: string, endTime: string) => {
+    for (const b of sortedBookings) {
+      const bStartTime = b.checkoutTime || "10:00 AM";
+      const bReturnTime = b.returnTime || b.checkinTime || b.checkoutTime || "10:00 AM";
+      if (
+        areDatesOverlapping(b.startDate, b.endDate, startISO, endISO, {
+          timeStartA: bStartTime,
+          timeEndA: bReturnTime,
+          timeStartB: startTime || "10:00 AM",
+          timeEndB: endTime || startTime || "10:00 AM",
+        })
+      ) {
+        return b;
+      }
+    }
+    return null;
+  };
+
+  // Compute earliest conflict-free return date & hour for the requested duration
+  let nextAvailableDate: string | null = null;
+  let nextAvailableTime: string | null = null;
+  if (sortedBookings.length > 0) {
+    const rawDiff =
+      reqStart && reqEnd
+        ? Math.round((new Date(`${reqEnd}T00:00:00Z`).getTime() - new Date(`${reqStart}T00:00:00Z`).getTime()) / 86400000)
+        : 1;
+    const minDurationDays = Math.max(1, isNaN(rawDiff) ? 1 : rawDiff);
+    const first = sortedBookings[0];
+    let candDate = first.endISO || formatDateToInput(first.endDate);
+    let candTime = first.returnTime || first.checkinTime || first.checkoutTime || "10:00 AM";
+
+    for (let step = 0; step <= sortedBookings.length; step++) {
+      const candEnd = addDaysToISODate(candDate, minDurationDays);
+      const hit = findConflictForWindow(candDate, candEnd, candTime, candTime);
+      if (!hit) break;
+      const hitEnd = hit.endISO || formatDateToInput(hit.endDate);
+      const hitRetTime = hit.returnTime || hit.checkinTime || hit.checkoutTime || "10:00 AM";
+      if (
+        hitEnd < candDate ||
+        (hitEnd === candDate && timeStringToMinutes(hitRetTime) <= timeStringToMinutes(candTime))
+      ) {
+        break;
+      }
+      candDate = hitEnd;
+      candTime = hitRetTime;
+    }
+
+    nextAvailableDate = candDate;
+    nextAvailableTime = candTime;
+  }
+
+  const blocking = findConflictForWindow(
+    reqStart,
+    reqEnd,
+    reqCheckoutTime || "10:00 AM",
+    reqCheckinTime || reqCheckoutTime || "10:00 AM"
+  );
+
+  if (blocking) {
+    return {
+      bookable: false,
+      reason: "conflict" as const,
+      blocking,
+      allBookings: sortedBookings,
+      nextAvailableDate: nextAvailableDate || blocking.endISO || formatDateToInput(blocking.endDate),
+      nextAvailableTime: nextAvailableTime || blocking.returnTime || blocking.checkinTime || blocking.checkoutTime || "10:00 AM",
+    };
+  }
+
+  return {
+    bookable: true,
+    reason: "available" as const,
+    blocking: null,
+    allBookings: sortedBookings,
+    nextAvailableDate,
+    nextAvailableTime,
+  };
 }
 
 // Call Multi-Provider AI Brain (Groq active models -> OpenAI -> Gemini) with full error visibility
@@ -479,6 +713,7 @@ export async function POST(req: Request) {
       allClients,
       allUnits,
       recentContracts,
+      activeBookingsByUnit = {},
       totalUnits,
       availableUnits,
       rentedUnits,
@@ -814,8 +1049,8 @@ BOOKING STATE: Client=${existingClientName || "None"}, Car=${existingUnitName ||
 
 RULES:
 1. BACKEND Q&A & FULL ACCESS: You have complete read access to every collection in MongoDB (fleet, clients, contracts, drivers, damages, inspections, transactions, logs, expiries, revenue). Answer directly from LIVE METRICS/lists above when complete. When user asks for specific/filtered cars, older clients, full history/vidange/inspections, date-range revenue/transactions, contracts, logs, drivers, or expiries not fully shown above, set "intent":"QUERY_BACKEND" with "backendQuery".
-2. FLEET AVAILABILITY & FILTERING: If user asks for available/rented/maintenance/cheapest/specific cars (e.g. "availbale mercedes", "free bmw", "rented urus", "black cars under 500"), set "intent":"GENERAL_CHAT" (or "QUERY_BACKEND" "fleet_query" if fleet > 100), list ALL matching cars with plate, year, color, status & AED rate, and set "searchQuery" + optional "filterStatus" so clickable car cards appear. NEVER ask for plate number on availability/filter questions!
-3. CONTRACT WIZARD: Only set "intent":"CONTRACT_FLOW" when user wants to CREATE/BOOK/SET UP a new contract (NOT questions like "how many contracts", "rental history", "overdue contracts"). Never invent missing cars; ask plate/year/color when selecting a bare/ambiguous car.
+2. FLEET AVAILABILITY & FILTERING: If user asks for available/rented/maintenance/cheapest/specific cars (e.g. "availbale mercedes", "free bmw", "rented urus", "black cars under 500"), set "intent":"GENERAL_CHAT" (or "QUERY_BACKEND" "fleet_query" if fleet > 100), list ALL matching cars with plate, year, color, status, AED rate & booked return date/hour if Rented, and set "searchQuery" + optional "filterStatus" so clickable car cards appear. NEVER ask for plate number on availability/filter questions!
+3. CONTRACT WIZARD & SCHEDULING: Set "intent":"CONTRACT_FLOW" when user wants to CREATE/BOOK/SET UP a new contract (extracting startDate YYYY-MM-DD, endDate YYYY-MM-DD, days, and checkoutTime in HH:MM AM/PM e.g. "03:00 PM"). Vehicles marked Rented show Booked:start..end(ret@time) — allow scheduling a contract on a Rented car when the requested startDate and checkoutTime are on/after its return date & hour; if they give no schedule or overlap, clearly tell them the exact return date and return hour. Never invent missing cars; ask plate/year/color when selecting a bare/ambiguous car.
 4. ENTITY INTEGRITY: Use "OPEN_CLIENT_DETAILS"/"OPEN_VEHICLE_DETAILS"/"NAVIGATE" only when user asks to open/go to a page or types ONLY a bare entity name, NEVER to hijack analytical/availability questions. Put queried name/plate in "searchQuery"; never guess IDs.
 
 Return ONLY valid JSON:
@@ -841,6 +1076,11 @@ Return ONLY valid JSON:
     ];
 
     // Deterministic Extraction & Question vs Action Classification
+    const parsedDates = parseRentalDates(message, todayDate);
+    const wantsAfterReturn =
+      /\b(after\s+return|when\s+(?:it|the\s+car)\s+returns?|once\s+(?:it|the\s+car)\s+returns?|as\s+soon\s+as\s+(?:it|the\s+car)\s+returns?|after\s+its?\s+return|next\s+available(?:\s+slot|\s+date|\s+time)?|earliest\s+available)\b|بعد\s+(?:الإرجاع|الارجاع|العودة|التسليم)|عند\s+(?:الإرجاع|الارجاع)|أول\s+ما\s+ترجع|عندما\s+ترجع/i.test(
+        message
+      );
     const detectedQueryStatus = detectRequestedUnitStatus(message);
     const hasAvailabilityOrFilterWords =
       Boolean(detectedQueryStatus) ||
@@ -869,9 +1109,12 @@ Return ONLY valid JSON:
       );
 
     const isCreatingContractPhrase =
-      /\b(create|make|setup|set\s+up|start|draft|prepare|book|reserve|forclien|with\s+car|sleect\s+car|select\s+car)\b|\b(?:new|add(?:\s+a)?)\s+(?:contract|booking|rental)\b|انشاء|إنشاء|سوي|سويلي|اعمل|جهز|احجز|عقد\s+جديد|حجز\s+جديد/i.test(
+      /\b(create|make|setup|set\s+up|start|draft|prepare|book|reserve|forclien|with\s+car|sleect\s+car|select\s+car)\b|\b(?:new|add(?:\s+a)?)\s+(?:contract|booking|rental)\b|انشاء|إنشاء|سوي|سويلي|اعمل|جهز|احجز|أجر|عقد\s+جديد|حجز\s+جديد/i.test(
         lower
-      );
+      ) ||
+      (/\b(?:rent|hire)\b|استأجر|أستأجر/i.test(lower) &&
+        !/\b(?:rented|how\s+(?:to|do|can)|last\s+time)\b/i.test(lower) &&
+        (parsedDates.hasExplicitStartDate || parsedDates.hasExplicitEndDate || Boolean(parsedDates.checkoutTime) || wantsAfterReturn));
 
     const isHowToQuestion =
       /^\s*(?:how\s+(?:do|can|does|to|should)|what\s+(?:is|are|does)|why\s+|explain\b|كيف\s+|ما\s+هو\s+|اشرح)/i.test(
@@ -879,7 +1122,7 @@ Return ONLY valid JSON:
       ) && !/\b(?:for\s+client|forclien|with\s+car|from\s+today)\b/i.test(lower);
 
     const hasContractWords =
-      /\b(contract|contrac|book|booking|rent|rental|reserve)\b|عقد|حجز|تأجير|استئجار/i.test(lower) &&
+      /\b(contract|contrac|book|booking|rent|rental|reserve)\b|عقد|حجز|تأجير|استئجار|أستأجر/i.test(lower) &&
       !isHowToQuestion &&
       (isCreatingContractPhrase || !isAnalyticalQuestion);
 
@@ -931,11 +1174,25 @@ Return ONLY valid JSON:
       ? (explicitCarDetailMatch ? explicitCarDetailMatch[1].trim() : message.trim())
       : null;
 
-    const clientRegex = /(?:\bfor client named\b|\bforclien named\b|\bfor client\b|\bclient named\b|\bcustomer named\b|\bfor customer\b|\bclient\b|\bcustomer\b|العميل|للعميل|لصالح)\s*:?\s*([A-Za-z\u0600-\u06FF\s]{2,45}?)(?=\s+(?:with|and\s+(?:sleect|select)|sleect|select|car|vehicle|بسيارة|سيارة|from|starting|for\s+\d|لمدة|من)|[,.\n]|$)/i;
-    const forNameRegex = /\b(?:contract|booking|rent|rental)\s+for\s+([A-Za-z\u0600-\u06FF][A-Za-z\u0600-\u06FF\s]{1,35}?)(?=\s+(?:with|and\s+(?:sleect|select)|sleect|select|car|vehicle|from|starting|for\s+\d)|[,.\n]|$)/i;
-    const clientMatch = !wantsClientDetails ? (message.match(clientRegex) || message.match(forNameRegex)) : null;
+    const scheduleStopInner =
+      "from\\s+today|from\\s+tomorrow|from\\s+\\d|from\\b|starting\\b|starts?\\b|on\\s+\\d|at\\s+\\d|tomorrow\\b|after\\s+tomorrow\\b|today\\b|after\\s+return|to\\s+\\d|too\\s+\\d|until\\b|for\\s+(?:client|customer|\\d+\\s*(?:day|days|week|month))|من\\s+اليوم|من\\s+\\d|من\\s+يوم|يبدأ|تبدأ|غداً|غدا|بكرة|بكرا|بعد\\s+غد|الساعة|لمدة";
+    const clientRegex = new RegExp(
+      `(?:\\bfor client named\\b|\\bforclien named\\b|\\bfor client\\b|\\bclient named\\b|\\bcustomer named\\b|\\bfor customer\\b|\\bclient\\b|\\bcustomer\\b|العميل|للعميل|لصالح)\\s*:?\\s*([A-Za-z\\u0600-\\u06FF\\s]{2,45}?)(?=\\s+(?:with|and\\s+(?:sleect|select)|sleect|select|car|vehicle|بسيارة|سيارة|${scheduleStopInner})|[,.\\n]|$)`,
+      "i"
+    );
+    const forNameRegex = new RegExp(
+      `\\b(?:contract|booking|rent|rental)\\s+for\\s+([A-Za-z\\u0600-\\u06FF][A-Za-z\\u0600-\\u06FF\\s]{1,35}?)(?=\\s+(?:with|and\\s+(?:sleect|select)|sleect|select|car|vehicle|بسيارة|سيارة|${scheduleStopInner})|[,.\\n]|$)`,
+      "i"
+    );
+    const tailForClientRegex = new RegExp(
+      `\\bfor\\s+(?!tomorrow\\b|today\\b|after\\b|a\\s+day\\b|client\\b|customer\\b)([A-Za-z\\u0600-\\u06FF][A-Za-z\\u0600-\\u06FF\\s]{1,35}?)(?=\\s+(?:${scheduleStopInner})|[,.\\n]|$)`,
+      "i"
+    );
+    const clientMatch = !wantsClientDetails
+      ? message.match(clientRegex) || message.match(forNameRegex) || (hasContractWords ? message.match(tailForClientRegex) : null)
+      : null;
     const rawExtractedClient = clientMatch ? clientMatch[1].trim() : null;
-    const reservedClientNoise = /^(new|new\s+client|new\s+clien|clien|client|customer|person|user|someone|any|a|an|the|car|vehicle|today|tomorrow|me|details|detail|profile|page|عميل|عميل\s+جديد|جديد|سيارة)$/i;
+    const reservedClientNoise = /^(new|new\s+client|new\s+clien|clien|client|customer|person|user|someone|any|a|an|the|car|vehicle|today|tomorrow|after\s+tomorrow|after\s+return|me|details|detail|profile|page|عميل|عميل\s+جديد|جديد|سيارة|اليوم|غداً|غدا)$/i;
     const extractedClientName =
       rawExtractedClient && !reservedClientNoise.test(rawExtractedClient) ? rawExtractedClient : null;
 
@@ -943,26 +1200,45 @@ Return ONLY valid JSON:
       /\b(how many\s+(?:cars|vehicles|units)|list\s+.*(?:cars|vehicles)|available\s+cars|cars\s+(?:are\s+)?available|all\s+cars|fleet\s+status)\b|كم\s+سيارة|السيارات\s+المتاح/i.test(
         lower
       ) && !parseCarDetails(message).isKnownMake;
-    const carRegex = /(?:\bsleect car\b|\bselect car\b|\bwith car\b|\bwith vehicle\b|\bchoose car\b|\bcar\b\s*:?|سيارة|بسيارة|مركبة)\s+([^\n,]+?)(?=\s+(?:from\s+today|from\s+\d|starting|to\s+\d|too\s+\d|until|for\s+\d+\s*(?:day|days|week|month)|من\s+اليوم|لمدة)|[,\n]|$)/i;
-    const directBookCarRegex = /\b(?:book|rent|booking|hire|احجز|استأجر|أجر)\s+(?:a\s+|an\s+|the\s+)?([^\n,]+?)(?=\s+(?:from\s+today|from\s+\d|starting|to\s+\d|too\s+\d|until|for\s+\d+\s*(?:day|days|week|month)|من\s+اليوم|لمدة)|[,\n]|$)/i;
+    const carStopLookahead =
+      "(?=\\s+(?:for\\s+(?:client|customer|\\d+\\s*(?:day|days|week|month)|[A-Za-z\\u0600-\\u06FF]+)|from\\s+today|from\\s+tomorrow|from\\s+\\d|from\\b|starting\\b|starts?\\b|when\\s+(?:it|the)|after\\s+return|on\\s+\\d|at\\s+\\d|tomorrow\\b|after\\s+tomorrow\\b|today\\b|to\\s+\\d|too\\s+\\d|until\\b|من\\s+اليوم|من\\s+\\d|من\\s+يوم|يبدأ|تبدأ|غداً|غدا|بكرة|بكرا|بعد\\s+غد|بعد\\s+(?:الإرجاع|الارجاع)|الساعة|لمدة|للعميل|لصالح)|[,\\n]|$)";
+    const carRegex = new RegExp(
+      `(?:\\bsleect car\\b|\\bselect car\\b|\\bwith car\\b|\\bwith vehicle\\b|\\bchoose car\\b|\\bcar\\b\\s*:?|سيارة|بسيارة|مركبة)\\s+([^\\n,]+?)${carStopLookahead}`,
+      "i"
+    );
+    const directBookCarRegex = new RegExp(
+      `\\b(?:book|rent|booking|hire|احجز|استأجر|أستأجر|أجر)\\s+(?:a\\s+|an\\s+|the\\s+)?([^\\n,]+?)${carStopLookahead}`,
+      "i"
+    );
+    const withCarRegex = new RegExp(
+      `\\bwith\\s+(?:a\\s+|an\\s+|the\\s+)?([^\\n,]+?)${carStopLookahead}`,
+      "i"
+    );
     const carMatch = !isFleetQuestion && !wantsVehicleDetails ? message.match(carRegex) : null;
     const directBookMatch =
       !carMatch && hasContractWords && !isFleetQuestion && !wantsVehicleDetails
         ? message.match(directBookCarRegex)
         : null;
+    const withCarMatch =
+      !carMatch && !directBookMatch && hasContractWords && !isFleetQuestion && !wantsVehicleDetails
+        ? message.match(withCarRegex)
+        : null;
     const directBookCandidate = directBookMatch?.[1]?.replace(/^:\s*/, "").trim() || null;
+    const withCarCandidate = withCarMatch?.[1]?.replace(/^:\s*/, "").trim() || null;
+    const isKnownCarCandidate = (cand: string | null) =>
+      Boolean(cand && (parseCarDetails(cand).isKnownMake || Boolean(parseCarDetails(cand).plate)));
     const rawExtractedCar = carMatch
       ? carMatch[1].replace(/^:\s*/, "").trim()
-      : directBookCandidate && parseCarDetails(directBookCandidate).isKnownMake
+      : isKnownCarCandidate(directBookCandidate)
       ? directBookCandidate
+      : isKnownCarCandidate(withCarCandidate)
+      ? withCarCandidate
       : null;
-    const reservedCarStartNoise = /^(are|is|was|were|available|free|rented|all|many|status|count|should|can|do|does|did|to|the|for|in|on|at|details|detail|page|profile)\b/i;
+    const reservedCarStartNoise = /^(are|is|was|were|available|free|rented|all|many|status|count|should|can|do|does|did|to|the|for|in|on|at|it|details|detail|page|profile)\b/i;
     const extractedCarName =
       rawExtractedCar && rawExtractedCar.length >= 2 && !reservedCarStartNoise.test(rawExtractedCar)
         ? rawExtractedCar
         : null;
-
-    const parsedDates = parseRentalDates(message, todayDate);
 
     const isBareCarQuestionText =
       /\b(plate number you need|so i open or select the right one|by name alone in our fleet|open its page or create a contract)\b|رقم اللوحة هذا|لتحديد السيارة المطلوبة|بهذا الاسم فقط في الأسطول/i.test(
@@ -972,13 +1248,21 @@ Return ONLY valid JSON:
       /\b(which car|which vehicle|select one of these|select a car|which specific plate|select the exact car)\b|أي سيارة|اختر سيارة|تفضل اختيار واحدة|لاختيار السيارة الصحيحة/i.test(
         lastAssistantText
       );
+    const isRentedScheduleQuestionText =
+      /\b(scheduled\s+to\s+return|expected\s+return\s+was|earliest\s+open\s+slot|currently\s+(?:marked\s+)?rented|your\s+requested\s+pickup\s+at|say\s+"after\s+return"|reply\s+with\s+(?:a\s+time|your\s+start\s+date))\b|موعد\s+إرجاعها|موعد\s+الإرجاع\s+المسجل|مؤجرة\s+حالياً|مبكراً?\s+قبل\s+التسليم|بعد\s+الإرجاع|تاريخ\s+وساعة\s+البدء/i.test(
+        lastAssistantText
+      );
     const lastWasContractTurn =
-      lastWasContractAction || (lastAssistantMsgObj?.action !== "SEARCH_RESULT" && lastAssistantMsgObj?.action !== "NONE" && isContractCarQuestionText);
+      lastWasContractAction ||
+      isRentedScheduleQuestionText ||
+      (lastAssistantMsgObj?.action !== "SEARCH_RESULT" && lastAssistantMsgObj?.action !== "NONE" && isContractCarQuestionText);
 
     const askedForClient = /who is the customer|who is the client|client name|من هو العميل|اسم العميل/.test(lastAssistantText);
     const askedForCar =
-      isContractCarQuestionText ||
-      (lastWasContractTurn && /plate number|model year|more details|رقم اللوحة|مزيد من التفاصيل/.test(lastAssistantText));
+      !isRentedScheduleQuestionText &&
+      (isContractCarQuestionText ||
+        (lastWasContractTurn && /plate number|model year|more details|رقم اللوحة|مزيد من التفاصيل/.test(lastAssistantText)));
+    const askedForRentedSchedule = isRentedScheduleQuestionText && !askedForCar;
     const askedForDays = /how many days|duration|كم مدة|كم يوم/.test(lastAssistantText);
     const askedToFinalize = /shall i finalize|create the contract now|هل أعتمد|هل أنشئ العقد/.test(lastAssistantText);
     const askedForVehicleDetails =
@@ -1094,7 +1378,10 @@ Return ONLY valid JSON:
       cData.clientName = message.trim();
     }
 
-    if (!cData.carName && extractedCarName) {
+    if (
+      extractedCarName &&
+      (!cData.carName || (parseCarDetails(extractedCarName).plate && !parseCarDetails(String(cData.carName)).plate))
+    ) {
       cData.carName = extractedCarName;
     } else if (
       !cData.carName &&
@@ -1112,11 +1399,27 @@ Return ONLY valid JSON:
       } else {
         cData.carName = message.trim();
       }
-    } else if (!cData.carName && askedForVehicleDetails && hasContractWords) {
-      const discussedPlateMatch = lastAssistantMsgObj?.text?.match(/(?:Plate|لوحة)\s*:\s*\*?\*?([A-Za-z0-9-]+)\*?\*?/i);
-      if (discussedPlateMatch) {
-        cData.carName = discussedPlateMatch[1].trim();
+    } else if (!cData.carName && askedForRentedSchedule) {
+      const replyUnitCheck = findUnitMatches(message.trim());
+      const replyParsed = parseCarDetails(message.trim());
+      if ((replyUnitCheck.hasExplicitPlate || replyParsed.isKnownMake) && replyUnitCheck.matches.length > 0) {
+        cData.carName = message.trim();
+      } else {
+        const prevPlate = extractFirstPlateFromText(lastAssistantMsgObj?.text || "");
+        if (prevPlate) cData.carName = prevPlate;
       }
+    } else if (
+      !cData.carName &&
+      lastAssistantMsgObj?.text &&
+      (askedForVehicleDetails ||
+        (hasContractWords &&
+          (/\b(it|this\s+(?:car|vehicle|one)|that\s+(?:car|vehicle|one)|same\s+(?:car|vehicle))\b|نفس\s+السيارة|هذه\s+السيارة|هاذ\s+السيارة/i.test(
+            lower
+          ) ||
+            wantsAfterReturn)))
+    ) {
+      const prevPlate = extractFirstPlateFromText(lastAssistantMsgObj.text);
+      if (prevPlate) cData.carName = prevPlate;
     }
 
     if (!cData.days && askedForDays) {
@@ -1124,13 +1427,36 @@ Return ONLY valid JSON:
       if (dm) cData.days = parseInt(dm[1], 10);
     }
 
-    if (!cData.endDate && parsedDates.endDate) {
-      cData.endDate = parsedDates.endDate;
+    if (parsedDates.checkoutTime) {
+      cData.checkoutTime = parsedDates.checkoutTime;
+    } else if (cData.checkoutTime) {
+      cData.checkoutTime = parseCheckoutTimeFromMessage(String(cData.checkoutTime)) || String(cData.checkoutTime);
+    }
+
+    if (parsedDates.hasExplicitStartDate) {
+      cData.startDate = parsedDates.startDate;
+    } else if (!cData.startDate && parsedDates.endDate) {
       cData.startDate = parsedDates.startDate || todayDate;
+    }
+
+    if (parsedDates.days && !cData.days) {
       cData.days = parsedDates.days;
+    }
+
+    if (parsedDates.hasExplicitEndDate && parsedDates.endDate) {
+      cData.endDate = parsedDates.endDate;
+      if (!cData.days && cData.startDate) {
+        const dDiff = Math.round((new Date(cData.endDate).getTime() - new Date(cData.startDate).getTime()) / 86400000);
+        cData.days = Math.max(1, dDiff);
+      }
+    } else if (!cData.endDate && parsedDates.endDate && cData.startDate) {
+      cData.endDate = cData.days ? addDaysToISODate(cData.startDate, Number(cData.days)) : parsedDates.endDate;
+    } else if (!cData.endDate && cData.startDate && cData.days) {
+      cData.endDate = addDaysToISODate(cData.startDate, Number(cData.days));
     } else if (cData.endDate && !cData.startDate) {
       cData.startDate = todayDate;
     }
+
     if (!cData.days && cData.startDate && cData.endDate) {
       const dDiff = Math.round((new Date(cData.endDate).getTime() - new Date(cData.startDate).getTime()) / 86400000);
       if (dDiff > 0) cData.days = dDiff;
@@ -1166,6 +1492,7 @@ Return ONLY valid JSON:
         hasContractWords ||
         askedForClient ||
         askedForCar ||
+        (askedForRentedSchedule && !isAnalyticalQuestion) ||
         askedForDays ||
         askedToFinalize ||
         (!isAnalyticalQuestion && Boolean(cData.clientName || cData.carName || cData.days)) ||
@@ -1210,9 +1537,11 @@ Return ONLY valid JSON:
       // Rescue validated DB client mentioned in prior contract assistant turn if URL search wasn't forwarded
       if (!resolvedClient && lastWasContractTurn && lastAssistantMsgObj?.text) {
         const prevClientMatch = lastAssistantMsgObj.text.match(
-          /select the exact car for ([^?]+)\?|لاختيار السيارة الصحيحة للعميل ([^.]+)\.?/i
+          /select the exact car for ([^?]+)\?|لاختيار السيارة الصحيحة للعميل ([^.]+)\.?|(?:for(?:\s+client)?|للعميل)\s+\*\*([^*]+)\*\*/i
         );
-        const prevClientCandidate = prevClientMatch ? (prevClientMatch[1] || prevClientMatch[2] || "").trim() : "";
+        const prevClientCandidate = prevClientMatch
+          ? (prevClientMatch[1] || prevClientMatch[2] || prevClientMatch[3] || "").trim()
+          : "";
         if (prevClientCandidate) {
           const rescuedMatches = await findClientMatches(prevClientCandidate);
           if (rescuedMatches.length > 0) {
@@ -1306,7 +1635,17 @@ Return ONLY valid JSON:
         if (resolvedClient.name) newParams.set("clientName", String(resolvedClient.name));
       }
       if (cData.days) newParams.set("days", String(cData.days));
-      if (cData.startDate) newParams.set("startDate", String(cData.startDate));
+      if (cData.startDate) {
+        newParams.set("startDate", String(cData.startDate));
+        if (!cData.endDate) {
+          const effDaysParam = cData.days || (existingDays ? Number(existingDays) : null);
+          if (effDaysParam && effDaysParam > 0) {
+            newParams.set("endDate", addDaysToISODate(String(cData.startDate), Number(effDaysParam)));
+          } else {
+            newParams.delete("endDate");
+          }
+        }
+      }
       if (cData.endDate) newParams.set("endDate", String(cData.endDate));
       if (cData.checkoutTime) newParams.set("checkoutTime", String(cData.checkoutTime));
       if (cData.totalPrice) newParams.set("price", String(cData.totalPrice));
@@ -1377,23 +1716,191 @@ Return ONLY valid JSON:
         });
       }
 
-      // SCENARIO B: Car exists in fleet but is NOT available (Rented or Maintenance)
-      if (resolvedUnit && resolvedUnit.status !== "Available") {
-        newParams.delete("unitId");
-        const statusAr = resolvedUnit.status === "Rented" ? "مؤجرة حالياً" : "في الصيانة";
-        const smartUnavailableReply =
-          lang === "ar"
-            ? `سيارة ${resolvedUnit.make} ${resolvedUnit.model} مسجلة في أسطولنا ولكنها (${statusAr}). السيارات المتاحة لدينا الآن: ${availableListAr || "مرسيدس C300"}. هل تفضل اختيار واحدة منها؟`
-            : `${resolvedUnit.make} ${resolvedUnit.model} is in our fleet but currently ${resolvedUnit.status}. Available cars right now: ${availableList || "Mercedes-Benz C300"}. Would you like to select one of these instead?`;
+      // SCENARIO B: Schedule & overlap verification (Maintenance, Rented with exact return date/hour, or overlapping bookings)
+      let scheduledForRentedCar = false;
+      if (resolvedUnit) {
+        const unitBookings: any[] =
+          activeBookingsByUnit[String(resolvedUnit._id)] || resolvedUnit.activeBookings || [];
+        const llmStartProvided =
+          Boolean(parsed?.contractData?.startDate) &&
+          (parsedDates.hasExplicitStartDate ||
+            parsed?.contractData?.startDate !== todayDate ||
+            /\btoday\b|اليوم/i.test(lower));
+        const hasScheduleSpec =
+          parsedDates.hasExplicitStartDate ||
+          parsedDates.hasExplicitEndDate ||
+          Boolean(parsedDates.checkoutTime) ||
+          llmStartProvided ||
+          Boolean(parsed?.contractData?.endDate) ||
+          Boolean(parsed?.contractData?.checkoutTime) ||
+          Boolean(existingParams.get("startDate")) ||
+          Boolean(existingParams.get("checkoutTime")) ||
+          wantsAfterReturn;
 
-        return NextResponse.json<AssistantResponse>({
-          reply: smartUnavailableReply,
-          action: "CREATE_CONTRACT",
-          navigateUrl: `/bookings/new?${newParams.toString()}`,
-        });
+        if (resolvedUnit.status === "Maintenance" || resolvedUnit.status === "Out of Service") {
+          newParams.delete("unitId");
+          const smartUnavailableReply =
+            lang === "ar"
+              ? `سيارة **${resolvedUnit.make} ${resolvedUnit.model}** (لوحة: **${resolvedUnit.plate}**) مسجلة في أسطولنا ولكنها حالياً (في الصيانة / خارج الخدمة). السيارات المتاحة لدينا الآن: ${availableListAr || "لا توجد سيارات متاحة"}. هل تفضل اختيار واحدة منها${clientLabel ? ` للعميل **${clientLabel}**` : ""}؟`
+              : `**${resolvedUnit.make} ${resolvedUnit.model}** (Plate: **${resolvedUnit.plate}**) is in our fleet but currently ${resolvedUnit.status}. Available cars right now: ${availableList || "None currently available"}. Would you like to select one of these instead${clientLabel ? ` for **${clientLabel}**` : ""}?`;
+
+          return NextResponse.json<AssistantResponse>({
+            reply: smartUnavailableReply,
+            action: "CREATE_CONTRACT",
+            navigateUrl: `/bookings/new?${newParams.toString()}`,
+          });
+        }
+
+        const effDays = Math.max(1, Number(cData.days || existingDays || 1));
+        const schedulePreview = evaluateUnitBookingSchedule(
+          resolvedUnit,
+          unitBookings,
+          todayDate,
+          addDaysToISODate(todayDate, effDays),
+          "10:00 AM",
+          "10:00 AM"
+        );
+
+        let effStart = String(cData.startDate || existingParams.get("startDate") || todayDate);
+        let effCheckoutTime = String(cData.checkoutTime || existingParams.get("checkoutTime") || "10:00 AM");
+        let effEnd = String(
+          cData.endDate ||
+            (!parsedDates.hasExplicitStartDate && existingParams.get("endDate")) ||
+            addDaysToISODate(effStart, effDays)
+        );
+
+        if (wantsAfterReturn && schedulePreview.nextAvailableDate) {
+          effStart = schedulePreview.nextAvailableDate >= todayDate ? schedulePreview.nextAvailableDate : todayDate;
+          if (
+            schedulePreview.nextAvailableDate >= todayDate &&
+            schedulePreview.nextAvailableTime &&
+            !parsedDates.checkoutTime &&
+            !parsed?.contractData?.checkoutTime
+          ) {
+            effCheckoutTime = schedulePreview.nextAvailableTime;
+          }
+          effEnd = addDaysToISODate(effStart, effDays);
+          cData.startDate = effStart;
+          cData.endDate = effEnd;
+          cData.days = effDays;
+          cData.checkoutTime = effCheckoutTime;
+          newParams.set("startDate", effStart);
+          newParams.set("endDate", effEnd);
+          newParams.set("days", String(effDays));
+          newParams.set("checkoutTime", effCheckoutTime);
+        }
+
+        // Case B1: Car is Rented and no start date/hour was provided -> tell exact return date & hour and ask
+        if (resolvedUnit.status === "Rented" && !hasScheduleSpec) {
+          newParams.delete("unitId");
+          let rentReply = "";
+          if (unitBookings.length > 0 && schedulePreview.nextAvailableDate) {
+            const retDate = schedulePreview.nextAvailableDate;
+            const retTime = schedulePreview.nextAvailableTime || "10:00 AM";
+            const retWords = formatDateWords(retDate) || retDate;
+            const slotsList = unitBookings.slice(0, 2).map((b) => formatBookingSlot(b, lang)).join(" | ");
+            if (retDate < todayDate) {
+              rentReply =
+                lang === "ar"
+                  ? `سيارة **${resolvedUnit.make} ${resolvedUnit.model}** (لوحة: **${resolvedUnit.plate}**) مؤجرة حالياً (موعد الإرجاع المسجل كان **${retWords} (${retDate})** الساعة **${retTime}** ولم يتم تسليمها بعد). أخبرني بتاريخ وساعة البدء المطلوبة${clientLabel ? ` للعميل **${clientLabel}**` : ""}، أو اختر من السيارات المتاحة: ${availableListAr || "لا توجد سيارات متاحة"}.`
+                  : `**${resolvedUnit.make} ${resolvedUnit.model}** (Plate: **${resolvedUnit.plate}**) is currently marked **Rented** (expected return was **${retWords} (${retDate})** at **${retTime}** and has not been marked returned yet). Share your desired start date & hour${clientLabel ? ` for **${clientLabel}**` : ""}, or pick an available car: ${availableList || "None currently available"}.`;
+            } else {
+              rentReply =
+                lang === "ar"
+                  ? `سيارة **${resolvedUnit.make} ${resolvedUnit.model}** (لوحة: **${resolvedUnit.plate}**) مؤجرة حالياً وموعد إرجاعها يوم **${retWords} (${retDate})** الساعة **${retTime}** (${slotsList}). يمكنك إنشاء عقد لها ابتداءً من **${retWords}** الساعة **${retTime}** فأكثر${clientLabel ? ` للعميل **${clientLabel}**` : ""} — أخبرني بتاريخ وساعة البدء المطلوبة (أو اكتب **"بعد الإرجاع"**)، أو اختر سيارة متاحة: ${availableListAr || "لا توجد سيارات متاحة"}.`
+                  : `**${resolvedUnit.make} ${resolvedUnit.model}** (Plate: **${resolvedUnit.plate}**) is currently **Rented** and scheduled to return on **${retWords} (${retDate})** at **${retTime}** (${slotsList}). You can create a contract for it${clientLabel ? ` for **${clientLabel}**` : ""} starting on/after **${retWords}** at **${retTime}** — reply with your start date & hour (or say **"after return"**), or choose an available car: ${availableList || "None currently available"}.`;
+            }
+          } else {
+            rentReply =
+              lang === "ar"
+                ? `سيارة **${resolvedUnit.make} ${resolvedUnit.model}** (لوحة: **${resolvedUnit.plate}**) مؤجرة حالياً (لا يوجد موعد إرجاع مسجل في عقد نشط). أخبرني بتاريخ وساعة البدء المطلوبة لجدولتها لاحقاً${clientLabel ? ` للعميل **${clientLabel}**` : ""}، أو اختر من السيارات المتاحة الآن: ${availableListAr || "لا توجد سيارات متاحة"}.`
+                : `**${resolvedUnit.make} ${resolvedUnit.model}** (Plate: **${resolvedUnit.plate}**) is currently **Rented** (no return date/hour logged on an active contract). Share a future start date & hour to schedule it${clientLabel ? ` for **${clientLabel}**` : ""}, or pick an available car right now: ${availableList || "None currently available"}.`;
+          }
+
+          return NextResponse.json<AssistantResponse>({
+            reply: rentReply,
+            action: "CREATE_CONTRACT",
+            navigateUrl: `/bookings/new?${newParams.toString()}`,
+          });
+        }
+
+        // Case B2: User provided a start date/hour -> check turnover hours & booking overlap
+        if (hasScheduleSpec) {
+          newParams.set("startDate", effStart);
+          newParams.set("endDate", effEnd);
+          newParams.set("days", String(effDays));
+          newParams.set("checkoutTime", effCheckoutTime);
+
+          const isUnreturnedOverdueToday =
+            resolvedUnit.status === "Rented" &&
+            effStart <= todayDate &&
+            (unitBookings.length === 0 ||
+              Boolean(schedulePreview.nextAvailableDate && schedulePreview.nextAvailableDate < todayDate));
+
+          const scheduleEval = evaluateUnitBookingSchedule(
+            resolvedUnit,
+            unitBookings,
+            effStart,
+            effEnd,
+            effCheckoutTime,
+            effCheckoutTime
+          );
+
+          if (!scheduleEval.bookable && scheduleEval.blocking) {
+            newParams.delete("unitId");
+            const blk = scheduleEval.blocking;
+            const blkStartISO = blk.startISO || formatDateToInput(blk.startDate);
+            const blkEndISO = blk.endISO || formatDateToInput(blk.endDate);
+            const blkRetTime = blk.returnTime || blk.checkinTime || blk.checkoutTime || "10:00 AM";
+            const blkStartWords = formatDateWords(blkStartISO) || blkStartISO;
+            const blkEndWords = formatDateWords(blkEndISO) || blkEndISO;
+            const nextDate = scheduleEval.nextAvailableDate || blkEndISO;
+            const nextTime = scheduleEval.nextAvailableTime || blkRetTime;
+            const nextWords = formatDateWords(nextDate) || nextDate;
+            const isTurnoverTooEarly = effStart === blkEndISO;
+
+            const conflictReply = isTurnoverTooEarly
+              ? lang === "ar"
+                ? `سيارة **${resolvedUnit.make} ${resolvedUnit.model}** (لوحة: **${resolvedUnit.plate}**) موعد إرجاعها يوم **${blkEndWords} (${blkEndISO})** الساعة **${blkRetTime}**، لذلك الساعة المطلوبة (**${effCheckoutTime}**) مبكرة قبل التسليم. يمكنك حجزها في نفس اليوم ابتداءً من الساعة **${blkRetTime}** أو بعدها${clientLabel ? ` للعميل **${clientLabel}**` : ""} — اكتب الساعة الجديدة (مثل ${blkRetTime}) أو اكتب **"بعد الإرجاع"**.`
+                : `**${resolvedUnit.make} ${resolvedUnit.model}** (Plate: **${resolvedUnit.plate}**) returns on **${blkEndWords} (${blkEndISO})** at **${blkRetTime}**, so your requested pickup at **${effCheckoutTime}** is before it returns. You can create the contract on **${blkEndWords}** starting at **${blkRetTime}** or later${clientLabel ? ` for **${clientLabel}**` : ""} — reply with a time at/after **${blkRetTime}** or say **"after return"**.`
+              : lang === "ar"
+              ? `لا يمكن بدء الحجز بتاريخ **${formatDateWords(effStart)} (${effStart})** الساعة **${effCheckoutTime}** لأن سيارة **${resolvedUnit.make} ${resolvedUnit.model}** (لوحة: **${resolvedUnit.plate}**) محجوزة من **${blkStartWords}** إلى **${blkEndWords}** وموعد إرجاعها **${blkEndWords} (${blkEndISO})** الساعة **${blkRetTime}**. أقرب وقت متاح لبدء العقد هو **${nextWords} (${nextDate})** الساعة **${nextTime}**${clientLabel ? ` للعميل **${clientLabel}**` : ""} — اكتب تاريخاً/ساعة جديدة أو قل **"بعد الإرجاع"**، أو اختر سيارة متاحة: ${availableListAr || "لا يوجد"}.`
+              : `**${resolvedUnit.make} ${resolvedUnit.model}** (Plate: **${resolvedUnit.plate}**) has an active booking from **${blkStartWords}** to **${blkEndWords}** (returns **${blkEndWords} (${blkEndISO})** at **${blkRetTime}**), so starting on **${formatDateWords(effStart)} (${effStart})** at **${effCheckoutTime}** overlaps. Earliest open slot: **${nextWords} (${nextDate})** at **${nextTime}**${clientLabel ? ` for **${clientLabel}**` : ""} — share a new start date & hour (or say **"after return"**), or pick an available car: ${availableList || "None"}.`;
+
+            return NextResponse.json<AssistantResponse>({
+              reply: conflictReply,
+              action: "CREATE_CONTRACT",
+              navigateUrl: `/bookings/new?${newParams.toString()}`,
+            });
+          }
+
+          if (isUnreturnedOverdueToday) {
+            newParams.delete("unitId");
+            const retInfoEn =
+              unitBookings.length > 0 && schedulePreview.nextAvailableDate
+                ? `expected return was ${formatDateWords(schedulePreview.nextAvailableDate)} (${schedulePreview.nextAvailableDate}) at ${schedulePreview.nextAvailableTime || "10:00 AM"}`
+                : "no return date/hour is logged on an active contract";
+            const retInfoAr =
+              unitBookings.length > 0 && schedulePreview.nextAvailableDate
+                ? `موعد الإرجاع المسجل كان ${formatDateWords(schedulePreview.nextAvailableDate)} (${schedulePreview.nextAvailableDate}) الساعة ${schedulePreview.nextAvailableTime || "10:00 AM"}`
+                : "لا يوجد موعد إرجاع مسجل";
+            return NextResponse.json<AssistantResponse>({
+              reply:
+                lang === "ar"
+                  ? `سيارة **${resolvedUnit.make} ${resolvedUnit.model}** (لوحة: **${resolvedUnit.plate}**) لا تزال حالتها **مؤجرة** ولم تُستلم بعد (${retInfoAr}). لجدولة عقد مستقبلي لها، حدد تاريخاً بعد اليوم${clientLabel ? ` للعميل **${clientLabel}**` : ""}، أو اختر سيارة متاحة الآن: ${availableListAr || "لا يوجد"}.`
+                  : `**${resolvedUnit.make} ${resolvedUnit.model}** (Plate: **${resolvedUnit.plate}**) is still marked **Rented** and has not been marked returned yet (${retInfoEn}). Share a future start date after today${clientLabel ? ` for **${clientLabel}**` : ""}, or pick an available car right now: ${availableList || "None"}.`,
+              action: "CREATE_CONTRACT",
+              navigateUrl: `/bookings/new?${newParams.toString()}`,
+            });
+          }
+
+          if (resolvedUnit.status === "Rented") {
+            scheduledForRentedCar = true;
+          }
+        }
       }
 
-      // SCENARIO C: Car is available in fleet
+      // SCENARIO C: Car is available or scheduled on a non-overlapping future/turnover slot
       if (resolvedUnit) {
         newParams.set("unitId", String(resolvedUnit._id));
         newParams.set("unitName", `${resolvedUnit.make} ${resolvedUnit.model}`);
@@ -1420,9 +1927,10 @@ Return ONLY valid JSON:
         }
       }
 
-      // Override aiReply if it is missing, generic, or contradicts resolved backend entities / confirmation
+      // Override aiReply if it is missing, generic, or contradicts resolved backend entities / schedule approval
       const replyContradictsResolution =
         (isConfirmed && resolvedClient && resolvedUnit) ||
+        (scheduledForRentedCar && resolvedUnit) ||
         (resolvedClient &&
           resolvedUnit &&
           /couldn'?t find|cannot find|not found|tell me the client|غير موجود|لم أجد/i.test(aiReply)) ||
@@ -1433,22 +1941,38 @@ Return ONLY valid JSON:
       let smartReply = aiReply;
       if (replyContradictsResolution) {
         const effectiveDays = cData.days || (existingDays ? Number(existingDays) : null);
+        const schedStart = newParams.get("startDate") || cData.startDate || "";
+        const schedTime = newParams.get("checkoutTime") || cData.checkoutTime || "10:00 AM";
+        const schedWords = schedStart ? formatDateWords(schedStart) || schedStart : "";
+        const schedNoteEn =
+          scheduledForRentedCar && schedStart
+            ? ` starting **${schedWords} (${schedStart})** at **${schedTime}** (after current return)`
+            : schedStart && (schedStart !== todayDate || Boolean(newParams.get("checkoutTime")))
+            ? ` starting **${schedWords} (${schedStart})** at **${schedTime}**`
+            : "";
+        const schedNoteAr =
+          scheduledForRentedCar && schedStart
+            ? ` ابتداءً من **${schedWords} (${schedStart})** الساعة **${schedTime}** (بعد موعد الإرجاع)`
+            : schedStart && (schedStart !== todayDate || Boolean(newParams.get("checkoutTime")))
+            ? ` ابتداءً من **${schedWords} (${schedStart})** الساعة **${schedTime}**`
+            : "";
+
         if (resolvedClient && resolvedUnit) {
           if (isConfirmed) {
             smartReply =
               lang === "ar"
-                ? `تم التأكيد! جاري تنفيذ الخطوات خطوة بخطوة واعتماد العقد للعميل ${resolvedClient.name} مع سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) الآن...`
-                : `Confirmed! Running all contract steps now for ${resolvedClient.name} with ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})!`;
+                ? `تم التأكيد! جاري تنفيذ الخطوات خطوة بخطوة واعتماد العقد للعميل ${resolvedClient.name} مع سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteAr} الآن...`
+                : `Confirmed! Running all contract steps now for ${resolvedClient.name} with ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteEn}!`;
           } else if (effectiveDays) {
             smartReply =
               lang === "ar"
-                ? `كل البيانات جاهزة: سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) للعميل ${resolvedClient.name} لمدة ${effectiveDays} أيام. هل أعتمد وأنشئ العقد الآن؟`
-                : `Everything is set: ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) for ${resolvedClient.name} for ${effectiveDays} day(s). Shall I finalize the contract now?`;
+                ? `كل البيانات جاهزة: سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) للعميل ${resolvedClient.name}${schedNoteAr} لمدة ${effectiveDays} أيام. هل أعتمد وأنشئ العقد الآن؟`
+                : `Everything is set: ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) for ${resolvedClient.name}${schedNoteEn} for ${effectiveDays} day(s). Shall I finalize the contract now?`;
           } else {
             smartReply =
               lang === "ar"
-                ? `جهزت العقد للعميل ${resolvedClient.name} مع سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}). كم يوماً مدة الإيجار، أم أعتمد العقد بيوم واحد مبدئياً؟`
-                : `Prepared ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) for ${resolvedClient.name}! How many days should the rental be, or should I finalize with the default 1 day?`;
+                ? `جهزت العقد للعميل ${resolvedClient.name} مع سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteAr}. كم يوماً مدة الإيجار، أم أعتمد العقد بيوم واحد مبدئياً؟`
+                : `Prepared ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) for ${resolvedClient.name}${schedNoteEn}! How many days should the rental be, or should I finalize with the default 1 day?`;
           }
         } else if (resolvedClient && !resolvedUnit) {
           smartReply =
@@ -1458,8 +1982,8 @@ Return ONLY valid JSON:
         } else if (!resolvedClient && resolvedUnit) {
           smartReply =
             lang === "ar"
-              ? `تم اختيار سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}). من هو العميل لهذا الحجز؟`
-              : `Selected ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}). Who is the customer for this booking?`;
+              ? `تم اختيار سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteAr}. من هو العميل لهذا الحجز؟`
+              : `Selected ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteEn}. Who is the customer for this booking?`;
         } else {
           smartReply =
             lang === "ar"
@@ -1701,13 +2225,15 @@ Return ONLY valid JSON:
         });
       }
 
-      // Single match found when user gave car name without plate -> show details + ask to confirm plate / extra details
+      // Single match found when user gave car name without plate -> show details + return schedule + ask to confirm plate / extra details
       const u = unitMatches[0];
+      const uBookings = activeBookingsByUnit[String(u._id)] || u.activeBookings || [];
+      const uReturnNote = formatUnitReturnNote(u, uBookings, lang);
       return NextResponse.json<AssistantResponse>({
         reply:
           lang === "ar"
-            ? `وجدت سيارة **${u.make} ${u.model}** (${u.year || "—"}، ${u.color || "—"} • لوحة: **${u.plate}** • الحالة: ${u.status}). هل تؤكد **رقم اللوحة** هذا أم لديك تفاصيل أخرى (اللوحة/اللون/الموديل)، وهل تريد فتح صفحتها أو إنشاء عقد؟`
-            : `I found **${u.make} ${u.model}** (${u.year || "N/A"}, ${u.color || "N/A"} • Plate: **${u.plate}** • ${u.status} • AED ${u.dailyRate || 85}/day). Can you confirm if **${u.plate}** is the plate number you need (or share more details like plate/color/year), and tell me if you want to open its page or create a contract?`,
+            ? `وجدت سيارة **${u.make} ${u.model}** (${u.year || "—"}، ${u.color || "—"} • لوحة: **${u.plate}** • الحالة: ${u.status}${uReturnNote ? ` • ${uReturnNote}` : ""}). هل تؤكد **رقم اللوحة** هذا أم لديك تفاصيل أخرى (اللوحة/اللون/الموديل)، وهل تريد فتح صفحتها أو إنشاء عقد؟`
+            : `I found **${u.make} ${u.model}** (${u.year || "N/A"}, ${u.color || "N/A"} • Plate: **${u.plate}** • ${u.status}${uReturnNote ? ` • ${uReturnNote}` : ""} • AED ${u.dailyRate || 85}/day). Can you confirm if **${u.plate}** is the plate number you need (or share more details like plate/color/year), and tell me if you want to open its page or create a contract?`,
         action: "SEARCH_RESULT",
         data: {
           type: "vehicles",
@@ -1805,7 +2331,10 @@ Return ONLY valid JSON:
         if (fm.brandMatchesCount > 0 && effectiveStatus) {
           const statusDetails = fm.baseMatches
             .slice(0, 4)
-            .map((u: any) => `${u.make} ${u.model} (Plate: ${u.plate} — ${u.status})`)
+            .map((u: any) => {
+              const retNote = formatUnitReturnNote(u, activeBookingsByUnit[String(u._id)] || u.activeBookings || [], lang);
+              return `${u.make} ${u.model} (Plate: ${u.plate} — ${u.status}${retNote ? `, ${retNote}` : ""})`;
+            })
             .join(" | ");
           return NextResponse.json<AssistantResponse>({
             reply:
@@ -1877,21 +2406,60 @@ Return ONLY valid JSON:
 
     // Smart Backend Q&A Fallback when AI provider is offline or returned empty
     if (!aiReply) {
+      const asksReturnSchedule =
+        /\b(when|return|returns|back|hour|hours|time)\b|متى|ترجع|يرجع|إرجاع|العودة|الساعة|موعد/i.test(lower);
+      const returnScheduleLookup = asksReturnSchedule && !isFleetQuestion ? findUnitMatches(message) : null;
+
       if (isGreetingOrSmallTalk) {
         aiReply =
           lang === "ar"
             ? `أهلاً بك! لدينا حالياً ${availableUnits}/${totalUnits} سيارة متاحة و${activeContractsCount} عقد نشط. كيف أساعدك اليوم؟`
             : `Hi! We currently have ${availableUnits}/${totalUnits} vehicles available and ${activeContractsCount} active contracts. How can I help you today?`;
+      } else if (
+        returnScheduleLookup &&
+        returnScheduleLookup.matchedMakeOrModelOrPlate &&
+        returnScheduleLookup.baseMatches.length > 0
+      ) {
+        const matchedCars = returnScheduleLookup.baseMatches.slice(0, 4);
+        const scheduleLines = matchedCars
+          .map((u: any) => {
+            const bks = activeBookingsByUnit[String(u._id)] || u.activeBookings || [];
+            const retNote = formatUnitReturnNote(u, bks, lang);
+            if (bks.length > 0) {
+              const slots = bks.slice(0, 2).map((b: any) => formatBookingSlot(b, lang)).join(" | ");
+              return lang === "ar"
+                ? `- **${u.make} ${u.model}** (لوحة: **${u.plate}** | ${u.status}) — ${retNote} [${slots}]`
+                : `- **${u.make} ${u.model}** (Plate: **${u.plate}** | ${u.status}) — ${retNote} [${slots}]`;
+            }
+            return lang === "ar"
+              ? `- **${u.make} ${u.model}** (لوحة: **${u.plate}** | ${u.status}) — ${u.status === "Available" ? "متاحة الآن فوراً" : "لا يوجد موعد إرجاع مسجل"}`
+              : `- **${u.make} ${u.model}** (Plate: **${u.plate}** | ${u.status}) — ${u.status === "Available" ? "Available now" : "No scheduled return logged"}`;
+          })
+          .join("\n");
+        aiReply =
+          lang === "ar"
+            ? `تفاصيل التوافر وموعد الإرجاع:\n${scheduleLines}`
+            : `Return & availability schedule:\n${scheduleLines}`;
+        attachedBackendData = {
+          type: "vehicles",
+          items: matchedCars.map((u: any) => ({
+            id: u._id,
+            title: `${u.make} ${u.model} (${u.year || "N/A"} • ${u.color || "N/A"})`,
+            plate: u.plate,
+            status: u.status,
+          })),
+        };
       } else if (isFleetFilterQuery) {
         const fm = findUnitMatches(message);
         const effStatus = fm.requestedStatus || detectedQueryStatus;
         if (fm.matches.length > 0) {
           const previewList = fm.matches
             .slice(0, 6)
-            .map(
-              (u: any) =>
-                `- **${u.make} ${u.model}** (${u.year || "N/A"}, ${u.color || "N/A"}) — Plate: **${u.plate}** | ${u.status} | AED ${u.dailyRate || 85}/day`
-            )
+            .map((u: any) => {
+              const bks = activeBookingsByUnit[String(u._id)] || u.activeBookings || [];
+              const retNote = formatUnitReturnNote(u, bks, lang);
+              return `- **${u.make} ${u.model}** (${u.year || "N/A"}, ${u.color || "N/A"}) — Plate: **${u.plate}** | ${u.status}${retNote ? ` (${retNote})` : ""} | AED ${u.dailyRate || 85}/day`;
+            })
             .join("\n");
           aiReply =
             lang === "ar"
@@ -1909,7 +2477,10 @@ Return ONLY valid JSON:
         } else if (fm.brandMatchesCount > 0 && effStatus) {
           const statusDetails = fm.baseMatches
             .slice(0, 4)
-            .map((u: any) => `${u.make} ${u.model} (Plate: ${u.plate} — ${u.status})`)
+            .map((u: any) => {
+              const retNote = formatUnitReturnNote(u, activeBookingsByUnit[String(u._id)] || u.activeBookings || [], lang);
+              return `${u.make} ${u.model} (Plate: ${u.plate} — ${u.status}${retNote ? `, ${retNote}` : ""})`;
+            })
             .join(" | ");
           aiReply =
             lang === "ar"
