@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession } from "next-auth/react";
 import { 
   X, 
   Search, 
@@ -22,6 +23,7 @@ interface SelectSecondDriverModalProps {
   selectedSecondDriverClientId?: string | null;
   onSelectSecondDriver: (client: any) => void;
   onOpenCreateClientModal: () => void;
+  hideClientPhone?: boolean;
 }
 
 export default function SelectSecondDriverModal({
@@ -32,8 +34,11 @@ export default function SelectSecondDriverModal({
   selectedSecondDriverClientId,
   onSelectSecondDriver,
   onOpenCreateClientModal,
+  hideClientPhone = false,
 }: SelectSecondDriverModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const { data: session } = useSession();
+  const hidePhone = Boolean(hideClientPhone || (session?.user as any)?.role === "driver");
 
   if (!isOpen) return null;
 
@@ -41,9 +46,9 @@ export default function SelectSecondDriverModal({
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const name = (client.name || "").toLowerCase();
-    const phone = (client.phone || "").toLowerCase();
+    const phone = hidePhone ? "" : (client.phone || "").toLowerCase();
     const license = (client.licenseNumber || "").toLowerCase();
-    return name.includes(q) || phone.includes(q) || license.includes(q);
+    return name.includes(q) || (!hidePhone && phone.includes(q)) || license.includes(q);
   });
 
   return (
@@ -91,7 +96,7 @@ export default function SelectSecondDriverModal({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search customer by name, phone, or license..."
+                placeholder={hidePhone ? "Search customer by name or license..." : "Search customer by name, phone, or license..."}
                 className="w-full pl-8.5 pr-8 py-2 sm:py-2.5 rounded-xl border border-border bg-white text-xs sm:text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-600 outline-none transition-all shadow-2xs text-text-primary placeholder:text-text-muted"
               />
               {searchQuery && (
@@ -165,7 +170,7 @@ export default function SelectSecondDriverModal({
                           {client.name}
                         </h4>
                         <div className="flex items-center gap-2 text-[11px] text-text-muted truncate mt-0.5">
-                          {client.phone && <span>{client.phone}</span>}
+                          {!hidePhone && client.phone && <span>{client.phone}</span>}
                           {client.licenseNumber && (
                             <span className="font-mono text-red-700 bg-red-100/60 px-1.5 py-0.2 rounded text-[10px]">
                               {client.licenseNumber}

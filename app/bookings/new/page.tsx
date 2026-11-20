@@ -205,7 +205,7 @@ function NewRentalAdminPageContent() {
       name: client.name || "",
       license: client.licenseNumber || "",
       nationality: client.nationality || "",
-      phone: client.phone || "",
+      phone: isDriver ? "" : (client.phone || ""),
       expiry: client.licenseExpiry ? new Date(client.licenseExpiry).toISOString().split("T")[0] : "",
       issuedAt: client.address || "Dubai",
     });
@@ -1442,7 +1442,7 @@ function NewRentalAdminPageContent() {
     ? typeFilteredClients.filter(c =>
         c.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.companyName?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-        c.phone?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        (!isDriver && c.phone?.toLowerCase().includes(clientSearchQuery.toLowerCase())) ||
         c.idNumber?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.trn?.toLowerCase().includes(clientSearchQuery.toLowerCase())
       )
@@ -1772,7 +1772,11 @@ function NewRentalAdminPageContent() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 type="text"
-                placeholder={isB2BMode ? "Search company name, phone, TRN..." : "Search by name, phone, license..."}
+                placeholder={
+                  isB2BMode
+                    ? (isDriver ? "Search company name, TRN..." : "Search company name, phone, TRN...")
+                    : (isDriver ? "Search by name or license..." : "Search by name, phone, license...")
+                }
                 value={clientSearchQuery}
                 onChange={(e) => setClientSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
@@ -1835,24 +1839,26 @@ function NewRentalAdminPageContent() {
                   {selectedClientObj.companyName || selectedClientObj.name}
                 </span>
                 <CheckCircle2 size={12} className="text-brand shrink-0" />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (selectedClientObj.customerType === "B2B" || selectedClientObj.clientType === "Corporate" || selectedClientObj.companyName) {
-                      setCompanyToEdit(selectedClientObj);
-                      setIsCompanyModalOpen(true);
-                    } else {
-                      setClientToEdit(selectedClientObj);
-                      setIsAddingForSecondDriver(false);
-                      setIsClientModalOpen(true);
-                    }
-                  }}
-                  className="p-0.5 text-gray-400 hover:text-brand transition-colors cursor-pointer"
-                  title="Edit details"
-                >
-                  <Edit2 size={11} />
-                </button>
+                {!isDriver && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedClientObj.customerType === "B2B" || selectedClientObj.clientType === "Corporate" || selectedClientObj.companyName) {
+                        setCompanyToEdit(selectedClientObj);
+                        setIsCompanyModalOpen(true);
+                      } else {
+                        setClientToEdit(selectedClientObj);
+                        setIsAddingForSecondDriver(false);
+                        setIsClientModalOpen(true);
+                      }
+                    }}
+                    className="p-0.5 text-gray-400 hover:text-brand transition-colors cursor-pointer"
+                    title="Edit details"
+                  >
+                    <Edit2 size={11} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setSelectedClient(null)}
@@ -1951,29 +1957,35 @@ function NewRentalAdminPageContent() {
                       {client.companyName || client.name}
                     </h3>
                     <p className="text-[11px] text-text-muted truncate">
-                      {client.phone && client.phone !== "N/A" ? client.phone : (client.trn ? `TRN: ${client.trn}` : "Corporate Account")}
+                      {isDriver
+                        ? (isCorpCard
+                            ? "Corporate Account"
+                            : (client.nationality ? `${client.clientType || "Client"} • ${client.nationality}` : (client.clientType || "Registered Client")))
+                        : (client.phone && client.phone !== "N/A" ? client.phone : (client.trn ? `TRN: ${client.trn}` : "Corporate Account"))}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isCorpCard) {
-                        setCompanyToEdit(client);
-                        setIsCompanyModalOpen(true);
-                      } else {
-                        setClientToEdit(client);
-                        setIsAddingForSecondDriver(false);
-                        setIsClientModalOpen(true);
-                      }
-                    }}
-                    className="p-1 text-gray-400 hover:text-brand hover:bg-brand/10 rounded-md transition-colors cursor-pointer"
-                    title="Edit details"
-                  >
-                    <Edit2 size={12} />
-                  </button>
+                  {!isDriver && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isCorpCard) {
+                          setCompanyToEdit(client);
+                          setIsCompanyModalOpen(true);
+                        } else {
+                          setClientToEdit(client);
+                          setIsAddingForSecondDriver(false);
+                          setIsClientModalOpen(true);
+                        }
+                      }}
+                      className="p-1 text-gray-400 hover:text-brand hover:bg-brand/10 rounded-md transition-colors cursor-pointer"
+                      title="Edit details"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                  )}
                   {isSelected ? (
                     <span className="bg-brand text-white p-0.5 rounded-full shrink-0"><CheckCircle2 size={14} /></span>
                   ) : (
@@ -2780,7 +2792,9 @@ function NewRentalAdminPageContent() {
                 <strong className="text-text-primary text-sm font-bold block truncate">
                   {clientObj?.companyName || clientObj?.name || (editingContract?.clientId?.name) || "N/A"}
                 </strong>
-                <span className="text-xs text-text-muted block truncate">{clientObj?.phone || (editingContract?.clientId?.phone) || ""}</span>
+                {!isDriver && (clientObj?.phone || editingContract?.clientId?.phone) && (
+                  <span className="text-xs text-text-muted block truncate">{clientObj?.phone || editingContract?.clientId?.phone}</span>
+                )}
               </div>
             )}
 
@@ -2799,7 +2813,7 @@ function NewRentalAdminPageContent() {
                   {personName || (editingContract?.personalizedPersonName) || "Personal Use"}
                 </strong>
                 <span className="text-xs text-text-muted block truncate">
-                  {selectedClient && clients.find(c => c._id === selectedClient)?.phone
+                  {!isDriver && selectedClient && clients.find(c => c._id === selectedClient)?.phone
                     ? clients.find(c => c._id === selectedClient)?.phone
                     : "Personalized Booking (حجز مخصص)"}
                 </span>
@@ -2815,7 +2829,7 @@ function NewRentalAdminPageContent() {
                 </span>
                 <strong className="text-text-primary text-sm font-bold block truncate">{additionalDriver.name}</strong>
                 <span className="text-xs text-text-muted block truncate">
-                  {additionalDriver.phone ? `${additionalDriver.phone} • ` : ""}Lic: {additionalDriver.license || "N/A"}
+                  {!isDriver && additionalDriver.phone ? `${additionalDriver.phone} • ` : ""}Lic: {additionalDriver.license || "N/A"}
                 </span>
               </div>
             )}
@@ -3136,7 +3150,7 @@ function NewRentalAdminPageContent() {
             <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-brand/5 border border-brand/20">
               <User size={15} className="text-brand shrink-0" />
               <span className="text-xs font-bold text-text-primary">{selectedClientObj.name}</span>
-              {selectedClientObj.phone && (
+              {!isDriver && selectedClientObj.phone && (
                 <span className="text-[11px] text-text-muted font-normal font-mono">({selectedClientObj.phone})</span>
               )}
             </div>
@@ -3793,6 +3807,7 @@ function NewRentalAdminPageContent() {
         clients={clients}
         primaryClientId={selectedClient}
         selectedSecondDriverClientId={secondDriverClient?._id || null}
+        hideClientPhone={isDriver}
         onSelectSecondDriver={handleSelectSecondDriver}
         onOpenCreateClientModal={() => {
           setIsAddingForSecondDriver(true);

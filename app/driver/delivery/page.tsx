@@ -434,7 +434,7 @@ export default function ConfirmDeliveryPage() {
       name: client.name || "",
       license: client.licenseNumber || "",
       nationality: client.nationality || "",
-      phone: client.phone || "",
+      phone: "",
       expiry: client.licenseExpiry ? new Date(client.licenseExpiry).toISOString().split("T")[0] : "",
       issuedAt: client.address || "Dubai",
     });
@@ -767,13 +767,13 @@ export default function ConfirmDeliveryPage() {
     }
   };
 
-  // Filter Clients (Matching Admin Step 2)
+  // Filter Clients (Matching Admin Step 2 — drivers cannot search clients by phone number)
   const filteredClients = clientSearchQuery
     ? clients.filter(
         (c) =>
           c.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-          c.phone?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-          c.idNumber?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+          c.idNumber?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+          c.licenseNumber?.toLowerCase().includes(clientSearchQuery.toLowerCase())
       )
     : (() => {
         const top6 = clients.slice(0, 6);
@@ -1057,7 +1057,7 @@ export default function ConfirmDeliveryPage() {
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               type="text"
-              placeholder="Search by name, phone, license..."
+              placeholder="Search by name, ID, or license..."
               value={clientSearchQuery}
               onChange={(e) => setClientSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
@@ -1207,7 +1207,9 @@ export default function ConfirmDeliveryPage() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-sm font-bold text-text-primary leading-snug truncate">{client.name}</h3>
-                    <p className="text-xs text-text-muted truncate">{client.phone || "No phone"}</p>
+                    <p className="text-xs text-text-muted truncate">
+                      {client.nationality ? `${client.clientType || "Client"} • ${client.nationality}` : (client.clientType || "Registered Client")}
+                    </p>
                     {client.idNumber && (
                       <span className="text-[10px] font-mono text-gray-500 block truncate">
                         ID: {client.idNumber}
@@ -1721,7 +1723,13 @@ export default function ConfirmDeliveryPage() {
           <strong className="text-text-primary text-sm font-bold block truncate">
             {selectedClientObj?.name || "No client selected"}
           </strong>
-          <span className="text-xs text-text-muted block truncate">{selectedClientObj?.phone || ""}</span>
+          {selectedClientObj && (
+            <span className="text-xs text-text-muted block truncate">
+              {selectedClientObj.nationality
+                ? `${selectedClientObj.clientType || "Client"} • ${selectedClientObj.nationality}`
+                : (selectedClientObj.clientType || "Registered Client")}
+            </span>
+          )}
         </div>
 
         {secondDriverName ? (
@@ -1729,7 +1737,7 @@ export default function ConfirmDeliveryPage() {
             <span className="text-red-700 text-xs font-bold block mb-1">2nd Driver (Authorized)</span>
             <strong className="text-text-primary text-sm font-bold block truncate">{secondDriverName}</strong>
             <span className="text-xs text-text-muted block truncate">
-              {additionalDriver.phone ? `${additionalDriver.phone} • ` : ""}Lic: {secondDriverLicense || "N/A"}
+              Lic: {secondDriverLicense || "N/A"}
             </span>
           </div>
         ) : (
@@ -2141,6 +2149,7 @@ export default function ConfirmDeliveryPage() {
           onClose={() => setIsSelectSecondDriverModalOpen(false)}
           clients={clients}
           primaryClientId={selectedClient}
+          hideClientPhone={true}
           onSelectSecondDriver={handleSelectSecondDriver}
           onOpenCreateClientModal={() => {
             setIsSelectSecondDriverModalOpen(false);

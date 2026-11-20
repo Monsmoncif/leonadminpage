@@ -1,11 +1,16 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import { Client } from "@/models/Client";
 import { Contract } from "@/models/Contract";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const isDriver = (session?.user as any)?.role === "driver";
+
     await connectDB();
     const isFullDocs = req.nextUrl.searchParams.get("withDocuments") === "true";
     const isSlim = req.nextUrl.searchParams.get("slim") === "true";
@@ -20,22 +25,25 @@ export async function GET(req: NextRequest) {
     if (search) {
       const escaped = search.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
       const rx = new RegExp(escaped, "i");
-      filter = {
-        $or: [
-          { name: rx },
-          { companyName: rx },
-          { email: rx },
-          { phone: rx },
-          { idNumber: rx },
-          { passportNumber: rx },
-          { licenseNumber: rx },
-          { nationality: rx },
-        ],
-      };
+      const orConditions: any[] = [
+        { name: rx },
+        { companyName: rx },
+        { idNumber: rx },
+        { passportNumber: rx },
+        { licenseNumber: rx },
+        { nationality: rx },
+      ];
+      // Prevent drivers from enumerating or finding clients by phone/email
+      if (!isDriver) {
+        orConditions.push({ email: rx }, { phone: rx });
+      }
+      filter = { $or: orConditions };
     }
 
     let query = Client.find(filter).sort({ createdAt: -1 });
-    if (isSlim || !isFullDocs) {
+    if (isDriver) {
+      query = query.select(isSlim || !isFullDocs ? "-documents -__v -phone -email" : "-phone -email");
+    } else if (isSlim || !isFullDocs) {
       query = query.select("-documents -__v");
     }
 
@@ -76,8 +84,12 @@ export async function GET(req: NextRequest) {
       blacklisted,
     };
 
+    const responseClients = isDriver
+      ? clients.map(({ phone: _p, email: _e, ...rest }: any) => rest)
+      : clients;
+
     return NextResponse.json({
-      clients,
+      clients: responseClients,
       stats,
       totalCount,
       totalPages: limit ? Math.max(1, Math.ceil(totalCount / limit)) : 1,

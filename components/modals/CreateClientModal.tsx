@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   ShieldCheck
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useToast } from "@/components/providers/ToastProvider";
 import { hasEmiratesIdNumber, isUaeLicenseAuthority } from "@/lib/client-utils";
 
@@ -39,6 +40,9 @@ export default function CreateClientModal({
   onSuccess,
   clientToEdit,
 }: CreateClientModalProps) {
+  const { data: session } = useSession();
+  const isDriverRole = (session?.user as any)?.role === "driver";
+  const hideExistingClientContact = isDriverRole && Boolean(clientToEdit);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [scanningDoc, setScanningDoc] = useState(false);
@@ -852,7 +856,7 @@ export default function CreateClientModal({
       setError("Please enter or scan the customer's name.");
       return;
     }
-    if (!formData.phone.trim()) {
+    if (!hideExistingClientContact && !formData.phone.trim()) {
       setError("Please enter the customer's phone number.");
       return;
     }
@@ -971,6 +975,12 @@ export default function CreateClientModal({
         documents: allDocuments,
       };
 
+      const requestPayload: Record<string, any> = { ...payload };
+      if (hideExistingClientContact) {
+        delete requestPayload.phone;
+        delete requestPayload.email;
+      }
+
       const method = clientToEdit ? "PUT" : "POST";
       const url = clientToEdit
         ? `/api/clients/${clientToEdit._id}`
@@ -979,7 +989,7 @@ export default function CreateClientModal({
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestPayload),
       });
 
       if (!res.ok) {
@@ -1769,36 +1779,40 @@ export default function CreateClientModal({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Phone / Mobile Number <span className="text-red-500 font-bold">*</span>
-                      </label>
-                      <input
-                        required
-                        type="tel"
-                        placeholder="e.g. +33 6 12 34 56 78"
-                        className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
-                        value={formData.phone}
-                        onChange={(e) =>
-                          setFormData({ ...formData, phone: e.target.value })
-                        }
-                      />
-                    </div>
+                    {!hideExistingClientContact && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-semibold text-text-secondary mb-1">
+                            Phone / Mobile Number <span className="text-red-500 font-bold">*</span>
+                          </label>
+                          <input
+                            required
+                            type="tel"
+                            placeholder="e.g. +33 6 12 34 56 78"
+                            className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
+                            value={formData.phone}
+                            onChange={(e) =>
+                              setFormData({ ...formData, phone: e.target.value })
+                            }
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="e.g. client@example.com"
-                        className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-text-secondary mb-1">
+                            Email Address
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="e.g. client@example.com"
+                            className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                            value={formData.email}
+                            onChange={(e) =>
+                              setFormData({ ...formData, email: e.target.value })
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
 
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-text-secondary mb-1">
@@ -2022,36 +2036,40 @@ export default function CreateClientModal({
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Phone Number (رقم الهاتف) <span className="text-red-500 font-bold">*</span>
-                      </label>
-                      <input
-                        required
-                        type="tel"
-                        placeholder="e.g. +971 50 123 4567"
-                        className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
-                        value={formData.phone}
-                        onChange={(e) =>
-                          setFormData({ ...formData, phone: e.target.value })
-                        }
-                      />
-                    </div>
+                    {!hideExistingClientContact && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-semibold text-text-secondary mb-1">
+                            Phone Number (رقم الهاتف) <span className="text-red-500 font-bold">*</span>
+                          </label>
+                          <input
+                            required
+                            type="tel"
+                            placeholder="e.g. +971 50 123 4567"
+                            className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand font-medium"
+                            value={formData.phone}
+                            onChange={(e) =>
+                              setFormData({ ...formData, phone: e.target.value })
+                            }
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary mb-1">
-                        Email Address (البريد الإلكتروني)
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="e.g. customer@example.com"
-                        className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-text-secondary mb-1">
+                            Email Address (البريد الإلكتروني)
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="e.g. customer@example.com"
+                            className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                            value={formData.email}
+                            onChange={(e) =>
+                              setFormData({ ...formData, email: e.target.value })
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
 
                     <div>
                       <label className="block text-xs font-semibold text-text-secondary mb-1">

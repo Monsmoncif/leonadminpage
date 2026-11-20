@@ -174,7 +174,7 @@ export default function CreateContractModal({
       additionalDriverName: client.name || "",
       additionalDriverLicense: client.licenseNumber || "",
       additionalDriverNationality: client.nationality || "",
-      additionalDriverPhone: client.phone || "",
+      additionalDriverPhone: isDriverRole ? "" : (client.phone || ""),
       additionalDriverExpiry: client.licenseExpiry
         ? new Date(client.licenseExpiry).toISOString().split("T")[0]
         : "",
@@ -788,7 +788,7 @@ export default function CreateContractModal({
     ? typeFilteredClients.filter(c =>
         c.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
         c.companyName?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-        c.phone?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+        (!isDriverRole && c.phone?.toLowerCase().includes(clientSearchQuery.toLowerCase())) ||
         c.idNumber?.toLowerCase().includes(clientSearchQuery.toLowerCase())
       )
     : (() => {
@@ -1179,7 +1179,11 @@ export default function CreateContractModal({
                         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
                         <input
                           type="text"
-                          placeholder={isB2BMode ? "Search by company name, phone, TRN..." : "Search by name, phone, national ID..."}
+                          placeholder={
+                            isB2BMode
+                              ? (isDriverRole ? "Search by company name, TRN..." : "Search by company name, phone, TRN...")
+                              : (isDriverRole ? "Search by name, national ID..." : "Search by name, phone, national ID...")
+                          }
                           value={clientSearchQuery}
                           onChange={(e) => setClientSearchQuery(e.target.value)}
                           className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
@@ -1323,7 +1327,13 @@ export default function CreateContractModal({
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-xs text-text-muted truncate">{client.phone || (isClientCorp ? "Corporate Account" : "No phone")}</p>
+                                <p className="text-xs text-text-muted truncate">
+                                  {isDriverRole
+                                    ? (isClientCorp
+                                        ? "Corporate Account"
+                                        : (client.nationality ? `${client.clientType || "Client"} • ${client.nationality}` : (client.clientType || "Registered Client")))
+                                    : (client.phone || (isClientCorp ? "Corporate Account" : "No phone"))}
+                                </p>
                               </div>
                             </div>
                             {isSelected ? (
@@ -1990,7 +2000,9 @@ export default function CreateContractModal({
                       <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
                         <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Customer</span>
                         <strong className="text-text-primary text-sm font-bold block truncate">{selectedClientObj?.name || "N/A"}</strong>
-                        <span className="text-xs text-text-muted block truncate">{selectedClientObj?.phone || ""}</span>
+                        {!isDriverRole && selectedClientObj?.phone && (
+                          <span className="text-xs text-text-muted block truncate">{selectedClientObj.phone}</span>
+                        )}
                       </div>
                       <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
                         <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">Vehicle</span>
@@ -2031,7 +2043,9 @@ export default function CreateContractModal({
                               {formData.additionalDriverName}
                             </strong>
                             <div className="flex items-center gap-2 text-xs text-text-muted mt-0.5 flex-wrap">
-                              <span>{formData.additionalDriverPhone || "No phone"}</span>
+                              {!isDriverRole && (
+                                <span>{formData.additionalDriverPhone || "No phone"}</span>
+                              )}
                               {formData.additionalDriverLicense && (
                                 <span className="font-mono text-[10px] text-emerald-700 bg-white px-1.5 py-0.2 rounded border border-emerald-200">
                                   {formData.additionalDriverLicense}
@@ -2292,6 +2306,7 @@ export default function CreateContractModal({
         clients={clients}
         primaryClientId={formData.clientId}
         selectedSecondDriverClientId={secondDriverClient?._id || null}
+        hideClientPhone={isDriverRole}
         onSelectSecondDriver={handleSelectSecondDriver}
         onOpenCreateClientModal={() => {
           setIsAddingForSecondDriver(true);

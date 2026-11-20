@@ -1,10 +1,20 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import { Client } from "@/models/Client";
 import { Contract } from "@/models/Contract";
 import { Unit } from "@/models/Unit";
 import { clearPdfCache, clearConsentPdfCache } from "@/lib/pdf-cache";
+
+function redactClientContactForDriver(clientDoc: any) {
+  if (!clientDoc || typeof clientDoc !== "object") return clientDoc;
+  const plain = typeof clientDoc.toObject === "function" ? clientDoc.toObject() : { ...clientDoc };
+  delete plain.phone;
+  delete plain.email;
+  return plain;
+}
 
 export async function GET(
   req: NextRequest,
@@ -16,12 +26,20 @@ export async function GET(
       return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
     }
 
+    const session = await getServerSession(authOptions);
+    const isDriver = (session?.user as any)?.role === "driver";
+
     await connectDB();
     const _u = Unit; // ensure Unit model is loaded for population
 
+    const clientQuery = Client.findById(id);
+    if (isDriver) {
+      clientQuery.select("-phone -email");
+    }
+
     // Execute client query and lightweight contracts query in parallel
     const [client, contracts] = await Promise.all([
-      Client.findById(id).lean(),
+      clientQuery.lean(),
       Contract.find({ clientId: id })
         .sort({ createdAt: -1 })
         .select("_id contractNumber unitId startDate endDate totalAmount status createdAt")
@@ -36,7 +54,8 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ ...client, contracts: contracts || [] });
+    const safeClient = isDriver ? redactClientContactForDriver(client) : client;
+    return NextResponse.json({ ...safeClient, contracts: contracts || [] });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -49,6 +68,15 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await req.json();
+    const session = await getServerSession(authOptions);
+    const isDriver = (session?.user as any)?.role === "driver";
+
+    // Drivers may update ID/license info on delivery, but must never view or overwrite contact phone/email
+    if (isDriver) {
+      delete body.phone;
+      delete body.email;
+    }
+
     await connectDB();
 
     if (body.email !== undefined) {
@@ -140,7 +168,7 @@ export async function PUT(
       console.warn("Could not bump contract updatedAt on client update:", touchErr);
     }
 
-    return NextResponse.json(client);
+    return NextResponse.json(isDriver ? redactClientContactForDriver(client) : client);
   } catch (error: any) {
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyPattern || {})[0];
