@@ -183,6 +183,9 @@ function NewRentalAdminPageContent() {
   const [clientToEdit, setClientToEdit] = useState<any>(null);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [companyToEdit, setCompanyToEdit] = useState<any>(null);
+  const [driverAddedClientIds, setDriverAddedClientIds] = useState<Record<string, boolean>>({});
+  const [driverDraftContactMap, setDriverDraftContactMap] = useState<Record<string, { phone?: string; email?: string }>>({});
+  const [hasFinishedContract, setHasFinishedContract] = useState(false);
   const [isCreateUnitModalOpen, setIsCreateUnitModalOpen] = useState(false);
   const [isSelectSecondDriverModalOpen, setIsSelectSecondDriverModalOpen] = useState(false);
   const [secondDriverClient, setSecondDriverClient] = useState<any | null>(null);
@@ -223,9 +226,65 @@ function NewRentalAdminPageContent() {
     toast.info("Second driver removed.");
   };
 
+  const canEditClientRecord = (client: any): boolean => {
+    if (!isDriver) return true;
+    if (!client?._id || isEditMode || hasFinishedContract) return false;
+    return Boolean(driverAddedClientIds[String(client._id)] || client.canDriverEdit);
+  };
+
+  const openEditClientRecord = (client: any) => {
+    if (!canEditClientRecord(client)) return;
+    const cid = String(client._id);
+    const draftContact = driverDraftContactMap[cid];
+    const enrichedClient = draftContact
+      ? { ...client, _draftPhone: draftContact.phone, _draftEmail: draftContact.email }
+      : client;
+    const isCorp =
+      client.customerType === "B2B" || client.clientType === "Corporate" || Boolean(client.companyName);
+    if (isCorp) {
+      setCompanyToEdit(enrichedClient);
+      setIsCompanyModalOpen(true);
+    } else {
+      setClientToEdit(enrichedClient);
+      setIsAddingForSecondDriver(false);
+      setIsClientModalOpen(true);
+    }
+  };
+
+  const syncSavedClientIntoState = (savedClient: any, wasEditing: boolean) => {
+    if (!savedClient || !(savedClient._id || savedClient.id)) return;
+    const cid = String(savedClient._id || savedClient.id);
+    const { _draftPhone, _draftEmail, ...cleanClient } = savedClient;
+    const clientRecord = {
+      ...cleanClient,
+      _id: cid,
+      ...(isDriver && !isEditMode && !hasFinishedContract ? { canDriverEdit: true } : {}),
+    };
+
+    if (isDriver && !isEditMode && !hasFinishedContract) {
+      if (!wasEditing) {
+        setDriverAddedClientIds((prev) => ({ ...prev, [cid]: true }));
+      }
+      if (_draftPhone !== undefined || _draftEmail !== undefined) {
+        setDriverDraftContactMap((prev) => ({
+          ...prev,
+          [cid]: { phone: _draftPhone, email: _draftEmail },
+        }));
+      }
+    }
+
+    setClients((prev) => {
+      const idx = prev.findIndex((c) => String(c._id) === cid);
+      const next = idx >= 0 ? prev.map((c, i) => (i === idx ? { ...c, ...clientRecord } : c)) : [clientRecord, ...prev];
+      setClientCache("clients_list", next);
+      return next;
+    });
+  };
+
   const handleClientModalSuccess = (newClient?: any) => {
-    fetchClients();
+    const wasEditing = Boolean(clientToEdit?._id);
     if (newClient) {
+      syncSavedClientIntoState(newClient, wasEditing);
       if (isAddingForSecondDriver) {
         handleSelectSecondDriver(newClient);
         setIsAddingForSecondDriver(false);
@@ -235,22 +294,25 @@ function NewRentalAdminPageContent() {
         if (contractType === "Personalized") {
           setPersonName(newClient.name);
         }
-        toast.success(clientToEdit ? `Customer "${newClient.name}" updated successfully! (تم تحديث بيانات العميل بنجاح) ✓` : `Registered "${newClient.name}" and selected as Primary Customer!`);
+        toast.success(wasEditing ? `Customer "${newClient.name}" updated successfully! (تم تحديث بيانات العميل بنجاح) ✓` : `Registered "${newClient.name}" and selected as Primary Customer!`);
       }
     }
+    fetchClients();
     setIsClientModalOpen(false);
     setClientToEdit(null);
   };
 
   const handleCompanyModalSuccess = (newCompany?: any) => {
-    fetchClients();
+    const wasEditing = Boolean(companyToEdit?._id);
     if (newCompany) {
+      syncSavedClientIntoState(newCompany, wasEditing);
       setSelectedClient(newCompany._id || newCompany.id);
       setRentalData(prev => ({ ...prev, customerType: "B2B" }));
       if (contractType === "Personalized") {
         setPersonName(newCompany.companyName || newCompany.name);
       }
     }
+    fetchClients();
     setIsCompanyModalOpen(false);
     setCompanyToEdit(null);
   };
@@ -1380,6 +1442,20 @@ function NewRentalAdminPageContent() {
         return;
       }
 
+      // Lock driver client editing immediately once the contract has been created
+      if (!isEditMode && selectedClient) {
+        setHasFinishedContract(true);
+        setDriverAddedClientIds({});
+        setDriverDraftContactMap({});
+        setClients((prev) => {
+          const updated = prev.map((c) =>
+            String(c._id) === String(selectedClient) ? { ...c, canDriverEdit: false } : c
+          );
+          setClientCache("clients_list", updated);
+          return updated;
+        });
+      }
+
       if (isEditMode) {
         toast.success("Contract updated successfully! (تم حفظ التعديلات بنجاح)");
       } else if (isDriver) {
@@ -1824,24 +1900,18 @@ function NewRentalAdminPageContent() {
                   {selectedClientObj.companyName || selectedClientObj.name}
                 </span>
                 <CheckCircle2 size={12} className="text-brand shrink-0" />
-                {!isDriver && (
+                {canEditClientRecord(selectedClientObj) && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (selectedClientObj.customerType === "B2B" || selectedClientObj.clientType === "Corporate" || selectedClientObj.companyName) {
-                        setCompanyToEdit(selectedClientObj);
-                        setIsCompanyModalOpen(true);
-                      } else {
-                        setClientToEdit(selectedClientObj);
-                        setIsAddingForSecondDriver(false);
-                        setIsClientModalOpen(true);
-                      }
+                      openEditClientRecord(selectedClientObj);
                     }}
-                    className="p-0.5 text-gray-400 hover:text-brand transition-colors cursor-pointer"
-                    title="Edit details"
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors cursor-pointer text-[10px] font-bold"
+                    title="Edit customer details before finishing contract"
                   >
-                    <Edit2 size={11} />
+                    <Edit2 size={10} />
+                    {isDriver && <span>Edit</span>}
                   </button>
                 )}
                 <button
@@ -1951,19 +2021,12 @@ function NewRentalAdminPageContent() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {!isDriver && (
+                  {canEditClientRecord(client) && (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (isCorpCard) {
-                          setCompanyToEdit(client);
-                          setIsCompanyModalOpen(true);
-                        } else {
-                          setClientToEdit(client);
-                          setIsAddingForSecondDriver(false);
-                          setIsClientModalOpen(true);
-                        }
+                        openEditClientRecord(client);
                       }}
                       className="p-1 text-gray-400 hover:text-brand hover:bg-brand/10 rounded-md transition-colors cursor-pointer"
                       title="Edit details"
@@ -2774,9 +2837,22 @@ function NewRentalAdminPageContent() {
             {/* Customer / Company — for Shop or whenever a client is selected */}
             {(contractType === "Shop" || (selectedClient && contractType !== "Personalized")) && (
               <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs">
-                <span className="text-text-muted text-[11px] sm:text-xs block mb-0.5 sm:mb-1">
-                  {rentalData.customerType === "B2B" ? "Company (الشركة)" : "Customer"}
-                </span>
+                <div className="flex items-center justify-between gap-2 mb-0.5 sm:mb-1">
+                  <span className="text-text-muted text-[11px] sm:text-xs block">
+                    {rentalData.customerType === "B2B" ? "Company (الشركة)" : "Customer"}
+                  </span>
+                  {clientObj && canEditClientRecord(clientObj) && (
+                    <button
+                      type="button"
+                      onClick={() => openEditClientRecord(clientObj)}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-brand hover:underline cursor-pointer"
+                      title="Edit details before creating contract"
+                    >
+                      <Edit2 size={10} />
+                      <span>Edit</span>
+                    </button>
+                  )}
+                </div>
                 <strong className="text-text-primary text-sm font-bold block truncate">
                   {clientObj?.companyName || clientObj?.name || (editingContract?.clientId?.name) || "N/A"}
                 </strong>
@@ -3743,6 +3819,15 @@ function NewRentalAdminPageContent() {
       <CreateClientModal
         isOpen={isClientModalOpen}
         clientToEdit={clientToEdit}
+        allowDriverContactEdit={
+          Boolean(
+            isDriver &&
+              clientToEdit?._id &&
+              canEditClientRecord(clientToEdit) &&
+              (driverAddedClientIds[String(clientToEdit._id)] ||
+                Boolean(driverDraftContactMap[String(clientToEdit._id)]))
+          )
+        }
         onClose={() => {
           setIsClientModalOpen(false);
           setIsAddingForSecondDriver(false);
@@ -3755,6 +3840,15 @@ function NewRentalAdminPageContent() {
       <CreateCompanyModal
         isOpen={isCompanyModalOpen}
         companyToEdit={companyToEdit}
+        allowDriverContactEdit={
+          Boolean(
+            isDriver &&
+              companyToEdit?._id &&
+              canEditClientRecord(companyToEdit) &&
+              (driverAddedClientIds[String(companyToEdit._id)] ||
+                Boolean(driverDraftContactMap[String(companyToEdit._id)]))
+          )
+        }
         onClose={() => {
           setIsCompanyModalOpen(false);
           setCompanyToEdit(null);

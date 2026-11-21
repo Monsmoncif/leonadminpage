@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     const isDriver = (session?.user as any)?.role === "driver";
+    const currentUserId = String((session?.user as any)?.id || "");
 
     await connectDB();
     const isFullDocs = req.nextUrl.searchParams.get("withDocuments") === "true";
@@ -84,8 +85,40 @@ export async function GET(req: NextRequest) {
       blacklisted,
     };
 
+    let contractedDriverDraftIds = new Set<string>();
+    if (isDriver && currentUserId && Array.isArray(clients) && clients.length > 0) {
+      const driverDraftIds = clients
+        .filter(
+          (c: any) =>
+            c.createdByRole === "driver" &&
+            String(c.createdByUserId || "") === currentUserId
+        )
+        .map((c: any) => c._id);
+
+      if (driverDraftIds.length > 0) {
+        const driverClientContracts = await Contract.find({
+          clientId: { $in: driverDraftIds },
+        })
+          .select("clientId status")
+          .lean();
+        for (const cnt of driverClientContracts as any[]) {
+          if (cnt?.clientId && cnt.status !== "Cancelled") {
+            contractedDriverDraftIds.add(String(cnt.clientId));
+          }
+        }
+      }
+    }
+
     const responseClients = isDriver
-      ? clients.map(({ phone: _p, email: _e, ...rest }: any) => rest)
+      ? clients.map(({ phone: _p, email: _e, ...rest }: any) => ({
+          ...rest,
+          canDriverEdit: Boolean(
+            currentUserId &&
+              rest.createdByRole === "driver" &&
+              String(rest.createdByUserId || "") === currentUserId &&
+              !contractedDriverDraftIds.has(String(rest._id))
+          ),
+        }))
       : clients;
 
     return NextResponse.json({
@@ -107,8 +140,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
     const body = await req.json();
     await connectDB();
+
+    delete body.createdByUserId;
+    delete body.createdByRole;
+    if ((session?.user as any)?.id) {
+      body.createdByUserId = String((session!.user as any).id);
+      body.createdByRole = String((session!.user as any).role || "admin");
+    }
 
     // Ensure email is properly formatted or empty string if not supplied
     if (!body.email || typeof body.email !== "string" || !body.email.trim()) {
@@ -176,7 +217,12 @@ export async function POST(req: NextRequest) {
     }
 
     const client = await Client.create(body);
-    return NextResponse.json(client, { status: 201 });
+    const isDriverUser = (session?.user as any)?.role === "driver";
+    const plainClient = typeof (client as any).toObject === "function" ? (client as any).toObject() : client;
+    return NextResponse.json(
+      isDriverUser ? { ...plainClient, canDriverEdit: true } : plainClient,
+      { status: 201 }
+    );
   } catch (error: any) {
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyPattern || {})[0];

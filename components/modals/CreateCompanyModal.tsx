@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Building2, X, Phone, Mail, MapPin, FileText, Upload, Trash2, Loader2, CheckCircle2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useToast } from "@/components/providers/ToastProvider";
 
 interface CreateCompanyModalProps {
@@ -9,6 +10,7 @@ interface CreateCompanyModalProps {
   onClose: () => void;
   onSuccess: (company?: any) => void;
   companyToEdit?: any;
+  allowDriverContactEdit?: boolean;
 }
 
 export default function CreateCompanyModal({
@@ -16,7 +18,11 @@ export default function CreateCompanyModal({
   onClose,
   onSuccess,
   companyToEdit,
+  allowDriverContactEdit = false,
 }: CreateCompanyModalProps) {
+  const { data: session } = useSession();
+  const isDriverRole = (session?.user as any)?.role === "driver";
+  const hideExistingContact = isDriverRole && Boolean(companyToEdit) && !allowDriverContactEdit;
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -34,9 +40,11 @@ export default function CreateCompanyModal({
     if (isOpen) {
       document.body.style.overflow = "hidden";
       if (companyToEdit) {
+        const initPhone = companyToEdit._draftPhone ?? companyToEdit.phone ?? "";
+        const initEmail = companyToEdit._draftEmail ?? companyToEdit.email ?? "";
         setCompanyName(companyToEdit.companyName || companyToEdit.name || "");
-        setPhone(companyToEdit.phone && companyToEdit.phone !== "N/A" ? companyToEdit.phone : "");
-        setEmail(companyToEdit.email || "");
+        setPhone(initPhone && initPhone !== "N/A" ? initPhone : "");
+        setEmail(initEmail);
         setAddress(companyToEdit.address && companyToEdit.address !== "Dubai" ? companyToEdit.address : "");
         setTrn(companyToEdit.trn || "");
         setTradeLicenseNumber(companyToEdit.tradeLicenseNumber || "");
@@ -117,11 +125,15 @@ export default function CreateCompanyModal({
 
       const allDocs = [...existingUrls, ...uploadedUrls];
 
-      const payload = {
+      const payload: Record<string, any> = {
         name: trimmedName,
         companyName: trimmedName,
-        phone: phone.trim() || "N/A",
-        email: email.trim(),
+        ...(!hideExistingContact
+          ? {
+              phone: phone.trim() || "N/A",
+              email: email.trim(),
+            }
+          : {}),
         address: address.trim() || "Dubai",
         trn: trn.trim(),
         tradeLicenseNumber: tradeLicenseNumber.trim(),
@@ -154,7 +166,12 @@ export default function CreateCompanyModal({
           ? `Company "${trimmedName}" updated successfully!`
           : `Company "${trimmedName}" registered successfully!`
       );
-      onSuccess(data);
+      onSuccess({
+        ...data,
+        ...(isDriverRole && (!companyToEdit || allowDriverContactEdit)
+          ? { _draftPhone: phone.trim() || "N/A", _draftEmail: email.trim() }
+          : {}),
+      });
       onClose();
     } catch (err: any) {
       console.error("Save company error:", err);
@@ -228,33 +245,35 @@ export default function CreateCompanyModal({
               </div>
 
               {/* Contact Phone & Email */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Phone / Contact (رقم الهاتف)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. +971 4 123 4567"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
-                  />
-                </div>
+              {!hideExistingContact && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      Phone / Contact (رقم الهاتف)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. +971 4 123 4567"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Email Address (البريد الإلكتروني)
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="e.g. info@company.ae"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
-                  />
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">
+                      Email Address (البريد الإلكتروني)
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="e.g. info@company.ae"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand bg-white"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Tax / TRN & Trade License */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

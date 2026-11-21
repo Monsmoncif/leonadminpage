@@ -46,6 +46,8 @@ export interface IClient extends Document {
   clientType?: "Resident" | "Tourist" | "Corporate";
   status: "Active" | "Blacklisted";
   documents: string[]; // Cloudinary URLs for uploaded docs
+  createdByUserId?: string;
+  createdByRole?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -97,6 +99,8 @@ const clientSchema = new Schema<IClient>(
     clientType: { type: String, enum: ["Resident", "Tourist", "Corporate"], default: "Resident" },
     status: { type: String, enum: ["Active", "Blacklisted"], default: "Active" },
     documents: [{ type: String }],
+    createdByUserId: { type: String, required: false },
+    createdByRole: { type: String, required: false },
   },
   { timestamps: true }
 );

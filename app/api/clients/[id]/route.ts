@@ -28,6 +28,7 @@ export async function GET(
 
     const session = await getServerSession(authOptions);
     const isDriver = (session?.user as any)?.role === "driver";
+    const currentUserId = String((session?.user as any)?.id || "");
 
     await connectDB();
     const _u = Unit; // ensure Unit model is loaded for population
@@ -42,7 +43,7 @@ export async function GET(
       clientQuery.lean(),
       Contract.find({ clientId: id })
         .sort({ createdAt: -1 })
-        .select("_id contractNumber unitId startDate endDate totalAmount status createdAt")
+        .select("_id contractNumber unitId startDate endDate status deliveryStatus contractType driverId deliveryDriverId createdAt")
         .populate({ path: "unitId", select: "make model plate" })
         .lean(),
     ]);
@@ -55,7 +56,19 @@ export async function GET(
     }
 
     const safeClient = isDriver ? redactClientContactForDriver(client) : client;
-    return NextResponse.json({ ...safeClient, contracts: contracts || [] });
+    const hasNonCancelledContract = (contracts || []).some((c: any) => c.status !== "Cancelled");
+    const canDriverEdit = Boolean(
+      isDriver &&
+        currentUserId &&
+        (client as any).createdByRole === "driver" &&
+        String((client as any).createdByUserId || "") === currentUserId &&
+        !hasNonCancelledContract
+    );
+    return NextResponse.json({
+      ...safeClient,
+      contracts: contracts || [],
+      ...(isDriver ? { canDriverEdit } : {}),
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -70,14 +83,72 @@ export async function PUT(
     const body = await req.json();
     const session = await getServerSession(authOptions);
     const isDriver = (session?.user as any)?.role === "driver";
+    const currentUserId = String((session?.user as any)?.id || "");
 
-    // Drivers may update ID/license info on delivery, but must never view or overwrite contact phone/email
-    if (isDriver) {
-      delete body.phone;
-      delete body.email;
-    }
+    delete body.createdByUserId;
+    delete body.createdByRole;
 
     await connectDB();
+
+    let canEditOwnDraftContact = false;
+    if (isDriver) {
+      const [existingClient, existingContracts] = await Promise.all([
+        Client.findById(id).select("createdByUserId createdByRole").lean() as Promise<any>,
+        Contract.find({ clientId: id })
+          .select("status deliveryStatus contractType driverId deliveryDriverId")
+          .lean() as Promise<any[]>,
+      ]);
+
+      if (!existingClient) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+
+      const activeContracts = (existingContracts || []).filter((c: any) => c.status !== "Cancelled");
+      const hasPendingDeliveryForDriver = activeContracts.some(
+        (c: any) =>
+          c.deliveryStatus === "Pending" &&
+          c.contractType === "Delivery" &&
+          (!currentUserId ||
+            (!c.deliveryDriverId && !c.driverId) ||
+            String(c.deliveryDriverId || "") === currentUserId ||
+            String(c.driverId || "") === currentUserId)
+      );
+      const createdByThisDriver =
+        Boolean(currentUserId) &&
+        String(existingClient.createdByUserId || "") === currentUserId &&
+        existingClient.createdByRole === "driver";
+      const hasAnyContract = activeContracts.length > 0;
+
+      // Once a contract is finished/created for this client (outside an active pending delivery handover), lock driver edits
+      if (hasAnyContract && !hasPendingDeliveryForDriver) {
+        return NextResponse.json(
+          {
+            error:
+              "Contract already created for this client. Only Admin can edit client details now. (تم إنشاء العقد لهذا العميل بالفعل، لا يمكن للسائق التعديل بعد إتمام العقد)",
+          },
+          { status: 403 }
+        );
+      }
+
+      // Prevent editing clients added by admins or other drivers unless assigned a pending delivery
+      if (existingClient.createdByUserId && !createdByThisDriver && !hasPendingDeliveryForDriver) {
+        return NextResponse.json(
+          {
+            error:
+              "You can only edit clients you added during contract creation before submitting the contract. (يمكنك تعديل العميل الذي أضفته فقط قبل إتمام العقد)",
+          },
+          { status: 403 }
+        );
+      }
+
+      // Only the driver who added this uncontracted draft client can fix typos in phone/email before creating the contract;
+      // otherwise drivers must never view or overwrite existing client phone/email.
+      canEditOwnDraftContact = createdByThisDriver && !hasAnyContract;
+      if (!canEditOwnDraftContact) {
+        delete body.phone;
+        delete body.email;
+      }
+    }
 
     if (body.email !== undefined) {
       if (!body.email || typeof body.email !== "string" || !body.email.trim()) {
@@ -168,7 +239,11 @@ export async function PUT(
       console.warn("Could not bump contract updatedAt on client update:", touchErr);
     }
 
-    return NextResponse.json(isDriver ? redactClientContactForDriver(client) : client);
+    return NextResponse.json(
+      isDriver
+        ? { ...redactClientContactForDriver(client), ...(canEditOwnDraftContact ? { canDriverEdit: true } : {}) }
+        : client
+    );
   } catch (error: any) {
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyPattern || {})[0];
@@ -192,6 +267,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if ((session?.user as any)?.role === "driver") {
+      return NextResponse.json({ error: "Drivers cannot delete client records." }, { status: 403 });
+    }
     const { id } = await params;
     await connectDB();
 

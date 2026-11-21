@@ -32,6 +32,7 @@ interface CreateClientModalProps {
   onClose: () => void;
   onSuccess: (client?: any) => void;
   clientToEdit?: any;
+  allowDriverContactEdit?: boolean;
 }
 
 export default function CreateClientModal({
@@ -39,10 +40,11 @@ export default function CreateClientModal({
   onClose,
   onSuccess,
   clientToEdit,
+  allowDriverContactEdit = false,
 }: CreateClientModalProps) {
   const { data: session } = useSession();
   const isDriverRole = (session?.user as any)?.role === "driver";
-  const hideExistingClientContact = isDriverRole && Boolean(clientToEdit);
+  const hideExistingClientContact = isDriverRole && Boolean(clientToEdit) && !allowDriverContactEdit;
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [scanningDoc, setScanningDoc] = useState(false);
@@ -272,8 +274,8 @@ export default function CreateClientModal({
           gender: normalizeGender(clientToEdit.gender),
           dateOfBirth: formatDateForInput(clientToEdit.dateOfBirth),
 
-          phone: clientToEdit.phone || "",
-          email: clientToEdit.email || "",
+          phone: clientToEdit._draftPhone ?? clientToEdit.phone ?? "",
+          email: clientToEdit._draftEmail ?? clientToEdit.email ?? "",
           nationality: clientToEdit.nationality || (type === "Tourist" ? "" : "Emirati"),
           idNumber: resolvedIdNumber,
           idIssuedBy: (clientToEdit as any).idIssuedBy || "",
@@ -999,7 +1001,12 @@ export default function CreateClientModal({
 
       const data = await res.json();
       toast.success(clientToEdit ? "Customer updated successfully! ✓" : "Customer created successfully! ✓");
-      onSuccess(data);
+      onSuccess({
+        ...data,
+        ...(isDriverRole && (!clientToEdit || allowDriverContactEdit)
+          ? { _draftPhone: payload.phone, _draftEmail: payload.email }
+          : {}),
+      });
     } catch (err: any) {
       setError(err.message);
       toast.error(err.message);
