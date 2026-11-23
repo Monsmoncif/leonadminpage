@@ -850,7 +850,7 @@ export default function ConfirmDeliveryPage() {
   const vehicleImage = contract.vehicleImage || contract.unitId?.images?.[0] || "";
   const pickupLoc = contract.pickupLocation || rentalData.pickupLocation || "Main Office";
 
-  const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate);
+  const totalDays = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
   const extraFees = Number(rentalData.babySeatFee || 0) + Number(rentalData.deliveryFee || 0);
   const rawCollectionTotal = Number(rentalData.collectionAmount || 0) + extraFees;
   const advancePaid = Number(contract?.advancePayment || rentalData.advancePayment || 0);
@@ -1337,7 +1337,7 @@ export default function ConfirmDeliveryPage() {
                 value={rentalData.startDate}
                 onChange={(e) => {
                   const newStart = e.target.value;
-                  const days = calculateRentalDays(newStart, rentalData.endDate);
+                  const days = calculateRentalDays(newStart, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
                   const rate = Number(rentalData.dailyRate) || 0;
                   setRentalData(prev => ({
                     ...prev,
@@ -1357,7 +1357,7 @@ export default function ConfirmDeliveryPage() {
                 value={rentalData.endDate}
                 onChange={(e) => {
                   const newEnd = e.target.value;
-                  const days = calculateRentalDays(rentalData.startDate, newEnd);
+                  const days = calculateRentalDays(rentalData.startDate, newEnd, rentalData.checkoutTime, rentalData.checkinTime);
                   const rate = Number(rentalData.dailyRate) || 0;
                   setRentalData(prev => ({
                     ...prev,

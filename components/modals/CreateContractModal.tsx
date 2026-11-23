@@ -270,7 +270,23 @@ export default function CreateContractModal({
 
         const editDailyRate = contractToEdit.dailyRate || 85;
         const editDays = calculateRentalDays(contractToEdit.startDate, contractToEdit.endDate, contractToEdit.checkoutTime, contractToEdit.checkinTime);
-        const editCollectionAmount = contractToEdit.totalAmount || (editDailyRate * editDays);
+        const editExtraFees =
+          (Number(contractToEdit.babySeatFees) || 0) +
+          (Number(contractToEdit.tintingFees) || 0) +
+          (Number(contractToEdit.deliveryCharges) || 0) +
+          (Number(contractToEdit.salikFees) || 0) +
+          (Number(contractToEdit.cleaningFees) || 0);
+        const rawEditCollection = contractToEdit.totalAmount !== undefined
+          ? Math.max(0, Number(contractToEdit.totalAmount) - editExtraFees)
+          : (editDailyRate * editDays);
+        const wasRoundedUpFromExtraHours =
+          contractToEdit.totalAmount !== undefined &&
+          editDailyRate > 0 &&
+          Number(contractToEdit.totalDays) > editDays &&
+          Math.abs(rawEditCollection - (editDailyRate * Number(contractToEdit.totalDays))) <= 1;
+        const editCollectionAmount = wasRoundedUpFromExtraHours
+          ? Math.round(editDailyRate * editDays * 100) / 100
+          : rawEditCollection;
 
         setSignatureData(contractToEdit.customerSignature || null);
         setAdminSignatureData(contractToEdit.adminSignature || DEFAULT_ADMIN_SIGNATURE);

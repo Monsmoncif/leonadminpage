@@ -741,11 +741,20 @@ function NewRentalAdminPageContent() {
       const days = calculateRentalDays(editStart, editEnd, c.checkoutTime, c.checkinTime);
       const editDailyRate = c.dailyRate || 85;
       const extraFees = (c.babySeatFees || 0) + (c.deliveryCharges || 0) + (c.salikFees || c.salikCharge || 0) + (c.tintingFees || 0) + (c.cleaningFees || 0);
-      const editCollectionAmount = c.collectionAmount !== undefined 
-        ? c.collectionAmount 
-        : (c.totalAmount !== undefined 
-            ? Math.max(0, c.totalAmount - extraFees)
+      const rawCollection = c.collectionAmount !== undefined
+        ? Number(c.collectionAmount)
+        : (c.totalAmount !== undefined
+            ? Math.max(0, Number(c.totalAmount) - extraFees)
             : (editDailyRate * days));
+      const wasRoundedUpFromExtraHours =
+        c.collectionAmount === undefined &&
+        c.totalAmount !== undefined &&
+        editDailyRate > 0 &&
+        Number(c.totalDays) > days &&
+        Math.abs(rawCollection - (editDailyRate * Number(c.totalDays))) <= 1;
+      const editCollectionAmount = wasRoundedUpFromExtraHours
+        ? Math.round(editDailyRate * days * 100) / 100
+        : rawCollection;
 
       hasManuallyEditedDatesRef.current = true;
       setRentalData({

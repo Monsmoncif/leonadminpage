@@ -294,13 +294,15 @@ export function parseTimeToMinutes(input: any): number | null {
 }
 
 /**
- * Calculates the rental duration in billable 24-hour days.
+ * Calculates the rental duration in billable full 24-hour days.
  *
- * Rule: every full 24 hours between pick-up and return = 1 day, and any extra hours
- * beyond a full 24h block count as one additional day.
+ * Rule: only every full 24 hours between pick-up and return counts as 1 day; any extra
+ * partial hours (< 24h) beyond full 24h blocks are NOT rounded up to an extra day
+ * (the admin counts/bills extra hours manually).
  *   03/11 10:00 AM -> 04/11 10:00 AM = 24h  = 1 day
+ *   03/11 10:00 AM -> 04/11 01:00 PM = 27h  = 1 day (+ 3 hours)
  *   01/11 10:00 AM -> 06/11 10:00 AM = 120h = 5 days
- *   01/11 10:00 AM -> 06/11 02:00 PM = 124h = 6 days
+ *   01/11 10:00 AM -> 06/11 02:00 PM = 124h = 5 days (+ 4 hours)
  * When no times are provided (or the return time is empty) the return time defaults to the
  * pick-up time, so the result is simply the number of calendar days between the dates.
  * Minimum duration is always 1 day.
@@ -347,11 +349,12 @@ export function calculateRentalDuration(
   const totalMinutes = dayDiff * 1440 + (endOffset - startOffset);
   if (totalMinutes <= 0) return fallback;
 
+  const fullDays = Math.floor(totalMinutes / 1440);
   return {
-    days: Math.floor(totalMinutes / 1440),
+    days: fullDays,
     hours: Math.floor((totalMinutes % 1440) / 60),
     minutes: totalMinutes % 60,
-    billableDays: Math.max(1, Math.ceil(totalMinutes / 1440)),
+    billableDays: Math.max(1, fullDays),
   };
 }
 
@@ -365,7 +368,7 @@ export function calculateRentalDays(
 }
 
 /**
- * Computes the endDate ("YYYY-MM-DD") that matches a requested number of billable days
+ * Computes the endDate ("YYYY-MM-DD") that matches a requested number of billable full 24h days
  * from startDate, taking into account checkoutTime and checkinTime.
  */
 export function computeEndDateForRentalDays(
@@ -378,14 +381,17 @@ export function computeEndDateForRentalDays(
   const startISO = formatDateToInput(startDateInput);
   const startMin = parseTimeToMinutes(startTimeInput);
   const endMin = startMin === null ? null : parseTimeToMinutes(endTimeInput);
-  const extraHourAddsDay = startMin !== null && endMin !== null && endMin > startMin;
-  const calendarOffset = extraHourAddsDay ? Math.max(0, safeDays - 1) : safeDays;
+  // When return time is earlier than pickup time, e.g. 2:00 PM -> 10:00 AM, reaching 2+ full
+  // 24h blocks requires one additional calendar date; extra partial hours (endMin >= startMin) do not add a day.
+  const shortReturnNeedsExtraCalendarDay =
+    startMin !== null && endMin !== null && endMin < startMin && safeDays > 1;
+  const calendarOffset = shortReturnNeedsExtraCalendarDay ? safeDays + 1 : safeDays;
   return addDaysToISODate(startISO, calendarOffset);
 }
 
 /**
- * Human readable duration, e.g. "1 day 4 hours (يوم و 4 ساعات)".
- * Extra hours beyond full 24h days are shown separately; billing rounds them up to a full day.
+ * Human readable duration, e.g. "1 day - 3 hours (يوم و 3 ساعات)".
+ * Extra hours beyond full 24h days are shown separately and do NOT add an extra billable day.
  */
 export function formatRentalDuration(
   startDateInput: any,
