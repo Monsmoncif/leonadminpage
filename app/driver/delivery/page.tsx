@@ -313,7 +313,7 @@ export default function ConfirmDeliveryPage() {
             license: contractData.additionalDriverLicense || "",
             nationality: contractData.additionalDriverNationality || "",
             phone: contractData.additionalDriverPhone || "",
-            expiry: contractData.additionalDriverExpiry ? new Date(contractData.additionalDriverExpiry).toISOString().split("T")[0] : "",
+            expiry: contractData.additionalDriverExpiry ? formatDateToInput(contractData.additionalDriverExpiry) : "",
             issuedAt: contractData.additionalDriverIssuedAt || "Dubai",
           });
         }
@@ -437,7 +437,7 @@ export default function ConfirmDeliveryPage() {
       license: client.licenseNumber || "",
       nationality: client.nationality || "",
       phone: "",
-      expiry: client.licenseExpiry ? new Date(client.licenseExpiry).toISOString().split("T")[0] : "",
+      expiry: client.licenseExpiry ? formatDateToInput(client.licenseExpiry) : "",
       issuedAt: client.address || "Dubai",
     });
     toast.success(`Selected "${client.name}" as Second Driver.`);

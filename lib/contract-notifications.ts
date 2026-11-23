@@ -13,7 +13,7 @@ import {
   buildAdminHandoverReminderEmail,
   getEmailLogoAttachment,
 } from "@/lib/email-templates";
-import { formatDateDMY } from "@/lib/date-utils";
+import { formatDateDMY, formatDateWords } from "@/lib/date-utils";
 import { isResidentClient } from "@/lib/client-utils";
 
 function getTransporter() {
@@ -88,8 +88,8 @@ export async function sendClientContractNotification(
     const vehicleColor = contract.unitId?.color || "";
     const vehicleYear = ""; // Do not show car year in client notifications
 
-    const startDate = new Date(contract.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-    const endDate = new Date(contract.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    const startDate = formatDateWords(contract.startDate);
+    const endDate = formatDateWords(contract.endDate);
     const driverName = contract.deliveryDriverId?.name || "Our driver";
     const driverPhone = contract.deliveryDriverId?.phone || "";
 

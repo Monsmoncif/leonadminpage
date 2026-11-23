@@ -16,6 +16,9 @@ import { sendClientContractNotification, sendDriverTaskNotification, sendHandove
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
 import {
   formatDateWords,
+  formatDateToInput,
+  addDaysToISODate,
+  getBusinessTodayISO,
   calculateRentalDays,
   parseContractDateToUTCMidnight,
   getBusinessStartOfMonthUTC,
@@ -402,8 +405,8 @@ export async function POST(req: Request) {
     // Check if vehicle has any overlapping booking/contract during requested dates
     const conflictingContract: any = await checkContractDateOverlap({
       unitId: body.unitId,
-      startDate: body.startDate,
-      endDate: body.endDate,
+      startDate: start,
+      endDate: end,
       checkoutTime: body.checkoutTime,
       checkinTime: body.checkinTime,
     });
@@ -496,8 +499,8 @@ export async function POST(req: Request) {
       returnDriverId: returnDriverId,
       checkoutMileage,
       checkoutFuelLevel: body.checkoutFuelLevel !== undefined ? Number(body.checkoutFuelLevel) : 100,
-      startDate: body.startDate,
-      endDate: body.endDate,
+      startDate: start,
+      endDate: end,
       dailyRate: isPersonalized ? 0 : (body.dailyRate !== undefined && body.dailyRate !== null ? Number(body.dailyRate) : dailyRate),
       dailyKmLimit: isPersonalized ? 0 : (body.dailyKmLimit || 0),
       pricePerExtraKm: isPersonalized ? 0 : (body.pricePerExtraKm || 0),
@@ -553,21 +556,15 @@ export async function POST(req: Request) {
         type: "contract"
       });
 
-      // If scheduled to start tomorrow, create a handover reminder notification immediately
-      const now = new Date();
-      const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
-      const tomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 23, 59, 59, 999);
-      const contractStartDate = new Date(contract.startDate);
-      
-      if (contractStartDate >= tomorrowStart && contractStartDate <= tomorrowEnd) {
+      // If scheduled to start tomorrow (in UAE calendar time), create a handover reminder notification immediately
+      const dubaiTomorrowISO = addDaysToISODate(getBusinessTodayISO(), 1);
+      const contractStartISO = formatDateToInput(contract.startDate);
+
+      if (contractStartISO === dubaiTomorrowISO) {
         const contractNum = contract.contractNumber 
           ? `#${contract.contractNumber}` 
           : `#${contract._id.toString().substring(0, 8).toUpperCase()}`;
-        const dateFormatted = contractStartDate.toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        });
+        const dateFormatted = formatDateWords(contract.startDate);
         const vehicle = unitDoc ? `${unitDoc.make} ${unitDoc.model} (${unitDoc.plate || ""})`.trim() : "Vehicle";
         
         const clientNameForNotif = body.clientName || "Client";

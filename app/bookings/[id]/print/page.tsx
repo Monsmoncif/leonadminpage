@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { CONTRACT_TERMS } from "@/lib/contractTerms";
 import { isResidentClient } from "@/lib/client-utils";
+import { formatDateDMY, getBusinessTimeFormatted } from "@/lib/date-utils";
 
 const INSPECTION_ANGLES = [
   { en: "Front View", ar: "الأمام" },
@@ -136,32 +137,10 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
     contract.status === "Completed"
   );
 
-  // Format Helper functions (Strict Day/Month/Year DD/MM/YYYY)
+  // Format Helper functions (Strict Day/Month/Year DD/MM/YYYY in Asia/Dubai)
   const formatDate = (dateStr: any) => {
     if (!dateStr) return "";
-    try {
-      if (typeof dateStr === "string") {
-        const trimmed = dateStr.trim();
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
-          return trimmed;
-        }
-        const match = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-        if (match) {
-          const year = match[1];
-          const month = match[2].padStart(2, "0");
-          const day = match[3].padStart(2, "0");
-          return `${day}/${month}/${year}`;
-        }
-      }
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return String(dateStr);
-      const day = String(d.getDate()).padStart(2, "0");
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const year = d.getFullYear();
-      return `${day}/${month}/${year}`;
-    } catch {
-      return String(dateStr);
-    }
+    return formatDateDMY(dateStr);
   };
 
   const client = contract.clientId || {};
@@ -186,29 +165,13 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   const getReturnTimeDisplay = () => {
     if (!isReturned) return "";
     if (isPersonalized && contract.returnedAt) {
-      try {
-        return new Date(contract.returnedAt).toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        });
-      } catch {
-        // fallback below
-      }
+      return getBusinessTimeFormatted(new Date(contract.returnedAt));
     }
     if (contract.checkinTime && contract.checkinTime !== "Pending Return" && contract.checkinTime !== "Pending Handover") {
       return contract.checkinTime;
     }
     if (contract.returnedAt) {
-      try {
-        return new Date(contract.returnedAt).toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        });
-      } catch {
-        return "";
-      }
+      return getBusinessTimeFormatted(new Date(contract.returnedAt));
     }
     return "";
   };
@@ -225,19 +188,11 @@ export default function PrintContractPage({ params }: { params: Promise<{ id: st
   };
 
   const getHandoverDateTimeDisplay = () => {
-    const handoverDateSource = contract.deliveredAt || contract.startDate;
+    const handoverDateSource = contract.startDate || contract.deliveredAt;
     const formattedDate = handoverDateSource ? formatDate(handoverDateSource) : "";
     let time = contract.checkoutTime;
     if (!time && contract.deliveredAt) {
-      try {
-        time = new Date(contract.deliveredAt).toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        });
-      } catch {
-        time = "";
-      }
+      time = getBusinessTimeFormatted(new Date(contract.deliveredAt));
     }
     if (!time) {
       time = "08:00 AM";

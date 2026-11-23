@@ -25,7 +25,12 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/providers/ToastProvider";
-import { getBusinessTodayISO, formatDateToInput, formatDateWords } from "@/lib/date-utils";
+import {
+  getBusinessTodayISO,
+  formatDateToInput,
+  formatDateWords,
+  formatDateShort,
+} from "@/lib/date-utils";
 import { sparklineData } from "@/data/mock";
 import ConfirmDeliveryModal from "@/components/modals/ConfirmDeliveryModal";
 import TablePagination from "@/components/ui/TablePagination";
@@ -444,12 +449,18 @@ export default function DriverDashboard() {
       };
     }
 
-    const taskDate = new Date(rawDateStr);
-    const now = new Date();
-    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const taskDateOnly = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
-    
-    const diffDays = Math.round((taskDateOnly.getTime() - nowDateOnly.getTime()) / (1000 * 60 * 60 * 24));
+    const taskYmd = formatDateToInput(rawDateStr);
+    const todayYmd = getBusinessTodayISO();
+    const parseYmdUTC = (ymd: string): number => {
+      const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return NaN;
+      return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    };
+    const taskDayMs = parseYmdUTC(taskYmd);
+    const todayDayMs = parseYmdUTC(todayYmd);
+    const diffDays = Number.isFinite(taskDayMs) && Number.isFinite(todayDayMs)
+      ? Math.round((taskDayMs - todayDayMs) / (1000 * 60 * 60 * 24))
+      : 0;
     const isToday = diffDays === 0;
     const isTomorrow = diffDays === 1;
     const isYesterday = diffDays === -1;
@@ -461,7 +472,7 @@ export default function DriverDashboard() {
       ? "Yesterday" 
       : isTomorrow 
       ? "Tomorrow" 
-      : taskDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      : formatDateShort(rawDateStr);
 
     // In WithClient tab: calm scheduled return due badge
     if (isWithClientTab) {
@@ -498,8 +509,12 @@ export default function DriverDashboard() {
       }
     }
 
-    const taskDateTime = new Date(taskDate);
-    taskDateTime.setHours(hours, minutes, 0, 0);
+    const hh = String(hours).padStart(2, "0");
+    const mm = String(minutes).padStart(2, "0");
+    const taskDateTime = taskYmd
+      ? new Date(`${taskYmd}T${hh}:${mm}:00+04:00`)
+      : new Date(rawDateStr);
+    const now = new Date();
 
     let urgency: "overdue" | "urgent" | "soon" | "today" | "upcoming" = "upcoming";
     let badgeText = "";
@@ -599,6 +614,7 @@ export default function DriverDashboard() {
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <Link
             href="/driver/contracts/new"
+            prefetch={false}
             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer shrink-0"
           >
             <Plus size={18} />

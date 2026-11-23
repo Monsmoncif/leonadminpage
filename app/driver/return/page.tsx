@@ -43,6 +43,7 @@ import VehicleInspectionPhotoCapture, {
   getExtraPhotoKeys,
 } from "@/components/ui/VehicleInspectionPhotoCapture";
 import HandoverPhotosGallery from "@/components/contracts/HandoverPhotosGallery";
+import { getBusinessTimeFormatted } from "@/lib/date-utils";
 
 const DEFAULT_STEPS = [
   { id: 1, title: "Vehicle & Mileage", arTitle: "المركبة والعداد" },
@@ -165,13 +166,7 @@ export default function VehicleReturnPage() {
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isAllMoneyConfirmed, setIsAllMoneyConfirmed] = useState(false);
 
-  const getCurrentFormattedTime = () => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date());
-  };
+  const getCurrentFormattedTime = () => getBusinessTimeFormatted();
 
   // Scroll to top on step change
   useEffect(() => {
@@ -289,7 +284,7 @@ export default function VehicleReturnPage() {
       setFinesCharge(String(selectedContractData.finesFees || selectedContractData.finesCharge || 0));
       setFuelCharge(String(selectedContractData.fuelFees || selectedContractData.fuelCharge || 0));
 
-      const nowTimeStr = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }).format(new Date());
+      const nowTimeStr = getBusinessTimeFormatted();
       setCheckinTime(selectedContractData.checkinTime && selectedContractData.checkinTime !== "Pending Handover" ? selectedContractData.checkinTime : nowTimeStr);
 
       const initialPhotos: Record<string, string> = {};

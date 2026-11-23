@@ -665,7 +665,8 @@ function ReturnPageContent() {
       let combinedReturnedAt = selectedContract.returnedAt || new Date().toISOString();
       if (returnDate) {
         try {
-          const d = new Date(returnDate);
+          const ymd = formatDateToInput(returnDate);
+          let time24 = "00:00";
           if (returnTime) {
             const match = returnTime.match(/(\d+):(\d+)\s*(AM|PM)?/i);
             if (match) {
@@ -674,10 +675,12 @@ function ReturnPageContent() {
               const ampm = match[3]?.toUpperCase();
               if (ampm === "PM" && hours < 12) hours += 12;
               if (ampm === "AM" && hours === 12) hours = 0;
-              d.setHours(hours, minutes, 0, 0);
+              time24 = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
             }
           }
-          combinedReturnedAt = d.toISOString();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+            combinedReturnedAt = new Date(`${ymd}T${time24}:00+04:00`).toISOString();
+          }
         } catch {}
       }
 

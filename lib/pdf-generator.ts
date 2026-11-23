@@ -8,6 +8,7 @@ import { Unit } from "@/models/Unit";
 import { User } from "@/models/User";
 import { CONTRACT_TERMS } from "@/lib/contractTerms";
 import { isResidentClient } from "@/lib/client-utils";
+import { formatDateDMY, getBusinessTimeFormatted } from "@/lib/date-utils";
 
 export interface ContractPdfData {
   contractNumber: string | number;
@@ -79,29 +80,7 @@ function getBrowserExecutablePath(): string | null {
 
 function formatDateDisplay(dateVal: any): string {
   if (!dateVal) return "";
-  try {
-    if (typeof dateVal === "string") {
-      const trimmed = dateVal.trim();
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
-        return trimmed;
-      }
-      const match = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-      if (match) {
-        const year = match[1];
-        const month = match[2].padStart(2, "0");
-        const day = match[3].padStart(2, "0");
-        return `${day}/${month}/${year}`;
-      }
-    }
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return String(dateVal);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  } catch {
-    return String(dateVal);
-  }
+  return formatDateDMY(dateVal);
 }
 
 /**
@@ -143,10 +122,10 @@ export function buildRealContractHtml(contract: any): string {
     { en: "Trunk / Boot", ar: "الصندوق" },
   ];
 
-  const handoverDisplay = `${formatDateDisplay(contract.deliveredAt || contract.startDate)} - ${contract.checkoutTime || "08:00 AM"}`;
+  const handoverDisplay = `${formatDateDisplay(contract.startDate || contract.deliveredAt)} - ${contract.checkoutTime || (contract.deliveredAt ? getBusinessTimeFormatted(new Date(contract.deliveredAt)) : "08:00 AM")}`;
   const returnTimeStr = isPersonalized && contract.returnedAt
-    ? new Date(contract.returnedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
-    : (contract.checkinTime || (contract.returnedAt ? new Date(contract.returnedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "N/A"));
+    ? getBusinessTimeFormatted(new Date(contract.returnedAt))
+    : (contract.checkinTime || (contract.returnedAt ? getBusinessTimeFormatted(new Date(contract.returnedAt)) : "N/A"));
   const returnDisplay = isReturned
     ? `${formatDateDisplay(contract.returnedAt || contract.endDate)} - ${returnTimeStr}`
     : (contract.endDate ? formatDateDisplay(contract.endDate) : "N/A");

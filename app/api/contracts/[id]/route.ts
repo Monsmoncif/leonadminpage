@@ -155,8 +155,17 @@ export async function PUT(
       ? (damageCharge + finesFees + salikFees + parkingFees + fuelFees)
       : ((totalDays * dailyRateVal) + babySeatFees + tintingFees + deliveryCharges + salikFees + parkingFees + finesFees + fuelFees + cleaningFees + extraKmCharge + damageCharge);
 
+    const startChanged =
+      body.startDate !== undefined &&
+      formatDateToInput(startDateVal) !== formatDateToInput(existingContract.startDate);
+
     const updatedData: any = {
       ...body,
+      ...(body.startDate !== undefined ? { startDate: startDateVal } : {}),
+      ...(body.endDate !== undefined ? { endDate: endDateVal } : {}),
+      ...(startChanged && body.deliveredAt === undefined && existingContract.deliveredAt
+        ? { deliveredAt: startDateVal }
+        : {}),
       totalDays,
       totalAmount,
       salikFees,

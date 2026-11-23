@@ -50,6 +50,7 @@ import {
   formatDateToInput,
   computeEndDateForRentalDays,
   formatDateWords,
+  formatDateShort,
 } from "@/lib/date-utils";
 import { DEFAULT_ADMIN_SIGNATURE } from "@/lib/default-admin-signature";
 
@@ -181,7 +182,7 @@ export default function CreateContractModal({
       additionalDriverNationality: client.nationality || "",
       additionalDriverPhone: isDriverRole ? "" : (client.phone || ""),
       additionalDriverExpiry: client.licenseExpiry
-        ? new Date(client.licenseExpiry).toISOString().split("T")[0]
+        ? formatDateToInput(client.licenseExpiry)
         : "",
       additionalDriverIssuedAt: client.address || "Dubai",
     }));
@@ -479,7 +480,7 @@ export default function CreateContractModal({
       const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime) : null;
       if (conflict && !isCurrentContractUnit(formData.unitId)) {
         if (conflict.reason === "Booked") {
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          const conflictEnd = formatDateShort(conflict.endDate);
           const returnHour = conflict.returnTime || "10:00 AM";
           toast.error(`Date Conflict: This car is booked until ${conflictEnd} at ${returnHour}. Please select a checkout time after ${returnHour} or choose another car.`);
         } else {
@@ -659,11 +660,9 @@ export default function CreateContractModal({
     }
 
     if (formData.startDate && formData.endDate) {
-      const s = new Date(formData.startDate);
-      s.setHours(0, 0, 0, 0);
-      const e = new Date(formData.endDate);
-      e.setHours(0, 0, 0, 0);
-      if (s > e) {
+      const s = formatDateToInput(formData.startDate);
+      const e = formatDateToInput(formData.endDate);
+      if (s && e && s > e) {
         toast.error("Start date cannot be after expected end date. Please adjust the return date. (تاريخ البداية لا يمكن أن يكون بعد تاريخ الإرجاع)");
         return;
       }
@@ -673,7 +672,7 @@ export default function CreateContractModal({
     const conflict = selectedUnit ? getUnitConflict(selectedUnit, formData.startDate, formData.endDate, formData.checkoutTime, formData.checkinTime) : null;
     if (conflict && !isCurrentContractUnit(formData.unitId)) {
       if (conflict.reason === "Booked") {
-        const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        const conflictEnd = formatDateShort(conflict.endDate);
         const returnHour = conflict.returnTime || "10:00 AM";
         toast.error(`Date Conflict: This car is booked until ${conflictEnd} at ${returnHour}. Please select a checkout time after ${returnHour} or choose another car.`);
       } else {
@@ -1028,8 +1027,8 @@ export default function CreateContractModal({
                                 }));
 
                                 if (conflict && conflict.reason === "Booked") {
-                                  const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-                                  const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                                  const conflictStart = formatDateShort(conflict.startDate);
+                                  const conflictEnd = formatDateShort(conflict.endDate);
                                   toast.info(`Selected ${unit.make} ${unit.model}. Note: It is booked from ${conflictStart} to ${conflictEnd}. Please choose non-overlapping dates.`);
                                 } else {
                                   toast.success(`Selected ${unit.make} ${unit.model} (${unit.plate})`);
@@ -1052,7 +1051,7 @@ export default function CreateContractModal({
                                   <span className="bg-brand text-white p-1 rounded-full"><CheckCircle2 size={16} /></span>
                                 ) : conflict?.reason === "Booked" ? (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                    Booked ({new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - {new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})
+                                    Booked ({formatDateShort(conflict.startDate)} - {formatDateShort(conflict.endDate)})
                                   </span>
                                 ) : unit.status === "Maintenance" || unit.status === "Out of Service" ? (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">

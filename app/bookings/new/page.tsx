@@ -207,7 +207,7 @@ function NewRentalAdminPageContent() {
       license: client.licenseNumber || "",
       nationality: client.nationality || "",
       phone: isDriver ? "" : (client.phone || ""),
-      expiry: client.licenseExpiry ? new Date(client.licenseExpiry).toISOString().split("T")[0] : "",
+      expiry: client.licenseExpiry ? formatDateToInput(client.licenseExpiry) : "",
       issuedAt: client.address || "Dubai",
     });
     toast.success(`Selected "${client.name}" as Second Driver.`);
@@ -320,6 +320,7 @@ function NewRentalAdminPageContent() {
   const getCurrentFormattedTime = () => getBusinessTimeFormatted();
 
   // Form State — initialized in UAE (Asia/Dubai) calendar date so midnight UAE never reverts to UTC yesterday
+  const hasManuallyEditedDatesRef = useRef(false);
   const initialStartDate = getBusinessTodayISO();
   const [rentalData, setRentalData] = useState({
     driverId: "",
@@ -746,6 +747,7 @@ function NewRentalAdminPageContent() {
             ? Math.max(0, c.totalAmount - extraFees)
             : (editDailyRate * days));
 
+      hasManuallyEditedDatesRef.current = true;
       setRentalData({
         driverId: c.driverId?._id || c.driverId || "",
         deliveryDriverId: c.deliveryDriverId?._id || c.deliveryDriverId || c.driverId?._id || c.driverId || "",
@@ -839,6 +841,45 @@ function NewRentalAdminPageContent() {
     });
   }, [contractId]);
 
+  useEffect(() => {
+    if (isEditMode) return;
+    const syncBusinessTodayIfUntouched = () => {
+      if (
+        hasManuallyEditedDatesRef.current ||
+        searchParams.get("startDate") ||
+        searchParams.get("endDate")
+      ) {
+        return;
+      }
+      const liveToday = getBusinessTodayISO();
+      setRentalData((prev) => {
+        if (prev.startDate === liveToday) return prev;
+        const prevDays = Math.max(
+          1,
+          calculateRentalDays(prev.startDate, prev.endDate, prev.checkoutTime, prev.checkinTime)
+        );
+        return {
+          ...prev,
+          startDate: liveToday,
+          endDate: addDaysToISODate(liveToday, prevDays),
+        };
+      });
+    };
+
+    syncBusinessTodayIfUntouched();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") syncBusinessTodayIfUntouched();
+    };
+    window.addEventListener("focus", syncBusinessTodayIfUntouched);
+    document.addEventListener("visibilitychange", handleVisibility);
+    const intervalId = setInterval(syncBusinessTodayIfUntouched, 30000);
+    return () => {
+      window.removeEventListener("focus", syncBusinessTodayIfUntouched);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearInterval(intervalId);
+    };
+  }, [isEditMode, searchParams]);
+
   const aiAutoPilotKeyRef = useRef<string>("");
   const [aiTriggerSubmit, setAiTriggerSubmit] = useState(false);
 
@@ -902,6 +943,9 @@ function NewRentalAdminPageContent() {
     }
 
     if (chosenUnit || paramStartDate || paramEndDate || paramPrice || paramDays) {
+      if (paramStartDate || paramEndDate || paramDays) {
+        hasManuallyEditedDatesRef.current = true;
+      }
       const startStr = isValidDate(paramStartDate) ? (paramStartDate as string) : getBusinessTodayISO();
       let daysCount = paramDays && !isNaN(Number(paramDays)) && Number(paramDays) > 0 ? Number(paramDays) : 3;
       let endStr: string;
@@ -1178,8 +1222,8 @@ function NewRentalAdminPageContent() {
         const vehicle = units.find(u => u._id === selectedVehicle);
         const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
         if (conflict && conflict.reason === "Booked") {
-          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          const conflictStart = formatDateShort(conflict.startDate);
+          const conflictEnd = formatDateShort(conflict.endDate);
           toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
           return;
         }
@@ -1199,8 +1243,8 @@ function NewRentalAdminPageContent() {
         const vehicle = units.find(u => u._id === selectedVehicle);
         const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
         if (conflict && conflict.reason === "Booked") {
-          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          const conflictStart = formatDateShort(conflict.startDate);
+          const conflictEnd = formatDateShort(conflict.endDate);
           toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
           return;
         }
@@ -1213,8 +1257,8 @@ function NewRentalAdminPageContent() {
         const vehicle = units.find(u => u._id === selectedVehicle);
         const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
         if (conflict && conflict.reason === "Booked") {
-          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          const conflictStart = formatDateShort(conflict.startDate);
+          const conflictEnd = formatDateShort(conflict.endDate);
           toast.error(`Date Conflict: You cannot make the same dates for two clients. This car is already booked from ${conflictStart} to ${conflictEnd}. Please choose different dates.`);
           return;
         }
@@ -1308,8 +1352,8 @@ function NewRentalAdminPageContent() {
       const conflict = vehicle ? getUnitConflict(vehicle, rentalData.startDate, rentalData.endDate) : null;
       if (conflict) {
         if (conflict.reason === "Booked") {
-          const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-          const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          const conflictStart = formatDateShort(conflict.startDate);
+          const conflictEnd = formatDateShort(conflict.endDate);
           toast.error(`Date Conflict: This car is already booked from ${conflictStart} to ${conflictEnd}. Please select different dates.`);
         } else {
           toast.error(`The selected car is currently in ${conflict.reason} and cannot be booked.`);
@@ -1666,8 +1710,8 @@ function NewRentalAdminPageContent() {
                     }));
 
                     if (conflict && conflict.reason === "Booked") {
-                      const conflictStart = new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-                      const conflictEnd = new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                      const conflictStart = formatDateShort(conflict.startDate);
+                      const conflictEnd = formatDateShort(conflict.endDate);
                       toast.info(`Selected ${unit.make} ${unit.model}. Note: It is booked from ${conflictStart} to ${conflictEnd}. Please choose non-overlapping dates.`);
                     } else {
                       toast.success(`Selected ${unit.make} ${unit.model} (${unit.plate})`);
@@ -1690,7 +1734,7 @@ function NewRentalAdminPageContent() {
                       <span className="bg-brand text-white p-0.5 rounded-full shrink-0"><CheckCircle2 size={14} /></span>
                     ) : conflict?.reason === "Booked" ? (
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                        Booked ({new Date(conflict.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - {new Date(conflict.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})
+                        Booked ({formatDateShort(conflict.startDate)} - {formatDateShort(conflict.endDate)})
                       </span>
                     ) : unit.status === "Maintenance" || unit.status === "Out of Service" ? (
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-700 border border-red-200 shrink-0">
@@ -2113,6 +2157,7 @@ function NewRentalAdminPageContent() {
               <button
                 type="button"
                 onClick={() => {
+                  hasManuallyEditedDatesRef.current = true;
                   const monthEnd = addDaysToISODate(rentalData.startDate, 30);
                   setRentalData(prev => ({
                     ...prev,
@@ -2190,6 +2235,7 @@ function NewRentalAdminPageContent() {
                   onChange={e => {
                     const newStart = e.target.value;
                     if (!newStart) return;
+                    hasManuallyEditedDatesRef.current = true;
 
                     const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
 
@@ -2259,6 +2305,7 @@ function NewRentalAdminPageContent() {
                   onChange={e => {
                     const newEnd = e.target.value;
                     if (!newEnd) return;
+                    hasManuallyEditedDatesRef.current = true;
                     const validEnd = newEnd < rentalData.startDate ? rentalData.startDate : newEnd;
                     const days = calculateRentalDays(rentalData.startDate, validEnd, rentalData.checkoutTime, rentalData.checkinTime);
                     const rate = Number(rentalData.dailyRate) || 0;
@@ -2317,6 +2364,7 @@ function NewRentalAdminPageContent() {
               <RentalDaysControl
                 days={totalDays}
                 onChange={(nextDays) => {
+                  hasManuallyEditedDatesRef.current = true;
                   const nextEnd = computeEndDateForRentalDays(rentalData.startDate, nextDays, rentalData.checkoutTime, rentalData.checkinTime);
                   const actualDays = calculateRentalDays(rentalData.startDate, nextEnd, rentalData.checkoutTime, rentalData.checkinTime);
                   const rate = Number(rentalData.dailyRate) || 0;
@@ -3242,6 +3290,7 @@ function NewRentalAdminPageContent() {
                   onChange={(e) => {
                     const newStart = e.target.value;
                     if (!newStart) return;
+                    hasManuallyEditedDatesRef.current = true;
                     const prevDuration = calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime);
                     let resolvedEnd = rentalData.endDate;
                     if (newStart > rentalData.endDate) {
@@ -3299,6 +3348,7 @@ function NewRentalAdminPageContent() {
                   onChange={(e) => {
                     const newEnd = e.target.value;
                     if (!newEnd) return;
+                    hasManuallyEditedDatesRef.current = true;
                     const validEnd = newEnd < rentalData.startDate ? rentalData.startDate : newEnd;
                     setRentalData(prev => ({ ...prev, endDate: validEnd }));
                   }}
@@ -3349,6 +3399,7 @@ function NewRentalAdminPageContent() {
               <RentalDaysControl
                 days={calculateRentalDays(rentalData.startDate, rentalData.endDate, rentalData.checkoutTime, rentalData.checkinTime)}
                 onChange={(nextDays) => {
+                  hasManuallyEditedDatesRef.current = true;
                   const nextEnd = computeEndDateForRentalDays(rentalData.startDate, nextDays, rentalData.checkoutTime, rentalData.checkinTime);
                   setRentalData(prev => ({
                     ...prev,

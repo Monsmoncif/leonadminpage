@@ -312,7 +312,7 @@ function ConfirmHandoverPageContent() {
             license: contractData.additionalDriverLicense || "",
             nationality: contractData.additionalDriverNationality || "",
             phone: contractData.additionalDriverPhone || "",
-            expiry: contractData.additionalDriverExpiry ? new Date(contractData.additionalDriverExpiry).toISOString().split("T")[0] : "",
+            expiry: contractData.additionalDriverExpiry ? formatDateToInput(contractData.additionalDriverExpiry) : "",
             issuedAt: contractData.additionalDriverIssuedAt || "Dubai",
           });
         }
@@ -537,7 +537,7 @@ function ConfirmHandoverPageContent() {
       license: client.licenseNumber || "",
       nationality: client.nationality || "",
       phone: client.phone || "",
-      expiry: client.licenseExpiry ? new Date(client.licenseExpiry).toISOString().split("T")[0] : "",
+      expiry: client.licenseExpiry ? formatDateToInput(client.licenseExpiry) : "",
       issuedAt: client.address || "Dubai",
     });
     setIsSelectSecondDriverModalOpen(false);

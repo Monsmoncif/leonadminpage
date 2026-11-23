@@ -5,6 +5,7 @@ import { User } from "@/models/User";
 import nodemailer from "nodemailer";
 
 import { buildBaseEmailLayout, buildDetailRow, getEmailLogoAttachment } from "@/lib/email-templates";
+import { getBusinessTodayISO, formatDateToInput, formatDateWords } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +15,7 @@ export async function GET() {
 
     const activeContracts = await Contract.find({ status: "Active" }).populate("driverId");
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayYMD = getBusinessTodayISO();
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -37,11 +37,10 @@ export async function GET() {
       const driver: any = contract.driverId;
       if (!driver || !driver.email) continue;
 
-      const endDate = new Date(contract.endDate);
-      endDate.setHours(0, 0, 0, 0);
+      const endYMD = formatDateToInput(contract.endDate);
 
-      const isDueToday = endDate.getTime() === today.getTime();
-      const isOverdue = endDate.getTime() < today.getTime();
+      const isDueToday = Boolean(endYMD && endYMD === todayYMD);
+      const isOverdue = Boolean(endYMD && endYMD < todayYMD);
 
       if (isDueToday || isOverdue) {
         const vehicleDesc = (contract.unitId as any)?.make ? `${(contract.unitId as any).make} ${(contract.unitId as any).model || ""}`.trim() : "Vehicle";
@@ -67,7 +66,7 @@ export async function GET() {
 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px; background-color: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
             ${buildDetailRow("Vehicle", vehicleDesc)}
-            ${buildDetailRow("Scheduled Return", endDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}
+            ${buildDetailRow("Scheduled Return", formatDateWords(contract.endDate))}
             ${buildDetailRow("Status", isOverdue ? "Overdue" : "Due Today", true)}
           </table>
 

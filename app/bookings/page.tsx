@@ -371,6 +371,7 @@ export default function ContractsPage() {
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <Link
             href="/bookings/new"
+            prefetch={false}
             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
             <Plus size={18} />
