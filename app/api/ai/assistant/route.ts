@@ -1050,7 +1050,7 @@ BOOKING STATE: Client=${existingClientName || "None"}, Car=${existingUnitName ||
 RULES:
 1. BACKEND Q&A & FULL ACCESS: You have complete read access to every collection in MongoDB (fleet, clients, contracts, drivers, damages, inspections, transactions, logs, expiries, revenue). Answer directly from LIVE METRICS/lists above when complete. When user asks for specific/filtered cars, older clients, full history/vidange/inspections, date-range revenue/transactions, contracts, logs, drivers, or expiries not fully shown above, set "intent":"QUERY_BACKEND" with "backendQuery".
 2. FLEET AVAILABILITY & FILTERING: If user asks for available/rented/maintenance/cheapest/specific cars (e.g. "availbale mercedes", "free bmw", "rented urus", "black cars under 500"), set "intent":"GENERAL_CHAT" (or "QUERY_BACKEND" "fleet_query" if fleet > 100), list ALL matching cars with plate, year, color, status, AED rate & booked return date/hour if Rented, and set "searchQuery" + optional "filterStatus" so clickable car cards appear. NEVER ask for plate number on availability/filter questions!
-3. CONTRACT WIZARD & SCHEDULING: Set "intent":"CONTRACT_FLOW" when user wants to CREATE/BOOK/SET UP a new contract (extracting startDate YYYY-MM-DD, endDate YYYY-MM-DD, days, and checkoutTime in HH:MM AM/PM e.g. "03:00 PM"). Vehicles marked Rented show Booked:start..end(ret@time) — allow scheduling a contract on a Rented car when the requested startDate and checkoutTime are on/after its return date & hour; if they give no schedule or overlap, clearly tell them the exact return date and return hour. Never invent missing cars; ask plate/year/color when selecting a bare/ambiguous car.
+3. CONTRACT WIZARD & SCHEDULING: Set "intent":"CONTRACT_FLOW" when user wants to CREATE/BOOK/SET UP a new contract (extracting startDate YYYY-MM-DD, endDate YYYY-MM-DD, days, and checkoutTime in HH:MM AM/PM e.g. "03:00 PM"). Vehicles marked Rented show Booked:start..end(ret@time) — allow scheduling a contract on a Rented car when the requested startDate and checkoutTime are on/after its return date & hour; if they give no schedule or overlap, clearly tell them the exact return date and return hour. Always prepare new Shop/Delivery bookings as a DRAFT for Admin review & later handover — NEVER set "readyToSubmit":true or say "Confirmed!" unless the user explicitly replies confirming a prepared draft (e.g. "yes"/"confirm"/"نعم"). Never pick "Personalized" unless the user explicitly asks for Personal/Personalized use. Never invent missing cars; ask plate/year/color when selecting a bare/ambiguous car.
 4. ENTITY INTEGRITY: Use "OPEN_CLIENT_DETAILS"/"OPEN_VEHICLE_DETAILS"/"NAVIGATE" only when user asks to open/go to a page or types ONLY a bare entity name, NEVER to hijack analytical/availability questions. Put queried name/plate in "searchQuery"; never guess IDs.
 
 Return ONLY valid JSON:
@@ -1264,7 +1264,9 @@ Return ONLY valid JSON:
         (lastWasContractTurn && /plate number|model year|more details|رقم اللوحة|مزيد من التفاصيل/.test(lastAssistantText)));
     const askedForRentedSchedule = isRentedScheduleQuestionText && !askedForCar;
     const askedForDays = /how many days|duration|كم مدة|كم يوم/.test(lastAssistantText);
-    const askedToFinalize = /shall i finalize|create the contract now|هل أعتمد|هل أنشئ العقد/.test(lastAssistantText);
+    const askedToFinalize = /shall i finalize|shall i save|save (?:this )?draft|save (?:the )?draft|save it as a|create the contract now|say\s+\*{0,2}"?yes"?\*{0,2}\s+to\s+save|هل أعتمد|هل أنشئ العقد|هل أحفظ|لحفظ المسودة|قل\s+\*{0,2}"?نعم"?\*{0,2}/.test(
+      lastAssistantText
+    );
     const askedForVehicleDetails =
       !lastWasContractTurn &&
       (isBareCarQuestionText ||
@@ -1412,6 +1414,7 @@ Return ONLY valid JSON:
       !cData.carName &&
       lastAssistantMsgObj?.text &&
       (askedForVehicleDetails ||
+        askedToFinalize ||
         (hasContractWords &&
           (/\b(it|this\s+(?:car|vehicle|one)|that\s+(?:car|vehicle|one)|same\s+(?:car|vehicle))\b|نفس\s+السيارة|هذه\s+السيارة|هاذ\s+السيارة/i.test(
             lower
@@ -1425,6 +1428,10 @@ Return ONLY valid JSON:
     if (!cData.days && askedForDays) {
       const dm = message.match(/\b(\d{1,3})\b/);
       if (dm) cData.days = parseInt(dm[1], 10);
+    } else if (!cData.days && askedToFinalize && lastAssistantMsgObj?.text) {
+      const prevDaysMatch = lastAssistantMsgObj.text.match(/\bfor\s+\*\*(\d{1,3})\s+day|\bfor\s+(\d{1,3})\s+day|لمدة\s+\*\*(\d{1,3})\*\*/i);
+      const rescuedDays = prevDaysMatch ? Number(prevDaysMatch[1] || prevDaysMatch[2] || prevDaysMatch[3]) : 0;
+      if (rescuedDays > 0) cData.days = rescuedDays;
     }
 
     if (parsedDates.checkoutTime) {
@@ -1474,11 +1481,15 @@ Return ONLY valid JSON:
     ]);
 
     const looksLikeConfirmWord =
-      /\b(yes|confirm|submit|create it|submit it|do it|finalize|now|go ahead)\b/i.test(lower) ||
+      /^(?:\s*(?:yes|yep|yeah|confirm|submit|create it|submit it|save draft|save it|do it|finalize|go ahead|proceed)[\s!.,؟]*)$/i.test(lower) ||
+      /\b(?:yes,?\s*(?:please|confirm|create|submit|save|finalize|go ahead|do it|proceed)|confirm\s+(?:it|booking|contract|draft)|save\s+(?:as\s+)?draft|finalize\s+(?:it|booking|contract|draft))\b/i.test(
+        lower
+      ) ||
       message.includes("نعم") ||
       message.includes("اعتمد") ||
       message.includes("انشئه") ||
-      message.includes("سوه");
+      message.includes("سوه") ||
+      message.includes("احفظ المسودة");
 
     const isContractRelated =
       !isGreetingOrSmallTalk &&
@@ -1618,11 +1629,18 @@ Return ONLY valid JSON:
         requestedCarAmbiguous = false;
       }
 
-      // 3. Contract Type
-      const resolvedType =
-        cData.contractType ||
-        (existingParams.get("contractType") as "Shop" | "Delivery" | "Personalized") ||
-        "Shop";
+      // 3. Contract Type (Only allow Personalized when explicitly requested by user or already in URL; default to Shop/Delivery Draft workflow)
+      const explicitPersonalRequest =
+        /\bpersonal(?:ized)?\b|شخصي|مخصص/i.test(message) ||
+        existingParams.get("contractType") === "Personalized";
+      const explicitDeliveryRequest =
+        /\bdeliver(?:y)?\b|توصيل/i.test(message) ||
+        existingParams.get("contractType") === "Delivery";
+      const resolvedType: "Shop" | "Delivery" | "Personalized" = explicitPersonalRequest
+        ? "Personalized"
+        : cData.contractType === "Delivery" || explicitDeliveryRequest
+        ? "Delivery"
+        : "Shop";
 
       const newParams = new URLSearchParams(existingParams.toString());
       newParams.set("contractType", resolvedType);
@@ -1911,25 +1929,32 @@ Return ONLY valid JSON:
         newParams.set("openAddClient", "true");
       }
 
-      // If user confirms to finalize
+      // Never auto-confirm or auto-submit from LLM's readyToSubmit flag or on an initial booking request;
+      // only confirm when user explicitly confirms a prepared draft (or explicitly confirms while reviewing /bookings/new).
+      const hasNewBookingEntities = Boolean(extractedClientName || extractedCarName || parsedDates.hasExplicitStartDate || parsedDates.hasExplicitEndDate);
+      const isFreshBookingRequest =
+        /\b(?:make|create|setup|set\s+up|add|new|start|draft|prepare|book|reserve)\b.*?\b(?:booking|contract|rental|car|vehicle)\b|\b(?:new\s+(?:booking|contract))\b|انشاء\s+عقد|إنشاء\s+عقد|عقد\s+جديد|حجز\s+جديد|سوي(?:لي)?\s+(?:عقد|حجز)|احجز/i.test(
+          lower
+        ) && (!askedToFinalize || hasNewBookingEntities);
       const isConfirmed =
-        Boolean(cData.readyToSubmit) ||
-        /\b(yes|confirm|submit|create it|submit it|do it|finalize|now|go ahead)\b/i.test(lower) ||
-        message.includes("نعم") ||
-        message.includes("اعتمد") ||
-        message.includes("انشئه") ||
-        message.includes("سوه");
+        !isFreshBookingRequest &&
+        looksLikeConfirmWord &&
+        (askedToFinalize || (pathname.startsWith("/bookings/new") && !hasNewBookingEntities));
 
       if (resolvedClient && resolvedUnit) {
         newParams.set("autoPilot", "true");
-        if (isConfirmed && resolvedType !== "Delivery") {
+        if (isConfirmed && resolvedType === "Shop") {
           newParams.set("autoSubmit", "true");
         }
       }
 
-      // Override aiReply if it is missing, generic, or contradicts resolved backend entities / schedule approval
+      // Override aiReply if it is missing, claims unconfirmed submission, or contradicts resolved backend entities
       const replyContradictsResolution =
         (isConfirmed && resolvedClient && resolvedUnit) ||
+        (!isConfirmed &&
+          /\b(confirmed|running all contract steps|finalized|submitted|creating(?: the)? contract now)\b|تم\s*التأكيد|تم\s*الاعتماد|جاري\s*(?:تنفيذ|إنشاء|اعتماد)/i.test(
+            aiReply
+          )) ||
         (scheduledForRentedCar && resolvedUnit) ||
         (resolvedClient &&
           resolvedUnit &&
@@ -1961,18 +1986,18 @@ Return ONLY valid JSON:
           if (isConfirmed) {
             smartReply =
               lang === "ar"
-                ? `تم التأكيد! جاري تنفيذ الخطوات خطوة بخطوة واعتماد العقد للعميل ${resolvedClient.name} مع سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteAr} الآن...`
-                : `Confirmed! Running all contract steps now for ${resolvedClient.name} with ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteEn}!`;
+                ? `جاري حفظ العقد كمسودة (Draft) للعميل ${resolvedClient.name} مع سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteAr} — وبعد الحفظ يمكنك مراجعته وتسليمه من صفحة الحجوزات.`
+                : `Saving **Draft** contract for ${resolvedClient.name} with ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteEn} — once saved as Draft, you can hand it over from Bookings!`;
           } else if (effectiveDays) {
             smartReply =
               lang === "ar"
-                ? `كل البيانات جاهزة: سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) للعميل ${resolvedClient.name}${schedNoteAr} لمدة ${effectiveDays} أيام. هل أعتمد وأنشئ العقد الآن؟`
-                : `Everything is set: ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) for ${resolvedClient.name}${schedNoteEn} for ${effectiveDays} day(s). Shall I finalize the contract now?`;
+                ? `كل البيانات جاهزة (مسودة): سيارة **${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})** للعميل **${resolvedClient.name}**${schedNoteAr} لمدة **${effectiveDays}** أيام. راجع البيانات أو قل **"نعم"** لحفظ المسودة (Draft) لتسليمها لاحقاً.`
+                : `Everything is set (Draft): **${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})** for **${resolvedClient.name}**${schedNoteEn} for **${effectiveDays} day(s)**. Say **"yes"** to save it as a **Draft**, then you can hand it over when ready.`;
           } else {
             smartReply =
               lang === "ar"
-                ? `جهزت العقد للعميل ${resolvedClient.name} مع سيارة ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})${schedNoteAr}. كم يوماً مدة الإيجار، أم أعتمد العقد بيوم واحد مبدئياً؟`
-                : `Prepared ${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate}) for ${resolvedClient.name}${schedNoteEn}! How many days should the rental be, or should I finalize with the default 1 day?`;
+                ? `جهزت نموذج العقد (مسودة) للعميل **${resolvedClient.name}** مع سيارة **${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})**${schedNoteAr}. حدد عدد الأيام، أو قل **"نعم"** لحفظ المسودة بيوم واحد لتسليمها لاحقاً.`
+                : `Prepared **Draft** form for **${resolvedUnit.make} ${resolvedUnit.model} (${resolvedUnit.plate})** for **${resolvedClient.name}**${schedNoteEn}. Review the details or say **"yes"** to save the Draft with 1 day, then hand it over later.`;
           }
         } else if (resolvedClient && !resolvedUnit) {
           smartReply =
