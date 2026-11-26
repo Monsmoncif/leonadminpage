@@ -87,6 +87,9 @@ export interface IContract extends Document {
   returnedAt?: Date | string;
   returnedBy?: string;
   privacyConsentDoc?: string;
+  handoverEmailSent?: boolean;
+  handoverEmailSentAt?: Date | string | null;
+  handoverEmailSentTo?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -216,6 +219,9 @@ const contractSchema = new Schema<IContract>(
     returnedAt: { type: Date, required: false },
     returnedBy: { type: String, required: false },
     privacyConsentDoc: { type: String, required: false },
+    handoverEmailSent: { type: Boolean, default: false },
+    handoverEmailSentAt: { type: Date, required: false },
+    handoverEmailSentTo: { type: String, required: false },
   },
   { timestamps: true }
 );

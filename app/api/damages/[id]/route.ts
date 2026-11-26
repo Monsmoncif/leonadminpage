@@ -69,6 +69,9 @@ export async function PUT(
           (targetContract.cleaningFees || 0) +
           (targetContract.extraKmCharge || 0) +
           totalDamageCharge;
+        targetContract.handoverEmailSent = false;
+        targetContract.handoverEmailSentAt = null;
+        targetContract.handoverEmailSentTo = "";
         await targetContract.save();
       }
     }

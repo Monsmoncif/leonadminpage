@@ -42,7 +42,9 @@ import {
   Loader2
 } from "lucide-react";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
+import { GmailIcon } from "@/components/icons/GmailIcon";
 import ExtendRentalModal from "@/components/modals/ExtendRentalModal";
+import { useToast } from "@/components/providers/ToastProvider";
 import { formatDateWords, formatDateTimeDMY, calculateRentalDays } from "@/lib/date-utils";
 
 const VEHICLE_ANGLES = [
@@ -222,6 +224,7 @@ export default function ContractDetailsModal({
 }: ContractDetailsModalProps) {
   const router = useRouter();
   const { data: session } = useSession();
+  const toast = useToast();
   const currentUserId = (session?.user as any)?.id;
   const isDriver = (session?.user as any)?.role === "driver";
 
@@ -232,6 +235,7 @@ export default function ContractDetailsModal({
   const [showConsentPreview, setShowConsentPreview] = useState(false);
   const [isExtendOpen, setIsExtendOpen] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isSendingHandoverEmail, setIsSendingHandoverEmail] = useState(false);
   const lastFetchedIdRef = useRef<string | null>(null);
   const contentContainerRef = useRef<HTMLDivElement>(null);
   const overlayContainerRef = useRef<HTMLDivElement>(null);
@@ -290,6 +294,43 @@ export default function ContractDetailsModal({
         })
         .catch((err) => console.error("Error refreshing contract details:", err))
         .finally(() => setIsLoadingDetails(false));
+    }
+  };
+
+  const handleSendHandoverEmail = async () => {
+    const targetId = contractData?._id || contractData?.id || contract?._id || contract?.id;
+    if (!targetId || contractData?.handoverEmailSent || isSendingHandoverEmail) return;
+    try {
+      setIsSendingHandoverEmail(true);
+      const res = await fetch(`/api/contracts/${targetId}/send-handover-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        if (res.status === 409 && resData?.alreadySent) {
+          setContractData((prev: any) => ({ ...prev, handoverEmailSent: true }));
+          onEdit?.({ ...contractData, handoverEmailSent: true });
+        }
+        throw new Error(resData.error || "Failed to send handover PDF via Gmail");
+      }
+
+      setContractData((prev: any) => ({
+        ...prev,
+        handoverEmailSent: true,
+        handoverEmailSentAt: resData.handoverEmailSentAt || new Date().toISOString(),
+        handoverEmailSentTo: resData.handoverEmailSentTo || prev?.handoverEmailSentTo || "",
+      }));
+      toast.success(
+        resData.emailSentTo
+          ? `Contract PDF sent via Gmail to ${resData.emailSentTo} (تم إرسال العقد عبر Gmail)`
+          : "Contract PDF sent via Gmail (تم إرسال العقد عبر Gmail)"
+      );
+      refreshContractData(String(targetId), true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send handover PDF via Gmail");
+    } finally {
+      setIsSendingHandoverEmail(false);
     }
   };
 
@@ -1892,6 +1933,41 @@ export default function ContractDetailsModal({
                     <span>Print PDF</span>
                   </button>
                 )}
+                {isHandedOver && !isDriver && !isPersonalized && !isCancelled && (() => {
+                  const isAlreadySent = Boolean(contractData?.handoverEmailSent);
+                  return (
+                    <button
+                      type="button"
+                      disabled={isAlreadySent || isSendingHandoverEmail}
+                      onClick={handleSendHandoverEmail}
+                      title={
+                        isAlreadySent
+                          ? `Handover PDF already sent${contractData?.handoverEmailSentTo ? ` to ${contractData.handoverEmailSentTo}` : ""} — edit contract to re-enable (تم الإرسال مسبقاً — عدّل العقد لإعادة التفعيل)`
+                          : "Send Handover PDF via Gmail (إرسال إشعار التسليم وعقد PDF عبر Gmail)"
+                      }
+                      className={`flex-1 sm:flex-none px-3.5 py-2.5 min-h-[40px] sm:min-h-[38px] border text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 ${
+                        isAlreadySent
+                          ? "bg-gray-100 text-text-muted border-border opacity-55 grayscale cursor-not-allowed"
+                          : isSendingHandoverEmail
+                          ? "bg-white text-text-primary border-border opacity-75 cursor-wait"
+                          : "bg-white hover:bg-red-50/70 active:scale-[0.98] text-text-primary border-border hover:border-red-200 cursor-pointer"
+                      }`}
+                    >
+                      {isSendingHandoverEmail ? (
+                        <Loader2 size={15} className="animate-spin text-brand shrink-0" />
+                      ) : (
+                        <GmailIcon size={15} className="shrink-0" />
+                      )}
+                      <span>
+                        {isAlreadySent
+                          ? "Gmail Sent"
+                          : isSendingHandoverEmail
+                          ? "Sending..."
+                          : "Send Gmail"}
+                      </span>
+                    </button>
+                  );
+                })()}
                 <button
                   type="button"
                   onClick={onClose}

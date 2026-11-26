@@ -36,15 +36,42 @@ function cleanVehicleName(name?: string): string {
   return name.replace(/\s*\(?(?:19|20)\d{2}\)?\s*/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
+export interface ClientContractNotificationOptions {
+  sendEmail?: boolean;
+  sendWhatsApp?: boolean;
+  markHandoverEmailSent?: boolean;
+  requirePdfAttachment?: boolean;
+}
+
 /**
  * Sends automated WhatsApp + Gmail notification to Client
  * Supports types: "created" (new booking), "initial" (car delivered), "final" (car returned)
  */
 export async function sendClientContractNotification(
   contractId: string,
-  type: "created" | "initial" | "final" = "created"
-): Promise<{ email: boolean; whatsapp: boolean }> {
-  const results = { email: false, whatsapp: false };
+  type: "created" | "initial" | "final" = "created",
+  options: ClientContractNotificationOptions = {}
+): Promise<{
+  email: boolean;
+  whatsapp: boolean;
+  emailSentTo?: string;
+  pdfAttached?: boolean;
+  error?: string;
+}> {
+  const {
+    sendEmail: shouldSendEmail = true,
+    sendWhatsApp: shouldSendWhatsApp = true,
+    markHandoverEmailSent = false,
+    requirePdfAttachment = false,
+  } = options;
+
+  const results: {
+    email: boolean;
+    whatsapp: boolean;
+    emailSentTo?: string;
+    pdfAttached?: boolean;
+    error?: string;
+  } = { email: false, whatsapp: false };
 
   // Return / Completed notifications are disabled
   if (type === "final") {
@@ -78,8 +105,27 @@ export async function sendClientContractNotification(
     }
 
     const clientName = clientDoc.name || "Valued Customer";
-    const clientEmail = clientDoc.email;
+    const clientEmail = typeof clientDoc.email === "string" ? clientDoc.email.trim() : "";
     const clientPhone = clientDoc.phone;
+
+    const hasValidClientEmail = Boolean(clientEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail));
+    const transporter = shouldSendEmail && hasValidClientEmail ? getTransporter() : null;
+
+    // Fail fast for email-only sends when recipient email or SMTP config is missing
+    if (shouldSendEmail && !shouldSendWhatsApp) {
+      if (!clientEmail) {
+        results.error = "Client email address is missing";
+        return results;
+      }
+      if (!hasValidClientEmail) {
+        results.error = "Client email address is invalid";
+        return results;
+      }
+      if (!transporter) {
+        results.error = "SMTP email service is not configured (SMTP_USER / SMTP_PASS missing)";
+        return results;
+      }
+    }
 
     const contractNum = contract.contractNumber || contract._id.toString().substring(0, 8).toUpperCase();
     const rawVehicleName = contract.unitId ? `${contract.unitId.make} ${contract.unitId.model}` : (contract.vehicle || "Vehicle");
@@ -103,9 +149,13 @@ export async function sendClientContractNotification(
     const isHandedOverOrDelivered = Boolean(
       contract.deliveryStatus === "Delivered" ||
       contract.status === "Active" ||
+      contract.status === "Completed" ||
       contract.deliveredAt
     );
-    const shouldSendContractPdf = type === "initial" && isHandedOverOrDelivered;
+    const shouldSendContractPdf =
+      type === "initial" &&
+      isHandedOverOrDelivered &&
+      (shouldSendEmail || shouldSendWhatsApp);
     let pdfBuffer: Buffer | undefined;
     if (shouldSendContractPdf) {
       const isResident = isResidentClient(clientDoc, contract);
@@ -163,14 +213,26 @@ export async function sendClientContractNotification(
         console.log(`[ClientNotification] Generating real contract PDF from print page for contract #${contractNum}...`);
         pdfBuffer = await generateContractPdfFromPrintUrl(contract._id.toString(), contractPdfData);
         console.log(`[ClientNotification] Successfully generated exact real contract PDF (${pdfBuffer.length} bytes) for #${contractNum}`);
-      } catch (browserErr) {
+      } catch (browserErr: any) {
         console.error(`[ClientNotification] Real print PDF generation failed for contract #${contractNum}; email will be sent without a PDF (link to the real contract is included):`, browserErr);
+        if (requirePdfAttachment) {
+          results.error = browserErr?.message || "Failed to generate Contract PDF attachment";
+        }
       }
+
+      if (requirePdfAttachment && (!pdfBuffer || pdfBuffer.length === 0)) {
+        if (!results.error) {
+          results.error = "Failed to generate Contract PDF attachment";
+        }
+        return results;
+      }
+    } else if (shouldSendEmail && requirePdfAttachment) {
+      results.error = "Contract must be handed over before sending the handover PDF";
+      return results;
     }
 
     // 1. SEND GMAIL TO CLIENT
-    if (clientEmail) {
-      const transporter = getTransporter();
+    if (shouldSendEmail && hasValidClientEmail) {
       if (transporter) {
         try {
           const { subject, html: emailHtml } = buildClientContractEmail({
@@ -223,15 +285,27 @@ export async function sendClientContractNotification(
             attachments,
           });
           results.email = true;
+          results.emailSentTo = clientEmail;
+          results.pdfAttached = Boolean(pdfBuffer && shouldSendContractPdf);
+          if (markHandoverEmailSent && type === "initial") {
+            await Contract.findByIdAndUpdate(contract._id, {
+              $set: {
+                handoverEmailSent: true,
+                handoverEmailSentAt: new Date(),
+                handoverEmailSentTo: clientEmail,
+              },
+            });
+          }
           console.log(`[ClientNotification] Email (${type}) sent to ${clientEmail} with real contract PDF attachment: ${Boolean(pdfBuffer)}`);
-        } catch (mailErr) {
+        } catch (mailErr: any) {
+          results.error = mailErr?.message || "Failed to send email via SMTP";
           console.error(`[ClientNotification] Failed to send email to ${clientEmail}:`, mailErr);
         }
       }
     }
 
     // 2. SEND WHATSAPP TO CLIENT
-    if (clientPhone) {
+    if (shouldSendWhatsApp && clientPhone) {
       try {
         console.log(`[ClientNotification] ▶ Starting WhatsApp send (${type}) to: "${clientPhone}"`);
         let whatsappMsg = "";

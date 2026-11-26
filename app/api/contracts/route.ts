@@ -152,7 +152,7 @@ export async function GET(req: Request) {
     let contractsQuery = Contract.find(filter).sort({ createdAt: -1 });
     if (isLite) {
       contractsQuery = contractsQuery.select(
-        "contractNumber isDispatched clientId unitId driverId deliveryDriverId returnDriverId personalizedPersonName additionalDriverName additionalDriverPhone contractType rentalType customerType startDate endDate checkoutTime checkinTime deliveredAt returnedAt depositAmount advancePayment totalAmount status createdAt updatedAt deliveryStatus paymentMethod paymentStatus pickupLocation dropoffLocation totalDays"
+        "contractNumber isDispatched clientId unitId driverId deliveryDriverId returnDriverId personalizedPersonName additionalDriverName additionalDriverPhone contractType rentalType customerType startDate endDate checkoutTime checkinTime deliveredAt returnedAt depositAmount advancePayment totalAmount status createdAt updatedAt deliveryStatus paymentMethod paymentStatus pickupLocation dropoffLocation totalDays handoverEmailSent handoverEmailSentAt handoverEmailSentTo"
       );
     } else if (!isFull) {
       contractsQuery = contractsQuery.select(
@@ -323,6 +323,9 @@ export async function GET(req: Request) {
         paymentStatus: c.paymentStatus || "Pending",
         customerSignature: c.customerSignature || "",
         adminSignature: c.adminSignature || "",
+        handoverEmailSent: Boolean(c.handoverEmailSent),
+        handoverEmailSentAt: c.handoverEmailSentAt || null,
+        handoverEmailSentTo: c.handoverEmailSentTo || "",
       };
     });
 
@@ -605,10 +608,13 @@ export async function POST(req: Request) {
     await syncUnitStatuses(body.unitId);
 
     // Automatically send contract notification to client:
-    // - When driver creates a contract (or car is already Delivered), send official agreement + PDF directly ("initial")
+    // - Handover/Delivered contracts ("initial") only auto-send WhatsApp; Gmail PDF is triggered manually from Actions
     // - For admin advance reservations, send order confirmation ("created")
     const clientNotificationType = (isDriverUser || Boolean(body.isDriver) || Boolean(body.notifyClient) || initialDeliveryStatus === "Delivered") ? "initial" : "created";
-    sendClientContractNotification(contract._id.toString(), clientNotificationType).catch((notifErr) => {
+    const clientNotificationOptions = clientNotificationType === "initial"
+      ? { sendEmail: false, sendWhatsApp: true }
+      : { sendEmail: true, sendWhatsApp: true };
+    sendClientContractNotification(contract._id.toString(), clientNotificationType, clientNotificationOptions).catch((notifErr) => {
       console.error(`Failed to dispatch client ${clientNotificationType} notification:`, notifErr);
     });
 

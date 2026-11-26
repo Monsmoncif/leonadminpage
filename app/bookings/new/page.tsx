@@ -1510,6 +1510,7 @@ function NewRentalAdminPageContent() {
       }
 
       if (isEditMode) {
+        invalidateClientCache("contracts");
         toast.success("Contract updated successfully! (تم حفظ التعديلات بنجاح)");
       } else if (isDriver) {
         toast.success("Contract created & sent to client directly! (تم إنشاء العقد وتفعيله وإرساله للعميل مباشرة)");

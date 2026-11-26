@@ -153,6 +153,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           (contract.cleaningFees || 0) + 
           (contract.extraKmCharge || 0) + 
           (contract.damageCharge || 0);
+        contract.handoverEmailSent = false;
+        contract.handoverEmailSentAt = null;
+        contract.handoverEmailSentTo = "";
           
         await contract.save();
       }

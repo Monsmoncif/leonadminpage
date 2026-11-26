@@ -29,6 +29,7 @@ import {
 import StatCard from "@/components/ui/StatCard";
 import TablePagination from "@/components/ui/TablePagination";
 import ContractDetailsModal from "@/components/modals/ContractDetailsModal";
+import { GmailIcon } from "@/components/icons/GmailIcon";
 import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 
 import { useToast } from "@/components/providers/ToastProvider";
@@ -139,6 +140,7 @@ export default function ContractsPage() {
   const toast = useToast();
   const [deliveringContractId, setDeliveringContractId] = useState<string | null>(null);
   const [dispatchingContractId, setDispatchingContractId] = useState<string | null>(null);
+  const [sendingEmailContractId, setSendingEmailContractId] = useState<string | null>(null);
 
   const handleOpenHandoverPage = (contract: any) => {
     // If contract is already delivered, allow editing handover immediately without restriction
@@ -181,6 +183,63 @@ export default function ContractsPage() {
       toast.error(err.message || "Failed to dispatch contract");
     } finally {
       setDispatchingContractId(null);
+    }
+  };
+
+  const handleSendHandoverEmail = async (contract: any) => {
+    if (!contract?._id || contract.handoverEmailSent || sendingEmailContractId === contract._id) {
+      return;
+    }
+    try {
+      setSendingEmailContractId(contract._id);
+      const res = await fetch(`/api/contracts/${contract._id}/send-handover-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        if (res.status === 409 && resData?.alreadySent) {
+          setData((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              contracts: prev.contracts.map((c) =>
+                c._id === contract._id ? { ...c, handoverEmailSent: true } : c
+              ),
+            };
+          });
+          invalidateClientCache("contracts");
+        }
+        throw new Error(resData.error || "Failed to send handover PDF via Gmail");
+      }
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          contracts: prev.contracts.map((c) =>
+            c._id === contract._id
+              ? {
+                  ...c,
+                  handoverEmailSent: true,
+                  handoverEmailSentAt: resData.handoverEmailSentAt || new Date().toISOString(),
+                  handoverEmailSentTo: resData.handoverEmailSentTo || "",
+                }
+              : c
+          ),
+        };
+      });
+      invalidateClientCache("contracts");
+      toast.success(
+        resData.emailSentTo
+          ? `Contract PDF sent via Gmail to ${resData.emailSentTo} (تم إرسال العقد عبر Gmail)`
+          : "Contract PDF sent via Gmail (تم إرسال العقد عبر Gmail)"
+      );
+      fetchContracts(0, true);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send handover PDF via Gmail");
+    } finally {
+      setSendingEmailContractId(null);
     }
   };
 
@@ -931,6 +990,51 @@ export default function ContractsPage() {
                                     <Download size={14} />
                                   </button>
                                 )}
+                                {Boolean(
+                                  contract.status !== "Cancelled" &&
+                                  contract.contractType !== "Personalized" &&
+                                  !contract.personalizedPersonName &&
+                                  contract.deliveryStatus !== "Pending" &&
+                                  (
+                                    contract.deliveryStatus === "Delivered" ||
+                                    contract.deliveryStatus === "Returned" ||
+                                    contract.status === "Active" ||
+                                    contract.status === "Completed" ||
+                                    contract.deliveredAt
+                                  )
+                                ) && (() => {
+                                  const isAlreadySent = Boolean(contract.handoverEmailSent);
+                                  const isSendingThis = sendingEmailContractId === contract._id;
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={isAlreadySent || isSendingThis}
+                                      aria-disabled={isAlreadySent || isSendingThis}
+                                      title={
+                                        isAlreadySent
+                                          ? `Handover PDF already sent${contract.handoverEmailSentTo ? ` to ${contract.handoverEmailSentTo}` : ""} — edit contract to re-enable (تم الإرسال مسبقاً — عدّل العقد لإعادة التفعيل)`
+                                          : "Send Handover PDF via Gmail (إرسال إشعار التسليم وعقد PDF عبر Gmail)"
+                                      }
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSendHandoverEmail(contract);
+                                      }}
+                                      className={`p-1 sm:p-1.5 rounded-md sm:rounded-lg transition-all inline-flex items-center justify-center ${
+                                        isAlreadySent
+                                          ? "opacity-40 grayscale cursor-not-allowed bg-gray-100 text-text-muted"
+                                          : isSendingThis
+                                          ? "opacity-75 cursor-wait bg-brand/10"
+                                          : "hover:bg-red-50 active:scale-95 cursor-pointer"
+                                      }`}
+                                    >
+                                      {isSendingThis ? (
+                                        <Loader2 size={14} className="animate-spin text-brand" />
+                                      ) : (
+                                        <GmailIcon size={14} />
+                                      )}
+                                    </button>
+                                  );
+                                })()}
                                 <div className="w-px h-3.5 sm:h-4 bg-border mx-0.5" />
                                 <button 
                                   className="p-1 sm:p-1.5 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-md sm:rounded-lg transition-colors cursor-pointer" 
@@ -1026,7 +1130,10 @@ export default function ContractsPage() {
           isOpen={Boolean(selectedContractForDetails)}
           onClose={() => setSelectedContractForDetails(null)}
           contract={selectedContractForDetails}
-          onEdit={() => fetchContracts(0, true)}
+          onEdit={() => {
+            invalidateClientCache("contracts");
+            fetchContracts(0, true);
+          }}
         />
       )}
 

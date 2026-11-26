@@ -177,6 +177,10 @@ export async function PUT(
       finesCharge: finesFees,
       fuelCharge: fuelFees,
       advancePayment: body.advancePayment !== undefined ? (Number(body.advancePayment) || 0) : (existingContract.advancePayment || 0),
+      // Reset manual handover email lock whenever the contract is edited so updated PDF can be sent again
+      handoverEmailSent: false,
+      handoverEmailSentAt: null,
+      handoverEmailSentTo: "",
     };
 
     // Validate target vehicle and date conflicts
@@ -382,14 +386,17 @@ export async function PUT(
       clearConsentPdfCache(String(existingContract.contractNumber));
     }
 
-    // Auto-send initial contract PDF to client once vehicle handover is confirmed (Delivered)
+    // Auto-send WhatsApp only once vehicle handover is confirmed; Gmail + PDF is sent manually via Actions button
     const isHandoverConfirmation = 
       Boolean(body.notifyClient) ||
       (body.deliveryStatus === "Delivered" && existingContract.deliveryStatus !== "Delivered") ||
       (body.status === "Active" && existingContract.status !== "Active" && (body.deliveryStatus === "Delivered" || existingContract.deliveryStatus === "Delivered"));
 
     if (isHandoverConfirmation) {
-      sendClientContractNotification(resolvedParams.id, "initial").catch(e => console.error("Client contract send trigger failed (background):", e));
+      sendClientContractNotification(resolvedParams.id, "initial", {
+        sendEmail: false,
+        sendWhatsApp: true,
+      }).catch(e => console.error("Client contract send trigger failed (background):", e));
 
       // Auto-notify admin that vehicle was delivered/handed over
       try {
