@@ -237,17 +237,36 @@ export async function PUT(
       delete updatedData.deliveryStatus;
     }
 
-    // Enforce: once a contract is handed over (Delivered/Returned), it can never be Draft
+    // Enforce: pending non-personalized contracts can only become Cancelled (not Active/Completed) until handover
     const targetDeliveryStatus = updatedData.deliveryStatus ?? existingContract.deliveryStatus;
-    const willBeHandedOver = Boolean(
+    const hasCompletedHandover = Boolean(
       targetDeliveryStatus === "Delivered" ||
       targetDeliveryStatus === "Returned" ||
-      updatedData.status === "Completed" ||
       existingContract.status === "Completed" ||
       updatedData.deliveredAt ||
       existingContract.deliveredAt ||
       updatedData.handoverCompletedAt ||
       existingContract.handoverCompletedAt
+    );
+
+    if (
+      !hasCompletedHandover &&
+      !isPersonalized &&
+      (body.status === "Active" || body.status === "Completed")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot set status to Active or Completed before vehicle handover. Only Draft or Cancelled is allowed while Pending. (لا يمكن تغيير حالة العقد قبل تسليم السيارة — المتاح فقط مسودة أو ملغي)",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Enforce: once a contract is handed over (Delivered/Returned), it can never be Draft
+    const willBeHandedOver = Boolean(
+      hasCompletedHandover ||
+      updatedData.status === "Completed"
     );
 
     if (body.status === "Draft" && willBeHandedOver) {

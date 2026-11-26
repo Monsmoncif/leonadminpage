@@ -811,9 +811,12 @@ export default function ContractsPage() {
                                   Boolean(contract.deliveredAt) ||
                                   Boolean(contract.handoverCompletedAt)
                                 );
+                                const canUsePostHandoverStatuses = isContractHandedOver || isPersonalizedContract(contract);
                                 const effectiveSelectStatus =
-                                  isContractHandedOver && contract.status === "Draft"
+                                  canUsePostHandoverStatuses && contract.status === "Draft"
                                     ? (contract.deliveryStatus === "Returned" ? "Completed" : "Active")
+                                    : !canUsePostHandoverStatuses && (contract.status === "Active" || contract.status === "Completed")
+                                    ? "Draft"
                                     : contract.status;
 
                                 return (
@@ -822,8 +825,12 @@ export default function ContractsPage() {
                                   value={effectiveSelectStatus}
                                   onChange={async (e) => {
                                     const newStatus = e.target.value;
-                                    if (newStatus === "Draft" && isContractHandedOver) {
+                                    if (newStatus === "Draft" && canUsePostHandoverStatuses) {
                                       toast.error("Cannot change a handed-over contract back to Draft. (لا يمكن إرجاع العقد المسلم إلى مسودة)");
+                                      return;
+                                    }
+                                    if (!canUsePostHandoverStatuses && newStatus !== "Draft" && newStatus !== "Cancelled") {
+                                      toast.error("Pending contracts can only be changed to Cancelled until vehicle handover is completed. (في حالة الانتظار يمكن تغيير الحالة إلى ملغي فقط حتى يتم التسليم)");
                                       return;
                                     }
                                     if (newStatus === "Active") {
@@ -870,11 +877,15 @@ export default function ContractsPage() {
                                   }}
                                   className={`text-[9.5px] sm:text-[11px] font-semibold px-1 sm:px-2 py-0.5 rounded border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getStatusClasses(effectiveSelectStatus)}`}
                                 >
-                                  {!isContractHandedOver && (
+                                  {!canUsePostHandoverStatuses && (
                                     <option value="Draft" className="bg-white text-gray-900">Draft</option>
                                   )}
-                                  <option value="Active" className="bg-white text-gray-900">Active</option>
-                                  <option value="Completed" className="bg-white text-gray-900">Completed</option>
+                                  {canUsePostHandoverStatuses && (
+                                    <>
+                                      <option value="Active" className="bg-white text-gray-900">Active</option>
+                                      <option value="Completed" className="bg-white text-gray-900">Completed</option>
+                                    </>
+                                  )}
                                   <option value="Cancelled" className="bg-white text-gray-900">Cancelled</option>
                                 </select>
                                 <div className="flex items-center gap-1 text-[8px] sm:text-[9px] font-semibold whitespace-nowrap">
