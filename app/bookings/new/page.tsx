@@ -39,6 +39,7 @@ import {
   Building2
 } from "lucide-react";
 import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
+import { matchesUnitSearch } from "@/lib/unit-search";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -1536,15 +1537,7 @@ function NewRentalAdminPageContent() {
   // Filter Units: Show vehicles available for the selected dates by default
   const availableUnits = units.filter(u => isUnitBookable(u, rentalData.startDate, rentalData.endDate));
   const baseUnits = fleetFilter === "available" ? availableUnits : units;
-  const filteredUnits = baseUnits.filter(u => {
-    if (!vehicleSearchQuery) return true;
-    const q = vehicleSearchQuery.toLowerCase();
-    return (
-      u.make?.toLowerCase().includes(q) ||
-      u.model?.toLowerCase().includes(q) ||
-      u.plate?.toLowerCase().includes(q)
-    );
-  });
+  const filteredUnits = baseUnits.filter((u) => matchesUnitSearch(u, vehicleSearchQuery));
 
   // Filter Clients based on Customer Type (B2C vs B2B)
   const isB2B = rentalData.customerType === "B2B";

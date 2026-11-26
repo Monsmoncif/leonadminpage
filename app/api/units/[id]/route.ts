@@ -5,8 +5,10 @@ import { Unit } from "@/models/Unit";
 import { Contract } from "@/models/Contract";
 import { Client } from "@/models/Client";
 import { Driver } from "@/models/Driver";
+import { Inspection } from "@/models/Inspection";
 import { syncUnitStatuses } from "@/lib/unit-status";
 import { clearPdfCache } from "@/lib/pdf-cache";
+import { mergeHandoverAndReturnImages, hasAnyValidPhotos } from "@/lib/unit-images";
 import mongoose from "mongoose";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -19,9 +21,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const _c = Client;
     const _d = Driver;
 
-    // Fetch the unit and all contracts for this vehicle (latest first) in parallel,
-    // excluding heavy signature/photo fields that the vehicle page doesn't use.
-    const [unit, allContracts] = await Promise.all([
+    // Fetch the unit, contracts summary, and latest handover/return photo sources in parallel.
+    const [unit, allContracts, latestHandoverContract, latestReturnContract] = await Promise.all([
       Unit.findById(id).lean(),
       Contract.find({ unitId: id })
         .select("-adminSignature -customerSignature -returnCustomerSignature -inspectionPhotos -returnPhotos -damagePhotos -moneyPhotos -returnMoneyPhotos -privacyConsentDoc")
@@ -35,9 +36,119 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           select: "name phone"
         })
         .lean(),
+      Contract.findOne({
+        unitId: id,
+        status: { $ne: "Cancelled" },
+        inspectionPhotos: { $elemMatch: { $nin: [null, ""] } },
+      })
+        .sort({ deliveredAt: -1, handoverCompletedAt: -1, startDate: -1, createdAt: -1 })
+        .select("inspectionPhotos deliveredAt handoverCompletedAt updatedAt")
+        .lean(),
+      Contract.findOne({
+        unitId: id,
+        status: { $ne: "Cancelled" },
+        returnPhotos: { $elemMatch: { $nin: [null, ""] } },
+      })
+        .sort({ returnedAt: -1, updatedAt: -1, startDate: -1, createdAt: -1 })
+        .select("returnPhotos returnedAt updatedAt")
+        .lean(),
     ]);
     if (!unit) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    }
+
+    // Merge all existing pictures from the latest Handover and latest Return so partial returns
+    // (e.g. only taking an odometer photo) never hide the rest of the vehicle's photos.
+    try {
+      let handoverPhotos: unknown[] = Array.isArray((latestHandoverContract as any)?.inspectionPhotos)
+        ? (latestHandoverContract as any).inspectionPhotos
+        : [];
+      let returnPhotos: unknown[] = Array.isArray((latestReturnContract as any)?.returnPhotos)
+        ? (latestReturnContract as any).returnPhotos
+        : [];
+
+      let handoverTs = latestHandoverContract
+        ? new Date(
+            (latestHandoverContract as any).handoverCompletedAt ||
+              (latestHandoverContract as any).deliveredAt ||
+              (latestHandoverContract as any).updatedAt ||
+              0
+          ).getTime()
+        : 0;
+      let returnTs = latestReturnContract
+        ? new Date(
+            (latestReturnContract as any).returnedAt ||
+              (latestReturnContract as any).updatedAt ||
+              0
+          ).getTime()
+        : 0;
+
+      if (!hasAnyValidPhotos(handoverPhotos)) {
+        const beforeInsp = (await Inspection.findOne({
+          unitId: id,
+          type: "Before Rental",
+          photos: { $elemMatch: { $nin: [null, ""] } },
+        })
+          .sort({ date: -1, createdAt: -1 })
+          .select("photos date updatedAt")
+          .lean()) as any;
+        if (beforeInsp && hasAnyValidPhotos(beforeInsp.photos)) {
+          handoverPhotos = beforeInsp.photos;
+          handoverTs = Math.max(
+            handoverTs,
+            new Date(beforeInsp.updatedAt || beforeInsp.date || 0).getTime()
+          );
+        }
+      }
+
+      if (!hasAnyValidPhotos(returnPhotos)) {
+        const afterInsp = (await Inspection.findOne({
+          unitId: id,
+          type: "After Rental",
+          photos: { $elemMatch: { $nin: [null, ""] } },
+        })
+          .sort({ date: -1, createdAt: -1 })
+          .select("photos date updatedAt")
+          .lean()) as any;
+        if (afterInsp && hasAnyValidPhotos(afterInsp.photos)) {
+          returnPhotos = afterInsp.photos;
+          returnTs = Math.max(
+            returnTs,
+            new Date(afterInsp.updatedAt || afterInsp.date || 0).getTime()
+          );
+        }
+      }
+
+      const manualTs = (unit as any).imagesUpdatedManuallyAt
+        ? new Date((unit as any).imagesUpdatedManuallyAt).getTime()
+        : 0;
+      const latestContractPhotoTs = Math.max(handoverTs, returnTs);
+
+      if (
+        (hasAnyValidPhotos(handoverPhotos) || hasAnyValidPhotos(returnPhotos)) &&
+        latestContractPhotoTs >= manualTs
+      ) {
+        const existingImages: string[] = Array.isArray((unit as any).images)
+          ? (unit as any).images.filter((u: unknown) => typeof u === "string" && u.trim() !== "")
+          : [];
+        const mergedImages = mergeHandoverAndReturnImages({
+          handoverPhotos,
+          returnPhotos,
+          fallbackUnitImages: existingImages,
+        });
+
+        if (mergedImages.length > 0) {
+          (unit as any).images = mergedImages;
+          const differsFromStored =
+            mergedImages.length !== existingImages.length ||
+            mergedImages.some((u, idx) => u !== existingImages[idx]);
+          if (differsFromStored) {
+            await Unit.findByIdAndUpdate(id, { $set: { images: mergedImages } });
+          }
+        }
+      }
+    } catch (photoMergeErr) {
+      console.warn("Could not merge handover and return photos on unit details:", photoMergeErr);
     }
 
     // Build mileage history from real contract data (Completed & Active)
@@ -127,7 +238,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const body = await req.json();
     await connectDB();
     
-    const unit = await Unit.findByIdAndUpdate(id, body, { new: true, runValidators: true });
+    const updatePayload: any = { ...body };
+    if (Array.isArray(body.images)) {
+      updatePayload.images = body.images.filter((u: unknown) => typeof u === "string" && u.trim() !== "");
+      updatePayload.imagesUpdatedManuallyAt = new Date();
+    }
+
+    const unit = await Unit.findByIdAndUpdate(id, updatePayload, { new: true, runValidators: true });
     if (!unit) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }

@@ -16,6 +16,7 @@ import { authOptions } from "@/lib/auth";
 import { sendClientContractNotification, sendDriverTaskNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
 import { clearPdfCache, clearConsentPdfCache } from "@/lib/pdf-cache";
+import { mergeHandoverAndReturnImages, hasAnyValidPhotos } from "@/lib/unit-images";
 import {
   calculateRentalDays,
   parseContractDateToUTCMidnight,
@@ -475,7 +476,95 @@ export async function PUT(
     const unitBeforeUpdate = await Unit.findById(existingContract.unitId);
     const initialMileage = existingContract.checkoutMileage || unitBeforeUpdate?.mileage || 0;
 
-    // Sync unit status and mileage based on contract status
+    const hasIncomingReturnPhotos = Array.isArray(body.returnPhotos) && hasAnyValidPhotos(body.returnPhotos);
+    const hasIncomingHandoverPhotos = Array.isArray(body.inspectionPhotos) && hasAnyValidPhotos(body.inspectionPhotos);
+    const shouldMergeUnitImages = Boolean(
+      existingContract.unitId &&
+        (hasIncomingReturnPhotos ||
+          hasIncomingHandoverPhotos ||
+          (body.status === "Completed" && body.status !== existingContract.status) ||
+          (body.deliveryStatus === "Delivered" && existingContract.deliveryStatus !== "Delivered"))
+    );
+
+    const resolveMergedUnitImages = async (): Promise<string[]> => {
+      if (!existingContract.unitId) return [];
+
+      let handoverSource: unknown[] = hasIncomingHandoverPhotos
+        ? body.inspectionPhotos
+        : hasAnyValidPhotos(updatedContract.inspectionPhotos)
+        ? updatedContract.inspectionPhotos
+        : hasAnyValidPhotos(existingContract.inspectionPhotos)
+        ? existingContract.inspectionPhotos
+        : [];
+
+      if (!hasAnyValidPhotos(handoverSource)) {
+        try {
+          const beforeInsp = (await Inspection.findOne({
+            contractId: existingContract._id,
+            type: "Before Rental",
+          })
+            .select("photos")
+            .lean()) as any;
+          if (beforeInsp && hasAnyValidPhotos(beforeInsp.photos)) {
+            handoverSource = beforeInsp.photos;
+          }
+        } catch {
+          // Non-fatal fallback
+        }
+      }
+
+      if (!hasAnyValidPhotos(handoverSource)) {
+        try {
+          const prevHandoverContract = (await Contract.findOne({
+            unitId: existingContract.unitId,
+            status: { $ne: "Cancelled" },
+            inspectionPhotos: { $elemMatch: { $nin: [null, ""] } },
+          })
+            .sort({ deliveredAt: -1, handoverCompletedAt: -1, startDate: -1, createdAt: -1 })
+            .select("inspectionPhotos")
+            .lean()) as any;
+          if (prevHandoverContract && hasAnyValidPhotos(prevHandoverContract.inspectionPhotos)) {
+            handoverSource = prevHandoverContract.inspectionPhotos;
+          }
+        } catch {
+          // Non-fatal fallback
+        }
+      }
+
+      let returnSource: unknown[] = hasIncomingReturnPhotos
+        ? body.returnPhotos
+        : hasAnyValidPhotos(updatedContract.returnPhotos)
+        ? updatedContract.returnPhotos
+        : hasAnyValidPhotos(existingContract.returnPhotos)
+        ? existingContract.returnPhotos
+        : [];
+
+      if (!hasAnyValidPhotos(returnSource)) {
+        try {
+          const prevReturnContract = (await Contract.findOne({
+            unitId: existingContract.unitId,
+            status: { $ne: "Cancelled" },
+            returnPhotos: { $elemMatch: { $nin: [null, ""] } },
+          })
+            .sort({ returnedAt: -1, updatedAt: -1, startDate: -1, createdAt: -1 })
+            .select("returnPhotos")
+            .lean()) as any;
+          if (prevReturnContract && hasAnyValidPhotos(prevReturnContract.returnPhotos)) {
+            returnSource = prevReturnContract.returnPhotos;
+          }
+        } catch {
+          // Non-fatal fallback
+        }
+      }
+
+      return mergeHandoverAndReturnImages({
+        handoverPhotos: handoverSource,
+        returnPhotos: returnSource,
+        fallbackUnitImages: unitBeforeUpdate?.images,
+      });
+    };
+
+    // Sync unit status, mileage, and merged handover+return photos based on contract update
     if (body.status && body.status !== existingContract.status) {
       if (body.status === "Completed" || body.status === "Cancelled") {
         let nextUnitStatus = "Available";
@@ -490,36 +579,44 @@ export async function PUT(
         if (body.status === "Completed" && body.returnOdometer !== undefined) {
           updateData.mileage = Number(body.returnOdometer);
         }
-        
-        // تحديث صور المركبة بصور الإرجاع المرفوعة من السائق
-        if (
-          body.status === "Completed" &&
-          Array.isArray(body.returnPhotos) &&
-          body.returnPhotos.length > 0
-        ) {
-          // نضيف صور الإرجاع فقط (الصور الجديدة الحقيقية بعد الرجوع)
-          // نستبدل صور المركبة القديمة بصور الإرجاع الجديدة
-          updateData.images = body.returnPhotos.filter((url: string) => typeof url === "string" && url.trim() !== "");
+
+        // Merge all photos from latest Handover and latest Return instead of overwriting with partial return shots (e.g. odometer only)
+        if (shouldMergeUnitImages && body.status === "Completed") {
+          const mergedImages = await resolveMergedUnitImages();
+          if (mergedImages.length > 0) {
+            updateData.images = mergedImages;
+            updateData.imagesUpdatedManuallyAt = null;
+          }
         }
 
         await Unit.findByIdAndUpdate(existingContract.unitId, updateData);
         await syncUnitStatuses(existingContract.unitId);
       } else if (body.status === "Active") {
+        if (shouldMergeUnitImages) {
+          const mergedImages = await resolveMergedUnitImages();
+          if (mergedImages.length > 0) {
+            await Unit.findByIdAndUpdate(existingContract.unitId, {
+              images: mergedImages,
+              imagesUpdatedManuallyAt: null,
+            });
+          }
+        }
         await syncUnitStatuses(existingContract.unitId);
       }
-    } else if (existingContract.status === "Completed" || body.status === "Completed") {
-      // Editing an existing completed contract return: sync mileage and return photos if provided
+    } else if (existingContract.status === "Completed" || body.status === "Completed" || shouldMergeUnitImages) {
+      // Editing an existing completed contract return or updating handover photos: sync mileage and merged photos
       const unitEditUpdates: any = {};
-      if (body.returnOdometer !== undefined && body.returnOdometer !== "") {
+      if ((existingContract.status === "Completed" || body.status === "Completed") && body.returnOdometer !== undefined && body.returnOdometer !== "") {
         const retOdo = Number(body.returnOdometer);
         if (!isNaN(retOdo) && retOdo > 0) {
           unitEditUpdates.mileage = retOdo;
         }
       }
-      if (Array.isArray(body.returnPhotos) && body.returnPhotos.length > 0) {
-        const validPhotos = body.returnPhotos.filter((url: string) => typeof url === "string" && url.trim() !== "");
-        if (validPhotos.length > 0) {
-          unitEditUpdates.images = validPhotos;
+      if (shouldMergeUnitImages) {
+        const mergedImages = await resolveMergedUnitImages();
+        if (mergedImages.length > 0) {
+          unitEditUpdates.images = mergedImages;
+          unitEditUpdates.imagesUpdatedManuallyAt = null;
         }
       }
       if (Object.keys(unitEditUpdates).length > 0) {

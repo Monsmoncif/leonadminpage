@@ -25,6 +25,7 @@ import StatCard from "@/components/ui/StatCard";
 import TablePagination from "@/components/ui/TablePagination";
 import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
+import { matchesUnitSearch } from "@/lib/unit-search";
 
 // Status badge styling with vibrant, professional colors matching bookings page
 const getStatusClasses = (status: string) => {
@@ -120,14 +121,7 @@ export default function UnitsPage() {
 
   const units = data?.units || [];
   const filteredUnits = units.filter((unit: any) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch = !searchQuery || (
-      unit.make?.toLowerCase().includes(q) || 
-      unit.model?.toLowerCase().includes(q) ||
-      unit.plate?.toLowerCase().includes(q) ||
-      unit.vin?.toLowerCase().includes(q) ||
-      unit.status?.toLowerCase().includes(q)
-    );
+    const matchesSearch = matchesUnitSearch(unit, searchQuery);
     const matchesStatus = statusFilter === "All" || unit.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -398,12 +392,12 @@ export default function UnitsPage() {
                         >
                           {/* Vehicle Column */}
                           <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
-                            <div className="flex items-center gap-2 sm:gap-2.5">
-                              <div className="w-10 h-7 sm:w-12 sm:h-9 rounded-md bg-white border border-border flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                            <div className="flex items-center gap-2.5 sm:gap-3.5">
+                              <div className="w-16 h-11 sm:w-20 sm:h-14 rounded-lg sm:rounded-xl bg-gray-50 border border-border flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
                                 {unit.images && unit.images.length > 0 ? (
                                   <img src={unit.images[0]} alt={unit.model} className="w-full h-full object-cover" />
                                 ) : (
-                                  <ExecutiveCarIcon size={14} className="text-gray-300" />
+                                  <ExecutiveCarIcon size={20} className="text-gray-300" />
                                 )}
                               </div>
                               <div className="min-w-0">

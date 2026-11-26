@@ -24,6 +24,7 @@ export interface IUnit {
   mileage: number;
   status: "Available" | "Rented" | "Maintenance" | "Out of Service";
   images: string[];
+  imagesUpdatedManuallyAt?: Date | string | null;
   documents: string[]; // URLs to registration, insurance etc.
   dailyRate: number;
   dailyKmLimit: number; // Daily kilometer allowance, 0 for unlimited
@@ -80,6 +81,7 @@ const unitSchema = new Schema<IUnit>(
       default: "Available"
     },
     images: [{ type: String }],
+    imagesUpdatedManuallyAt: { type: Date, required: false },
     documents: [{ type: String }],
     dailyRate: { type: Number, default: 0 },
     dailyKmLimit: { type: Number, default: 0 }, // 0 means unlimited
@@ -110,7 +112,8 @@ unitSchema.index({ createdAt: -1 });
 if (
   mongoose.models.Unit &&
   (!mongoose.models.Unit.schema.path("vidangeHistory") ||
-    !mongoose.models.Unit.schema.path("oilChangeInterval"))
+    !mongoose.models.Unit.schema.path("oilChangeInterval") ||
+    !mongoose.models.Unit.schema.path("imagesUpdatedManuallyAt"))
 ) {
   delete mongoose.models.Unit;
 }

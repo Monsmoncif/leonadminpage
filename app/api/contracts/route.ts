@@ -14,6 +14,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { sendClientContractNotification, sendDriverTaskNotification, sendHandoverReminderNotification } from "@/lib/contract-notifications";
 import { syncUnitStatuses, checkContractDateOverlap } from "@/lib/unit-status";
+import { mergeHandoverAndReturnImages, hasAnyValidPhotos } from "@/lib/unit-images";
 import {
   formatDateWords,
   formatDateToInput,
@@ -541,6 +542,32 @@ export async function POST(req: Request) {
       additionalDriverExpiry: body.additionalDriverExpiry || "",
       additionalDriverIssuedAt: body.additionalDriverIssuedAt || "",
     });
+
+    if (initialDeliveryStatus === "Delivered" && hasAnyValidPhotos(body.inspectionPhotos)) {
+      try {
+        const prevReturnContract = (await Contract.findOne({
+          unitId: contract.unitId,
+          status: { $ne: "Cancelled" },
+          returnPhotos: { $elemMatch: { $nin: [null, ""] } },
+        })
+          .sort({ returnedAt: -1, updatedAt: -1, startDate: -1, createdAt: -1 })
+          .select("returnPhotos")
+          .lean()) as any;
+        const mergedImages = mergeHandoverAndReturnImages({
+          handoverPhotos: body.inspectionPhotos,
+          returnPhotos: prevReturnContract?.returnPhotos || [],
+          fallbackUnitImages: unitDoc?.images,
+        });
+        if (mergedImages.length > 0) {
+          await Unit.findByIdAndUpdate(contract.unitId, {
+            images: mergedImages,
+            imagesUpdatedManuallyAt: null,
+          });
+        }
+      } catch (imgSyncErr) {
+        console.warn("Failed to merge unit images on contract creation:", imgSyncErr);
+      }
+    }
 
     if (contractType === "Personalized" || isDriverUser) {
       try {
