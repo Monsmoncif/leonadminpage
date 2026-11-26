@@ -3,8 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import { Unit } from "@/models/Unit";
 import { Contract } from "@/models/Contract";
+import { Inspection } from "@/models/Inspection";
 import { syncUnitStatuses } from "@/lib/unit-status";
 import { getBusinessEndOfDayUTC } from "@/lib/date-utils";
+import { mergeHandoverAndReturnImages, hasAnyValidPhotos } from "@/lib/unit-images";
 
 const emptyResponse = {
   units: [],
@@ -49,7 +51,6 @@ export async function GET(req: NextRequest) {
       unitsQuery = unitsQuery.select({
         documents: 0,
         vidangeHistory: 0,
-        images: { $slice: 1 },
       });
     }
 
@@ -65,6 +66,89 @@ export async function GET(req: NextRequest) {
     ]);
 
     const nowEndOfDay = getBusinessEndOfDayUTC();
+
+    // Recover & merge handover/return photos for any unit whose stored images array is empty or has only a single fallback shot (e.g. legacy return odometer overwrite)
+    const fallbackImagesByUnit: Record<string, string[]> = {};
+    if (!isSlim) {
+      const unitIdsNeedingRecovery = (units as any[])
+        .filter((u) => {
+          const validImgs = Array.isArray(u.images)
+            ? u.images.filter((img: unknown) => typeof img === "string" && img.trim() !== "")
+            : [];
+          return validImgs.length === 0 || (validImgs.length === 1 && !u.imagesUpdatedManuallyAt);
+        })
+        .map((u) => u._id);
+
+      if (unitIdsNeedingRecovery.length > 0) {
+        try {
+          const [relatedContracts, relatedInspections] = await Promise.all([
+            Contract.find({
+              unitId: { $in: unitIdsNeedingRecovery },
+              status: { $ne: "Cancelled" },
+              $or: [
+                { inspectionPhotos: { $elemMatch: { $nin: [null, ""] } } },
+                { returnPhotos: { $elemMatch: { $nin: [null, ""] } } },
+              ],
+            })
+              .sort({ deliveredAt: -1, returnedAt: -1, updatedAt: -1, startDate: -1, createdAt: -1 })
+              .select("unitId inspectionPhotos returnPhotos deliveredAt handoverCompletedAt returnedAt updatedAt")
+              .lean(),
+            Inspection.find({
+              unitId: { $in: unitIdsNeedingRecovery },
+              photos: { $elemMatch: { $nin: [null, ""] } },
+            })
+              .sort({ date: -1, createdAt: -1 })
+              .select("unitId type photos date updatedAt")
+              .lean(),
+          ]);
+
+          const latestHandoverByUnit: Record<string, unknown[]> = {};
+          const latestReturnByUnit: Record<string, unknown[]> = {};
+
+          for (const c of relatedContracts as any[]) {
+            const uid = c.unitId?.toString();
+            if (!uid) continue;
+            if (!latestHandoverByUnit[uid] && hasAnyValidPhotos(c.inspectionPhotos)) {
+              latestHandoverByUnit[uid] = c.inspectionPhotos;
+            }
+            if (!latestReturnByUnit[uid] && hasAnyValidPhotos(c.returnPhotos)) {
+              latestReturnByUnit[uid] = c.returnPhotos;
+            }
+          }
+
+          for (const insp of relatedInspections as any[]) {
+            const uid = insp.unitId?.toString();
+            if (!uid || !hasAnyValidPhotos(insp.photos)) continue;
+            if (insp.type === "Before Rental" && !latestHandoverByUnit[uid]) {
+              latestHandoverByUnit[uid] = insp.photos;
+            } else if (insp.type === "After Rental" && !latestReturnByUnit[uid]) {
+              latestReturnByUnit[uid] = insp.photos;
+            }
+          }
+
+          for (const u of units as any[]) {
+            const uid = u._id.toString();
+            const existingValid = Array.isArray(u.images)
+              ? u.images.filter((img: unknown) => typeof img === "string" && img.trim() !== "")
+              : [];
+            const hPhotos = latestHandoverByUnit[uid] || [];
+            const rPhotos = latestReturnByUnit[uid] || [];
+            if (hPhotos.length > 0 || rPhotos.length > 0) {
+              const merged = mergeHandoverAndReturnImages({
+                handoverPhotos: hPhotos,
+                returnPhotos: rPhotos,
+                fallbackUnitImages: existingValid,
+              });
+              if (merged.length > existingValid.length || (merged.length > 0 && existingValid.length === 0)) {
+                fallbackImagesByUnit[uid] = merged;
+              }
+            }
+          }
+        } catch (imgRecoverErr) {
+          console.warn("Could not recover handover/return unit images in list API:", imgRecoverErr);
+        }
+      }
+    }
 
     const bookingsByUnit: Record<string, any[]> = {};
     const rentedUnitSet = new Set<string>();
@@ -103,8 +187,14 @@ export async function GET(req: NextRequest) {
           ? "Rented"
           : "Available";
 
+      const cleanExistingImages = Array.isArray(u.images)
+        ? u.images.filter((img: unknown) => typeof img === "string" && img.trim() !== "")
+        : [];
+      const resolvedImages = fallbackImagesByUnit[uid] || cleanExistingImages;
+
       return {
         ...u,
+        images: resolvedImages,
         status: computedStatus,
         activeBookings: bookingsByUnit[uid] || [],
       };

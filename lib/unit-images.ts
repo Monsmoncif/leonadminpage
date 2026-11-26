@@ -40,8 +40,8 @@ export function mergeHandoverAndReturnImages({
   const maxSlots = Math.max(handoverArr.length, returnArr.length);
 
   for (let i = 0; i < maxSlots; i++) {
-    if (i < returnArr.length) pushUnique(returnArr[i]);
     if (i < handoverArr.length) pushUnique(handoverArr[i]);
+    if (i < returnArr.length) pushUnique(returnArr[i]);
   }
 
   // If no handover photos exist (e.g. return-only odometer shot), preserve existing

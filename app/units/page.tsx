@@ -27,6 +27,51 @@ import { ExecutiveCarIcon } from "@/components/icons/ExecutiveCarIcon";
 import { getClientCache, setClientCache, invalidateClientCache } from "@/lib/client-cache";
 import { matchesUnitSearch } from "@/lib/unit-search";
 
+const getFirstValidImage = (unit: any): string | null => {
+  if (Array.isArray(unit?.images)) {
+    const found = unit.images.find((img: unknown) => typeof img === "string" && img.trim() !== "");
+    if (found) return found.trim();
+  }
+  if (typeof unit?.image === "string" && unit.image.trim() !== "") {
+    return unit.image.trim();
+  }
+  return null;
+};
+
+function UnitTableThumbnail({ unit }: { unit: any }) {
+  const firstImage = getFirstValidImage(unit);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [firstImage]);
+
+  const showImg = Boolean(firstImage && !hasError);
+
+  return (
+    <div className="relative w-20 h-14 sm:w-24 sm:h-16 rounded-xl bg-gradient-to-br from-slate-100 via-gray-50 to-gray-100 border border-border/80 flex items-center justify-center shrink-0 overflow-hidden shadow-xs ring-1 ring-black/[0.04] group">
+      {showImg && firstImage ? (
+        <>
+          <img
+            src={firstImage}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-md opacity-35"
+          />
+          <img
+            src={firstImage}
+            alt={`${unit.make || ""} ${unit.model || ""}`.trim() || "Vehicle"}
+            onError={() => setHasError(true)}
+            className="relative z-10 w-full h-full object-contain p-0.5 transition-transform duration-300 group-hover:scale-105"
+          />
+        </>
+      ) : (
+        <ExecutiveCarIcon size={22} className="text-gray-300" />
+      )}
+    </div>
+  );
+}
+
 // Status badge styling with vibrant, professional colors matching bookings page
 const getStatusClasses = (status: string) => {
   switch (status) {
@@ -393,13 +438,7 @@ export default function UnitsPage() {
                           {/* Vehicle Column */}
                           <td className="py-2 sm:py-2.5 px-2.5 sm:px-4">
                             <div className="flex items-center gap-2.5 sm:gap-3.5">
-                              <div className="w-16 h-11 sm:w-20 sm:h-14 rounded-lg sm:rounded-xl bg-gray-50 border border-border flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-                                {unit.images && unit.images.length > 0 ? (
-                                  <img src={unit.images[0]} alt={unit.model} className="w-full h-full object-cover" />
-                                ) : (
-                                  <ExecutiveCarIcon size={20} className="text-gray-300" />
-                                )}
-                              </div>
+                              <UnitTableThumbnail unit={unit} />
                               <div className="min-w-0">
                                 <span className="font-bold text-text-primary text-[11px] sm:text-xs md:text-sm block truncate" title={`${unit.make} ${unit.model}`}>
                                   {unit.make} {unit.model}
