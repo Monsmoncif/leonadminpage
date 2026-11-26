@@ -232,6 +232,35 @@ export async function PUT(
       updatedData.returnDriver = body.returnDriver;
     }
 
+    // Sanitize deliveryStatus: only allow valid enum values; strip out non-enums like "Return Scheduled"
+    if (updatedData.deliveryStatus && !["Pending", "Delivered", "Returned"].includes(updatedData.deliveryStatus)) {
+      delete updatedData.deliveryStatus;
+    }
+
+    // Enforce: once a contract is handed over (Delivered/Returned), it can never be Draft
+    const targetDeliveryStatus = updatedData.deliveryStatus ?? existingContract.deliveryStatus;
+    const willBeHandedOver = Boolean(
+      targetDeliveryStatus === "Delivered" ||
+      targetDeliveryStatus === "Returned" ||
+      updatedData.status === "Completed" ||
+      existingContract.status === "Completed" ||
+      updatedData.deliveredAt ||
+      existingContract.deliveredAt ||
+      updatedData.handoverCompletedAt ||
+      existingContract.handoverCompletedAt
+    );
+
+    if (body.status === "Draft" && willBeHandedOver) {
+      return NextResponse.json(
+        { error: "Cannot change a handed-over contract back to Draft. (لا يمكن إرجاع العقد المسلم إلى مسودة)" },
+        { status: 400 }
+      );
+    }
+
+    if (willBeHandedOver && (updatedData.status === "Draft" || (!updatedData.status && existingContract.status === "Draft"))) {
+      updatedData.status = targetDeliveryStatus === "Returned" ? "Completed" : "Active";
+    }
+
     if (body.checkoutMileage !== undefined && body.checkoutMileage !== "") {
       const coMileage = Number(body.checkoutMileage);
       if (!isNaN(coMileage) && coMileage >= 0) {
@@ -245,11 +274,6 @@ export async function PUT(
           }
         }
       }
-    }
-
-    // Sanitize deliveryStatus: only allow valid enum values; strip out non-enums like "Return Scheduled"
-    if (updatedData.deliveryStatus && !["Pending", "Delivered", "Returned"].includes(updatedData.deliveryStatus)) {
-      delete updatedData.deliveryStatus;
     }
 
     // Auto-sync deliveryStatus, returnedAt, and checkinTime when completed

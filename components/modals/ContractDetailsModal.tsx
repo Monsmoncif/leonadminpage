@@ -1933,7 +1933,7 @@ export default function ContractDetailsModal({
                     <span>Print PDF</span>
                   </button>
                 )}
-                {isHandedOver && !isDriver && !isPersonalized && !isCancelled && (() => {
+                {isHandedOver && !isDriver && !isPersonalized && !isCancelled && !isCompletedOrReturned && (() => {
                   const isAlreadySent = Boolean(contractData?.handoverEmailSent);
                   return (
                     <button

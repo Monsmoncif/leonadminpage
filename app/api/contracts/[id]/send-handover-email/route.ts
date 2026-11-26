@@ -73,11 +73,20 @@ export async function POST(
       );
     }
 
+    if (
+      contract.status === "Completed" ||
+      contract.deliveryStatus === "Returned" ||
+      Boolean(contract.returnedAt)
+    ) {
+      return NextResponse.json(
+        { error: "Handover email cannot be sent for completed contracts." },
+        { status: 400 }
+      );
+    }
+
     const isHandedOver = Boolean(
       contract.deliveryStatus !== "Pending" &&
-        (contract.status === "Completed" ||
-          contract.deliveryStatus === "Returned" ||
-          contract.deliveryStatus === "Delivered" ||
+        (contract.deliveryStatus === "Delivered" ||
           contract.status === "Active" ||
           contract.deliveredAt)
     );

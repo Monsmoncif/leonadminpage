@@ -152,7 +152,7 @@ export async function GET(req: Request) {
     let contractsQuery = Contract.find(filter).sort({ createdAt: -1 });
     if (isLite) {
       contractsQuery = contractsQuery.select(
-        "contractNumber isDispatched clientId unitId driverId deliveryDriverId returnDriverId personalizedPersonName additionalDriverName additionalDriverPhone contractType rentalType customerType startDate endDate checkoutTime checkinTime deliveredAt returnedAt depositAmount advancePayment totalAmount status createdAt updatedAt deliveryStatus paymentMethod paymentStatus pickupLocation dropoffLocation totalDays handoverEmailSent handoverEmailSentAt handoverEmailSentTo"
+        "contractNumber isDispatched clientId unitId driverId deliveryDriverId returnDriverId personalizedPersonName additionalDriverName additionalDriverPhone contractType rentalType customerType startDate endDate checkoutTime checkinTime deliveredAt handoverCompletedAt returnedAt depositAmount advancePayment totalAmount status createdAt updatedAt deliveryStatus paymentMethod paymentStatus pickupLocation dropoffLocation totalDays handoverEmailSent handoverEmailSentAt handoverEmailSentTo"
       );
     } else if (!isFull) {
       contractsQuery = contractsQuery.select(
@@ -302,6 +302,7 @@ export async function GET(req: Request) {
         checkoutTime: c.checkoutTime || "08:00 AM",
         checkinTime: c.checkinTime || "",
         deliveredAt: c.deliveredAt || null,
+        handoverCompletedAt: c.handoverCompletedAt || null,
         returnedAt: c.returnedAt || (c.status === "Completed" ? (c.updatedAt || new Date().toISOString()) : null),
         startDate: formatDateWords(c.startDate),
         endDate: formatDateWords(c.endDate),
@@ -528,8 +529,8 @@ export async function POST(req: Request) {
       inspectionPhotos: body.inspectionPhotos || [],
       moneyPhotos: body.moneyPhotos || [],
       deliveryStatus: initialDeliveryStatus,
-      deliveredBy: isDriverUser ? (userName || "Driver") : (body.deliveredBy || undefined),
-      deliveredAt: isDriverUser ? new Date() : (body.deliveredAt || undefined),
+      deliveredBy: initialDeliveryStatus === "Delivered" ? (isDriverUser ? (userName || "Driver") : (body.deliveredBy || undefined)) : undefined,
+      deliveredAt: initialDeliveryStatus === "Delivered" ? (body.deliveredAt ? new Date(body.deliveredAt) : new Date()) : undefined,
       handoverCompletedAt: isDriverUser ? new Date().toISOString() : (body.handoverCompletedAt || undefined),
       paymentMethod: isPersonalized ? "Personal / Free" : (body.paymentMethod || "Cash"),
       paymentStatus: isPersonalized ? "Paid" : (body.paymentStatus || (Number(body.advancePayment) >= totalAmount ? "Paid" : (Number(body.advancePayment) > 0 ? "Partial" : "Pending"))),

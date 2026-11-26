@@ -803,11 +803,29 @@ export default function ContractsPage() {
 
                             {/* Status Column */}
                             <td className="py-2 sm:py-2.5 px-2 whitespace-nowrap w-[96px] sm:w-[120px]">
+                              {(() => {
+                                const isContractHandedOver = Boolean(
+                                  contract.deliveryStatus === "Delivered" ||
+                                  contract.deliveryStatus === "Returned" ||
+                                  contract.status === "Completed" ||
+                                  Boolean(contract.deliveredAt) ||
+                                  Boolean(contract.handoverCompletedAt)
+                                );
+                                const effectiveSelectStatus =
+                                  isContractHandedOver && contract.status === "Draft"
+                                    ? (contract.deliveryStatus === "Returned" ? "Completed" : "Active")
+                                    : contract.status;
+
+                                return (
                               <div className="flex flex-col gap-0.5 sm:gap-1 w-[92px] sm:w-[116px] max-w-[116px]" onClick={(e) => e.stopPropagation()}>
                                 <select
-                                  value={contract.status}
+                                  value={effectiveSelectStatus}
                                   onChange={async (e) => {
                                     const newStatus = e.target.value;
+                                    if (newStatus === "Draft" && isContractHandedOver) {
+                                      toast.error("Cannot change a handed-over contract back to Draft. (لا يمكن إرجاع العقد المسلم إلى مسودة)");
+                                      return;
+                                    }
                                     if (newStatus === "Active") {
                                       if (!isShopContract(contract) && contract.deliveryStatus !== "Delivered") {
                                         toast.error("This order is assigned to a driver. The driver must confirm vehicle handover in their dashboard to activate the contract.");
@@ -850,9 +868,11 @@ export default function ContractsPage() {
                                       toast.error(err.message || "Failed to update status");
                                     }
                                   }}
-                                  className={`text-[9.5px] sm:text-[11px] font-semibold px-1 sm:px-2 py-0.5 rounded border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getStatusClasses(contract.status)}`}
+                                  className={`text-[9.5px] sm:text-[11px] font-semibold px-1 sm:px-2 py-0.5 rounded border focus:outline-none focus:ring-1 cursor-pointer shadow-2xs transition-colors w-full ${getStatusClasses(effectiveSelectStatus)}`}
                                 >
-                                  <option value="Draft" className="bg-white text-gray-900">Draft</option>
+                                  {!isContractHandedOver && (
+                                    <option value="Draft" className="bg-white text-gray-900">Draft</option>
+                                  )}
                                   <option value="Active" className="bg-white text-gray-900">Active</option>
                                   <option value="Completed" className="bg-white text-gray-900">Completed</option>
                                   <option value="Cancelled" className="bg-white text-gray-900">Cancelled</option>
@@ -866,6 +886,8 @@ export default function ContractsPage() {
                                   </span>
                                 </div>
                               </div>
+                                );
+                              })()}
                             </td>
 
                             {/* Actions Column (Matches Clients Page) */}
@@ -992,14 +1014,15 @@ export default function ContractsPage() {
                                 )}
                                 {Boolean(
                                   contract.status !== "Cancelled" &&
+                                  contract.status !== "Completed" &&
+                                  contract.deliveryStatus !== "Returned" &&
+                                  !contract.returnedAt &&
                                   contract.contractType !== "Personalized" &&
                                   !contract.personalizedPersonName &&
                                   contract.deliveryStatus !== "Pending" &&
                                   (
                                     contract.deliveryStatus === "Delivered" ||
-                                    contract.deliveryStatus === "Returned" ||
                                     contract.status === "Active" ||
-                                    contract.status === "Completed" ||
                                     contract.deliveredAt
                                   )
                                 ) && (() => {
